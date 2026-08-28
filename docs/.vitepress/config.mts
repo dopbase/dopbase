@@ -74,6 +74,11 @@ export default defineConfig({
             { text: "CLI overview", link: "/cli/" },
             { text: "serve", link: "/cli/serve" },
             { text: "client connect", link: "/cli/client-connect" },
+            { text: "Client configuration", link: "/cli/configuration" },
+            {
+              text: "Projects and environments",
+              link: "/cli/environment-targeting",
+            },
             { text: "Command reference", link: "/cli/commands" },
           ],
         },
@@ -125,6 +130,10 @@ export default defineConfig({
             { text: "Project principles", link: "/about/" },
             { text: "Open source", link: "/about/open-source" },
             { text: "Roadmap", link: "/about/roadmap" },
+            {
+              text: "Admin UI v0.1 plan",
+              link: "/about/admin-ui-v0.1-plan",
+            },
             { text: "Product boundaries", link: "/about/product-boundaries" },
           ],
         },

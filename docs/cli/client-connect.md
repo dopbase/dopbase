@@ -2,15 +2,50 @@
 
 `dopbase client connect` selects the server used by later client commands.
 
-```bash
-dopbase client connect http://localhost:8376
+When no server has been selected, Dopbase uses the local default automatically:
+
+```text
+http://localhost:8376
 ```
 
-Connecting does not authenticate. Sign in separately after selecting an endpoint:
+You can therefore start a default local server and sign in without running
+`connect` first:
+
+```bash
+dopbase serve
+dopbase login
+```
+
+## Connect to another server
+
+Select a self-hosted or Cloud endpoint:
+
+```bash
+dopbase client connect https://dopbase.example.com
+```
+
+The command normalizes the URL and verifies that it is a compatible Dopbase
+server before changing machine-global state. If validation fails, the previous
+server and credential remain active.
+
+Connecting does not authenticate. A successful server change removes the old
+saved credential, so sign in separately:
 
 ```bash
 dopbase login
 ```
+
+## Return to the local server
+
+Use the `local` alias:
+
+```bash
+dopbase client connect local
+dopbase login
+```
+
+After validating `http://localhost:8376`, Dopbase removes the configured server
+override and returns to the implicit local default.
 
 ## Cloud uses the same command
 
@@ -19,14 +54,23 @@ dopbase client connect <dopbase-cloud-url>
 dopbase login
 ```
 
-The Cloud URL has not been published. Dopbase Cloud follows the same client and REST API model as a self-hosted server.
+The Cloud URL has not been published. Dopbase Cloud follows the same client and
+REST model as a self-hosted server.
 
-## Local client state
+## Machine-global state
 
-The client is expected to store the active endpoint and authentication material in local user configuration. It must not store a plaintext copy of every project secret.
+The selected endpoint is stored in the user's global Dopbase configuration,
+not in an application repository. Login credentials are stored separately in
+the operating system credential store. No active project or environment is
+saved.
 
-The location, file format, token-storage mechanism, and support for named connection profiles are not final. The first release only requires one active endpoint.
+Use `dopbase config` to inspect the effective endpoint and authentication
+status without displaying token contents. Read [client configuration](./configuration)
+for the file format, precedence rules, and multi-instance behavior.
 
 ## Safety behavior
 
-The command should make the selected endpoint visible. Later operations must fail clearly if that endpoint cannot be reached. Dopbase must not silently switch servers or fall back from a self-hosted endpoint to Cloud.
+Once a remote endpoint is configured, an outage causes client commands to fail.
+Dopbase does not silently switch to localhost, another self-hosted server, or
+Cloud. The implicit local default applies only when no server is configured or
+overridden.

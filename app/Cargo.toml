@@ -24,6 +24,9 @@ tower-http = { version = "0.7", features = [
   "trace",
   "util",
 ] }
+# API Documentation
+utoipa = { version = "5", features = ["axum_extras", "chrono", "decimal"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # SQLite driver, connection pool, and runtime migrations
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
 # CLI subcommands (serve, login, run, ...)

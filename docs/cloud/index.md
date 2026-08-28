@@ -15,7 +15,8 @@ dopbase client connect <dopbase-cloud-url>
 dopbase login
 ```
 
-Commands such as `import`, `set`, `export`, and `run` then use the active Cloud endpoint.
+Commands such as `import`, `secret set`, `export`, and `run` then use the active
+Cloud endpoint and an explicit environment reference.
 
 ## Managed responsibilities
 

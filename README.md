@@ -26,9 +26,9 @@ The server and client will ship in the same `dopbase` executable:
 ```bash
 # Planned interface, not available yet
 dopbase serve
-dopbase client connect http://localhost:8376
 dopbase login
-dopbase run -- npm start
+dopbase init payment-service development --from .env
+dopbase run payment-service/development -- npm start
 ```
 
 Read the [public documentation](./docs/) for the product model, planned CLI, self-hosting guidance, security design, and roadmap.

@@ -12,6 +12,9 @@ The roadmap describes intent, not a release commitment. Work may move as impleme
 - CLI, `.env` import and export, and `dopbase run`
 - Service tokens and audit records
 
+The ordered engineering checklist is documented in the
+[Admin UI v0.1 implementation plan](./admin-ui-v0.1-plan).
+
 ## v0.2
 
 - Secret version history and rollback

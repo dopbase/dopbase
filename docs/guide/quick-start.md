@@ -1,9 +1,11 @@
 # Quick start
 
-This walkthrough shows the planned v0.1 experience for a local, self-hosted server.
+This walkthrough shows the planned v0.1 experience for a local, self-hosted
+server.
 
 ::: warning Planned interface
-No stable Dopbase release is available yet. The commands below define the intended workflow and may change during implementation.
+No stable Dopbase release is available yet. The commands below define the
+intended workflow and may change during implementation.
 :::
 
 ## 1. Install Dopbase
@@ -14,7 +16,8 @@ The planned installer will place the `dopbase` executable on your path:
 curl -fsSL https://dopbase.com/install.sh | sh
 ```
 
-Until a release and installer are published, treat this command as documentation of intent rather than an available download.
+Until a release and installer are published, treat this command as
+documentation of intent rather than an available download.
 
 ## 2. Start the server
 
@@ -32,15 +35,25 @@ Database: ./dopbase.db
 
 Keep this process running while you use the client.
 
-## 3. Connect the client
+## 3. Confirm the client configuration
 
-Open another terminal and set the active server:
+Open another terminal. With no configured server, Dopbase uses the local default
+automatically:
 
 ```bash
-dopbase client connect http://localhost:8376
+dopbase config
 ```
 
-This connection applies to later commands until you choose a different server.
+```text
+Server:          http://localhost:8376
+Server source:   default
+Authentication:  not logged in
+Environment:     none (pass one explicitly)
+```
+
+No repository or global config file is required for the implicit local server.
+Use `dopbase client connect <server-url>` only when targeting another local,
+self-hosted, or Cloud instance.
 
 ## 4. Sign in
 
@@ -48,25 +61,33 @@ This connection applies to later commands until you choose a different server.
 dopbase login
 ```
 
-`login` authenticates with the active server. Connecting and authenticating are separate operations.
+`login` authenticates with the resolved local server and saves the token in the
+operating system credential store.
 
-## 5. Import a project
+## 5. Bootstrap a project
 
-From an application directory:
+From an application directory with an existing `.env` file:
 
 ```bash
 cd my-project
-dopbase import .env
+dopbase init my-project development --from .env
 ```
 
-The planned import flow creates or selects a project and environment, then stores every `.env` entry as an individual secret.
+Dopbase atomically creates the project and its `development` environment, then
+stores every `.env` entry as an individual secret. It prints the immutable
+environment ID without writing Dopbase configuration into the repository.
 
 ## 6. Run the application
 
+Use the readable environment reference while developing:
+
 ```bash
-dopbase run -- npm start
+dopbase run my-project/development -- npm start
 ```
 
-Dopbase retrieves the selected environment and adds its secrets to the child process. It does not need to write a new `.env` file to disk.
+Dopbase retrieves that environment and adds its secrets to the child process.
+It does not need to write a new `.env` file to disk.
 
-Next, read [server and client](./server-client) to understand where data and credentials live.
+For production and staging deployments, use immutable environment IDs and
+separate scoped tokens. Read [target projects and environments](/cli/environment-targeting)
+for the complete workflow.

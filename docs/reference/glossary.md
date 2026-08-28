@@ -2,7 +2,14 @@
 
 ## Active server
 
-The self-hosted or Cloud endpoint selected by `dopbase client connect`. Later client commands send requests to this server.
+The self-hosted or Cloud endpoint resolved by the client. It comes from an
+explicit override, the machine-global config, or the implicit local default.
+
+## Client configuration
+
+Per-user machine-global state stored in `~/.dopbase/config.toml` or its Windows
+equivalent. It contains the selected server but no token, project, environment,
+or secret value.
 
 ## Audit event
 
@@ -15,6 +22,11 @@ A key used to encrypt secret data. In the planned envelope-encryption design, th
 ## Environment
 
 A named set of secrets for one application context, such as development, staging, or production.
+
+## Environment reference
+
+An immutable environment ID such as `env_...` or a readable
+`project/environment` name accepted by environment-scoped CLI commands.
 
 ## Machine identity
 
@@ -39,3 +51,8 @@ A Dopbase server operated by the user or their organization.
 ## Service token
 
 A revocable credential that allows a machine identity to perform permitted operations.
+
+## Runner token
+
+A service token scoped to retrieving secrets from one environment for
+`dopbase run`. It cannot modify or export secrets.

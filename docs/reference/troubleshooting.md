@@ -4,20 +4,39 @@ Dopbase is pre-release, so stable diagnostic commands and error codes are not av
 
 ## The client cannot connect
 
-1. Confirm the server process is running.
-2. Confirm the active endpoint is the one you intended to use.
+1. Run `dopbase config` and confirm the effective server and its source.
+2. Confirm the server process is running.
 3. Check the scheme, hostname, port, firewall, and TLS configuration.
 4. Do not assume the client will fall back to another endpoint.
 
-For local development, the planned default is `http://localhost:8376`.
+For local development, the default is `http://localhost:8376` when no endpoint
+is configured or overridden. If a configured remote endpoint is unavailable,
+Dopbase does not fall back to that local default.
 
 ## Authentication fails
 
-Connecting and logging in are separate. Select the server first, then authenticate with that endpoint. A token issued by one server should not be assumed to work on another.
+Connecting and logging in are separate. Run `dopbase config` to verify the
+resolved endpoint and authentication source. A saved token is used only for the
+normalized server that issued it; a token issued by one server is not reused on
+another.
+
+If the operating system credential store is unavailable, provide a scoped token
+through `DOPBASE_TOKEN` instead of expecting `login` to write plaintext
+credentials.
 
 ## An application cannot see a variable
 
-Check the selected project and environment, confirm the key exists there, and verify that the application was started through `dopbase run`. The final inspection commands are not yet defined.
+Check the environment reference passed to `dopbase run`, then inspect its safe
+metadata and keys:
+
+```bash
+dopbase env show payment-service/staging
+dopbase secret list payment-service/staging
+```
+
+Confirm that the intended key exists and that the application was started with
+the same readable reference or immutable environment ID. These commands do not
+reveal secret values.
 
 ## A secret appeared in logs
 

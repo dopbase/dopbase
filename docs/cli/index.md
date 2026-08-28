@@ -1,6 +1,7 @@
 # CLI overview
 
-The Dopbase command-line interface starts a server, selects a remote server, manages secrets, and runs applications with those secrets.
+The Dopbase command-line interface starts a server, selects a remote server,
+manages projects and environments, and runs applications with their secrets.
 
 Both server and client commands ship in the same planned `dopbase` executable:
 
@@ -9,35 +10,55 @@ Both server and client commands ship in the same planned `dopbase` executable:
 dopbase serve
 
 # Client role
-dopbase client connect http://localhost:8376
+dopbase config
 dopbase login
-dopbase projects
-dopbase env
-dopbase set
-dopbase get
-dopbase import
-dopbase export
-dopbase run
+dopbase init payment-service development --from .env
+dopbase env create payment-service staging
+dopbase import payment-service/staging .env.staging
+dopbase run payment-service/development -- npm start
 ```
 
 ::: warning Pre-release command reference
-The command groups express the intended v0.1 interface. Flags, output, configuration locations, and compatibility guarantees are not final.
+The commands express the intended v0.1 interface. Dopbase is not yet a stable
+or production-ready secrets manager.
 :::
+
+## No hidden project or environment
+
+Without configuration, the CLI connects to `http://localhost:8376`. Connecting
+to another endpoint saves only that server in the user's machine-global config.
+Dopbase does not write repository configuration and does not save an active
+project or environment.
+
+Commands accept an environment directly. Use a readable reference such as
+`payment-service/staging` in a terminal or an immutable `env_...` ID in a
+deployment. Because each environment belongs to one project, no separate
+project selection is required.
+
+Read [target projects and environments](./environment-targeting) for the full
+development, staging, and production workflow.
 
 ## Typical sequence
 
-1. Start a server or obtain a Dopbase Cloud endpoint.
-2. Select it with `dopbase client connect`.
-3. Authenticate with `dopbase login` or a service token.
-4. Select a project and environment.
-5. Manage secrets or run an application.
+1. Start the default local server, or obtain another Dopbase endpoint.
+2. Use implicit localhost or select another server with `dopbase client connect`.
+3. Authenticate with `dopbase login` or a scoped runner token.
+4. Bootstrap a project with `init`, or create project and environment resources.
+5. Pass an environment reference to secret, import, export, or run commands.
 
 ## Output and secrets
 
-Commands should be useful in both a terminal and automation. Human-readable output must never include a secret value unless the user explicitly requests a reveal or export operation.
+Commands should work in both a terminal and automation. Human-readable and
+structured output must never include a secret value unless the user explicitly
+requests reveal or export behavior.
 
-Errors should identify the server, project, environment, and failed operation when safe. They must not include request bodies, tokens, plaintext secrets, or decrypted values.
+Errors identify the server, project, environment, and failed operation when
+safe. They must not include request bodies, tokens, plaintext secrets, or
+decrypted values.
 
 ## Exit behavior
 
-The final exit-code contract is not yet published. Client commands are expected to return a nonzero status for invalid configuration, connection failures, authentication failures, authorization failures, and rejected server operations.
+Client commands return a nonzero status for invalid configuration, connection
+failures, authentication failures, authorization failures, and rejected server
+operations. `dopbase run` returns the child process exit status after the child
+has started.

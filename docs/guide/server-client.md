@@ -29,29 +29,46 @@ Self-hosted storage is planned to use SQLite by default. The master encryption k
 
 ## The client
 
-The client is every command that talks to a server, including `login`, `set`, `get`, `import`, `export`, and `run`.
+The client is every command that talks to a server, including `login`, project,
+environment, and secret commands, `import`, `export`, and `run`.
 
-First choose the active endpoint:
+With no machine-global configuration, the client uses the default local
+endpoint:
 
-```bash
-dopbase client connect http://localhost:8376
+```text
+http://localhost:8376
 ```
 
-Then authenticate:
+Authenticate directly when using that default:
 
 ```bash
 dopbase login
 ```
 
-The client stores connection and authentication configuration locally. It does not become a second source of truth for project secrets.
+For another endpoint, `dopbase client connect` validates and saves the server in
+`~/.dopbase/config.toml`, then `login` stores its token in the operating system
+credential store. Client state does not become a second source of truth for
+project secrets.
+
+The saved client state contains no active project or environment. Commands
+target an environment explicitly with an immutable ID or a readable
+`project/environment` reference:
+
+```bash
+dopbase run payment-service/development -- npm start
+```
+
+Application servers can avoid saved client state by providing `DOPBASE_URL`, an
+environment-scoped `DOPBASE_TOKEN`, and the immutable environment ID in their
+deployment configuration.
 
 ## Self-hosted and Cloud
 
 The same client and API model apply to both deployment types:
 
 ```bash
-# Self-hosted
-dopbase client connect http://localhost:8376
+# Another self-hosted instance
+dopbase client connect https://dopbase.internal.example
 
 # Dopbase Cloud
 dopbase client connect <dopbase-cloud-url>
@@ -61,4 +78,10 @@ Dopbase Cloud is a managed server endpoint. It does not control or depend on an 
 
 ## Connection failures
 
-If the active endpoint is unavailable, client operations should stop with a clear connection error. The client must not silently switch to another server, use stale secret values, or fall back to Cloud.
+If the active endpoint is unavailable, client operations stop with a clear
+connection error. The client does not silently switch servers, use stale secret
+values, or fall back to localhost or Cloud. Localhost is used automatically
+only when no endpoint is configured or overridden.
+
+Read [client configuration](/cli/configuration) for configuration paths,
+credential storage, resolution order, and multiple local instances.
