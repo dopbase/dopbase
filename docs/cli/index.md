@@ -3,7 +3,7 @@
 The Dopbase command-line interface starts a server, selects a remote server,
 manages projects and environments, and runs applications with their secrets.
 
-Both server and client commands ship in the same planned `dopbase` executable:
+Both server and client commands ship in the same `dopbase` executable:
 
 ```bash
 # Server role
@@ -17,11 +17,6 @@ dopbase env create payment-service staging
 dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
 ```
-
-::: warning Pre-release command reference
-The commands express the intended v0.1 interface. Dopbase is not yet a stable
-or production-ready secrets manager.
-:::
 
 ## No hidden project or environment
 

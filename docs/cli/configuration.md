@@ -20,14 +20,18 @@ falls back to localhost, Cloud, or another endpoint.
 
 ## Configuration file
 
-The planned per-user locations are:
+The per-user locations are:
 
 ```text
 Unix and macOS: ~/.dopbase/config.toml
 Windows:        %USERPROFILE%\.dopbase\config.toml
 ```
 
-The v0.1 schema contains only non-secret client state:
+Use the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR` to relocate this
+file together with the default server data. The CLI option takes precedence
+over the environment variable.
+
+The v0.0.1 schema contains only non-secret client state:
 
 ```toml
 version = 1
@@ -79,7 +83,7 @@ server's credential.
 store, keyed by the normalized server URL. It never writes the token to
 `config.toml` or a Dopbase server's SQLite database.
 
-Only one saved connection is active in v0.1. Logging in again replaces the
+Only one saved connection is active in v0.0.1. Logging in again replaces the
 credential for that server. `dopbase logout` removes the active credential but
 leaves the selected server unchanged.
 
@@ -142,7 +146,7 @@ Each Dopbase server instance has its own address and server-owned SQLite
 database. For example, two local instances might listen on ports `8376` and
 `8377`.
 
-Only one endpoint can be globally active; v0.1 does not retain named profiles
+Only one endpoint can be globally active; v0.0.1 does not retain named profiles
 or token history for previously selected servers:
 
 ```bash

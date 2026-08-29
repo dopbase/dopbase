@@ -1,14 +1,9 @@
 # Command reference
 
-This page defines the planned v0.1 command surface. Dopbase does not infer a
+This page defines the implemented v0.0.1 command surface. Dopbase does not infer a
 project or environment from the current directory and does not store an active
 project or environment. Commands that work with secrets receive an environment
 reference directly.
-
-::: warning Pre-release command reference
-These commands describe the intended interface. Dopbase is not yet ready for
-production automation.
-:::
 
 ## Connections and authentication
 
@@ -217,7 +212,7 @@ status is returned to the calling shell.
 
 ## Structured output
 
-Resource and metadata commands will support `--json` for automation. Secret
+Resource and metadata commands support `--json` for automation. Secret
 values remain excluded unless the user explicitly selected `--reveal`,
 `--stdout`, or an export destination. Errors identify the server, project,
 environment, and operation when safe without including request bodies, tokens,
