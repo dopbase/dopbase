@@ -1,0 +1,35 @@
+FROM oven/bun:1 AS admin-ui
+
+WORKDIR /workspace
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY index.html vite.config.ts tsconfig*.json eslint.config.js ./
+COPY config ./config
+COPY public ./public
+COPY src ./src
+COPY tests ./tests
+RUN bun run build
+
+FROM rust:1.97-bookworm
+
+LABEL dopbase.test="true"
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN rustup component add clippy rustfmt
+
+WORKDIR /workspace
+
+COPY app/Cargo.toml app/Cargo.lock ./app/
+COPY app/src ./app/src
+COPY app/tests ./app/tests
+COPY app/migrations ./app/migrations
+COPY app/scripts ./app/scripts
+COPY --from=admin-ui /workspace/dist ./dist
+
+WORKDIR /workspace/app
+
+CMD ["bash", "./scripts/verify-backend.sh"]
