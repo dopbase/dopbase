@@ -2,7 +2,7 @@
 
 Audit records answer who performed a sensitive action, where it happened, and when. They describe the action without storing the secret value involved.
 
-## Planned events
+## Audit events in 0.0.1
 
 | Area           | Events                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------ |
@@ -13,7 +13,7 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 | Tokens         | `token.created`, `token.revoked`                                                           |
 | Authentication | `login.succeeded`, `login.failed`                                                          |
 
-The event names are provisional until the API schema is implemented.
+The API schema defines the event names used by this release.
 
 ## Record contents
 
@@ -44,4 +44,4 @@ environment: production
 secret: DATABASE_URL
 ```
 
-Retention, export, filtering, and integrity guarantees will be documented when the audit subsystem is implemented.
+Retention, export, advanced filtering, and additional integrity guarantees remain roadmap work.

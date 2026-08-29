@@ -17,7 +17,7 @@ A record of a security-relevant action. It contains safe context about the actio
 
 ## Data encryption key
 
-A key used to encrypt secret data. In the planned envelope-encryption design, the master key encrypts this key before it is stored.
+A key used to encrypt secret data. In Dopbase's envelope-encryption design, the master key encrypts this key before it is stored.
 
 ## Environment
 

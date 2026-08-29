@@ -1,7 +1,5 @@
 # Troubleshooting
 
-Dopbase is pre-release, so stable diagnostic commands and error codes are not available yet. The checks below follow the intended server/client model.
-
 ## The client cannot connect
 
 1. Run `dopbase config` and confirm the effective server and its source.
