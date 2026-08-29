@@ -2,8 +2,9 @@
 
 Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Security is part of the product behavior, not a layer added after storage and APIs are complete.
 
-::: warning Design-stage security model
-This page describes the intended architecture. It is not a completed threat model, security audit, or claim of production readiness.
+::: info Review the security model
+This page documents the 0.0.1 security model. Public source makes independent
+review possible, but it is not the same as an independent security audit.
 :::
 
 ## Security goals
@@ -18,7 +19,7 @@ This page describes the intended architecture. It is not a completed threat mode
 
 ## Envelope encryption
 
-The planned design uses envelope encryption:
+The v0.0.1 implementation uses envelope encryption:
 
 ```text
 Secret value
@@ -30,9 +31,14 @@ Data encryption key
 Encrypted data key
 ```
 
-The database can store ciphertext, a nonce, the encrypted data key, an encryption version, and safe metadata. The master key remains in a separate key source.
+Each stored value receives a random 256-bit data key. XChaCha20-Poly1305
+encrypts the value and separately wraps its data key with the master key. The
+environment ID, secret key, version, and algorithm version are authenticated as
+additional data. Unique random nonces are stored with the ciphertext.
 
-AES-256-GCM and ChaCha20-Poly1305 are possible authenticated encryption schemes. The final algorithm, nonce strategy, key hierarchy, and library choices require implementation review and independent assessment.
+The database contains ciphertext, wrapped keys, nonces, versions, and safe
+metadata. The 256-bit master key remains in a separate owner-only file and is
+verified before the HTTP listener starts.
 
 ## Data in transit
 

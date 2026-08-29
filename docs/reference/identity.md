@@ -4,21 +4,26 @@ Dopbase needs identities for people and for software.
 
 ## Human users
 
-Human users access the admin interface and CLI. They authenticate with the active server and receive permissions for the organizations, projects, environments, and secret operations they need.
+v0.0.1 supports exactly one human administrator with full access to the Admin UI
+and human CLI operations.
 
-The final login method, session lifetime, recovery process, and multi-factor authentication support are not yet defined.
+Passwords are hashed with Argon2id. Browser sessions have an eight-hour idle
+and 24-hour absolute lifetime. CLI sessions are opaque bearer tokens with a
+30-day idle and 90-day absolute lifetime and are stored in the operating-system
+credential store. Offline password recovery verifies the master key, requires
+the server to be stopped, and revokes every human session.
 
 ## Machine identities
 
-CI jobs, servers, containers, deployment systems, and automation cannot depend on an interactive login. Dopbase plans to support machine identities and service tokens for these workloads.
+CI jobs, servers, containers, deployment systems, and automation use
+environment-scoped runner tokens.
 
 ```bash
 export DOPBASE_TOKEN=dbs_xxxxxxxxxxxxxxxxx
 dopbase run env_01ABCDEF -- npm start
 ```
 
-The token format is provisional. `DOPBASE_TOKEN` is the planned automation
-interface and is preferred over a saved human login when it is present.
+`DOPBASE_TOKEN` is preferred over a saved human login when it is present.
 
 Interactive `dopbase login` stores its token in the operating system credential
 store under the normalized server URL. The global TOML config contains the
@@ -39,17 +44,9 @@ use different runner tokens.
 
 ## Permission model
 
-The planned permission model may distinguish these operations:
-
-- View secret names and metadata
-- Create or update secrets
-- Reveal plaintext values
-- Export an environment
-- Manage projects and environments
-- Manage users and service tokens
-- Read audit history
-
-Basic role-based access control is planned for v0.1. More advanced policy features should wait until the basic model is clear and tested.
+The single administrator has full v0.0.1 access. Runner tokens can resolve and
+retrieve runtime values only for their assigned environment. Organizations,
+additional humans, invitations, and advanced policy rules remain later work.
 
 ## Token handling
 
