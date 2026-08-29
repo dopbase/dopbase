@@ -5,6 +5,11 @@
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
 
+    /* Path aliases (must match vite.config.ts `resolve.alias`) */
+    "paths": {
+      "~/*": ["./src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
