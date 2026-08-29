@@ -3,7 +3,7 @@ import { assetFileNames } from "../../config/asset-file-names.ts";
 
 export default defineConfig({
   title: "Dopbase",
-  description: "Open-source secrets management in one binary.",
+  description: "Secrets manager in a single file.",
   lang: "en-US",
   cleanUrls: true,
   lastUpdated: true,
@@ -130,10 +130,6 @@ export default defineConfig({
             { text: "Project principles", link: "/about/" },
             { text: "Open source", link: "/about/open-source" },
             { text: "Roadmap", link: "/about/roadmap" },
-            {
-              text: "Admin UI v0.1 plan",
-              link: "/about/admin-ui-v0.1-plan",
-            },
             { text: "Product boundaries", link: "/about/product-boundaries" },
           ],
         },
@@ -145,7 +141,7 @@ export default defineConfig({
     sidebarMenuLabel: "Menu",
     darkModeSwitchLabel: "Appearance",
     footer: {
-      message: "Open-source secrets management in one binary.",
+      message: "Secrets manager in a single file.",
       copyright: "Dopbase documentation",
     },
   },

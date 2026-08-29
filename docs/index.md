@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Welcome to Dopbase"
-  text: "Secrets management in one binary"
-  tagline: Run the server yourself or connect the same client to Dopbase Cloud. Keep projects, environments, and secrets in one place without building a platform around the platform.
+  text: "Secrets manager in a single file"
+  tagline: Run the server yourself. Keep projects, environments, and secrets in one place without building a platform around the platform.
   actions:
     - theme: brand
       text: Get started
@@ -14,10 +14,10 @@ hero:
       link: /guide/server-client
 
 features:
-  - title: One executable
+  - title: One file to install
     details: The server, API, admin interface, migrations, and command-line client ship together.
-  - title: Your server or ours
-    details: Point the same Dopbase client at a self-hosted endpoint or Dopbase Cloud.
+  - title: Built for self-hosting
+    details: Run Dopbase on your own infrastructure with SQLite storage and a separate master key.
   - title: Built around applications
     details: Organize secrets by project and environment, then inject them directly into a process.
   - title: Secure by design
