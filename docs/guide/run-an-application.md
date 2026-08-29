@@ -2,11 +2,6 @@
 
 `dopbase run` starts a child process with secrets from one explicit environment.
 
-::: warning Planned interface
-The behavior on this page defines the intended v0.1 command and is not yet
-available in a stable release.
-:::
-
 Use `--` to separate Dopbase arguments from the application command:
 
 ```bash

@@ -1,30 +1,31 @@
 # Product status
 
-Dopbase is in the pre-release design and implementation stage. The documentation is public so users and contributors can see the intended behavior before the first stable release.
+Dopbase 0.0.1 is the current testing release. It includes the Rust server and
+CLI, the embedded Vue Admin UI, the REST API, generated OpenAPI and Swagger
+documentation, and SQLite storage in one executable. It is intended for testing
+and evaluation before the first public release, 0.1.0.
 
-## What this means
+## Available in 0.0.1
 
-Examples marked as planned describe the v0.1 interface. They are a product contract under development, not proof that a downloadable release already exists.
-
-The following areas are part of the planned v0.1 scope:
-
-- One executable containing the server and command-line client
-- SQLite storage for self-hosted installations
 - Projects, environments, and individually managed secrets
-- Encryption before persistence
-- A REST API and admin interface
+- Encryption before persistence with separate master-key material
 - `.env` import and export
 - Process injection through `dopbase run`
-- Human authentication, service tokens, and audit records
+- Human authentication and environment-scoped runner tokens
+- Audit records
+- Self-hosted binaries for macOS and Linux on AMD64 and ARM64
 
-## Details that are not final
+## Current boundaries
 
-Command names express the intended workflow, but flags and configuration keys may change. The public Dopbase Cloud hostname, installation packages, authentication flow, API paths, encryption implementation, and release compatibility policy are not final.
+Dopbase Cloud is not available yet. The current release does not include a
+Windows binary, automatic upgrades, or managed backups. Self-hosted operators
+remain responsible for TLS, network access, database backups, master-key
+storage, monitoring, upgrades, and incident response.
 
-Pages avoid inventing these details. Where a value has not been decided, the documentation uses a placeholder or says that the behavior is planned.
+The source is public so anyone can inspect the implementation and report
+security problems privately. Public source makes review possible, but it is not
+the same as an independent security audit. Do not treat this testing release as
+production-ready secret storage.
 
-## Before using Dopbase
-
-Do not treat a pre-release build as production-ready secret storage until the project publishes a supported release, threat model, security review, backup procedure, and upgrade policy.
-
-Follow the [public roadmap](/about/roadmap) for the planned sequence of work.
+Follow the [roadmap](/about/roadmap) for the planned 0.1.0 public release and
+later work.

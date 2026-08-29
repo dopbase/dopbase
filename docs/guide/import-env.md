@@ -3,11 +3,6 @@
 Dopbase treats `.env` as an import and export format. It does not store the
 file as one opaque object.
 
-::: warning Planned interface
-The commands on this page specify intended v0.1 behavior and are not available
-in a stable release yet.
-:::
-
 ## Create a project from `.env`
 
 Use `init` when the project does not exist yet:
