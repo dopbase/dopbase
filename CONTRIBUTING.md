@@ -1,6 +1,6 @@
 # Contributing to Dopbase
 
-Thanks for taking the time to work on Dopbase. The project is still pre-release, and much of the public documentation describes the product we are building rather than finished behavior. Check the code before assuming a documented command already exists.
+Thanks for taking the time to work on Dopbase. Check the code, tests, and current documentation before changing public behavior.
 
 ## Before you start
 
@@ -72,10 +72,16 @@ Run the checks that apply to your change.
 Frontend:
 
 ```bash
+bun run typecheck
 bunx vitest run --passWithNoTests
 bun run build
 bunx prettier --check .
 ```
+
+The frontend temporarily uses two TypeScript compilers. Native TypeScript 7
+checks the TypeScript project graph, while the TypeScript 6 compatibility
+package powers `vue-tsc` and ESLint until their Vue/compiler integrations
+support the TypeScript 7 API. Run `bun run typecheck` to execute both checks.
 
 The repository does not contain a discoverable frontend test file yet, so `--passWithNoTests` keeps the scaffold check explicit without treating the absence of tests as a failure. Vitest will run normally as soon as `*.test.*` or `*.spec.*` files are added.
 
@@ -87,6 +93,21 @@ cargo clippy --manifest-path app/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path app/Cargo.toml
 ```
 
+Changes that affect migrations or multiple backend modules must also pass the
+isolated Docker verification:
+
+```bash
+docker build -f app/Dockerfile.test -t dopbase-backend-test .
+docker run --rm --name dopbase-backend-test-run dopbase-backend-test
+docker image rm dopbase-backend-test
+docker image prune -f --filter label=dopbase.test=true
+```
+
+The container builds the real Vue Admin UI, embeds it in the release binary,
+then launches that binary from a clean temporary directory. It verifies the UI,
+health API, OpenAPI document, Swagger UI, and default storage layout without
+mounting or modifying a host database.
+
 Documentation:
 
 ```bash
@@ -95,11 +116,29 @@ bun run docs:build
 
 If an existing unrelated failure prevents a check from passing, describe the failure and the command output in the pull request. Do not hide or silently skip it.
 
+## Publish a release
+
+Releases use annotated semantic-version tags. Before tagging, update the
+version in `app/Cargo.toml`, refresh `app/Cargo.lock`, and add the release notes
+to `CHANGELOG.md`. Merge those changes into `main`, then create and push the
+tag from the release commit:
+
+```bash
+git switch main
+git pull --ff-only
+git tag -a v0.0.1 -m "v0.0.1"
+git push origin v0.0.1
+```
+
+Pushing the tag starts the GitHub release workflow. It verifies that the tag
+matches the Rust package version, builds the Linux and macOS archives, creates
+`checksums.txt`, and publishes the release only after every target succeeds.
+
 ## Review expectations
 
 Maintainers may ask for a smaller change, clearer tests, documentation, or a different interface. Review focuses on correctness, security, maintainability, and keeping Dopbase understandable for someone running it themselves.
 
-Be patient and respectful. Reviews may take time, especially while the project is pre-release.
+Be patient and respectful. Security-sensitive changes may need additional review.
 
 ## Contribution license
 

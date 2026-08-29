@@ -1,19 +1,18 @@
 <p align="center">
-  <img src="./assets/banner.jpg" alt="Dopbase — secrets management in one binary" width="100%" />
+  <img src="./assets/banner.jpg" alt="Dopbase, a secrets manager in a single file" width="100%" />
 </p>
 
 # Dopbase
 
-Dopbase is an open-source secrets manager designed to run as one executable. It keeps application secrets organized by project and environment, with a command-line client that can connect to either a self-hosted server or Dopbase Cloud.
+Dopbase is an open-source secrets manager in a single file. One executable contains the server, Admin UI, REST API, migrations, and command-line client. It keeps application secrets organized by project and environment and runs on your own infrastructure.
 
-> [!WARNING]
-> Dopbase is pre-release software. The repository currently contains early Rust and Vue scaffolding, not a production-ready secrets manager. The public documentation describes the intended v0.1 experience and marks unfinished behavior as planned.
+The executable is a single download. Runtime data stays separate: Dopbase stores its SQLite database, configuration, and master key under `~/.dopbase` by default.
 
 ## Why Dopbase
 
 `.env` files are convenient on one machine. They become difficult to track when a project has several developers, CI jobs, servers, and deployment environments. Dopbase is intended to add encrypted storage, individual secret records, access control, history, and audit events without requiring a large supporting infrastructure stack.
 
-The planned model stays small:
+The model stays small:
 
 ```text
 Project
@@ -21,26 +20,29 @@ Project
         └── Secrets
 ```
 
-The server and client will ship in the same `dopbase` executable:
+The server and client are built into the same `dopbase` executable:
 
 ```bash
-# Planned interface, not available yet
 dopbase serve
 dopbase login
 dopbase init payment-service development --from .env
 dopbase run payment-service/development -- npm start
 ```
 
-Read the [public documentation](./docs/) for the product model, planned CLI, self-hosting guidance, security design, and roadmap.
+A production build embeds the Vue Admin UI in that executable. By default, its
+SQLite database, lock files, configuration, and local master key live under
+`~/.dopbase`; use `--data-dir` or `DOPBASE_DATA_DIR` to relocate them.
+
+Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
 ## Repository layout
 
-| Path     | Purpose                                   | Current state               |
-| -------- | ----------------------------------------- | --------------------------- |
-| `app/`   | Rust service and command-line application | Initial scaffold            |
-| `src/`   | Vue administration interface              | Initial scaffold            |
-| `docs/`  | VitePress product documentation           | Active public specification |
-| `tests/` | Frontend tests and test setup             | Early test scaffold         |
+| Path     | Purpose                                   | Current state                 |
+| -------- | ----------------------------------------- | ----------------------------- |
+| `app/`   | Rust service and command-line application | v0.0.1 backend implementation |
+| `src/`   | Vue administration interface              | Initial scaffold              |
+| `docs/`  | VitePress product documentation           | Active public specification   |
+| `tests/` | Frontend tests and test setup             | Early test scaffold           |
 
 ## Development
 
@@ -50,14 +52,25 @@ Install the JavaScript dependencies and start the Vue development server:
 
 ```bash
 bun install
+bun run dev:ui
+```
+
+Run the Rust backend without the long Cargo command:
+
+```bash
+bun run app
+```
+
+Or start the Vue Admin UI and Rust backend together:
+
+```bash
 bun run dev
 ```
 
-Run the Rust scaffold:
-
-```bash
-cargo run --manifest-path app/Cargo.toml
-```
+The combined command serves the UI at `http://localhost:8080`, proxies `/api`
+requests to the backend at `http://localhost:8376`, and stops both processes
+when you press Ctrl-C. To serve the Admin UI and API from one executable, run
+`bun run build:binary` and then `./app/target/release/dopbase serve`.
 
 Start the documentation site:
 
@@ -69,6 +82,7 @@ The repository defines these production build commands:
 
 ```bash
 bun run build
+bun run build:binary
 bun run docs:build
 ```
 
