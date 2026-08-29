@@ -1,0 +1,10 @@
+.git
+.codegraph
+.DS_Store
+.vscode
+node_modules
+dist
+app/target
+docs/.vitepress/cache
+docs/.vitepress/dist
+coverage
