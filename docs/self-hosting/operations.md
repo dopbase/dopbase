@@ -6,7 +6,7 @@ Running a secrets manager means protecting both availability and confidentiality
 
 Localhost is the expected development default. Any server reachable over a network needs authenticated encryption in transit, a deliberate bind address, and firewall rules that expose only the required interface.
 
-Production TLS and reverse-proxy guidance will be published after the server configuration is implemented.
+Terminate TLS with a reviewed reverse proxy and restrict the Dopbase listener to the network interfaces that need it.
 
 ## Monitoring
 
@@ -18,7 +18,7 @@ Application logs may include timestamps, operation names, request identifiers, s
 
 ## Upgrades
 
-A supported release needs documented database migrations, version compatibility, rollback limits, and backup requirements. Do not automate upgrades until those guarantees are published.
+Back up the database and master key before an upgrade. Review the release notes for migration and compatibility information before replacing the executable.
 
 ## Incident response
 

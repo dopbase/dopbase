@@ -1,16 +1,12 @@
 # Self-hosting Dopbase
 
-Self-hosting is a first-class Dopbase workflow. The planned Community edition runs as one executable with SQLite storage and an embedded admin interface.
+Self-hosting is a first-class Dopbase workflow. The Community edition runs as one executable with SQLite storage and an embedded Admin UI.
 
 ```bash
 dopbase serve
 ```
 
 That command is intentionally simple. Operating a secrets server safely still requires decisions about networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.
-
-::: warning Pre-release operations guide
-Dopbase has not published a production release or support policy. This section describes the intended operational model, not a production-ready deployment procedure.
-:::
 
 ## What you operate
 

@@ -1,19 +1,33 @@
 # Storage and backups
 
-Dopbase Community is planned to use SQLite by default. A small installation may have a data layout similar to:
+Dopbase Community uses SQLite by default. Unless `--data-dir` or
+`DOPBASE_DATA_DIR` selects another location, its flat per-user layout is:
 
 ```text
-dopbase_data/
-└── dopbase.db
+~/.dopbase/
+├── config.toml
+├── dopbase.db
+├── dopbase.db.lock
+├── dopbase.db-shm
+├── dopbase.db-wal
+├── master.key
+└── server.toml
 ```
 
-The exact path and configuration are not final.
+The `-wal` and `-shm` files are managed by SQLite and may appear only while the
+server is running. `config.toml` and `server.toml` are created only when needed.
+Do not edit, remove, or copy individual SQLite files while Dopbase is running.
 
 ## Database contents
 
-The database is expected to contain encrypted secret values, encrypted data keys, nonces, encryption-version metadata, users, projects, environments, tokens, and audit records.
+The database contains encrypted secret values, wrapped data keys, nonces,
+encryption-version metadata, the administrator, sessions, projects,
+environments, runner tokens, and audit records.
 
-It must not contain the master encryption key required to decrypt those records.
+It does not contain the master encryption key required to decrypt those records.
+The local default keeps `master.key` in the same data directory for a simple
+single-binary experience. Production operators should override the key path and
+back up the key through a separately protected process.
 
 ## Backup principles
 
@@ -26,6 +40,19 @@ It must not contain the master encryption key required to decrypt those records.
 
 A database backup without the correct master key cannot restore plaintext secrets. A master key without the database is also insufficient. Losing either can make recovery impossible.
 
+## Offline file backup
+
+For v0.0.1, stop Dopbase cleanly and wait for the process to exit before copying
+`dopbase.db`. Clean shutdown checkpoints the WAL into the main database. Back up
+the matching master key separately; never place the database and key copies in
+the same backup location.
+
 ## Restore procedure
 
-The supported backup and restore commands will be documented after the storage implementation is stable. Until then, no file-copy example should be treated as a production procedure.
+1. Stop Dopbase and confirm that the process has exited.
+2. Restore `dopbase.db` to the configured data directory.
+3. Restore the matching master key to its configured path through a separate protected process.
+4. Restrict both files to the Dopbase operating-system user.
+5. Start Dopbase and confirm the health endpoint, authentication, resource metadata, and a controlled secret retrieval.
+
+A database and master key from different backup points may not form a usable pair. Keep backup identifiers and restoration records without recording secret values.

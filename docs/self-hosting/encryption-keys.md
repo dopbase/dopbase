@@ -10,19 +10,21 @@ master encryption key stored separately
 
 This separation means that stealing the database alone should not reveal plaintext secret values.
 
-## Planned key sources
+## Current key source
 
-The architecture may support:
+Dopbase 0.0.1 uses a 256-bit master key in a local owner-only file. Set its
+location in `server.toml`, with `DOPBASE_MASTER_KEY_PATH`, or with the
+`--master-key-file` option. Dopbase creates the file when it initializes a new
+instance and verifies it before opening the HTTP listener.
 
-- A protected environment variable
-- A local file with restrictive permissions
-- An operating-system secret store
+External key managers remain roadmap work. Future providers may include:
+
 - AWS KMS
 - Google Cloud KMS
 - Azure Key Vault
 - A hardware security module
 
-Only implemented and reviewed providers will appear in the production configuration reference.
+Only implemented and reviewed providers appear in the configuration reference.
 
 ## Operator responsibilities
 
@@ -32,4 +34,5 @@ Only implemented and reviewed providers will appear in the production configurat
 - Plan rotation before the original key is compromised or retired.
 - Test recovery with the same provider and access policy used in production.
 
-The exact key format, provider configuration, and rotation procedure are not final.
+The current release does not automate master-key rotation. Protect and back up
+the file separately from the SQLite database.
