@@ -1,10 +1,16 @@
 # Open source
 
-Secrets management asks users to place unusual trust in software. Dopbase is open source so users can inspect how credentials are stored, encrypted, revealed, and audited.
+Secrets management asks users to trust software with credentials that can open databases, cloud accounts, and payment systems. Dopbase is open source so anyone can inspect how those credentials are stored, encrypted, revealed, and audited.
+
+Public code makes security claims verifiable. You can read the implementation,
+build the executable yourself, review changes, and report a vulnerability
+without relying only on product copy. Open source does not prove that software
+is secure, but it gives users and reviewers the evidence needed to test its
+claims.
 
 ## Public commitments
 
-The open-source edition is intended to include the useful core:
+The open-source edition includes the useful core:
 
 - The single server and client executable
 - SQLite storage
@@ -13,9 +19,9 @@ The open-source edition is intended to include the useful core:
 - `.env` import and export
 - Process injection
 - Service tokens and basic permissions
-- Audit records, history, and rollback
+- Audit records
 
-Self-hosting should remain a supported product experience rather than a trial for Cloud.
+Self-hosting is a supported product experience rather than a trial for Cloud.
 
 ## Project license
 

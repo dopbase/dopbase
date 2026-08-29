@@ -2,7 +2,7 @@
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## v0.1
+## Current testing release: v0.0.1
 
 - Authentication
 - Projects and environments
@@ -12,25 +12,26 @@ The roadmap describes intent, not a release commitment. Work may move as impleme
 - CLI, `.env` import and export, and `dopbase run`
 - Service tokens and audit records
 
-The ordered engineering checklist is documented in the
-[Admin UI v0.1 implementation plan](./admin-ui-v0.1-plan).
+## v0.1.0 — first public release
 
-## v0.2
+- Stabilize and validate the current server, CLI, Admin UI, and self-hosting
+  workflows for the first public release
+
+## v0.2.0
 
 - Secret version history and rollback
 - User invitations
 - Service accounts
 - Improved role-based access control
-- API tokens
 
-## v0.3
+## v0.3.0
 
 - Environment inheritance
 - GitHub Actions and GitLab CI integrations
 - Docker workflows
 - Webhooks and secret references
 
-## v0.4
+## v0.4.0
 
 - AWS KMS, Google Cloud KMS, and Azure Key Vault
 - Single sign-on
@@ -45,4 +46,4 @@ The ordered engineering checklist is documented in the
 - Compliance tooling
 - Automatic secret rotation
 
-See [product status](/guide/product-status) for the difference between planned and available behavior.
+See [product status](/guide/product-status) for current capabilities and operational boundaries.
