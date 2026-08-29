@@ -1,31 +1,79 @@
 # REST API
 
-The Dopbase server will expose a REST API used by the CLI and admin interface. Self-hosted deployments and Dopbase Cloud are intended to follow the same API model.
+Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.
+The generated OpenAPI 3 specification is available from a running server:
 
-::: warning API not published
-There is no stable endpoint reference or OpenAPI document yet. Do not infer production paths, request bodies, or compatibility guarantees from conceptual examples in these docs.
-:::
+```text
+OpenAPI JSON: http://localhost:8376/api/v1/openapi.json
+Swagger UI:   http://localhost:8376/api/docs
+```
 
-## Planned resource areas
+The Rust request and response types are the source of truth. Every Axum route
+is registered in the generated specification and checked by an API contract
+test.
 
-The API is expected to cover:
+## Resource areas
 
-- Authentication and sessions
-- Projects and environments
-- Secret metadata and encrypted value operations
-- Human membership and service tokens
-- Import and export
-- Audit records
+| Area                                        | Base paths                                           |
+| ------------------------------------------- | ---------------------------------------------------- |
+| Health and compatibility                    | `/api/v1/health`                                     |
+| Initial administrator                       | `/api/v1/bootstrap`                                  |
+| Login and sessions                          | `/api/v1/auth`                                       |
+| Projects                                    | `/api/v1/projects`                                   |
+| Environments                                | `/api/v1/environments`                               |
+| Secrets, import, export, and runtime values | `/api/v1/environments/{id}/secrets`                  |
+| Runner tokens                               | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
+| Audit and instance status                   | `/api/v1/audit-events`, `/api/v1/instance`           |
 
-## Security requirements
+Consult Swagger for request bodies, parameters, authentication schemes, and
+the responses supported by each operation.
 
-- Authenticate every protected request.
-- Authorize access at the relevant organization, project, environment, and operation.
-- Use TLS for networked clients.
-- Never include plaintext values in error messages or logs.
-- Treat reveal and export as distinct, auditable operations.
-- Use stable error shapes before declaring API compatibility.
+## Response format
+
+A successful request uses a typed envelope:
+
+```json
+{
+  "success": true,
+  "message": "PROJECT_CREATED",
+  "data": {
+    "id": "prj_01...",
+    "name": "payment-service"
+  }
+}
+```
+
+Errors map stable codes to safe messages:
+
+```json
+{
+  "success": false,
+  "error": {
+    "EMAIL_INVAILD": "Please use proper email"
+  }
+}
+```
+
+Validation may report more than one code in the `error` object. Clients must
+branch on the code rather than the English message or object ordering. Request
+correlation is returned in the `X-Request-Id` header; errors never include
+request bodies, plaintext secrets, tokens, key material, SQL, or filesystem
+details.
+
+## Authentication
+
+- Browser sessions use an HttpOnly, SameSite Strict cookie and require the
+  server-issued `X-Dopbase-CSRF` header for mutations.
+- CLI sessions and runner identities use `Authorization: Bearer <token>`.
+- A runner token can retrieve runtime secrets only from its assigned
+  environment. It cannot list metadata, mutate secrets, reveal, or export.
+
+The OpenAPI document declares the `cookieAuth`, `bearerAuth`, and `csrfHeader`
+security schemes.
 
 ## Compatibility
 
-Versioning, pagination, rate limits, idempotency, error schemas, and deprecation policy remain open design work. This page will link to the OpenAPI definition when that contract exists.
+`GET /api/v1/health` identifies the product, binary version, and API version.
+`dopbase client connect` validates this response before changing local client
+configuration. v0.0.1 does not yet promise compatibility with future major API
+versions or implement idempotency keys.
