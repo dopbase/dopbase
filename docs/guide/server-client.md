@@ -25,7 +25,7 @@ Self-hosted server or Dopbase Cloud
 - Database migrations
 - The REST API and admin interface
 
-Self-hosted storage is planned to use SQLite by default. The master encryption key must remain outside that database.
+Self-hosted storage uses SQLite by default. The master encryption key remains outside that database.
 
 ## The client
 

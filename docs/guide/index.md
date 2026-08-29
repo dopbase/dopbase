@@ -10,10 +10,6 @@ The product has three parts:
 
 Both the server and client ship in the same `dopbase` executable. You choose the role through commands such as `dopbase serve` and `dopbase client connect`.
 
-::: warning Pre-release documentation
-Dopbase is still being designed and built. These pages describe the planned v0.1 experience. Commands and behavior may change before the first stable release.
-:::
-
 ## Why Dopbase exists
 
 A `.env` file is convenient on one machine. It becomes harder to manage when several developers, servers, CI jobs, and deployment environments need the same values. Copies drift apart, old credentials remain active, and nobody has a reliable history of what changed.
@@ -32,7 +28,7 @@ A project represents an application or service. Environments hold the values tha
 
 ## Where to go next
 
-- Follow the [quick start](./quick-start) for the planned first-run workflow.
+- Follow the [quick start](./quick-start) to install Dopbase and run it locally.
 - Learn how the [server and client](./server-client) divide responsibilities.
 - Read the [self-hosting guide](/self-hosting/) before operating a server.
 - Review the [security model](/reference/security) before storing real credentials.

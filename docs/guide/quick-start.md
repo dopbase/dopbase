@@ -1,23 +1,32 @@
 # Quick start
 
-This walkthrough shows the planned v0.1 experience for a local, self-hosted
-server.
+This walkthrough installs Dopbase 0.0.1, starts a local server, imports an
+existing `.env` file, and runs an application with its secrets.
 
-::: warning Planned interface
-No stable Dopbase release is available yet. The commands below define the
-intended workflow and may change during implementation.
+::: warning Testing release
+Dopbase 0.0.1 is intended for testing and evaluation. The first public release
+will be 0.1.0.
 :::
 
 ## 1. Install Dopbase
 
-The planned installer will place the `dopbase` executable on your path:
+The installer downloads the correct macOS or Linux archive from GitHub
+Releases, verifies its SHA-256 checksum, and places `dopbase` in
+`~/.local/bin`:
 
 ```bash
 curl -fsSL https://dopbase.com/install.sh | sh
 ```
 
-Until a release and installer are published, treat this command as
-documentation of intent rather than an available download.
+Add `~/.local/bin` to `PATH` if the installer asks you to, then confirm the
+installation:
+
+```bash
+dopbase --version
+```
+
+Set `DOPBASE_INSTALL_DIR` to choose another directory. Set `DOPBASE_VERSION` to
+install a specific release.
 
 ## 2. Start the server
 
@@ -25,20 +34,20 @@ documentation of intent rather than an available download.
 dopbase serve
 ```
 
-The default local server is expected to expose:
+The default local server exposes:
 
 ```text
 Admin UI: http://localhost:8376
-API:      http://localhost:8376/api
-Database: ./dopbase.db
+API:      http://localhost:8376/api/v1
+Database: ~/.dopbase/dopbase.db
 ```
 
 Keep this process running while you use the client.
 
 ## 3. Confirm the client configuration
 
-Open another terminal. With no configured server, Dopbase uses the local default
-automatically:
+Open another terminal. With no configured server, Dopbase uses the local
+default automatically:
 
 ```bash
 dopbase config
@@ -52,8 +61,8 @@ Environment:     none (pass one explicitly)
 ```
 
 No repository or global config file is required for the implicit local server.
-Use `dopbase client connect <server-url>` only when targeting another local,
-self-hosted, or Cloud instance.
+Use `dopbase client connect <server-url>` when targeting another local or
+self-hosted instance.
 
 ## 4. Sign in
 
@@ -61,7 +70,7 @@ self-hosted, or Cloud instance.
 dopbase login
 ```
 
-`login` authenticates with the resolved local server and saves the token in the
+`login` authenticates with the resolved server and saves the token in the
 operating system credential store.
 
 ## 5. Bootstrap a project
@@ -86,7 +95,7 @@ dopbase run my-project/development -- npm start
 ```
 
 Dopbase retrieves that environment and adds its secrets to the child process.
-It does not need to write a new `.env` file to disk.
+It does not write a new `.env` file to disk.
 
 For production and staging deployments, use immutable environment IDs and
 separate scoped tokens. Read [target projects and environments](/cli/environment-targeting)
