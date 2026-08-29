@@ -1,0 +1,252 @@
+use std::{
+    fs::{File, OpenOptions},
+    sync::Arc,
+    time::Duration,
+};
+
+use anyhow::{Context, Result};
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    http::{HeaderName, StatusCode, Uri},
+    middleware,
+    response::{IntoResponse, Response},
+};
+use fs2::FileExt;
+use tower_http::{
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme};
+use utoipa_swagger_ui::SwaggerUi;
+
+use crate::{
+    config::{ServerConfig, database_path, ensure_data_dir},
+    constants::errors::{INTERNAL_ERROR, REQUEST_INVALID},
+    http::HttpError,
+    modules,
+    services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
+    state::{AppState, SetupState},
+};
+
+pub async fn build_state(config: ServerConfig) -> Result<AppState> {
+    ensure_data_dir(&config.data_dir)?;
+    let db = DbClient::connect(&config.database_url)
+        .await
+        .context("failed to open SQLite")?;
+    db.migrate()
+        .await
+        .context("failed to run database migrations")?;
+    let crypto = CryptoService::initialize(db.pool(), &config.master_key.path)
+        .await
+        .context("failed to initialize master key")?;
+    let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
+        .fetch_one(db.pool())
+        .await?;
+    let setup_token = if admin_count == 0 {
+        Some(token::generate("setup_")?)
+    } else {
+        None
+    };
+    Ok(AppState {
+        config: Arc::new(config),
+        db,
+        crypto,
+        setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
+        rate_limiter: RateLimiter::default(),
+    })
+}
+
+pub fn router(state: AppState) -> Router {
+    let mut openapi = modules::openapi();
+    let components = openapi.components.get_or_insert_with(Default::default);
+    components.add_security_scheme(
+        "bearerAuth",
+        SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
+    );
+    components.add_security_scheme(
+        "cookieAuth",
+        SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("dopbase_session"))),
+    );
+    components.add_security_scheme(
+        "csrfHeader",
+        SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Dopbase-CSRF"))),
+    );
+    let request_id = HeaderName::from_static("x-request-id");
+    Router::new()
+        .merge(modules::routes())
+        .merge(SwaggerUi::new("/api/docs").url("/api/v1/openapi.json", openapi))
+        .fallback(static_fallback)
+        .layer(DefaultBodyLimit::max(3 * 1024 * 1024))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(30),
+        ))
+        .layer(TraceLayer::new_for_http())
+        .layer(PropagateRequestIdLayer::new(request_id.clone()))
+        .layer(SetRequestIdLayer::new(request_id, MakeRequestUuid))
+        .layer(middleware::map_response(normalize_error_response))
+        .with_state(state)
+}
+
+async fn normalize_error_response(response: Response) -> Response {
+    let status = response.status();
+    if !status.is_client_error() && !status.is_server_error() {
+        return response;
+    }
+    let is_json = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"));
+    if is_json {
+        return response;
+    }
+    let request_id = response.headers().get("x-request-id").cloned();
+    let error = if status.is_server_error() {
+        HttpError::new(status, INTERNAL_ERROR, "An internal error occurred.")
+    } else {
+        HttpError::new(
+            status,
+            REQUEST_INVALID,
+            "The request could not be processed.",
+        )
+    };
+    let mut normalized = error.into_response();
+    if let Some(request_id) = request_id {
+        normalized.headers_mut().insert("x-request-id", request_id);
+    }
+    normalized
+}
+
+pub async fn serve(config: ServerConfig) -> Result<()> {
+    ensure_data_dir(&config.data_dir)?;
+    let _lock = InstanceLock::acquire(&config.database_url)?;
+    let state = build_state(config).await?;
+    if let Some(setup) = state.setup.read().await.token.as_deref() {
+        eprintln!("\nDopbase setup token (shown once):\n{setup}\n");
+    }
+    let address = state.config.bind_addr()?;
+    let grace = state.config.shutdown_grace_seconds;
+    let listener = tokio::net::TcpListener::bind(address)
+        .await
+        .with_context(|| format!("failed to bind {address}"))?;
+    let public_url = state.config.public_url.trim_end_matches('/');
+    let database = database_path(&state.config.database_url)?;
+    #[cfg(feature = "embedded-ui")]
+    eprintln!("Admin UI:   {public_url}");
+    #[cfg(not(feature = "embedded-ui"))]
+    eprintln!("Admin UI:   not embedded (run `bun run dev` or `bun run build:binary`)");
+    eprintln!(
+        "API:        {public_url}/api/v1\nSwagger:    {public_url}/api/docs\nData:       {}\nDatabase:   {}",
+        state.config.data_dir.display(),
+        database.display()
+    );
+    tracing::info!(%address,"Dopbase server started");
+    axum::serve(listener, router(state.clone()))
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+    if let Err(error) = state.db.checkpoint().await {
+        tracing::warn!(%error, "failed to checkpoint SQLite WAL during shutdown");
+    }
+    let _ = tokio::time::timeout(Duration::from_secs(grace), state.db.close()).await;
+    Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut signal) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            signal.recv().await;
+        } else {
+            std::future::pending::<()>().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {_=ctrl_c=>{},_=terminate=>{}}
+}
+
+pub(crate) struct InstanceLock {
+    file: File,
+}
+impl InstanceLock {
+    pub(crate) fn acquire(database_url: &str) -> Result<Option<Self>> {
+        if database_url.contains(":memory:") {
+            return Ok(None);
+        }
+        let database = database_path(database_url)?;
+        let lock = std::path::PathBuf::from(format!("{}.lock", database.display()));
+        if let Some(parent) = lock.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&lock)?;
+        file.try_lock_exclusive()
+            .context("another Dopbase process is using this database")?;
+        Ok(Some(Self { file }))
+    }
+}
+impl Drop for InstanceLock {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+    }
+}
+
+async fn static_fallback(uri: Uri) -> Response {
+    if uri.path().starts_with("/api/") {
+        return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
+            .into_response();
+    }
+    #[cfg(feature = "embedded-ui")]
+    {
+        embedded_asset(uri.path()).unwrap_or_else(|| {
+            embedded_asset("/index.html").unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
+        })
+    }
+    #[cfg(not(feature = "embedded-ui"))]
+    {
+        use crate::constants::ui::ADMIN_UI_NOT_EMBEDDED_PAGE;
+        use axum::response::Html;
+        let _ = uri;
+        Html(ADMIN_UI_NOT_EMBEDDED_PAGE).into_response()
+    }
+}
+
+#[cfg(feature = "embedded-ui")]
+#[derive(rust_embed::RustEmbed)]
+#[folder = "../dist/"]
+struct AdminAssets;
+
+#[cfg(feature = "embedded-ui")]
+fn embedded_asset(path: &str) -> Option<Response> {
+    use axum::http::{HeaderValue, header};
+    let key = path.trim_start_matches('/');
+    let key = if key.is_empty() { "index.html" } else { key };
+    let asset = AdminAssets::get(key)?;
+    let mime = mime_guess::from_path(key).first_or_octet_stream();
+    let mut response = asset.data.into_owned().into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(mime.as_ref()).ok()?,
+    );
+    let cache = if key == "index.html" {
+        "no-cache"
+    } else {
+        "public, max-age=31536000, immutable"
+    };
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+    Some(response)
+}
