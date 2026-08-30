@@ -24,7 +24,6 @@ tokio = { version = "1", features = [
 ] }
 # HTTP server / REST API
 axum = "0.8"
-tower = { version = "0.5", features = ["limit", "timeout", "util"] }
 tower-http = { version = "0.7", features = [
   "cors",
   "limit",
@@ -52,8 +51,6 @@ serde_json = "1"
 toml = "0.9"
 url = "2"
 directories = "6"
-# Field Validator
-validator = { version = "0.21", features = ["derive"] }
 # Authentication tokens
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
@@ -61,25 +58,19 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 keyring = "3"
 rpassword = "7"
-# Typed error definitions (stable error shapes)
-thiserror = "2"
 # Envelope encryption (authenticated encryption)
 chacha20poly1305 = "0.10"
-rand = "0.9"
 # Human-user authentication (password hashing)
 argon2 = "0.5"
 # Timestamps (audit records, token metadata)
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
-async-trait = "0.1"
-axum-extra = { version = "0.10", features = ["cookie"] }
 base64 = "0.22"
 fs2 = "0.4"
 getrandom = "0.3"
-hex = "0.4"
 mime_guess = { version = "2", optional = true }
 regex = "1"
-nix = { version = "0.30", features = ["signal", "process"] }
+nix = { version = "0.30", features = ["signal", "process", "fs"] }
 rust-embed = { version = "8", optional = true }
 sha2 = "0.10"
 subtle = "2"
