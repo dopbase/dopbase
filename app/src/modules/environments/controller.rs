@@ -1,7 +1,7 @@
 use super::{error::EnvironmentError, model::*, service};
 use crate::{
   extractors::require_mutation,
-  http::{ErrorBody, HttpResponse, HttpResponseFormat},
+  http::{HttpResponse, HttpResponseFormat},
   models::AuthIdentity,
   state::AppState,
 };
@@ -9,7 +9,23 @@ use axum::{
   extract::{Path, Query, State},
   http::HeaderMap,
 };
-#[utoipa::path(get,path="/api/v1/environments",tag="environments",security(("bearerAuth"=[]),("cookieAuth"=[])),params(("project"=Option<String>,Query)),responses((status=200,body=inline(HttpResponseFormat<Vec<EnvironmentResponse>>)),(status=401,body=ErrorBody)))]
+
+/// List environments
+///
+/// Return every environment, optionally filtered to one project via the
+/// `project` query parameter. Administrator authentication is required.
+#[utoipa::path(
+  get,
+  path = "/api/v1/environments",
+  tag = "environments",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("project" = Option<String>, Query, description = "Filter environments by project reference")),
+  responses(
+    (status = 200, description = "Environments fetched", body = inline(HttpResponseFormat<Vec<EnvironmentResponse>>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Only administrators may list environments", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn list(
   State(state): State<AppState>,
   identity: AuthIdentity,
@@ -20,7 +36,24 @@ pub async fn list(
     "ENVIRONMENTS_FETCHED",
   ))
 }
-#[utoipa::path(get,path="/api/v1/environments/resolve",tag="environments",security(("bearerAuth"=[])),params(("reference"=String,Query)),responses((status=200,body=inline(HttpResponseFormat<EnvironmentResponse>)),(status=403,body=ErrorBody),(status=404,body=ErrorBody)))]
+
+/// Resolve an environment reference
+///
+/// Look up an environment by id or name and return it. Runner tokens are
+/// restricted to the environment they belong to.
+#[utoipa::path(
+  get,
+  path = "/api/v1/environments/resolve",
+  tag = "environments",
+  security(("bearerAuth" = [])),
+  params(("reference" = String, Query, description = "Environment id or project/name reference")),
+  responses(
+    (status = 200, description = "Environment resolved", body = inline(HttpResponseFormat<EnvironmentResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "The runner token cannot access this environment", body = crate::http::ErrorBody),
+    (status = 404, description = "No environment matches the reference", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn resolve(
   State(state): State<AppState>,
   identity: AuthIdentity,
@@ -31,7 +64,27 @@ pub async fn resolve(
     "ENVIRONMENT_RESOLVED",
   ))
 }
-#[utoipa::path(post,path="/api/v1/projects/{project_ref}/environments",tag="environments",security(("bearerAuth"=[]),("cookieAuth"=[])),params(("project_ref"=String,Path)),request_body=CreateEnvironmentRequest,responses((status=201,body=inline(HttpResponseFormat<EnvironmentResponse>)),(status=409,body=ErrorBody),(status=422,body=ErrorBody)))]
+
+/// Create an environment
+///
+/// Add a new environment to a project. Names must be lowercase slugs.
+/// Requires the CSRF header for browser sessions.
+#[utoipa::path(
+  post,
+  path = "/api/v1/projects/{project_ref}/environments",
+  tag = "environments",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("project_ref" = String, Path, description = "Project id or name")),
+  request_body = CreateEnvironmentRequest,
+  responses(
+    (status = 201, description = "Environment created", body = inline(HttpResponseFormat<EnvironmentResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The project was not found", body = crate::http::ErrorBody),
+    (status = 409, description = "An environment with this name already exists in the project", body = crate::http::ErrorBody),
+    (status = 422, description = "The environment name is invalid", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn create(
   State(state): State<AppState>,
   headers: HeaderMap,
@@ -45,7 +98,23 @@ pub async fn create(
     "ENVIRONMENT_CREATED",
   ))
 }
-#[utoipa::path(get,path="/api/v1/environments/{environment_id}",tag="environments",security(("bearerAuth"=[]),("cookieAuth"=[])),params(("environment_id"=String,Path)),responses((status=200,body=inline(HttpResponseFormat<EnvironmentResponse>)),(status=404,body=ErrorBody)))]
+
+/// Show an environment
+///
+/// Fetch one environment by id. Administrator authentication is required.
+#[utoipa::path(
+  get,
+  path = "/api/v1/environments/{environment_id}",
+  tag = "environments",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "Environment id")),
+  responses(
+    (status = 200, description = "Environment fetched", body = inline(HttpResponseFormat<EnvironmentResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Only administrators may view environments", body = crate::http::ErrorBody),
+    (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn show(
   State(state): State<AppState>,
   identity: AuthIdentity,
@@ -57,7 +126,28 @@ pub async fn show(
     "ENVIRONMENT_FETCHED",
   ))
 }
-#[utoipa::path(patch,path="/api/v1/environments/{environment_id}",tag="environments",security(("bearerAuth"=[]),("cookieAuth"=[])),params(("environment_id"=String,Path)),request_body=RenameEnvironmentRequest,responses((status=200,body=inline(HttpResponseFormat<EnvironmentResponse>)),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=422,body=ErrorBody)))]
+
+/// Rename an environment
+///
+/// Change the name of an environment. Names must be lowercase slugs and
+/// unique within the project. Requires the CSRF header for browser
+/// sessions.
+#[utoipa::path(
+  patch,
+  path = "/api/v1/environments/{environment_id}",
+  tag = "environments",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "Environment id")),
+  request_body = RenameEnvironmentRequest,
+  responses(
+    (status = 200, description = "Environment renamed", body = inline(HttpResponseFormat<EnvironmentResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
+    (status = 409, description = "An environment with this name already exists in the project", body = crate::http::ErrorBody),
+    (status = 422, description = "The environment name is invalid", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn rename(
   State(state): State<AppState>,
   headers: HeaderMap,
@@ -71,7 +161,25 @@ pub async fn rename(
     "ENVIRONMENT_RENAMED",
   ))
 }
-#[utoipa::path(delete,path="/api/v1/environments/{environment_id}",tag="environments",security(("bearerAuth"=[]),("cookieAuth"=[])),params(("environment_id"=String,Path)),responses((status=200,body=inline(HttpResponseFormat<DeleteEnvironmentResponse>)),(status=404,body=ErrorBody)))]
+
+/// Delete an environment
+///
+/// Remove an environment together with all of its secrets and runner
+/// tokens. The response reports how many resources were affected.
+/// Requires the CSRF header for browser sessions.
+#[utoipa::path(
+  delete,
+  path = "/api/v1/environments/{environment_id}",
+  tag = "environments",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "Environment id")),
+  responses(
+    (status = 200, description = "Environment deleted; affected resource counts are returned", body = inline(HttpResponseFormat<DeleteEnvironmentResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn delete(
   State(state): State<AppState>,
   headers: HeaderMap,

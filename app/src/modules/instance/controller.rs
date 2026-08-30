@@ -1,11 +1,26 @@
 use super::{error::InstanceError, model::InstanceStatus, service};
 use crate::{
-  http::{ErrorBody, HttpResponse, HttpResponseFormat},
+  http::{HttpResponse, HttpResponseFormat},
   models::AuthIdentity,
   state::AppState,
 };
 use axum::extract::State;
-#[utoipa::path(get,path="/api/v1/instance",tag="instance",security(("bearerAuth"=[]),("cookieAuth"=[])),responses((status=200,body=inline(HttpResponseFormat<InstanceStatus>)),(status=401,body=ErrorBody)))]
+
+/// Show instance status
+///
+/// Report the version, public URL, initialization state, and the health of
+/// the database and key store. Administrator authentication is required.
+#[utoipa::path(
+  get,
+  path = "/api/v1/instance",
+  tag = "instance",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  responses(
+    (status = 200, description = "Instance status fetched", body = inline(HttpResponseFormat<InstanceStatus>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Only administrators may view instance status", body = crate::http::ErrorBody),
+  ),
+)]
 pub async fn status(
   State(state): State<AppState>,
   identity: AuthIdentity,
