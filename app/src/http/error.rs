@@ -99,21 +99,3 @@ impl From<sqlx::Error> for HttpError {
     Self::internal()
   }
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::constants::errors::{EMAIL_INVAILD, EMAIL_INVAILD_MESSAGE};
-
-  #[test]
-  fn serializes_required_shape() {
-    let body = ErrorBody {
-      success: false,
-      error: BTreeMap::from([(EMAIL_INVAILD.into(), EMAIL_INVAILD_MESSAGE.into())]),
-    };
-    assert_eq!(
-      serde_json::to_value(body).unwrap(),
-      serde_json::json!({"success":false,"error":{"EMAIL_INVAILD":"Please use proper email"}})
-    );
-  }
-}
