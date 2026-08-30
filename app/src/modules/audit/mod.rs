@@ -7,5 +7,5 @@ pub mod model;
 mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/api/v1/audit-events", get(controller::list))
+  Router::new().route("/api/v1/audit-events", get(controller::list))
 }

@@ -1,0 +1,11 @@
+# Align function parameters and arguments vertically for better readability.
+fn_params_layout = "Vertical"
+
+# Maximum width of a line. Helps keep the code readable.
+max_width = 100
+
+# Use spaces instead of tabs for indentation.
+hard_tabs = false
+
+# Number of spaces per indentation level.
+tab_spaces = 2

@@ -15,27 +15,27 @@ pub mod secrets;
 pub mod tokens;
 
 pub fn routes() -> Router<AppState> {
-    Router::new()
-        .merge(health::routes())
-        .merge(bootstrap::routes())
-        .merge(auth::routes())
-        .merge(projects::routes())
-        .merge(environments::routes())
-        .merge(secrets::routes())
-        .merge(tokens::routes())
-        .merge(audit::routes())
-        .merge(instance::routes())
+  Router::new()
+    .merge(health::routes())
+    .merge(bootstrap::routes())
+    .merge(auth::routes())
+    .merge(projects::routes())
+    .merge(environments::routes())
+    .merge(secrets::routes())
+    .merge(tokens::routes())
+    .merge(audit::routes())
+    .merge(instance::routes())
 }
 
 pub fn openapi() -> OpenApi {
-    let mut doc = health::doc::build();
-    doc.merge(bootstrap::doc::build());
-    doc.merge(auth::doc::build());
-    doc.merge(projects::doc::build());
-    doc.merge(environments::doc::build());
-    doc.merge(secrets::doc::build());
-    doc.merge(tokens::doc::build());
-    doc.merge(audit::doc::build());
-    doc.merge(instance::doc::build());
-    doc
+  let mut doc = health::doc::build();
+  doc.merge(bootstrap::doc::build());
+  doc.merge(auth::doc::build());
+  doc.merge(projects::doc::build());
+  doc.merge(environments::doc::build());
+  doc.merge(secrets::doc::build());
+  doc.merge(tokens::doc::build());
+  doc.merge(audit::doc::build());
+  doc.merge(instance::doc::build());
+  doc
 }

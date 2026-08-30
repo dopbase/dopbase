@@ -5,5 +5,5 @@ use utoipa::OpenApi;
 #[openapi(paths(controller::list),components(schemas(AuditEvent,AuditPage,ErrorBody,HttpResponseFormat<AuditPage>)),tags((name="audit")))]
 struct AuditApi;
 pub fn build() -> utoipa::openapi::OpenApi {
-    AuditApi::openapi()
+  AuditApi::openapi()
 }

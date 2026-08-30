@@ -3,6 +3,6 @@ use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct SecretInput {
-    pub key: String,
-    pub value: String,
+  pub key: String,
+  pub value: String,
 }

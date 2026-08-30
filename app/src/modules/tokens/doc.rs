@@ -5,5 +5,5 @@ use utoipa::OpenApi;
 #[openapi(paths(controller::list,controller::create,controller::revoke),components(schemas(TokenMetadata,CreateTokenRequest,CreatedTokenResponse,ErrorBody,HttpResponseFormat<Vec<TokenMetadata>>,HttpResponseFormat<CreatedTokenResponse>,HttpResponseFormat<TokenMetadata>)),tags((name="tokens")))]
 struct TokensApi;
 pub fn build() -> utoipa::openapi::OpenApi {
-    TokensApi::openapi()
+  TokensApi::openapi()
 }

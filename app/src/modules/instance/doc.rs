@@ -5,5 +5,5 @@ use utoipa::OpenApi;
 #[openapi(paths(controller::status),components(schemas(InstanceStatus,ErrorBody,HttpResponseFormat<InstanceStatus>)),tags((name="instance")))]
 struct InstanceApi;
 pub fn build() -> utoipa::openapi::OpenApi {
-    InstanceApi::openapi()
+  InstanceApi::openapi()
 }
