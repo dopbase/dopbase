@@ -7,7 +7,7 @@
 3. Check the scheme, hostname, port, firewall, and TLS configuration.
 4. Do not assume the client will fall back to another endpoint.
 
-For local development, the default is `http://localhost:8376` when no endpoint
+For local development, the default is `http://localhost:8840` when no endpoint
 is configured or overridden. If a configured remote endpoint is unavailable,
 Dopbase does not fall back to that local default.
 

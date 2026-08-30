@@ -1,6 +1,6 @@
 use std::{
   env, fs,
-  net::SocketAddr,
+  net::{IpAddr, SocketAddr},
   path::{Path, PathBuf},
   str::FromStr,
 };
@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::constants::config::{
-  CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, ENV_BIND_ADDRESS, ENV_DATA_DIR,
-  ENV_DATABASE_URL, ENV_MASTER_KEY_PATH, ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS,
-  MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
+  CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_BIND_ADDRESS,
+  ENV_DATA_DIR, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT,
+  ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -34,7 +34,23 @@ pub struct ServerConfig {
   pub public_url: String,
   pub database_url: String,
   pub shutdown_grace_seconds: u64,
+  #[serde(skip)]
+  pub docs_enabled: bool,
+  /// True when this process runs as a supervised background server and must
+  /// manage the PID file.
+  #[serde(skip)]
+  pub daemonized: bool,
   pub master_key: MasterKeyConfig,
+  /// True when bind_address came from an explicit source (file, environment,
+  /// or `--bind-address`). The ergonomic `port`/`host` selectors refuse to
+  /// mix with it so there is exactly one source of truth for the socket.
+  #[serde(skip)]
+  pub bind_address_explicit: bool,
+  /// True when public_url came from an explicit source. Otherwise it is
+  /// derived from the bind address (`http://localhost:{port}` for loopback;
+  /// remote binds fail closed and require an explicit value).
+  #[serde(skip)]
+  pub public_url_explicit: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -43,6 +59,8 @@ pub struct ServerOverrides {
   pub config_path: Option<PathBuf>,
   pub bind_address: Option<String>,
   pub public_url: Option<String>,
+  pub port: Option<u16>,
+  pub host: Option<String>,
   pub database_url: Option<String>,
   pub shutdown_grace_seconds: Option<u64>,
   pub master_key_path: Option<PathBuf>,
@@ -53,6 +71,8 @@ struct ServerConfigFile {
   version: Option<u32>,
   bind_address: Option<String>,
   public_url: Option<String>,
+  port: Option<u16>,
+  host: Option<String>,
   database_url: Option<String>,
   shutdown_grace_seconds: Option<u64>,
   master_key: Option<MasterKeyConfigFile>,
@@ -64,14 +84,19 @@ struct MasterKeyConfigFile {
   path: Option<PathBuf>,
 }
 
+/// `DOPBASE_*` environment overrides, structured so tests (and any embedder)
+/// can resolve configuration from injected values instead of process state.
 #[derive(Debug, Default)]
-struct EnvironmentOverrides {
-  data_dir: Option<PathBuf>,
-  bind_address: Option<String>,
-  public_url: Option<String>,
-  database_url: Option<String>,
-  shutdown_grace_seconds: Option<String>,
-  master_key_path: Option<PathBuf>,
+pub struct EnvironmentOverrides {
+  pub data_dir: Option<PathBuf>,
+  pub bind_address: Option<String>,
+  pub public_url: Option<String>,
+  pub port: Option<String>,
+  pub host: Option<String>,
+  pub database_url: Option<String>,
+  pub shutdown_grace_seconds: Option<String>,
+  pub docs: Option<String>,
+  pub master_key_path: Option<PathBuf>,
 }
 
 impl EnvironmentOverrides {
@@ -80,8 +105,11 @@ impl EnvironmentOverrides {
       data_dir: env::var_os(ENV_DATA_DIR).map(PathBuf::from),
       bind_address: env::var(ENV_BIND_ADDRESS).ok(),
       public_url: env::var(ENV_PUBLIC_URL).ok(),
+      port: env::var(ENV_PORT).ok(),
+      host: env::var(ENV_HOST).ok(),
       database_url: env::var(ENV_DATABASE_URL).ok(),
       shutdown_grace_seconds: env::var(ENV_SHUTDOWN_GRACE_SECONDS).ok(),
+      docs: env::var(ENV_DOCS).ok(),
       master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
     }
   }
@@ -116,6 +144,10 @@ impl ServerConfig {
       bind_address: DEFAULT_BIND_ADDRESS.into(),
       public_url: DEFAULT_PUBLIC_URL.into(),
       shutdown_grace_seconds: 10,
+      docs_enabled: false,
+      daemonized: false,
+      bind_address_explicit: false,
+      public_url_explicit: false,
     }
   }
 
@@ -123,7 +155,7 @@ impl ServerConfig {
     Self::load_with_environment(overrides, EnvironmentOverrides::read())
   }
 
-  fn load_with_environment(
+  pub fn load_with_environment(
     overrides: &ServerOverrides,
     environment: EnvironmentOverrides,
   ) -> Result<Self> {
@@ -143,16 +175,38 @@ impl ServerConfig {
     let mut config = Self::for_data_dir(data_dir);
     config.config_path.clone_from(&config_path);
 
+    let file_port;
+    let file_host;
     if config_path.exists() {
       let contents = fs::read_to_string(&config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
       let file: ServerConfigFile = toml::from_str(&contents)
         .with_context(|| format!("failed to parse {}", config_path.display()))?;
+      file_port = file.port;
+      file_host = file.host.clone();
       config.apply_file(file);
+    } else {
+      file_port = None;
+      file_host = None;
     }
 
+    let environment_port = environment
+      .port
+      .clone()
+      .map(|value| value.parse::<u16>().context("invalid DOPBASE_PORT"))
+      .transpose()?;
+    let environment_host = environment.host.clone();
     config.apply_environment(environment)?;
     config.apply_overrides(overrides);
+
+    // The ergonomic `port`/`host` selectors (CLI > environment > file) compose
+    // the bind address; an explicit `bind_address` from any source excludes
+    // them so there is exactly one source of truth for the socket.
+    config.select_bind_address(
+      overrides.port.or(environment_port).or(file_port),
+      overrides.host.clone().or(environment_host).or(file_host),
+    )?;
+    config.derive_public_url()?;
     config.master_key.path = resolve_path(&config.master_key.path)?;
     config.validate()?;
     Ok(config)
@@ -167,9 +221,11 @@ impl ServerConfig {
     }
     if let Some(value) = file.bind_address {
       self.bind_address = value;
+      self.bind_address_explicit = true;
     }
     if let Some(value) = file.public_url {
       self.public_url = value;
+      self.public_url_explicit = true;
     }
     if let Some(value) = file.database_url {
       self.database_url = value;
@@ -193,9 +249,11 @@ impl ServerConfig {
   ) -> Result<()> {
     if let Some(value) = environment.bind_address {
       self.bind_address = value;
+      self.bind_address_explicit = true;
     }
     if let Some(value) = environment.public_url {
       self.public_url = value;
+      self.public_url_explicit = true;
     }
     if let Some(value) = environment.database_url {
       self.database_url = value;
@@ -217,9 +275,11 @@ impl ServerConfig {
   ) {
     if let Some(value) = &overrides.bind_address {
       self.bind_address.clone_from(value);
+      self.bind_address_explicit = true;
     }
     if let Some(value) = &overrides.public_url {
       self.public_url.clone_from(value);
+      self.public_url_explicit = true;
     }
     if let Some(value) = &overrides.database_url {
       self.database_url.clone_from(value);
@@ -236,16 +296,67 @@ impl ServerConfig {
     self.bind_address.parse().context("invalid bind address")
   }
 
+  /// Compose the bind address from the ergonomic `port`/`host` selectors.
+  /// Either may be omitted and falls back to the default. An explicit
+  /// `bind_address` (file, environment, or `--bind-address`) excludes these
+  /// selectors entirely so the socket has exactly one source of truth.
+  fn select_bind_address(
+    &mut self,
+    port: Option<u16>,
+    host: Option<String>,
+  ) -> Result<()> {
+    if port.is_none() && host.is_none() {
+      return Ok(());
+    }
+    if self.bind_address_explicit {
+      bail!("configure either port/host or bind_address, not both");
+    }
+    let host = host.as_deref().unwrap_or("127.0.0.1");
+    let ip = match host {
+      "localhost" => IpAddr::from([127, 0, 0, 1]),
+      other => other.parse::<IpAddr>().with_context(|| {
+        format!("invalid host \"{other}\": use an IP address like 127.0.0.1 or 0.0.0.0")
+      })?,
+    };
+    self.bind_address = format!("{ip}:{}", port.unwrap_or(DEFAULT_PORT));
+    Ok(())
+  }
+
+  /// When public_url was not configured explicitly, derive it from the bind
+  /// address so `--port` alone is enough for local development. Remote binds
+  /// fail closed: Dopbase does not trust the Host header and will not guess
+  /// its public address.
+  fn derive_public_url(&mut self) -> Result<()> {
+    if self.public_url_explicit {
+      return Ok(());
+    }
+    let bind: SocketAddr = self.bind_address.parse().context("invalid bind_address")?;
+    if !bind.ip().is_loopback() {
+      bail!(
+        "public_url is required when binding beyond loopback (bind_address = \"{}\").\n\
+         Dopbase does not trust the Host header, so it cannot guess its public address.\n\
+         Set --public-url (or public_url in server.toml) to the URL clients will use,\n\
+         e.g. --public-url https://dopbase.example.com",
+        self.bind_address
+      );
+    }
+    self.public_url = format!("http://localhost:{}", bind.port());
+    Ok(())
+  }
+
   pub fn validate(&self) -> Result<()> {
     if self.version != 1 {
       bail!("unsupported server configuration version {}", self.version);
     }
     let bind = SocketAddr::from_str(&self.bind_address).context("invalid bind_address")?;
-    let public = Url::parse(&self.public_url).context("invalid public_url")?;
-    if !matches!(public.scheme(), "http" | "https") || public.host_str().is_none() {
-      bail!("public_url must be an absolute HTTP or HTTPS URL");
-    }
-    if !bind.ip().is_loopback() && self.public_url == DEFAULT_PUBLIC_URL {
+    if self.public_url_explicit {
+      let public = Url::parse(&self.public_url).context("invalid public_url")?;
+      if !matches!(public.scheme(), "http" | "https") || public.host_str().is_none() {
+        bail!("public_url must be an absolute HTTP or HTTPS URL");
+      }
+    } else if !bind.ip().is_loopback() {
+      // load() derives public_url for loopback binds before validating, so a
+      // non-loopback bind reaching here means the value was never configured.
       bail!("public_url must be configured for a non-loopback bind address");
     }
     if !self.database_url.starts_with("sqlite:") {

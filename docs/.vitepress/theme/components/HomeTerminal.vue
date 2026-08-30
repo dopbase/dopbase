@@ -5,12 +5,12 @@
       server and client handshake
     </div>
     <pre><span class="prompt">$</span> dopbase serve
-<span class="quiet">Admin UI</span>  http://localhost:8376
-<span class="quiet">API</span>       http://localhost:8376/api
+<span class="quiet">Admin UI</span>  http://localhost:8840
+<span class="quiet">API</span>       http://localhost:8840/api
 <span class="success">Ready.</span>
 
 <span class="prompt">$</span> dopbase config
-<span class="success">Server: http://localhost:8376 (default)</span>
+<span class="success">Server: http://localhost:8840 (default)</span>
 
 <span class="prompt">$</span> dopbase init storefront development --from .env
 <span class="success">Created storefront/development (env_01DEV...)</span>

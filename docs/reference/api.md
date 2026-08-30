@@ -4,8 +4,8 @@ Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.
 The generated OpenAPI 3 specification is available from a running server:
 
 ```text
-OpenAPI JSON: http://localhost:8376/api/v1/openapi.json
-Swagger UI:   http://localhost:8376/api/docs
+OpenAPI JSON: http://localhost:8840/api/v1/openapi.json
+Swagger UI:   http://localhost:8840/api/docs
 ```
 
 The Rust request and response types are the source of truth. Every Axum route

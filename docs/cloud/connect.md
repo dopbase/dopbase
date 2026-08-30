@@ -26,7 +26,7 @@ Migration tools are planned for a later release. They will need to preserve reso
 You can select a self-hosted endpoint again with `dopbase client connect`. The client should make the active endpoint visible so users can verify the destination before importing, exporting, or updating secrets.
 
 Use `dopbase client connect local` to return to the implicit
-`http://localhost:8376` default. Connecting validates the destination and clears
+`http://localhost:8840` default. Connecting validates the destination and clears
 the credential from the previous active server; run `dopbase login` against the
 new destination.
 

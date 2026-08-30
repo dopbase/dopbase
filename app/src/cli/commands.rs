@@ -29,6 +29,8 @@ pub async fn execute(cli: Cli) -> Result<i32> {
         config_path: args.config,
         bind_address: args.bind_address,
         public_url: args.public_url,
+        port: args.port,
+        host: args.host,
         database_url: args.database_url,
         shutdown_grace_seconds: args.shutdown_grace_seconds,
         master_key_path: args.master_key_file,

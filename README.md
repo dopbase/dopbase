@@ -68,7 +68,7 @@ bun run dev
 ```
 
 The combined command serves the UI at `http://localhost:8080`, proxies `/api`
-requests to the backend at `http://localhost:8376`, and stops both processes
+requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
 `bun run build:binary` and then `./app/target/release/dopbase serve`.
 

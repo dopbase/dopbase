@@ -5,7 +5,7 @@
 When no server has been selected, Dopbase uses the local default automatically:
 
 ```text
-http://localhost:8376
+http://localhost:8840
 ```
 
 You can therefore start a default local server and sign in without running
@@ -44,7 +44,7 @@ dopbase client connect local
 dopbase login
 ```
 
-After validating `http://localhost:8376`, Dopbase removes the configured server
+After validating `http://localhost:8840`, Dopbase removes the configured server
 override and returns to the implicit local default.
 
 ## Cloud uses the same command

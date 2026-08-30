@@ -20,7 +20,7 @@ dopbase run payment-service/development -- npm start
 
 ## No hidden project or environment
 
-Without configuration, the CLI connects to `http://localhost:8376`. Connecting
+Without configuration, the CLI connects to `http://localhost:8840`. Connecting
 to another endpoint saves only that server in the user's machine-global config.
 Dopbase does not write repository configuration and does not save an active
 project or environment.

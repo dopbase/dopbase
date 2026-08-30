@@ -21,21 +21,43 @@ Master key: ~/.dopbase/master.key
 
 ## Server configuration
 
+The easy path only needs a port — Dopbase derives everything else:
+
 ```toml
 version = 1
-bind_address = "127.0.0.1:8376"
-public_url = "http://localhost:8376"
-database_url = "sqlite:///home/alex/.dopbase/dopbase.db"
-shutdown_grace_seconds = 10
-
-[master_key]
-provider = "file"
-path = "~/.dopbase/master.key"
+port = 8840
 ```
 
-By default, all runtime files live in `~/.dopbase`. Select another directory
-with the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR`. Data-directory
-selection resolves in this order: CLI option, environment variable, default.
+With no `public_url` configured, a loopback server derives it from the port
+(`http://localhost:8840`). The same applies on the command line:
+
+```bash
+dopbase serve --port 8840
+```
+
+To expose the server beyond localhost, set a host and tell Dopbase its public
+address — it refuses to guess (it does not trust the `Host` header):
+
+```bash
+dopbase serve --host 0.0.0.0 --public-url https://dopbase.example.com
+```
+
+```toml
+version = 1
+host = "0.0.0.0"
+port = 8840
+public_url = "https://dopbase.example.com"
+```
+
+Advanced deployments (reverse proxies, Docker port mappings, path prefixes)
+that need the raw socket can use `bind_address` instead of `port`/`host`.
+The two styles cannot be mixed:
+
+```toml
+version = 1
+bind_address = "127.0.0.1:8840"
+public_url = "https://dopbase.example.com"
+```
 
 Individual settings resolve from command option, matching environment variable,
 `server.toml`, then the default derived from the selected data directory.

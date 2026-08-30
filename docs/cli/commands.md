@@ -16,7 +16,7 @@ reference directly.
 | `dopbase logout`                      | Remove the active saved credential  |
 | `dopbase config`                      | Show safe effective client settings |
 
-When no server is configured, client commands use `http://localhost:8376`.
+When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint before saving it in the machine-global
 config and clears the credential from the previous connection. It does not
 select a project or environment.
@@ -26,7 +26,7 @@ The server resolution order is:
 1. A global `--server <url>` argument
 2. `DOPBASE_URL`
 3. The endpoint saved by `dopbase client connect`
-4. `http://localhost:8376`
+4. `http://localhost:8840`
 
 Machine authentication uses `DOPBASE_TOKEN` in preference to a token saved by
 `login` in the operating system credential store. A saved credential is used

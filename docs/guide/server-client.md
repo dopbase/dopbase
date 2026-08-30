@@ -36,7 +36,7 @@ With no machine-global configuration, the client uses the default local
 endpoint:
 
 ```text
-http://localhost:8376
+http://localhost:8840
 ```
 
 Authenticate directly when using that default:

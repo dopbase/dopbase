@@ -5,7 +5,7 @@ in an application repository and does not remember an active project or active
 environment.
 
 The server connection is separate machine-global state. With no configured
-server, Dopbase uses `http://localhost:8376`; `client connect` can select another
+server, Dopbase uses `http://localhost:8840`; `client connect` can select another
 endpoint. See [client configuration](./configuration).
 
 This keeps the selected environment visible at the point where secrets are

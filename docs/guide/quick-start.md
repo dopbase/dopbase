@@ -37,8 +37,8 @@ dopbase serve
 The default local server exposes:
 
 ```text
-Admin UI: http://localhost:8376
-API:      http://localhost:8376/api/v1
+Admin UI: http://localhost:8840
+API:      http://localhost:8840/api/v1
 Database: ~/.dopbase/dopbase.db
 ```
 
@@ -54,7 +54,7 @@ dopbase config
 ```
 
 ```text
-Server:          http://localhost:8376
+Server:          http://localhost:8840
 Server source:   default
 Authentication:  not logged in
 Environment:     none (pass one explicitly)

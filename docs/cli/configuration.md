@@ -9,7 +9,7 @@ store an active project or environment.
 When no server is configured, the CLI uses:
 
 ```text
-http://localhost:8376
+http://localhost:8840
 ```
 
 This default is implicit. Dopbase does not need to create a configuration file
@@ -73,7 +73,7 @@ dopbase client connect local
 dopbase login
 ```
 
-The `local` alias resolves to `http://localhost:8376`. Dopbase validates the
+The `local` alias resolves to `http://localhost:8840`. Dopbase validates the
 local server, removes the `server_url` override, and removes the previous
 server's credential.
 
@@ -109,7 +109,7 @@ same safe fields for diagnostics and automation:
 ```json
 {
   "config_file": "/home/alex/.dopbase/config.toml",
-  "server_url": "http://localhost:8376",
+  "server_url": "http://localhost:8840",
   "server_source": "default",
   "authentication": "none",
   "environment": null
@@ -126,7 +126,7 @@ The effective server is resolved in this order:
 1. Global `--server <url>` argument
 2. `DOPBASE_URL`
 3. `server_url` in the global config
-4. `http://localhost:8376`
+4. `http://localhost:8840`
 
 Authentication is resolved in this order:
 
@@ -143,7 +143,7 @@ process. They never rewrite the global configuration.
 ## Multiple instances on one machine
 
 Each Dopbase server instance has its own address and server-owned SQLite
-database. For example, two local instances might listen on ports `8376` and
+database. For example, two local instances might listen on ports `8840` and
 `8377`.
 
 Only one endpoint can be globally active; v0.0.1 does not retain named profiles
@@ -156,8 +156,8 @@ dopbase client connect http://localhost:8377
 Other processes can target a different instance without changing global state:
 
 ```bash
-DOPBASE_URL=http://localhost:8376 \
-DOPBASE_TOKEN=<token-for-8376> \
+DOPBASE_URL=http://localhost:8840 \
+DOPBASE_TOKEN=<token-for-8840> \
 dopbase run env_01LOCAL -- ./application
 ```
 

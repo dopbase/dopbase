@@ -80,8 +80,20 @@ pub enum Command {
 pub struct ServeArgs {
   #[arg(long)]
   pub config: Option<PathBuf>,
+  /// Port to listen on (with --host). Cannot be combined with --bind-address.
+  #[arg(long, value_name = "PORT", conflicts_with = "bind_address")]
+  pub port: Option<u16>,
+  /// Network interface to bind, e.g. 127.0.0.1 (default) or 0.0.0.0 to expose
+  /// the server. Requires --public-url when binding beyond loopback. Cannot be
+  /// combined with --bind-address.
+  #[arg(long, value_name = "HOST", conflicts_with = "bind_address")]
+  pub host: Option<String>,
+  /// Advanced: full socket to bind, e.g. 127.0.0.1:8840. Cannot be combined
+  /// with --port/--host.
   #[arg(long)]
   pub bind_address: Option<String>,
+  /// Public URL clients use to reach this server (banners, generated links).
+  /// Optional for loopback binds; required with --host 0.0.0.0.
   #[arg(long)]
   pub public_url: Option<String>,
   #[arg(long)]
