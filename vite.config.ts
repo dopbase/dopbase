@@ -6,7 +6,9 @@ import { assetFileNames } from "./config/asset-file-names.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "./",
+  // The backend serves the UI root-mounted from ../dist (rust-embed), so
+  // assets must use absolute URLs — relative ones break on nested SPA routes.
+  base: "/",
   plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {

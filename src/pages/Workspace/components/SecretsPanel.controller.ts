@@ -307,6 +307,8 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     loading,
     loadError,
     actionError,
+    /** Refetches the metadata listing (e.g. after a full-page import). */
+    reload: load,
     revealedKey,
     revealedValue,
     revealCountdown,

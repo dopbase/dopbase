@@ -49,6 +49,11 @@ export const router = createRouter({
       component: () => import("~/pages/Workspace/Workspace.page.vue"),
     },
     {
+      path: "/workspace/p/:projectRef/e/:environmentId/import",
+      name: "environment-import",
+      component: () => import("~/pages/Workspace/ImportSecrets.page.vue"),
+    },
+    {
       path: "/audit",
       name: "audit",
       component: () => import("~/pages/Audit/Audit.page.vue"),

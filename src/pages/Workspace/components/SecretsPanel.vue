@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useSecretsPanelController } from "./SecretsPanel.controller";
 import EnvFileEditor from "./EnvFileEditor.vue";
 import ImportSecretsDialog from "./ImportSecretsDialog.vue";
@@ -46,6 +47,15 @@ const props = defineProps<{
 
 const environmentIdRef = computed(() => props.environmentId);
 const controller = useSecretsPanelController(environmentIdRef);
+const route = useRoute();
+// Returning from the full-page import sets an `imported` timestamp in the
+// query; refetch so the table reflects what was just applied.
+watch(
+  () => route.query.imported,
+  () => {
+    if (route.name === "environment") void controller.reload();
+  },
+);
 // Destructure so refs auto-unwrap in the template.
 const {
   secrets,
