@@ -18,9 +18,14 @@ const props = withDefaults(
     initialName?: string;
     submitLabel?: string;
     hint?: string;
+    placeholder?: string;
     action: (name: string) => Promise<void>;
   }>(),
-  { initialName: "", submitLabel: "Save" },
+  {
+    initialName: "",
+    submitLabel: "Save",
+    placeholder: "e.g. payment-service",
+  },
 );
 
 const emit = defineEmits<{ close: []; success: [] }>();
@@ -87,7 +92,7 @@ async function submit(): Promise<void> {
         v-model="name"
         :label="label"
         name="resource-name"
-        placeholder="e.g. payment-service"
+        :placeholder="placeholder"
         mono
         :hint="hint"
         :error="error" />

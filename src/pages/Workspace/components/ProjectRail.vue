@@ -271,6 +271,7 @@ async function confirmEnvDelete(): Promise<void> {
       "
       :submit-label="envDialog?.mode === 'rename' ? 'Rename' : 'Create'"
       hint="Example: development, staging, production"
+      placeholder="e.g. production, staging, development"
       :action="
         (name: string) =>
           envDialog?.mode === 'rename'

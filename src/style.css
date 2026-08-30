@@ -15,6 +15,9 @@
     "Fira Code Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   --color-canvas: #0a0c10;
+  /* Editor surfaces sit on the page canvas but must read as a distinct,
+     editable region — a blue-leaning step between canvas and panel. */
+  --color-editor: #0d1424;
   --color-panel: #10131a;
   --color-raised: #171b25;
   --color-line: #232837;
@@ -50,6 +53,9 @@
 @layer base {
   html {
     color-scheme: dark;
+    /* Reserves the scrollbar gutter while a modal locks body scroll, so
+       opening a dialog does not shift the layout. */
+    scrollbar-gutter: stable;
   }
 
   body {

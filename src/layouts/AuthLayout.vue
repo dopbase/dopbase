@@ -80,8 +80,33 @@ const { health, reachable, endpoint } = useServerStatus();
 
     <!-- Form side -->
     <main
-      class="flex flex-1 items-start justify-center px-6 py-10 md:items-center md:px-12">
+      class="auth-form-side relative flex flex-1 items-start justify-center px-6 py-10 md:items-center md:px-12">
       <slot />
     </main>
   </div>
 </template>
+
+<style scoped>
+/* Blueprint grid on the form side, fading out from the center so the
+   form stays the focal point. Painted behind the slot content. */
+.auth-form-side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgb(35 40 55 / 0.55) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(35 40 55 / 0.55) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 45%,
+    black 20%,
+    transparent 80%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 45%,
+    black 20%,
+    transparent 80%
+  );
+}
+</style>

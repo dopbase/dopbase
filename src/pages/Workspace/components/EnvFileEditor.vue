@@ -83,7 +83,7 @@ defineExpose({ focus });
 <template>
   <div
     data-testid="env-editor"
-    class="flex flex-col overflow-hidden rounded-[var(--radius-card)] border bg-canvas transition-colors focus-within:border-accent"
+    class="flex flex-col overflow-hidden rounded-[var(--radius-card)] border bg-editor transition-colors focus-within:border-accent"
     :class="issues.length > 0 ? 'border-crit/60' : 'border-line'">
     <div class="max-h-[26rem] min-h-[12rem] overflow-y-auto">
       <div class="relative">

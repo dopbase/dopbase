@@ -27,6 +27,21 @@ const widthClass = {
   lg: "max-w-2xl",
 }[props.size];
 
+// Stacked dialogs (e.g. a confirm dialog over the import dialog) share one
+// body scroll lock: it is released only when the last one closes, so an
+// inner dialog unmounting early cannot unlock the page beneath an open one.
+let scrollLockCount = 0;
+
+function acquireScrollLock(): void {
+  scrollLockCount += 1;
+  if (scrollLockCount === 1) document.body.style.overflow = "hidden";
+}
+
+function releaseScrollLock(): void {
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if (scrollLockCount === 0) document.body.style.overflow = "";
+}
+
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape" && !props.persistent) emit("close");
 }
@@ -36,11 +51,11 @@ watch(
   (open) => {
     if (open) {
       document.addEventListener("keydown", onKeydown);
-      document.body.style.overflow = "hidden";
+      acquireScrollLock();
       requestAnimationFrame(() => panel.value?.focus());
     } else {
       document.removeEventListener("keydown", onKeydown);
-      document.body.style.overflow = "";
+      releaseScrollLock();
     }
   },
 );
@@ -48,13 +63,13 @@ watch(
 onMounted(() => {
   if (props.open) {
     document.addEventListener("keydown", onKeydown);
-    document.body.style.overflow = "hidden";
+    acquireScrollLock();
   }
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("keydown", onKeydown);
-  document.body.style.overflow = "";
+  if (props.open) releaseScrollLock();
 });
 </script>
 
