@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 pub mod constants;
+pub mod daemon;
 pub mod extractors;
 pub mod http;
 pub mod models;

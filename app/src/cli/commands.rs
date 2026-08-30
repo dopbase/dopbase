@@ -16,6 +16,7 @@ use std::{
   env, fs,
   io::{self, IsTerminal, Read, Write},
   path::{Path, PathBuf},
+  time::Duration,
 };
 
 pub async fn execute(cli: Cli) -> Result<i32> {
@@ -24,8 +25,32 @@ pub async fn execute(cli: Cli) -> Result<i32> {
   let json_output = cli.json;
   match cli.command {
     Command::Serve(args) => {
+      let docs = args.docs();
+      let background = args.background;
+      let supervised = args.supervised;
+      if background {
+        let config = ServerConfig::load(&ServerOverrides {
+          data_dir: data_dir.clone(),
+          docs,
+          background,
+          supervised,
+          config_path: args.config.clone(),
+          bind_address: args.bind_address.clone(),
+          public_url: args.public_url.clone(),
+          port: args.port,
+          host: args.host.clone(),
+          database_url: args.database_url.clone(),
+          shutdown_grace_seconds: args.shutdown_grace_seconds,
+          master_key_path: args.master_key_file.clone(),
+        })?;
+        let flags = serve_flags(&args, &config.data_dir);
+        return crate::daemon::start(config, &flags, json_output).await;
+      }
       let config = ServerConfig::load(&ServerOverrides {
         data_dir,
+        docs,
+        background,
+        supervised,
         config_path: args.config,
         bind_address: args.bind_address,
         public_url: args.public_url,
@@ -35,7 +60,12 @@ pub async fn execute(cli: Cli) -> Result<i32> {
         shutdown_grace_seconds: args.shutdown_grace_seconds,
         master_key_path: args.master_key_file,
       })?;
-      crate::server::serve(config).await?;
+      let ready = supervised.then(crate::daemon::Ready::attached).flatten();
+      let result = crate::server::serve_with_ready(config, ready.as_ref()).await;
+      if let (Some(ready), Err(error)) = (&ready, &result) {
+        ready.fail(&format!("{error:#}"));
+      }
+      result?;
       Ok(0)
     }
     Command::Client {
@@ -67,11 +97,71 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       Ok(0)
     }
     Command::Admin { command } => admin(command, data_dir).await,
+    Command::Update => super::update::run(json_output).await,
+    Command::Stop { timeout } => {
+      crate::daemon::stop(
+        data_dir.as_deref(),
+        Duration::from_secs(timeout),
+        json_output,
+      )
+      .await
+    }
     command => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
       execute_client(command, &server, json_output).await
     }
   }
+}
+
+/// Build the argv for the detached background server: the same user flags
+/// plus the resolved data directory and the internal `--supervised` marker
+/// (`--background` itself must not reappear, or the child would daemonize again).
+fn serve_flags(
+  args: &ServeArgs,
+  data_dir: &Path,
+) -> Vec<String> {
+  let mut flags = vec!["serve".to_string()];
+  if let Some(value) = &args.config {
+    flags.push("--config".into());
+    flags.push(value.to_string_lossy().into_owned());
+  }
+  if let Some(value) = &args.bind_address {
+    flags.push("--bind-address".into());
+    flags.push(value.clone());
+  }
+  if let Some(value) = args.port {
+    flags.push("--port".into());
+    flags.push(value.to_string());
+  }
+  if let Some(value) = &args.host {
+    flags.push("--host".into());
+    flags.push(value.clone());
+  }
+  if let Some(value) = &args.public_url {
+    flags.push("--public-url".into());
+    flags.push(value.clone());
+  }
+  if let Some(value) = &args.database_url {
+    flags.push("--database-url".into());
+    flags.push(value.clone());
+  }
+  if let Some(value) = args.shutdown_grace_seconds {
+    flags.push("--shutdown-grace-seconds".into());
+    flags.push(value.to_string());
+  }
+  match args.docs() {
+    Some(true) => flags.push("--docs".into()),
+    Some(false) => flags.push("--no-docs".into()),
+    None => {}
+  }
+  if let Some(value) = &args.master_key_file {
+    flags.push("--master-key-file".into());
+    flags.push(value.to_string_lossy().into_owned());
+  }
+  flags.push("--data-dir".into());
+  flags.push(data_dir.to_string_lossy().into_owned());
+  flags.push("--supervised".into());
+  flags
 }
 
 async fn connect(

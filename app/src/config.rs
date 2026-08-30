@@ -63,6 +63,9 @@ pub struct ServerOverrides {
   pub host: Option<String>,
   pub database_url: Option<String>,
   pub shutdown_grace_seconds: Option<u64>,
+  pub docs: Option<bool>,
+  pub background: bool,
+  pub supervised: bool,
   pub master_key_path: Option<PathBuf>,
 }
 
@@ -75,6 +78,7 @@ struct ServerConfigFile {
   host: Option<String>,
   database_url: Option<String>,
   shutdown_grace_seconds: Option<u64>,
+  docs: Option<bool>,
   master_key: Option<MasterKeyConfigFile>,
 }
 
@@ -233,6 +237,9 @@ impl ServerConfig {
     if let Some(value) = file.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
     }
+    if let Some(value) = file.docs {
+      self.docs_enabled = value;
+    }
     if let Some(master_key) = file.master_key {
       if let Some(value) = master_key.provider {
         self.master_key.provider = value;
@@ -263,6 +270,9 @@ impl ServerConfig {
         .parse()
         .context("invalid DOPBASE_SHUTDOWN_GRACE_SECONDS")?;
     }
+    if let Some(value) = environment.docs {
+      self.docs_enabled = value.parse().context("invalid DOPBASE_DOCS")?;
+    }
     if let Some(value) = environment.master_key_path {
       self.master_key.path = value;
     }
@@ -287,6 +297,10 @@ impl ServerConfig {
     if let Some(value) = overrides.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
     }
+    if let Some(value) = overrides.docs {
+      self.docs_enabled = value;
+    }
+    self.daemonized = overrides.background || overrides.supervised;
     if let Some(value) = &overrides.master_key_path {
       self.master_key.path.clone_from(value);
     }
@@ -381,14 +395,6 @@ pub fn resolve_data_dir(argument: Option<&Path>) -> Result<PathBuf> {
   resolve_path(argument.or(environment.as_deref()).unwrap_or(&fallback))
 }
 
-pub fn default_server_config_path() -> PathBuf {
-  dopbase_home().join(SERVER_CONFIG_FILENAME)
-}
-
-pub fn default_client_config_path() -> PathBuf {
-  dopbase_home().join(CLIENT_CONFIG_FILENAME)
-}
-
 pub fn client_config_path(data_dir: Option<&Path>) -> Result<PathBuf> {
   Ok(resolve_data_dir(data_dir)?.join(CLIENT_CONFIG_FILENAME))
 }
@@ -449,81 +455,4 @@ fn expand_home(path: &Path) -> PathBuf {
     return base.home_dir().join(rest);
   }
   path.to_path_buf()
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn defaults_use_the_dopbase_data_directory() {
-    let config = ServerConfig::default();
-    assert_eq!(
-      config.database_url,
-      sqlite_url(&config.data_dir.join(DATABASE_FILENAME))
-    );
-    assert_eq!(
-      config.master_key.path,
-      config.data_dir.join(MASTER_KEY_FILENAME)
-    );
-    assert_eq!(
-      config.config_path,
-      config.data_dir.join(SERVER_CONFIG_FILENAME)
-    );
-    config.validate().unwrap();
-  }
-
-  #[test]
-  fn cli_overrides_environment_and_config_file() {
-    let directory = tempfile::TempDir::new().unwrap();
-    let data_dir = directory.path().join("data");
-    fs::create_dir_all(&data_dir).unwrap();
-    let config_path = data_dir.join(SERVER_CONFIG_FILENAME);
-    fs::write(
-            &config_path,
-            "bind_address = '127.0.0.1:1001'\ndatabase_url = 'sqlite://file.db'\n[master_key]\npath = 'file.key'\n",
-        )
-        .unwrap();
-    let overrides = ServerOverrides {
-      data_dir: Some(data_dir.clone()),
-      bind_address: Some("127.0.0.1:3003".into()),
-      database_url: Some("sqlite://cli.db".into()),
-      master_key_path: Some(directory.path().join("cli.key")),
-      ..Default::default()
-    };
-    let environment = EnvironmentOverrides {
-      bind_address: Some("127.0.0.1:2002".into()),
-      database_url: Some("sqlite://environment.db".into()),
-      master_key_path: Some(directory.path().join("environment.key")),
-      ..Default::default()
-    };
-
-    let config = ServerConfig::load_with_environment(&overrides, environment).unwrap();
-    assert_eq!(config.data_dir, data_dir);
-    assert_eq!(config.bind_address, "127.0.0.1:3003");
-    assert_eq!(config.database_url, "sqlite://cli.db");
-    assert_eq!(config.master_key.path, directory.path().join("cli.key"));
-  }
-
-  #[test]
-  fn rejects_remote_bind_without_public_url() {
-    let config = ServerConfig {
-      bind_address: "0.0.0.0:8376".into(),
-      ..Default::default()
-    };
-    assert!(config.validate().is_err());
-  }
-
-  #[cfg(unix)]
-  #[test]
-  fn creates_owner_only_data_directory() {
-    use std::os::unix::fs::PermissionsExt;
-    let directory = tempfile::TempDir::new().unwrap();
-    let data_dir = directory.path().join("private");
-    ensure_data_dir(&data_dir).unwrap();
-    assert_eq!(
-      fs::metadata(data_dir).unwrap().permissions().mode() & 0o777,
-      0o700
-    );
-  }
 }

@@ -74,6 +74,14 @@ pub enum Command {
     #[command(subcommand)]
     command: AdminCommand,
   },
+  /// Check GitHub for a newer Dopbase release (informational only).
+  Update,
+  /// Stop the background server started with `serve --background`.
+  Stop {
+    /// Seconds to wait for a graceful shutdown before forcing it.
+    #[arg(long, default_value_t = 10)]
+    timeout: u64,
+  },
 }
 
 #[derive(Args, Debug, Default)]
@@ -100,8 +108,34 @@ pub struct ServeArgs {
   pub database_url: Option<String>,
   #[arg(long)]
   pub shutdown_grace_seconds: Option<u64>,
+  /// Serve the API documentation (Swagger UI) at /api/docs. Off by default.
+  #[arg(long, overrides_with = "no_docs")]
+  pub docs: bool,
+  /// Disable the API documentation for this run, overriding server.toml or DOPBASE_DOCS.
+  #[arg(long, overrides_with = "docs")]
+  pub no_docs: bool,
+  /// Run the server detached in the background (macOS and Linux).
+  #[arg(long)]
+  pub background: bool,
+  /// Internal: set by `serve --background` on the detached child process.
+  #[arg(long, hide = true)]
+  pub supervised: bool,
   #[arg(long)]
   pub master_key_file: Option<PathBuf>,
+}
+
+impl ServeArgs {
+  /// Fold the `--docs`/`--no-docs` pair into a single tri-state value
+  /// (last flag on the command line wins).
+  pub fn docs(&self) -> Option<bool> {
+    if self.docs {
+      Some(true)
+    } else if self.no_docs {
+      Some(false)
+    } else {
+      None
+    }
+  }
 }
 #[derive(Subcommand, Debug)]
 pub enum ClientCommand {
@@ -199,111 +233,4 @@ pub enum AdminCommand {
     #[arg(long)]
     master_key_file: Option<PathBuf>,
   },
-}
-
-#[cfg(test)]
-mod tests {
-  use super::Cli;
-  use clap::Parser;
-
-  #[test]
-  fn parses_every_v0_1_command_shape() {
-    let commands: &[&[&str]] = &[
-      &["dopbase", "serve"],
-      &["dopbase", "serve", "--data-dir", "/tmp/dopbase"],
-      &["dopbase", "client", "connect", "http://localhost:8376"],
-      &["dopbase", "login"],
-      &["dopbase", "logout"],
-      &["dopbase", "config"],
-      &["dopbase", "init", "billing", "production", "--from", ".env"],
-      &["dopbase", "project", "create", "billing"],
-      &["dopbase", "project", "list"],
-      &["dopbase", "project", "show", "billing"],
-      &["dopbase", "project", "rename", "billing", "payments"],
-      &["dopbase", "project", "delete", "billing", "--yes"],
-      &["dopbase", "env", "create", "billing", "production"],
-      &["dopbase", "env", "list", "billing"],
-      &["dopbase", "env", "show", "billing/production"],
-      &["dopbase", "env", "rename", "env_01", "staging"],
-      &["dopbase", "env", "delete", "env_01", "--yes"],
-      &["dopbase", "secret", "list", "billing/production"],
-      &[
-        "dopbase",
-        "secret",
-        "set",
-        "billing/production",
-        "API_KEY",
-        "--stdin",
-      ],
-      &[
-        "dopbase",
-        "secret",
-        "get",
-        "billing/production",
-        "API_KEY",
-        "--reveal",
-      ],
-      &[
-        "dopbase",
-        "secret",
-        "delete",
-        "billing/production",
-        "API_KEY",
-        "--yes",
-      ],
-      &[
-        "dopbase",
-        "import",
-        "billing/production",
-        ".env",
-        "--dry-run",
-      ],
-      &["dopbase", "export", "billing/production", "--stdout"],
-      &[
-        "dopbase",
-        "token",
-        "create",
-        "billing/production",
-        "--name",
-        "server",
-      ],
-      &["dopbase", "token", "list", "billing/production"],
-      &["dopbase", "token", "revoke", "tok_01"],
-      &["dopbase", "run", "billing/production", "--", "printenv"],
-      &["dopbase", "admin", "reset-password", "admin@example.com"],
-      &["dopbase", "--json", "project", "list"],
-      &["dopbase", "--data-dir", "/tmp/dopbase", "config"],
-    ];
-
-    for command in commands {
-      Cli::try_parse_from(*command)
-        .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
-    }
-  }
-
-  #[test]
-  fn rejects_conflicting_file_options() {
-    assert!(
-      Cli::try_parse_from([
-        "dopbase",
-        "import",
-        "billing/production",
-        ".env",
-        "--dry-run",
-        "--replace",
-      ])
-      .is_err()
-    );
-    assert!(
-      Cli::try_parse_from([
-        "dopbase",
-        "export",
-        "billing/production",
-        "--output",
-        "secrets.env",
-        "--stdout",
-      ])
-      .is_err()
-    );
-  }
 }

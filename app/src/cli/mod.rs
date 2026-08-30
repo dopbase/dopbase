@@ -1,8 +1,9 @@
-mod args;
+pub mod args;
 mod client;
 mod commands;
-mod dotenv;
+pub mod dotenv;
 mod local_config;
+pub mod update;
 
 pub use args::Cli;
 

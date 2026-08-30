@@ -9,6 +9,11 @@ use tempfile::TempDir;
 use tower::ServiceExt;
 
 async fn test_app() -> (TempDir, app::state::AppState, Router) {
+  let (directory, state, router) = test_app_with_docs(true).await;
+  (directory, state, router)
+}
+
+async fn test_app_with_docs(docs_enabled: bool) -> (TempDir, app::state::AppState, Router) {
   let directory = TempDir::new().unwrap();
   let database = directory.path().join("dopbase.db");
   let config = ServerConfig {
@@ -17,6 +22,7 @@ async fn test_app() -> (TempDir, app::state::AppState, Router) {
       provider: "file".into(),
       path: directory.path().join("master.key"),
     },
+    docs_enabled,
     ..ServerConfig::default()
   };
   let state = server::build_state(config).await.unwrap();
@@ -91,6 +97,42 @@ async fn health_and_openapi_are_available() {
     );
   }
   assert!(spec["components"]["schemas"]["ErrorBody"].is_object());
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn docs_are_disabled_by_default() {
+  let (_directory, state, router) = test_app_with_docs(false).await;
+  let (status, body, _) = call(&router, "GET", "/api/v1/health", None, None).await;
+  assert_eq!(status, 200);
+  assert_eq!(body["data"]["product"], "dopbase");
+  let (status, body, _) = call(&router, "GET", "/api/v1/openapi.json", None, None).await;
+  assert_eq!(status, 404);
+  assert_eq!(
+    body,
+    json!({"success":false,"error":{"REQUEST_INVALID":"The requested API route was not found."}})
+  );
+  let (status, _, _) = call(&router, "GET", "/api/docs", None, None).await;
+  assert_eq!(status, 404);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn docs_can_be_enabled_per_config() {
+  let (_directory, state, router) = test_app_with_docs(true).await;
+  let request = Request::builder()
+    .uri("/api/docs/")
+    .body(Body::empty())
+    .unwrap();
+  let response = router.clone().oneshot(request).await.unwrap();
+  assert_eq!(response.status().as_u16(), 200, "trailing-slash docs route");
+  assert_eq!(
+    response.headers().get(header::CONTENT_TYPE).unwrap(),
+    "text/html"
+  );
+  let (status, spec, _) = call(&router, "GET", "/api/v1/openapi.json", None, None).await;
+  assert_eq!(status, 200);
+  assert!(spec["paths"]["/api/v1/health"].is_object());
   state.db.close().await;
 }
 

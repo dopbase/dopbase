@@ -10,16 +10,42 @@ reference directly.
 | Command                               | Purpose                             |
 | ------------------------------------- | ----------------------------------- |
 | `dopbase serve`                       | Start a self-hosted server          |
+| `dopbase serve --background`          | Start the server as a daemon        |
+| `dopbase stop`                        | Stop the background server          |
 | `dopbase client connect <server-url>` | Validate and save another server    |
 | `dopbase client connect local`        | Return to the implicit local server |
 | `dopbase login`                       | Authenticate with the active server |
 | `dopbase logout`                      | Remove the active saved credential  |
 | `dopbase config`                      | Show safe effective client settings |
+| `dopbase update`                      | Check GitHub for a newer release    |
 
 When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint before saving it in the machine-global
 config and clears the credential from the previous connection. It does not
 select a project or environment.
+
+## Server lifecycle
+
+`serve --background` and `stop` manage a detached server; see
+[serve](./serve#run-in-the-background) for PID and log file locations.
+`stop --timeout <seconds>` extends the grace period before the daemon is
+force-stopped (default 10).
+
+## Check for updates
+
+`dopbase update` compares the running version against the latest release tag on
+GitHub. It is informational only and never modifies the binary:
+
+```text
+dopbase 0.0.1 is up to date (latest release v0.1.0).
+```
+
+When a newer release exists, the command prints the current version, the latest
+version, the release URL, and a reminder that Dopbase does not self-update —
+install the new release with `scripts/install.sh` or the release archive. The
+command exits with status 0 whether or not an update is available, and with
+status 1 when the release cannot be queried. Run it with `--json` for
+automation; no other command contacts GitHub.
 
 The server resolution order is:
 

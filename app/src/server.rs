@@ -59,24 +59,26 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
 }
 
 pub fn router(state: AppState) -> Router {
-  let mut openapi = modules::openapi();
-  let components = openapi.components.get_or_insert_with(Default::default);
-  components.add_security_scheme(
-    "bearerAuth",
-    SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
-  );
-  components.add_security_scheme(
-    "cookieAuth",
-    SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("dopbase_session"))),
-  );
-  components.add_security_scheme(
-    "csrfHeader",
-    SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Dopbase-CSRF"))),
-  );
   let request_id = HeaderName::from_static("x-request-id");
-  Router::new()
-    .merge(modules::routes())
-    .merge(SwaggerUi::new("/api/docs").url("/api/v1/openapi.json", openapi))
+  let mut router = Router::new().merge(modules::routes());
+  if state.config.docs_enabled {
+    let mut openapi = modules::openapi();
+    let components = openapi.components.get_or_insert_with(Default::default);
+    components.add_security_scheme(
+      "bearerAuth",
+      SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
+    );
+    components.add_security_scheme(
+      "cookieAuth",
+      SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("dopbase_session"))),
+    );
+    components.add_security_scheme(
+      "csrfHeader",
+      SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Dopbase-CSRF"))),
+    );
+    router = router.merge(SwaggerUi::new("/api/docs").url("/api/v1/openapi.json", openapi));
+  }
+  router
     .fallback(static_fallback)
     .layer(DefaultBodyLimit::max(3 * 1024 * 1024))
     .layer(TimeoutLayer::with_status_code(
@@ -121,10 +123,20 @@ async fn normalize_error_response(response: Response) -> Response {
 }
 
 pub async fn serve(config: ServerConfig) -> Result<()> {
+  serve_with_ready(config, None).await
+}
+
+/// Run the server, optionally reporting readiness (or the startup failure) to
+/// the foreground command that spawned it in background mode.
+pub async fn serve_with_ready(
+  config: ServerConfig,
+  ready: Option<&crate::daemon::Ready>,
+) -> Result<()> {
   ensure_data_dir(&config.data_dir)?;
   let _lock = InstanceLock::acquire(&config.database_url)?;
   let state = build_state(config).await?;
-  if let Some(setup) = state.setup.read().await.token.as_deref() {
+  let setup_token = state.setup.read().await.token.clone();
+  if let Some(setup) = setup_token.as_deref() {
     eprintln!("\nDopbase setup token (shown once):\n{setup}\n");
   }
   let address = state.config.bind_addr()?;
@@ -132,21 +144,39 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
   let listener = tokio::net::TcpListener::bind(address)
     .await
     .with_context(|| format!("failed to bind {address}"))?;
+  let daemonized = state.config.daemonized;
+  if daemonized {
+    crate::daemon::write_pid_file(
+      &crate::daemon::pid_file_path(&state.config.data_dir),
+      std::process::id(),
+      &state.config.bind_address,
+    )?;
+  }
+  if let Some(ready) = ready {
+    ready.ok(std::process::id(), setup_token.as_deref());
+  }
   let public_url = state.config.public_url.trim_end_matches('/');
-  let database = database_path(&state.config.database_url)?;
   #[cfg(feature = "embedded-ui")]
   eprintln!("Admin UI:   {public_url}");
   #[cfg(not(feature = "embedded-ui"))]
   eprintln!("Admin UI:   not embedded (run `bun run dev` or `bun run build:binary`)");
-  eprintln!(
-    "API:        {public_url}/api/v1\nSwagger:    {public_url}/api/docs\nData:       {}\nDatabase:   {}",
-    state.config.data_dir.display(),
-    database.display()
-  );
+  let mut banner = format!("API:        {public_url}/api/v1");
+  if state.config.docs_enabled {
+    banner.push_str(&format!("\nSwagger:    {public_url}/api/docs"));
+  }
+  banner.push_str(&format!(
+    "\nConfig:     {}",
+    state.config.data_dir.display()
+  ));
+  eprintln!("{banner}");
   tracing::info!(%address,"Dopbase server started");
-  axum::serve(listener, router(state.clone()))
+  let serve_result = axum::serve(listener, router(state.clone()))
     .with_graceful_shutdown(shutdown_signal())
-    .await?;
+    .await;
+  if daemonized {
+    let _ = crate::daemon::remove_pid_file(&crate::daemon::pid_file_path(&state.config.data_dir));
+  }
+  serve_result?;
   if let Err(error) = state.db.checkpoint().await {
     tracing::warn!(%error, "failed to checkpoint SQLite WAL during shutdown");
   }
@@ -212,6 +242,13 @@ async fn static_fallback(uri: Uri) -> Response {
   #[cfg(feature = "embedded-ui")]
   {
     embedded_asset(uri.path()).unwrap_or_else(|| {
+      // Asset-looking paths must 404 instead of falling back to
+      // index.html — serving HTML for a missing .js/.css masks broken
+      // asset URLs as a silently blank page ("Failed to load module
+      // script" with an HTML MIME type).
+      if looks_like_asset(uri.path()) {
+        return StatusCode::NOT_FOUND.into_response();
+      }
       embedded_asset("/index.html").unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
     })
   }
@@ -228,6 +265,17 @@ async fn static_fallback(uri: Uri) -> Response {
 #[derive(rust_embed::RustEmbed)]
 #[folder = "../dist/"]
 struct AdminAssets;
+
+#[cfg(feature = "embedded-ui")]
+fn looks_like_asset(path: &str) -> bool {
+  const ASSET_EXTENSIONS: [&str; 12] = [
+    "js", "mjs", "css", "map", "woff", "woff2", "ttf", "otf", "svg", "png", "jpg", "ico",
+  ];
+  let name = path.rsplit('/').next().unwrap_or(path);
+  name
+    .split_once('.')
+    .is_some_and(|(_, ext)| ASSET_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+}
 
 #[cfg(feature = "embedded-ui")]
 fn embedded_asset(path: &str) -> Option<Response> {

@@ -25,6 +25,7 @@ trap cleanup EXIT
 cp ./target/release/dopbase "${binary}"
 cd "${runtime_root}"
 "${binary}" --data-dir "${data_dir}" serve \
+  --docs \
   --bind-address 127.0.0.1:18376 \
   --public-url http://127.0.0.1:18376 \
   >"${server_log}" 2>&1 &
