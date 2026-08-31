@@ -25,7 +25,7 @@ const children: Child[] = [
 ];
 
 console.log("Dopbase development servers starting:");
-console.log("  Admin UI: http://localhost:8080");
+console.log("  Admin UI: http://localhost:9000");
 console.log("  API:      http://localhost:8840/api/v1");
 console.log("  Swagger:  http://localhost:8840/api/docs/");
 

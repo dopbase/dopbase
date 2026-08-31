@@ -3,5 +3,6 @@ dist/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 .DS_Store
+*.DS_Store
 *.local
 *.codegraph
