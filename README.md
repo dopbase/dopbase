@@ -39,7 +39,7 @@ Read the [public documentation](./docs/) for the product model, CLI, self-hostin
 
 | Path     | Purpose                                   | Current state                 |
 | -------- | ----------------------------------------- | ----------------------------- |
-| `app/`   | Rust service and command-line application | v0.0.1 backend implementation |
+| `app/`   | Rust service and command-line application | v0.0.8 backend implementation |
 | `src/`   | Vue administration interface              | Initial scaffold              |
 | `docs/`  | VitePress product documentation           | Active public specification   |
 | `tests/` | Frontend tests and test setup             | Early test scaffold           |

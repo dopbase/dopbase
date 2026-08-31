@@ -27,7 +27,7 @@ const {
       <header class="mb-6">
         <h1 class="text-lg font-semibold">Account</h1>
         <p class="mt-0.5 text-sm text-ink-muted">
-          v0.0.1 supports exactly one administrator.
+          v0.0.8 supports exactly one administrator.
         </p>
       </header>
 

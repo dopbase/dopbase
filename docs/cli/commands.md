@@ -1,6 +1,6 @@
 # Command reference
 
-This page defines the implemented v0.0.1 command surface. Dopbase does not infer a
+This page defines the implemented v0.0.8 command surface. Dopbase does not infer a
 project or environment from the current directory and does not store an active
 project or environment. Commands that work with secrets receive an environment
 reference directly.
@@ -37,7 +37,7 @@ force-stopped (default 10).
 GitHub. It is informational only and never modifies the binary:
 
 ```text
-dopbase 0.0.1 is up to date (latest release v0.1.0).
+dopbase 0.0.8 is up to date (latest release v0.1.0).
 ```
 
 When a newer release exists, the command prints the current version, the latest

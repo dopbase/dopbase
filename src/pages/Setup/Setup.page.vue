@@ -92,7 +92,7 @@ const {
       </form>
 
       <p class="mt-6 text-sm leading-relaxed text-ink-muted">
-        Only one administrator account exists in v0.0.1. Password recovery later
+        Only one administrator account exists in v0.0.8. Password recovery later
         requires the master key on the server host via
         <DbCode>dopbase admin reset-password</DbCode>.
       </p>

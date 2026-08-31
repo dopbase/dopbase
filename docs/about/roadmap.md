@@ -2,7 +2,7 @@
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## Current testing release: v0.0.1
+## Current testing release: v0.0.8
 
 - Authentication
 - Projects and environments

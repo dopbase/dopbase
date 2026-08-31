@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "~/stores/auth.store";
+import { useRoute } from "vue-router";
 import {
   TerminalIcon,
   FolderIcon,
@@ -11,6 +9,7 @@ import {
   LogOutIcon,
 } from "~/assets/icons";
 import ReauthModal from "~/components/app/ReauthModal.vue";
+import { useDashboardLayoutController } from "./DashboardLayout.controller";
 
 /**
  * DashboardLayout — the authenticated app shell.
@@ -21,8 +20,7 @@ import ReauthModal from "~/components/app/ReauthModal.vue";
  * it.
  */
 const route = useRoute();
-const router = useRouter();
-const auth = useAuthStore();
+const { email, logout } = useDashboardLayoutController();
 
 const navItems = [
   {
@@ -53,13 +51,6 @@ const navItems = [
 
 const isActive = (item: (typeof navItems)[number]): boolean =>
   item.match(route.path);
-
-const email = computed(() => auth.session?.email ?? "");
-
-async function logout(): Promise<void> {
-  await auth.logout();
-  router.push({ name: "login" });
-}
 </script>
 
 <template>

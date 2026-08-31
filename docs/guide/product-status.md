@@ -1,11 +1,11 @@
 # Product status
 
-Dopbase 0.0.1 is the current testing release. It includes the Rust server and
+Dopbase 0.0.8 is the current testing release. It includes the Rust server and
 CLI, the embedded Vue Admin UI, the REST API, generated OpenAPI and Swagger
 documentation, and SQLite storage in one executable. It is intended for testing
 and evaluation before the first public release, 0.1.0.
 
-## Available in 0.0.1
+## Available in 0.0.8
 
 - Projects, environments, and individually managed secrets
 - Encryption before persistence with separate master-key material

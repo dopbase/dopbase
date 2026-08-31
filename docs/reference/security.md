@@ -3,7 +3,7 @@
 Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Security is part of the product behavior, not a layer added after storage and APIs are complete.
 
 ::: info Review the security model
-This page documents the 0.0.1 security model. Public source makes independent
+This page documents the 0.0.8 security model. Public source makes independent
 review possible, but it is not the same as an independent security audit.
 :::
 
@@ -19,7 +19,7 @@ review possible, but it is not the same as an independent security audit.
 
 ## Envelope encryption
 
-The v0.0.1 implementation uses envelope encryption:
+The v0.0.8 implementation uses envelope encryption:
 
 ```text
 Secret value

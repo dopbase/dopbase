@@ -1,10 +1,10 @@
 # Quick start
 
-This walkthrough installs Dopbase 0.0.1, starts a local server, imports an
+This walkthrough installs Dopbase 0.0.8, starts a local server, imports an
 existing `.env` file, and runs an application with its secrets.
 
 ::: warning Testing release
-Dopbase 0.0.1 is intended for testing and evaluation. The first public release
+Dopbase 0.0.8 is intended for testing and evaluation. The first public release
 will be 0.1.0.
 :::
 

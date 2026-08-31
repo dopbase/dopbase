@@ -4,37 +4,117 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+## 0.0.8 - 2026-08-30
+
 ### Added
 
-- `dopbase serve --port <PORT>` and `--host <HOST>` flags (plus `port`/`host`
-  keys in `server.toml` and `DOPBASE_PORT`/`DOPBASE_HOST` environment
-  variables) as the simple way to configure the network address. With a
-  loopback bind and no explicit `public_url`, the public URL is derived from
-  the port. Binding beyond loopback without `public_url` fails with guidance
-  instead of guessing.
-- `dopbase update` checks GitHub for a newer release and prints the current
-  version, the latest version, and the release URL. Informational only —
-  Dopbase does not self-update.
-- `dopbase serve --background` starts the server as a detached daemon with a
-  PID file (`dopbase.pid`) and log file (`serve.log`) in the data directory.
-  Startup failures are reported to the terminal before the command returns.
-- `dopbase stop` gracefully stops the background server, escalating to a
-  forced stop after `--timeout` seconds (default 10), and cleans up stale PID
-  files.
-- `docs` server setting with `--docs`/`--no-docs` flags and `DOPBASE_DOCS`
-  environment variable to control the Swagger UI and OpenAPI document.
+- Configurable server host and port through CLI flags, `server.toml`, and
+  environment variables, including automatic public URL derivation for
+  loopback addresses.
+- Background server operation with PID and log files, graceful shutdown via
+  `dopbase stop`, stale PID cleanup, and startup failure reporting.
+- Informational `dopbase update` checks for newer GitHub releases.
+- Configuration and CLI controls for enabling the Swagger UI and OpenAPI
+  document when required.
+- A dedicated Admin UI page for reviewing imported secrets.
 
 ### Changed
 
-- The default server port is now **8840** (was 8376). Existing `server.toml`
-  files with an explicit `bind_address` are unaffected; default installs will
-  serve on `http://localhost:8840` after upgrading.
-- The Swagger UI (`/api/docs`) and OpenAPI document (`/api/v1/openapi.json`)
-  are now disabled by default; pass `--docs` to enable them.
+- The default server port is now **8840** instead of 8376.
+- Swagger UI and OpenAPI documents are disabled by default.
+- Expanded generated endpoint documentation and moved HTTP error coverage into
+  integration tests.
+- Refined workspace and dialog presentation throughout the Admin UI.
+- Streamlined backend dependencies and adopted shared Rust formatting rules.
 
-## 0.0.1 - 2026-08-29
+## 0.0.7 - 2026-08-29
 
 ### Added
 
-- Testing release of the Dopbase server, CLI, REST API, and embedded Admin UI.
-- Self-contained release binaries for Linux and macOS on x64 and ARM64.
+- Public documentation for CLI commands, REST API endpoints, security,
+  encryption keys, backups, audit events, and troubleshooting.
+- Operational guides for installation, configuration, project workflows, and
+  self-hosting.
+- Initial release changelog and project branding.
+
+### Changed
+
+- Updated the roadmap, open-source status, development guidance, and usage
+  documentation to reflect the implemented v0.1 command and API surface.
+
+## 0.0.6 - 2026-08-29
+
+### Added
+
+- Complete Admin UI routing and boot flow with authentication and dashboard
+  layouts.
+- Instance setup, administrator login, account and session management, audit
+  events, and instance status screens.
+- Project and environment navigation with secret and runner token management.
+- Dotenv parsing, syntax highlighting, import/export workflows, and environment
+  file editing.
+- Typed frontend API clients, session state, reauthentication flows, shared UI
+  components, and application icons.
+- Frontend tests covering authentication, workspace workflows, secret
+  management, dotenv handling, formatting, and HTTP behavior.
+
+### Changed
+
+- Replaced the starter interface with the Dopbase design theme and application
+  shell.
+
+## 0.0.5 - 2026-08-29
+
+### Added
+
+- CLI commands for serving Dopbase and managing authentication, projects,
+  environments, secrets, and runner tokens.
+- A CLI API client, local client configuration, and dotenv parsing and
+  serialization.
+- End-to-end backend workflow and application verification tests.
+- The composed Dopbase binary and supporting database service integration.
+
+## 0.0.4 - 2026-08-29
+
+### Added
+
+- Versioned REST API modules for health checks, authentication, instance
+  bootstrap, projects, environments, secrets, runner tokens, audit events, and
+  instance status.
+- Contracts, validation errors, persistence, business logic, HTTP handlers,
+  OpenAPI schemas, and route assembly for each API module.
+
+## 0.0.3 - 2026-08-29
+
+### Added
+
+- Layered server configuration with shared constants, resource limits, error
+  codes, and token prefixes.
+- Authentication extractors, secure token utilities, request rate limiting,
+  envelope encryption, and shared audit recording.
+- Stable HTTP response envelopes and error responses.
+- Shared authentication, resource, and secret models.
+- Application state, server lifecycle management, router composition, and an
+  embedded fallback UI.
+
+## 0.0.2 - 2026-08-29
+
+### Added
+
+- Cross-platform release automation and a release installer for Linux and
+  macOS on x64 and ARM64.
+- Installer tests, a backend test container, and a combined development runner.
+- Initial database migrations for instance metadata, administrators, sessions,
+  projects, environments, secrets, runner tokens, audit events, and environment
+  layouts.
+- Migration operation documentation and the v0.1 implementation roadmap.
+
+## 0.0.1 - 2026-08-28
+
+### Added
+
+- Initial Rust backend and Vue Admin UI project scaffold.
+- Project README, contribution guidelines, license, security policy, and legal
+  notices.
+- Initial public documentation site, product boundaries, roadmap, CLI and API
+  plans, self-hosting guidance, and reference documentation.

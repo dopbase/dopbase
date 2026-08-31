@@ -2,7 +2,7 @@
 
 Audit records answer who performed a sensitive action, where it happened, and when. They describe the action without storing the secret value involved.
 
-## Audit events in 0.0.1
+## Audit events in 0.0.8
 
 | Area           | Events                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------ |

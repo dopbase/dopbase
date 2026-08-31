@@ -7,7 +7,7 @@ export interface InstanceStatus {
   initializationState: string;
   databaseHealth: string;
   keyAvailability: string;
-  /** Always `"restart-required"` in v0.0.1: config changes need a restart. */
+  /** Always `"restart-required"` in v0.0.8: config changes need a restart. */
   configurationReload: string;
 }
 
