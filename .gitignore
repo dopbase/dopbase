@@ -6,3 +6,4 @@ docs/.vitepress/dist/
 *.DS_Store
 *.local
 *.codegraph
+package.dev.json
