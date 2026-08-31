@@ -1,3 +1,8 @@
+---
+title: "Operations"
+description: "Operate a Dopbase server safely: network and TLS setup, monitoring, upgrades, backups, and recovery for a secrets manager."
+---
+
 # Operations
 
 Running a secrets manager means protecting both availability and confidentiality. A working process is not enough by itself.

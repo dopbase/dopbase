@@ -1,3 +1,8 @@
+---
+title: "Security model"
+description: "The Dopbase security model: encryption of secret values, separation of master key material, audit records, and access control."
+---
+
 # Security model
 
 Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Security is part of the product behavior, not a layer added after storage and APIs are complete.

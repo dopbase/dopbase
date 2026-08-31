@@ -1,3 +1,8 @@
+---
+title: "Encryption keys"
+description: "Keep the Dopbase master encryption key outside the database that stores encrypted secrets, and plan for its backup and recovery."
+---
+
 # Encryption keys
 
 Dopbase must keep the master encryption key outside the database that stores encrypted secrets.

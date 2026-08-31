@@ -1,3 +1,8 @@
+---
+title: "Client configuration"
+description: "How the Dopbase CLI stores machine-global connection state and resolves the effective server for client commands."
+---
+
 # Client configuration
 
 Dopbase keeps client connection state in a machine-global configuration. It

@@ -1,3 +1,8 @@
+---
+title: "Self-hosted or Cloud"
+description: "Compare self-hosting Dopbase with Dopbase Cloud: who runs the server, TLS, backups, and master-key infrastructure in each model."
+---
+
 # Self-hosted or Cloud
 
 Both deployments use the same client concepts. The difference is who operates the server.

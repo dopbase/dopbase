@@ -1,3 +1,8 @@
+---
+title: "Target projects and environments"
+description: "Dopbase targets projects and environments explicitly on every command — no active project, no repository-local configuration."
+---
+
 # Target projects and environments
 
 Dopbase uses explicit environment targeting. It does not place configuration

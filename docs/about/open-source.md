@@ -1,3 +1,8 @@
+---
+title: "Open source"
+description: "Dopbase is open source so anyone can inspect how credentials are stored, encrypted, revealed, and audited. Build it yourself and verify the claims."
+---
+
 # Open source
 
 Secrets management asks users to trust software with credentials that can open databases, cloud accounts, and payment systems. Dopbase is open source so anyone can inspect how those credentials are stored, encrypted, revealed, and audited.

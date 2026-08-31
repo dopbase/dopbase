@@ -1,3 +1,8 @@
+---
+title: "Dopbase Cloud"
+description: "Dopbase Cloud is the planned managed deployment of the Dopbase server for teams that want the same model without operating it."
+---
+
 # Dopbase Cloud
 
 Dopbase Cloud is the planned managed deployment of the Dopbase server. It is for teams that want the same client and project model without operating the service themselves.

@@ -1,3 +1,8 @@
+---
+title: "Connect to Dopbase Cloud"
+description: "How the Dopbase client will connect to Dopbase Cloud, mirroring the self-hosted connect and login flow."
+---
+
 # Connect to Dopbase Cloud
 
 The Cloud connection flow is planned to mirror self-hosting.

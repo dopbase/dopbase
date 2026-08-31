@@ -1,3 +1,8 @@
+---
+title: "Glossary"
+description: "Definitions for Dopbase terms: active server, client configuration, environments, projects, master key, and more."
+---
+
 # Glossary
 
 ## Active server

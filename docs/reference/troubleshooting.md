@@ -1,3 +1,8 @@
+---
+title: "Troubleshooting"
+description: "Fix common Dopbase problems: client connection failures, authentication errors, and server or storage issues."
+---
+
 # Troubleshooting
 
 ## The client cannot connect

@@ -1,3 +1,8 @@
+---
+title: "Run an application"
+description: "Start a child process with secrets injected from one explicit Dopbase environment using dopbase run."
+---
+
 # Run an application
 
 `dopbase run` starts a child process with secrets from one explicit environment.

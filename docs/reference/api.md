@@ -1,3 +1,8 @@
+---
+title: "REST API"
+description: "Dopbase exposes a versioned REST API with a generated OpenAPI 3 specification and Swagger UI from a running server."
+---
+
 # REST API
 
 Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.

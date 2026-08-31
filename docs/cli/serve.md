@@ -1,3 +1,8 @@
+---
+title: "dopbase serve"
+description: "dopbase serve starts the self-hosted HTTP server, REST API, SQLite storage, and embedded Admin UI in a single command."
+---
+
 # `dopbase serve`
 
 `dopbase serve` starts the self-hosted HTTP server, REST API, SQLite storage,

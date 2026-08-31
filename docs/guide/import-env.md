@@ -1,3 +1,8 @@
+---
+title: "Import a .env file"
+description: "Import an existing .env file into Dopbase, create a project from it, and export values back out when you need the file form."
+---
+
 # Import a `.env` file
 
 Dopbase treats `.env` as an import and export format. It does not store the
@@ -60,6 +65,10 @@ it is permission-controlled and audited.
 
 Prefer [`dopbase run`](./run-an-application) when an application only needs
 secrets in its process environment.
+
+The same import and export workflows are available in the browser. The Admin UI
+parses the file locally, shows a key review and a dry-run summary before
+applying, and downloads exports; see [import and export](/ui/import-export).
 
 ## Handle values safely
 

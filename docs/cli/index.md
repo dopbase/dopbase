@@ -1,3 +1,8 @@
+---
+title: "CLI overview"
+description: "The Dopbase CLI starts a server, selects a remote server, manages projects and environments, and runs applications with their secrets."
+---
+
 # CLI overview
 
 The Dopbase command-line interface starts a server, selects a remote server,

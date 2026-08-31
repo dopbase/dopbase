@@ -1,3 +1,8 @@
+---
+title: "Command reference"
+description: "Reference for every Dopbase CLI command in v0.0.8: connections, authentication, projects, environments, and secret operations."
+---
+
 # Command reference
 
 This page defines the implemented v0.0.8 command surface. Dopbase does not infer a
@@ -189,6 +194,9 @@ restrictive permissions where the platform supports them. Export and stdout
 reveal plaintext values and therefore require reveal permission and create an
 audit event.
 
+The same workflows exist in the Admin UI, with a visual review and dry-run
+summary before anything is stored; see [import and export](/ui/import-export).
+
 ## Runner tokens
 
 Create a different token for each deployed environment:
@@ -204,7 +212,9 @@ dopbase token create payment-service/production \
 | `dopbase token list <environment>`                               | List token metadata   |
 | `dopbase token revoke <token-id>`                                | Revoke a token        |
 
-The plaintext token is displayed only once. A runner token can retrieve values
+The plaintext token is displayed only once. Tokens can also be created and
+revoked on an environment's Tokens tab in the [Admin UI](/ui/projects-environments).
+A runner token can retrieve values
 for its assigned environment so `dopbase run` can inject them, but it cannot
 modify, export, or access another environment.
 

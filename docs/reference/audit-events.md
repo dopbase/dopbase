@@ -1,3 +1,8 @@
+---
+title: "Audit events"
+description: "The audit events Dopbase records — who performed a sensitive action, where, and when — without storing secret values."
+---
+
 # Audit events
 
 Audit records answer who performed a sensitive action, where it happened, and when. They describe the action without storing the secret value involved.

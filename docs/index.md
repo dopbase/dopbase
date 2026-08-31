@@ -1,5 +1,8 @@
 ---
 layout: home
+title: "Dopbase — open-source secrets manager in a single file"
+titleTemplate: false
+description: Dopbase is an open-source secrets manager you self-host as a single executable. Organize secrets by project and environment and inject them into any process.
 
 hero:
   name: "Welcome to Dopbase"

@@ -1,3 +1,8 @@
+---
+title: "Storage and backups"
+description: "Where Dopbase stores its SQLite database and configuration, and how to back up and restore a self-hosted server safely."
+---
+
 # Storage and backups
 
 Dopbase Community uses SQLite by default. Unless `--data-dir` or

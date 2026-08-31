@@ -1,3 +1,8 @@
+---
+title: "Introduction"
+description: "Dopbase is an open-source secrets manager for application configuration: one place for database URLs, API keys, and credentials across environments."
+---
+
 # Introduction
 
 Dopbase is an open-source secrets manager for application configuration. It gives developers one place to store values such as database URLs, API keys, and service credentials across development, staging, and production.
@@ -30,5 +35,6 @@ A project represents an application or service. Environments hold the values tha
 
 - Follow the [quick start](./quick-start) to install Dopbase and run it locally.
 - Learn how the [server and client](./server-client) divide responsibilities.
+- Manage secrets in the browser with the [Admin UI](/ui/).
 - Read the [self-hosting guide](/self-hosting/) before operating a server.
 - Review the [security model](/reference/security) before storing real credentials.

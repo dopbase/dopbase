@@ -1,3 +1,8 @@
+---
+title: "Product status"
+description: "What ships in Dopbase 0.0.8: the Rust server, CLI, Admin UI, REST API, and SQLite storage in one executable, plus what is planned for 0.1.0."
+---
+
 # Product status
 
 Dopbase 0.0.8 is the current testing release. It includes the Rust server and
@@ -10,6 +15,9 @@ and evaluation before the first public release, 0.1.0.
 - Projects, environments, and individually managed secrets
 - Encryption before persistence with separate master-key material
 - `.env` import and export
+- An embedded browser Admin UI covering setup, sign-in, project and
+  environment management, secret management with a `.env` editor, runner
+  tokens, audit events, and instance status
 - Process injection through `dopbase run`
 - Human authentication and environment-scoped runner tokens
 - Audit records

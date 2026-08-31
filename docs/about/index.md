@@ -1,3 +1,8 @@
+---
+title: "Project principles"
+description: "The principles behind Dopbase: keep secrets management understandable, make self-hosting real, and avoid becoming another platform."
+---
+
 # Project principles
 
 Dopbase exists to make application secrets easier to manage without turning secrets management into another infrastructure platform.

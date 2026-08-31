@@ -1,3 +1,8 @@
+---
+title: "Quick start"
+description: "Install Dopbase, start a local server, import an existing .env file, and run an application with its secrets in a few minutes."
+---
+
 # Quick start
 
 This walkthrough installs Dopbase 0.0.8, starts a local server, imports an
@@ -41,6 +46,10 @@ Admin UI: http://localhost:8840
 API:      http://localhost:8840/api/v1
 Database: ~/.dopbase/dopbase.db
 ```
+
+The same address serves the Admin UI in a browser. The first visit walks you
+through claiming the server with the setup token; the [Admin UI guide](/ui/)
+covers every screen.
 
 Keep this process running while you use the client.
 

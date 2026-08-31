@@ -1,3 +1,8 @@
+---
+title: "Self-hosting Dopbase"
+description: "Run Dopbase on your own infrastructure: one executable with SQLite storage and an embedded Admin UI, plus the decisions safe operation requires."
+---
+
 # Self-hosting Dopbase
 
 Self-hosting is a first-class Dopbase workflow. The Community edition runs as one executable with SQLite storage and an embedded Admin UI.

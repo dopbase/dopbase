@@ -1,3 +1,8 @@
+---
+title: "Server and client"
+description: "One executable, two roles: how the Dopbase server protects and serves secrets while the client tells it what to do over the REST API."
+---
+
 # Server and client
 
 Dopbase uses one executable in two roles. The server protects and serves data. The client tells a server what you want to do.
@@ -24,6 +29,11 @@ Self-hosted server or Dopbase Cloud
 - Audit records
 - Database migrations
 - The REST API and admin interface
+
+The admin interface is the browser UI served from the same address as the API.
+It works on the same data through the same REST API, so what it changes is
+immediately visible to every client. The [Admin UI guide](/ui/) documents its
+screens.
 
 Self-hosted storage uses SQLite by default. The master encryption key remains outside that database.
 

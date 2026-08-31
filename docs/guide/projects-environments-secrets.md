@@ -1,3 +1,8 @@
+---
+title: "Projects, environments, and secrets"
+description: "How Dopbase organizes application configuration: projects, environments, and individually managed secret records."
+---
+
 # Projects, environments, and secrets
 
 Dopbase keeps its data model deliberately small. Most work happens within a

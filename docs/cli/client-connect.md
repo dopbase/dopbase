@@ -1,3 +1,8 @@
+---
+title: "dopbase client connect"
+description: "Select the Dopbase server used by later client commands with dopbase client connect, including the localhost default."
+---
+
 # `dopbase client connect`
 
 `dopbase client connect` selects the server used by later client commands.

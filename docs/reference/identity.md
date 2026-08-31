@@ -1,3 +1,8 @@
+---
+title: "Identity and tokens"
+description: "How Dopbase models identities and access: the human administrator, hashed passwords, sessions, and tokens for software clients."
+---
+
 # Identity and tokens
 
 Dopbase needs identities for people and for software.
