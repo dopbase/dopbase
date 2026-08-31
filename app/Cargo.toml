@@ -8,10 +8,6 @@ license = "Apache-2.0"
 name = "dopbase"
 path = "src/main.rs"
 
-[features]
-default = []
-embedded-ui = ["dep:rust-embed", "dep:mime_guess"]
-
 [dependencies]
 # Async runtime (required by axum / sqlx)
 tokio = { version = "1", features = [
@@ -68,10 +64,10 @@ anyhow = "1"
 base64 = "0.22"
 fs2 = "0.4"
 getrandom = "0.3"
-mime_guess = { version = "2", optional = true }
+mime_guess = "2"
 regex = "1"
 nix = { version = "0.30", features = ["signal", "process", "fs"] }
-rust-embed = { version = "8", optional = true }
+rust-embed = "8"
 sha2 = "0.10"
 subtle = "2"
 tracing = "0.1"

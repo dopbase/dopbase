@@ -156,10 +156,7 @@ pub async fn serve_with_ready(
     ready.ok(std::process::id(), setup_token.as_deref());
   }
   let public_url = state.config.public_url.trim_end_matches('/');
-  #[cfg(feature = "embedded-ui")]
   eprintln!("Admin UI:   {public_url}");
-  #[cfg(not(feature = "embedded-ui"))]
-  eprintln!("Admin UI:   not embedded (run `bun run dev` or `bun run build:binary`)");
   let mut banner = format!("API:        {public_url}/api/v1");
   if state.config.docs_enabled {
     banner.push_str(&format!("\nSwagger:    {public_url}/api/docs"));
@@ -239,34 +236,22 @@ async fn static_fallback(uri: Uri) -> Response {
     return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
       .into_response();
   }
-  #[cfg(feature = "embedded-ui")]
-  {
-    embedded_asset(uri.path()).unwrap_or_else(|| {
-      // Asset-looking paths must 404 instead of falling back to
-      // index.html — serving HTML for a missing .js/.css masks broken
-      // asset URLs as a silently blank page ("Failed to load module
-      // script" with an HTML MIME type).
-      if looks_like_asset(uri.path()) {
-        return StatusCode::NOT_FOUND.into_response();
-      }
-      embedded_asset("/index.html").unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
-    })
-  }
-  #[cfg(not(feature = "embedded-ui"))]
-  {
-    use crate::constants::ui::ADMIN_UI_NOT_EMBEDDED_PAGE;
-    use axum::response::Html;
-    let _ = uri;
-    Html(ADMIN_UI_NOT_EMBEDDED_PAGE).into_response()
-  }
+  embedded_asset(uri.path()).unwrap_or_else(|| {
+    // Asset-looking paths must 404 instead of falling back to
+    // index.html — serving HTML for a missing .js/.css masks broken
+    // asset URLs as a silently blank page ("Failed to load module
+    // script" with an HTML MIME type).
+    if looks_like_asset(uri.path()) {
+      return StatusCode::NOT_FOUND.into_response();
+    }
+    embedded_asset("/index.html").unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
+  })
 }
 
-#[cfg(feature = "embedded-ui")]
 #[derive(rust_embed::RustEmbed)]
 #[folder = "../dist/"]
 struct AdminAssets;
 
-#[cfg(feature = "embedded-ui")]
 fn looks_like_asset(path: &str) -> bool {
   const ASSET_EXTENSIONS: [&str; 12] = [
     "js", "mjs", "css", "map", "woff", "woff2", "ttf", "otf", "svg", "png", "jpg", "ico",
@@ -277,7 +262,6 @@ fn looks_like_asset(path: &str) -> bool {
     .is_some_and(|(_, ext)| ASSET_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
 }
 
-#[cfg(feature = "embedded-ui")]
 fn embedded_asset(path: &str) -> Option<Response> {
   use axum::http::{HeaderValue, header};
   let key = path.trim_start_matches('/');

@@ -148,7 +148,6 @@ jobs:
             --manifest-path app/Cargo.toml \
             --locked \
             --release \
-            --features embedded-ui \
             --target "${target}"
 
       - name: Smoke-test release binary

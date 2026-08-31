@@ -13,7 +13,7 @@
     "typecheck:vue": "vue-tsc -b",
     "typecheck": "bun run typecheck:native && bun run typecheck:vue",
     "build": "bun run typecheck && vite build",
-    "build:binary": "bun run build && cargo build --manifest-path app/Cargo.toml --release --features embedded-ui",
+    "build:binary": "bun run build && cargo build --manifest-path app/Cargo.toml --release",
     "test:installer": "sh scripts/install.test.sh",
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs",

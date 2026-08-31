@@ -136,26 +136,6 @@ async fn docs_can_be_enabled_per_config() {
   state.db.close().await;
 }
 
-#[cfg(not(feature = "embedded-ui"))]
-#[tokio::test]
-async fn backend_only_root_explains_how_to_start_the_admin_ui() {
-  let (_directory, state, router) = test_app().await;
-  let request = Request::builder().uri("/").body(Body::empty()).unwrap();
-  let response = router.oneshot(request).await.unwrap();
-
-  assert_eq!(response.status(), 200);
-  assert_eq!(
-    response.headers().get(header::CONTENT_TYPE).unwrap(),
-    "text/html; charset=utf-8"
-  );
-  let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-  let html = String::from_utf8(body.to_vec()).unwrap();
-  assert!(html.contains("backend-only development build"));
-  assert!(html.contains("bun run dev"));
-  assert!(html.contains("bun run build:binary"));
-  state.db.close().await;
-}
-
 #[tokio::test]
 async fn validation_uses_required_error_map() {
   let (_directory, state, router) = test_app().await;

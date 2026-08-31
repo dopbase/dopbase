@@ -5,7 +5,13 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets
 cargo test --all-targets --all-features
-cargo build --release --features embedded-ui
+
+# Release builds embed ../dist/ at compile time (rust-embed).
+if [[ ! -f ../dist/index.html ]]; then
+  echo "error: dist/index.html not found — run 'bun run build' first" >&2
+  exit 1
+fi
+cargo build --release
 
 runtime_root="$(mktemp -d)"
 data_dir="${runtime_root}/data"
