@@ -17,7 +17,7 @@
     "test:installer": "sh scripts/install.test.sh",
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
+    "docs:build": "vitepress build docs && bun ./scripts/docs-postbuild.mjs",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
