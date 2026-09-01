@@ -15,6 +15,7 @@ use crate::{
 };
 use chrono::Utc;
 use regex::Regex;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::OnceLock;
 pub fn validate_entry(entry: &SecretInput) -> Result<(), HttpError> {
@@ -82,20 +83,30 @@ pub async fn set(
   validate_entry(&input)?;
   let (admin_id, email) = require_admin(identity)?;
   let env = environment(state, id).await?;
-  let existing = repository::find(state.db.pool(), id, &key).await?;
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let existing: Option<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key=?")
+    .bind(id).bind(&key).fetch_optional(&mut *tx).await?;
   let version = existing.as_ref().map_or(1, |row| row.version + 1);
+  let created_at = existing
+    .as_ref()
+    .map_or_else(|| Utc::now().to_rfc3339(), |row| row.created_at.clone());
   let encrypted = state
     .crypto
     .encrypt(input.value.as_bytes(), id, &key, version)
     .map_err(|_| HttpError::internal())?;
   let now = Utc::now().to_rfc3339();
+  let metadata = SecretMetadata {
+    key: key.clone(),
+    version,
+    created_at: created_at.clone(),
+    updated_at: now.clone(),
+  };
   let action = if existing.is_some() {
     "secret.updated"
   } else {
     "secret.created"
   };
-  let mut tx = state.db.pool().begin().await?;
-  sqlx::query("INSERT INTO secrets(environment_id,key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at)VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(environment_id,key) DO UPDATE SET version=excluded.version,ciphertext=excluded.ciphertext,value_nonce=excluded.value_nonce,wrapped_key=excluded.wrapped_key,key_nonce=excluded.key_nonce,updated_at=excluded.updated_at").bind(id).bind(&key).bind(version).bind(encrypted.ciphertext).bind(encrypted.value_nonce).bind(encrypted.wrapped_key).bind(encrypted.key_nonce).bind(existing.as_ref().map_or(&now,|row|&row.created_at)).bind(&now).execute(&mut *tx).await?;
+  sqlx::query("INSERT INTO secrets(environment_id,key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at)VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(environment_id,key) DO UPDATE SET version=excluded.version,ciphertext=excluded.ciphertext,value_nonce=excluded.value_nonce,wrapped_key=excluded.wrapped_key,key_nonce=excluded.key_nonce,updated_at=excluded.updated_at").bind(id).bind(&key).bind(version).bind(encrypted.ciphertext).bind(encrypted.value_nonce).bind(encrypted.wrapped_key).bind(encrypted.key_nonce).bind(&created_at).bind(&now).execute(&mut *tx).await?;
   common::audit(
     &mut *tx,
     "admin",
@@ -110,7 +121,7 @@ pub async fn set(
   )
   .await?;
   tx.commit().await?;
-  get(state, identity, id, &input.key).await
+  Ok(metadata)
 }
 pub async fn delete(
   state: &AppState,
@@ -120,18 +131,18 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   let (admin_id, email) = require_admin(identity)?;
   let env = environment(state, id).await?;
-  if repository::find(state.db.pool(), id, key).await?.is_none() {
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let deleted = sqlx::query("DELETE FROM secrets WHERE environment_id=? AND key=?")
+    .bind(id)
+    .bind(key)
+    .execute(&mut *tx)
+    .await?;
+  if deleted.rows_affected() != 1 {
     return Err(HttpError::not_found(
       "SECRET_NOT_FOUND",
       "The requested secret was not found.",
     ));
   }
-  let mut tx = state.db.pool().begin().await?;
-  sqlx::query("DELETE FROM secrets WHERE environment_id=? AND key=?")
-    .bind(id)
-    .bind(key)
-    .execute(&mut *tx)
-    .await?;
   common::audit(
     &mut *tx,
     "admin",
@@ -248,7 +259,22 @@ pub async fn import(
   validate_import(&request)?;
   let (admin_id, email) = require_admin(identity)?;
   let env = environment(state, id).await?;
-  let rows = repository::rows(state.db.pool(), id).await?;
+  // Applying takes the SQLite write reservation before reading. This makes
+  // the diff, version selection, replacement deletes, layout, and audit one
+  // serializable state transition. Dry runs intentionally remain read-only.
+  let mut tx = if request.dry_run {
+    state.db.pool().begin().await?
+  } else {
+    state.db.pool().begin_with("BEGIN IMMEDIATE").await?
+  };
+  let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
+    .bind(id).fetch_all(&mut *tx).await?;
+  let layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  let revision = collection_revision(id, rows.iter(), layout.as_deref());
   let existing: HashMap<String, repository::SecretRow> =
     rows.into_iter().map(|row| (row.key.clone(), row)).collect();
   let incoming: HashMap<&str, &SecretInput> = request
@@ -280,13 +306,31 @@ pub async fn import(
   unchanged.sort();
   deleted.sort();
   if request.dry_run {
+    tx.rollback().await?;
     return Ok(ImportSecretsResponse {
       added_keys: added,
       updated_keys: updated,
       unchanged_keys: unchanged,
       deleted_keys: deleted,
       dry_run: true,
+      revision,
     });
+  }
+  if request.mode == ImportMode::Replace && request.expected_revision.is_none() {
+    return Err(HttpError::conflict(
+      "IMPORT_PREVIEW_REQUIRED",
+      "Run a dry run before applying a replace import.",
+    ));
+  }
+  if request
+    .expected_revision
+    .as_deref()
+    .is_some_and(|expected| expected != revision)
+  {
+    return Err(HttpError::conflict(
+      "IMPORT_PREVIEW_STALE",
+      "The secrets changed after the preview. Run the dry run again.",
+    ));
   }
   let now = Utc::now().to_rfc3339();
   let mut encrypted = Vec::new();
@@ -305,7 +349,6 @@ pub async fn import(
         .map_err(|_| HttpError::internal())?,
     ));
   }
-  let mut tx = state.db.pool().begin().await?;
   for (entry, version, value) in encrypted {
     sqlx::query("INSERT INTO secrets(environment_id,key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at)VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(environment_id,key)DO UPDATE SET version=excluded.version,ciphertext=excluded.ciphertext,value_nonce=excluded.value_nonce,wrapped_key=excluded.wrapped_key,key_nonce=excluded.key_nonce,updated_at=excluded.updated_at").bind(id).bind(&entry.key).bind(version).bind(value.ciphertext).bind(value.value_nonce).bind(value.wrapped_key).bind(value.key_nonce).bind(existing.get(&entry.key).map_or(&now,|row|&row.created_at)).bind(&now).execute(&mut *tx).await?;
   }
@@ -319,6 +362,14 @@ pub async fn import(
   if let Some(env_layout) = &request.env_layout {
     repository::upsert_layout(&mut tx, id, env_layout, &now).await?;
   }
+  let resulting_rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
+    .bind(id).fetch_all(&mut *tx).await?;
+  let resulting_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  let revision = collection_revision(id, resulting_rows.iter(), resulting_layout.as_deref());
   common::audit(&mut *tx,"admin",Some(admin_id),Some(email),"secret.imported",Some(&env.project_id),Some(id),Some("environment"),Some(id),serde_json::json!({"added":added,"updated":updated,"unchanged":unchanged,"deleted":deleted,"layout":request.env_layout.is_some()})).await?;
   tx.commit().await?;
   Ok(ImportSecretsResponse {
@@ -327,7 +378,28 @@ pub async fn import(
     unchanged_keys: unchanged,
     deleted_keys: deleted,
     dry_run: false,
+    revision,
   })
+}
+
+fn collection_revision<'a>(
+  environment_id: &str,
+  rows: impl Iterator<Item = &'a repository::SecretRow>,
+  layout: Option<&str>,
+) -> String {
+  let mut hash = Sha256::new();
+  hash.update(environment_id.as_bytes());
+  for row in rows {
+    hash.update([0]);
+    hash.update(row.key.as_bytes());
+    hash.update(row.version.to_be_bytes());
+    hash.update(row.updated_at.as_bytes());
+  }
+  if let Some(layout) = layout {
+    hash.update([1]);
+    hash.update(layout.as_bytes());
+  }
+  format!("{:x}", hash.finalize())
 }
 async fn decrypt_all(
   state: &AppState,

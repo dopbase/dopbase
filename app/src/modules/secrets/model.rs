@@ -37,6 +37,10 @@ pub struct ImportSecretsRequest {
   /// editor view survives reloads.
   #[serde(default)]
   pub env_layout: Option<String>,
+  /// Collection revision returned by a dry run. When supplied, apply fails
+  /// if the environment changed after the preview was generated.
+  #[serde(default)]
+  pub expected_revision: Option<String>,
 }
 /// The stored `.env` editor layout for one environment. Contains no secret
 /// values — comments, blank lines, ordering, and empty `KEY=` slots only.
@@ -54,6 +58,7 @@ pub struct ImportSecretsResponse {
   pub unchanged_keys: Vec<String>,
   pub deleted_keys: Vec<String>,
   pub dry_run: bool,
+  pub revision: String,
 }
 #[derive(Serialize, ToSchema)]
 pub struct ExportSecretsResponse {
