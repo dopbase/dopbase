@@ -42,7 +42,7 @@ force-stopped (default 10).
 GitHub. It is informational only and never modifies the binary:
 
 ```text
-dopbase 0.0.12 is up to date (latest release v0.1.0).
+dopbase 0.0.12 is up to date (latest release 0.1.0).
 ```
 
 When a newer release exists, the command prints the current version, the latest

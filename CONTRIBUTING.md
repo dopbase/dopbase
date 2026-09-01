@@ -126,8 +126,8 @@ tag from the release commit:
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v0.0.12 -m "v0.0.12"
-git push origin v0.0.12
+git tag -a 0.0.12 -m "0.0.12"
+git push origin 0.0.12
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
