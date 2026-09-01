@@ -31,7 +31,10 @@ jobs:
       - name: Install Rust
         shell: bash
         run: |
-          rustup toolchain install "${RUST_VERSION}" --profile minimal
+          rustup toolchain install "${RUST_VERSION}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy
           rustup default "${RUST_VERSION}"
 
       - name: Validate release version
