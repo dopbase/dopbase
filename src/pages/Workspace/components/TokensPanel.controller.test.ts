@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { useTokensPanelController } from "./TokensPanel.controller";
 import * as tokensApi from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
@@ -20,6 +20,25 @@ function makeController() {
 }
 
 describe("useTokensPanelController", () => {
+  it("ignores an older environment response that resolves last", async () => {
+    let resolveFirst!: (value: (typeof token)[]) => void;
+    let resolveSecond!: (value: (typeof token)[]) => void;
+    vi.mocked(tokensApi.listTokens)
+      .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+      .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
+    const environmentId = ref("env_1");
+    const c = useTokensPanelController(environmentId);
+    environmentId.value = "env_2";
+    await nextTick();
+    const current = { ...token, id: "tok_current", environmentId: "env_2" };
+    resolveSecond([current]);
+    await vi.waitFor(() => expect(c.tokens.value).toEqual([current]));
+    resolveFirst([{ ...token, id: "tok_stale" }]);
+    await nextTick();
+    expect(c.tokens.value).toEqual([current]);
+    expect(c.loading.value).toBe(false);
+  });
+
   it("creates a token and exposes the plaintext exactly once", async () => {
     vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
     vi.mocked(tokensApi.createToken).mockResolvedValueOnce({

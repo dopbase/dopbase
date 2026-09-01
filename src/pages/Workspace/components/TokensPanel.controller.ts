@@ -17,39 +17,52 @@ export function useTokensPanelController(environmentId: Ref<string>) {
   const loadError = ref<string | null>(null);
   const actionError = ref<string | null>(null);
   const creating = ref(false);
+  let loadRequest: AbortController | null = null;
 
   /** Shown exactly once inside the creation dialog. */
   const created = ref<CreatedTokenResponse | null>(null);
 
-  async function load(): Promise<void> {
+  async function load(target = environmentId.value): Promise<void> {
+    loadRequest?.abort();
+    const request = new AbortController();
+    loadRequest = request;
     loading.value = true;
     loadError.value = null;
     try {
-      tokens.value = await tokensApi.listTokens(environmentId.value);
+      const result = await tokensApi.listTokens(target, request.signal);
+      if (!request.signal.aborted && environmentId.value === target) {
+        tokens.value = result;
+      }
     } catch {
+      if (request.signal.aborted || environmentId.value !== target) return;
       loadError.value = "Could not load runner tokens.";
       tokens.value = null;
     } finally {
-      loading.value = false;
+      if (loadRequest === request) loading.value = false;
     }
   }
 
   watch(environmentId, load, { immediate: true });
   onUnmounted(() => {
+    loadRequest?.abort();
     // Closing the panel discards the plaintext permanently.
     created.value = null;
   });
 
   async function create(name: string): Promise<void> {
+    const target = environmentId.value;
     creating.value = true;
     actionError.value = null;
     try {
-      created.value = await tokensApi.createToken(environmentId.value, {
+      const result = await tokensApi.createToken(target, {
         name,
         role: "runner",
       });
-      await load();
+      if (environmentId.value !== target) return;
+      created.value = result;
+      await load(target);
     } catch (cause) {
+      if (environmentId.value !== target) return;
       if (cause instanceof ApiError && cause.status === 409) {
         actionError.value = "A token with this name already exists.";
       } else {
@@ -57,7 +70,7 @@ export function useTokensPanelController(environmentId: Ref<string>) {
       }
       throw cause;
     } finally {
-      creating.value = false;
+      if (environmentId.value === target) creating.value = false;
     }
   }
 
@@ -66,11 +79,13 @@ export function useTokensPanelController(environmentId: Ref<string>) {
   }
 
   async function revoke(token: RunnerToken): Promise<void> {
+    const target = environmentId.value;
     actionError.value = null;
     try {
       await tokensApi.revokeToken(token.id);
-      await load();
+      if (environmentId.value === target) await load(target);
     } catch {
+      if (environmentId.value !== target) return;
       actionError.value = "Could not revoke the token.";
       throw new Error("revoke-failed");
     }
