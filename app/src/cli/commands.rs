@@ -704,13 +704,13 @@ async fn run(
   let mut child = child_command
     .spawn()
     .with_context(|| format!("failed to start {program}"))?;
-  let pid = child.id().context("child process has no process ID")? as i32;
   #[cfg(unix)]
   {
     use nix::{
       sys::signal::{Signal, killpg},
       unistd::Pid,
     };
+    let pid = child.id().context("child process has no process ID")? as i32;
     let status = tokio::select! {status=child.wait()=>status?,_=tokio::signal::ctrl_c()=>{let _=killpg(Pid::from_raw(pid),Signal::SIGINT);child.wait().await?},_=terminate_signal()=>{let _=killpg(Pid::from_raw(pid),Signal::SIGTERM);child.wait().await?}};
     use std::os::unix::process::ExitStatusExt;
     Ok(

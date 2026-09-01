@@ -35,7 +35,7 @@ pub fn write(
     drop(file);
 
     if replace {
-      fs::rename(&temporary, path)?;
+      replace_file(&temporary, path)?;
     } else {
       match fs::hard_link(&temporary, path) {
         Ok(()) => fs::remove_file(&temporary)?,
@@ -61,6 +61,48 @@ pub fn write(
     let _ = fs::remove_file(&temporary);
   }
   result.with_context(|| format!("failed to write {}", path.display()))
+}
+
+#[cfg(not(windows))]
+fn replace_file(
+  source: &Path,
+  destination: &Path,
+) -> std::io::Result<()> {
+  fs::rename(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_file(
+  source: &Path,
+  destination: &Path,
+) -> std::io::Result<()> {
+  use std::{iter, os::windows::ffi::OsStrExt};
+  use windows_sys::Win32::Storage::FileSystem::{
+    MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+  };
+
+  let source = source
+    .as_os_str()
+    .encode_wide()
+    .chain(iter::once(0))
+    .collect::<Vec<_>>();
+  let destination = destination
+    .as_os_str()
+    .encode_wide()
+    .chain(iter::once(0))
+    .collect::<Vec<_>>();
+  let moved = unsafe {
+    MoveFileExW(
+      source.as_ptr(),
+      destination.as_ptr(),
+      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+    )
+  };
+  if moved == 0 {
+    Err(std::io::Error::last_os_error())
+  } else {
+    Ok(())
+  }
 }
 
 fn unique_temporary(path: &Path) -> Result<PathBuf> {

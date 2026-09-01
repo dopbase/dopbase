@@ -77,6 +77,9 @@ zeroize = { version = "1", features = ["derive"] }
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30", features = ["signal", "process", "fs"] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
 [dev-dependencies]
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }

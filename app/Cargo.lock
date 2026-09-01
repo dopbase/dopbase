@@ -135,6 +135,7 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
+ "windows-sys 0.61.2",
  "zeroize",
 ]
 
