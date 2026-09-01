@@ -86,26 +86,8 @@ pub fn write(
   if let Some(parent) = path.parent() {
     ensure_data_dir(parent)?;
   }
-  let temporary = path.with_extension("toml.tmp");
   let text = toml::to_string_pretty(config)?;
-  let mut options = fs::OpenOptions::new();
-  options.write(true).create(true).truncate(true);
-  #[cfg(unix)]
-  {
-    use std::os::unix::fs::OpenOptionsExt;
-    options.mode(0o600);
-  }
-  use std::io::Write;
-  let mut file = options.open(&temporary)?;
-  file.write_all(text.as_bytes())?;
-  file.sync_all()?;
-  fs::rename(temporary, path)?;
-  #[cfg(unix)]
-  {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-  }
-  Ok(())
+  crate::utils::private_file::write(path, text.as_bytes(), true)
 }
 pub fn normalize(value: &str) -> Result<String> {
   let mut url = Url::parse(value).context("server URL must be absolute")?;
