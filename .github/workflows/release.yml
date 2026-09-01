@@ -95,18 +95,27 @@ jobs:
             target: x86_64-unknown-linux-musl
             asset_os: linux
             asset_arch: amd64
+            binary_name: dopbase
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
             asset_os: linux
             asset_arch: arm64
+            binary_name: dopbase
           - runner: macos-15-intel
             target: x86_64-apple-darwin
             asset_os: darwin
             asset_arch: amd64
+            binary_name: dopbase
           - runner: macos-15
             target: aarch64-apple-darwin
             asset_os: darwin
             asset_arch: arm64
+            binary_name: dopbase
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            asset_os: windows
+            asset_arch: amd64
+            binary_name: dopbase.exe
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
@@ -133,6 +142,11 @@ jobs:
           name: release-ui
           path: dist/
 
+      - name: Test Windows installer
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: ./scripts/install.test.ps1
+
       - name: Build release binary
         shell: bash
         run: |
@@ -151,6 +165,7 @@ jobs:
             --target "${target}"
 
       - name: Smoke-test release binary
+        if: matrix.asset_os != 'windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -196,7 +211,64 @@ jobs:
           curl --fail --silent http://127.0.0.1:18376/ | grep --quiet '<div id="app"></div>'
           curl --fail --silent http://127.0.0.1:18376/api/v1/health | grep --quiet "\"version\":\"${version}\""
 
+      - name: Smoke-test Windows release binary
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $binary = "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $actualVersion = (& $binary --version).Trim()
+          if ($actualVersion -ne "dopbase $version") {
+            throw "unexpected Dopbase version: $actualVersion"
+          }
+
+          $runtimeRoot = Join-Path $env:RUNNER_TEMP ("dopbase-smoke-" + [guid]::NewGuid())
+          $serverLog = Join-Path $runtimeRoot "server.log"
+          $serverError = Join-Path $runtimeRoot "server-error.log"
+          New-Item -ItemType Directory -Path $runtimeRoot | Out-Null
+          $process = $null
+          try {
+            $process = Start-Process -FilePath $binary -ArgumentList @(
+              "--data-dir", (Join-Path $runtimeRoot "data"),
+              "serve", "--bind-address", "127.0.0.1:18376",
+              "--public-url", "http://127.0.0.1:18376"
+            ) -RedirectStandardOutput $serverLog -RedirectStandardError $serverError -PassThru
+
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18376/api/v1/health"
+                $ready = $true
+                break
+              } catch {
+                if ($process.HasExited) {
+                  Get-Content $serverLog, $serverError -ErrorAction SilentlyContinue
+                  throw "Dopbase exited before becoming ready"
+                }
+                Start-Sleep -Milliseconds 250
+              }
+            }
+            if (-not $ready) {
+              throw "Dopbase did not become ready"
+            }
+            if ($health.success -ne $true -or $health.data.version -ne $version) {
+              throw "unexpected health response"
+            }
+            $root = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:18376/"
+            if ($root.Content -notmatch '<div id="app"></div>') {
+              throw "embedded Admin UI is unavailable"
+            }
+          } finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id
+              $process.WaitForExit()
+            }
+            Remove-Item -Recurse -Force -LiteralPath $runtimeRoot -ErrorAction SilentlyContinue
+          }
+
       - name: Package release archive
+        if: matrix.asset_os != 'windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -208,6 +280,20 @@ jobs:
           chmod 755 "${package_dir}/dopbase"
           (cd "${package_dir}" && zip -9 --quiet "${GITHUB_WORKSPACE}/${archive}" dopbase CHANGELOG.md LICENSE NOTICE)
           unzip -Z1 "${archive}" | sort
+
+      - name: Package Windows release archive
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $archive = "dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
+          $packageDir = Join-Path $env:RUNNER_TEMP ("dopbase-package-" + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $packageDir | Out-Null
+          Copy-Item "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}" (Join-Path $packageDir "dopbase.exe")
+          Copy-Item CHANGELOG.md, LICENSE, NOTICE -Destination $packageDir
+          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $archive
+          (Get-ChildItem -LiteralPath $packageDir).Name | Sort-Object
 
       - name: Upload release archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -243,11 +329,12 @@ jobs:
             "dopbase_${version}_darwin_arm64.zip"
             "dopbase_${version}_linux_amd64.zip"
             "dopbase_${version}_linux_arm64.zip"
+            "dopbase_${version}_windows_amd64.zip"
           )
           for archive in "${expected[@]}"; do
             test -f "${archive}"
           done
-          test "$(find . -maxdepth 1 -name 'dopbase_*.zip' -type f | wc -l | tr -d ' ')" = "4"
+          test "$(find . -maxdepth 1 -name 'dopbase_*.zip' -type f | wc -l | tr -d ' ')" = "5"
           sha256sum "${expected[@]}" | sort -k2 > checksums.txt
           sha256sum --check checksums.txt
 
