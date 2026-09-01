@@ -31,7 +31,7 @@ pub async fn create(
   if request.role != "runner" {
     return Err(HttpError::validation(std::collections::BTreeMap::from([(
       TOKEN_SCOPE_INVALID.into(),
-      "Only the runner role is supported in v0.0.8.".into(),
+      "Only the runner role is supported in v0.0.12.".into(),
     )])));
   }
   let name = request.name.trim();
@@ -108,12 +108,19 @@ pub async fn revoke(
   }
   let env = crate::modules::environments::service::show(state, &token.environment_id).await?;
   let now = Utc::now().to_rfc3339();
-  let mut tx = state.db.pool().begin().await?;
-  sqlx::query("UPDATE runner_tokens SET revoked_at=? WHERE id=?")
-    .bind(&now)
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let updated =
+    sqlx::query("UPDATE runner_tokens SET revoked_at=? WHERE id=? AND revoked_at IS NULL")
+      .bind(&now)
+      .bind(id)
+      .execute(&mut *tx)
+      .await?;
+  if updated.rows_affected() != 1 {
+    return Err(HttpError::conflict(
+      "TOKEN_REVOKED",
+      "The token has already been revoked.",
+    ));
+  }
   common::audit(
     &mut *tx,
     "admin",
