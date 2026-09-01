@@ -11,6 +11,8 @@ $installDir = Join-Path $testDir "install"
 $version = "0.0.12"
 $archiveName = "dopbase_${version}_windows_amd64.zip"
 $archivePath = Join-Path $releaseDir $archiveName
+$releaseUrl = ([uri]$releaseDir).AbsoluteUri
+$legacyReleaseUrl = ([uri]$legacyReleaseDir).AbsoluteUri
 
 function Invoke-RestMethod {
   param([string]$Uri)
@@ -33,7 +35,7 @@ try {
   & (Join-Path $rootDir "scripts\install.ps1") `
     -Version $version `
     -InstallDir $installDir `
-    -RepositoryUrl ([uri]$repositoryDir).AbsoluteUri
+    -DownloadBaseUrl $releaseUrl
 
   $installed = Join-Path $installDir "dopbase.exe"
   if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {
@@ -45,12 +47,12 @@ try {
 
   & (Join-Path $rootDir "scripts\install.ps1") `
     -InstallDir $installDir `
-    -RepositoryUrl ([uri]$repositoryDir).AbsoluteUri
+    -DownloadBaseUrl $releaseUrl
 
   & (Join-Path $rootDir "scripts\install.ps1") `
     -Version "v$version" `
     -InstallDir $installDir `
-    -RepositoryUrl ([uri]$repositoryDir).AbsoluteUri
+    -DownloadBaseUrl $legacyReleaseUrl
 
   Set-Content -LiteralPath (Join-Path $releaseDir "checksums.txt") -Value ("0" * 64 + "  $archiveName")
   $acceptedInvalidChecksum = $true
@@ -58,7 +60,7 @@ try {
     & (Join-Path $rootDir "scripts\install.ps1") `
       -Version $version `
       -InstallDir $installDir `
-      -RepositoryUrl ([uri]$repositoryDir).AbsoluteUri
+      -DownloadBaseUrl $releaseUrl
   } catch {
     $acceptedInvalidChecksum = $false
   }
