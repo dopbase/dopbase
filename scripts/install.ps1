@@ -2,13 +2,16 @@
 param(
   [string]$Version = $env:DOPBASE_VERSION,
   [string]$InstallDir = $env:DOPBASE_INSTALL_DIR,
-  [string]$DownloadBaseUrl = $env:DOPBASE_DOWNLOAD_BASE_URL
+  [string]$DownloadBaseUrl = $env:DOPBASE_DOWNLOAD_BASE_URL,
+  [string]$RepositoryUrl = $env:DOPBASE_REPOSITORY_URL
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$repositoryUrl = "https://github.com/dopbase/dopbase"
+if ([string]::IsNullOrWhiteSpace($RepositoryUrl)) {
+  $RepositoryUrl = "https://github.com/dopbase/dopbase"
+}
 if ([string]::IsNullOrWhiteSpace($InstallDir)) {
   $base = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { $env:USERPROFILE }
   $InstallDir = Join-Path $base "Dopbase\bin"
@@ -18,14 +21,15 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
   $release = Invoke-RestMethod -Uri "https://api.github.com/repos/dopbase/dopbase/releases/latest"
   $Version = [string]$release.tag_name
 }
-$Version = $Version.TrimStart("v")
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-  throw "dopbase installer: invalid version: $Version"
+$releaseTag = $Version.Trim()
+if ($releaseTag -notmatch '^v?\d+\.\d+\.\d+$') {
+  throw "dopbase installer: invalid release tag: $releaseTag"
 }
+$Version = $releaseTag.TrimStart("v")
 
 $archiveName = "dopbase_${Version}_windows_amd64.zip"
 if ([string]::IsNullOrWhiteSpace($DownloadBaseUrl)) {
-  $DownloadBaseUrl = "$repositoryUrl/releases/download/v$Version"
+  $DownloadBaseUrl = "$RepositoryUrl/releases/download/$releaseTag"
 }
 $DownloadBaseUrl = $DownloadBaseUrl.TrimEnd("/")
 

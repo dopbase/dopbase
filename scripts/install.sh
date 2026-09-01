@@ -2,7 +2,7 @@
 
 set -eu
 
-repository_url="https://github.com/dopbase/dopbase"
+repository_url="${DOPBASE_REPOSITORY_URL:-https://github.com/dopbase/dopbase}"
 install_dir="${DOPBASE_INSTALL_DIR:-${HOME}/.local/bin}"
 
 require_command() {
@@ -34,18 +34,20 @@ case "$(uname -m)" in
 esac
 
 if [ -n "${DOPBASE_VERSION:-}" ]; then
-  version=${DOPBASE_VERSION#v}
+  release_tag=$DOPBASE_VERSION
 else
   latest_url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "${repository_url}/releases/latest")
-  latest_tag=${latest_url##*/}
-  case "$latest_tag" in
-    v[0-9]*.[0-9]*.[0-9]*) version=${latest_tag#v} ;;
-    *)
-      echo "dopbase installer: could not determine the latest release" >&2
-      exit 1
-      ;;
-  esac
+  release_tag=${latest_url##*/}
 fi
+
+case "$release_tag" in
+  v[0-9]*.[0-9]*.[0-9]*) version=${release_tag#v} ;;
+  [0-9]*.[0-9]*.[0-9]*) version=$release_tag ;;
+  *)
+    echo "dopbase installer: invalid release tag: ${release_tag}" >&2
+    exit 1
+    ;;
+esac
 
 if ! printf '%s\n' "$version" | awk -F. '
   NF == 3 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ { valid = 1 }
@@ -56,7 +58,7 @@ if ! printf '%s\n' "$version" | awk -F. '
 fi
 
 archive_name="dopbase_${version}_${asset_os}_${asset_arch}.zip"
-release_base_url="${DOPBASE_DOWNLOAD_BASE_URL:-${repository_url}/releases/download/v${version}}"
+release_base_url="${DOPBASE_DOWNLOAD_BASE_URL:-${repository_url}/releases/download/${release_tag}}"
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dopbase-install.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
 
