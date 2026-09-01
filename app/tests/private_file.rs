@@ -1,6 +1,17 @@
 use std::sync::{Arc, Barrier};
 
 #[test]
+fn replace_writer_overwrites_existing_destination() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let path = directory.path().join("config.toml");
+  std::fs::write(&path, b"old").unwrap();
+
+  app::utils::private_file::write(&path, b"new", true).unwrap();
+
+  assert_eq!(std::fs::read(path).unwrap(), b"new");
+}
+
+#[test]
 fn concurrent_no_replace_writers_never_overwrite_each_other() {
   let directory = tempfile::TempDir::new().unwrap();
   let path = directory.path().join("secrets.env");
