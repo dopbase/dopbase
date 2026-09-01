@@ -34,9 +34,11 @@ pub async fn login(
     ));
   }
   let admin = repository::admin_by_email(state.db.pool(), &email).await?;
-  let valid = admin
-    .as_ref()
-    .is_some_and(|(_, _, hash)| common::verify_password(&request.password, hash));
+  let valid = if let Some((_, _, hash)) = &admin {
+    common::verify_password_async(request.password.clone(), hash.clone()).await?
+  } else {
+    false
+  };
   if !valid {
     state.rate_limiter.failure(&limit_key).await;
     let _ = common::audit(
@@ -79,6 +81,15 @@ pub async fn login(
   };
   let session_id = token::public_id(SESSION_ID_PREFIX);
   let mut tx = state.db.pool().begin().await?;
+  // Keep revoked/expired session history for 30 days for operational
+  // diagnosis, then prune it during the naturally recurring login path.
+  let retention_cutoff = (now - Duration::days(30)).to_rfc3339();
+  sqlx::query("DELETE FROM sessions WHERE (revoked_at IS NOT NULL AND revoked_at < ?) OR (absolute_expires_at < ?) OR (idle_expires_at < ?)")
+    .bind(&retention_cutoff)
+    .bind(&retention_cutoff)
+    .bind(&retention_cutoff)
+    .execute(&mut *tx)
+    .await?;
   sqlx::query("INSERT INTO sessions(id,admin_id,kind,token_hash,csrf_hash,created_at,last_used_at,recent_auth_at,idle_expires_at,absolute_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(&session_id).bind(&admin_id).bind(request.session_kind.as_str()).bind(token::hash(&raw)).bind(csrf.as_ref().map(|v|token::hash(v))).bind(now.to_rfc3339()).bind(now.to_rfc3339()).bind(now.to_rfc3339()).bind(idle.to_rfc3339()).bind(absolute.to_rfc3339()).execute(&mut *tx).await?;
   common::audit(
     &mut *tx,
@@ -137,13 +148,14 @@ pub async fn logout(
     _ => unreachable!(),
   };
   let now = Utc::now().to_rfc3339();
+  let mut tx = state.db.pool().begin().await?;
   sqlx::query("UPDATE sessions SET revoked_at=? WHERE id=?")
     .bind(&now)
     .bind(session_id)
-    .execute(state.db.pool())
+    .execute(&mut *tx)
     .await?;
   common::audit(
-    state.db.pool(),
+    &mut *tx,
     "admin",
     Some(admin_id),
     Some(email),
@@ -155,6 +167,7 @@ pub async fn logout(
     serde_json::json!({}),
   )
   .await?;
+  tx.commit().await?;
   Ok(())
 }
 pub async fn reauthenticate(
@@ -166,7 +179,7 @@ pub async fn reauthenticate(
   let hash = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
-  if !common::verify_password(password, &hash) {
+  if !common::verify_password_async(password.to_owned(), hash).await? {
     return Err(HttpError::unauthorized(
       AUTHENTICATION_INVALID,
       "The password is incorrect.",
@@ -176,13 +189,14 @@ pub async fn reauthenticate(
     AuthIdentity::Admin { session_id, .. } => session_id,
     _ => unreachable!(),
   };
+  let mut tx = state.db.pool().begin().await?;
   sqlx::query("UPDATE sessions SET recent_auth_at=? WHERE id=?")
     .bind(Utc::now().to_rfc3339())
     .bind(session_id)
-    .execute(state.db.pool())
+    .execute(&mut *tx)
     .await?;
   common::audit(
-    state.db.pool(),
+    &mut *tx,
     "admin",
     Some(admin_id),
     Some(email),
@@ -194,6 +208,7 @@ pub async fn reauthenticate(
     serde_json::json!({}),
   )
   .await?;
+  tx.commit().await?;
   Ok(())
 }
 pub async fn change_password(
@@ -206,13 +221,13 @@ pub async fn change_password(
   let old = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
-  if !common::verify_password(&request.current_password, &old) {
+  if !common::verify_password_async(request.current_password.clone(), old).await? {
     return Err(HttpError::unauthorized(
       AUTHENTICATION_INVALID,
       "The password is incorrect.",
     ));
   }
-  let new_hash = common::hash_password(&request.new_password)?;
+  let new_hash = common::hash_password_async(request.new_password.clone()).await?;
   let mut tx = state.db.pool().begin().await?;
   sqlx::query("UPDATE admins SET password_hash=?,updated_at=? WHERE id=?")
     .bind(new_hash)

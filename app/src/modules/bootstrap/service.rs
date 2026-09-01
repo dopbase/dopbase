@@ -47,7 +47,7 @@ pub async fn create(
       "The setup token is invalid.",
     ));
   }
-  let hash = common::hash_password(&request.password)?;
+  let hash = common::hash_password_async(request.password.clone()).await?;
   let admin_id = token::public_id(ADMIN_ID_PREFIX);
   let session_id = token::public_id(SESSION_ID_PREFIX);
   let session_token = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;

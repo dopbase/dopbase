@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::OnceLock};
+use std::{
+  collections::BTreeMap,
+  sync::{Arc, OnceLock},
+};
 
 use argon2::{
   Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
@@ -83,6 +86,48 @@ pub fn verify_password(
     Argon2::default()
       .verify_password(value.as_bytes(), &hash)
       .is_ok()
+  })
+}
+
+fn password_workers() -> &'static Arc<tokio::sync::Semaphore> {
+  static WORKERS: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
+  WORKERS.get_or_init(|| Arc::new(tokio::sync::Semaphore::new(4)))
+}
+
+pub async fn hash_password_async(value: String) -> Result<String, HttpError> {
+  let permit = password_workers()
+    .clone()
+    .acquire_owned()
+    .await
+    .map_err(|_| HttpError::internal())?;
+  tokio::task::spawn_blocking(move || {
+    let _permit = permit;
+    hash_password(&value)
+  })
+  .await
+  .map_err(|error| {
+    tracing::error!(%error, "password hashing worker failed");
+    HttpError::internal()
+  })?
+}
+
+pub async fn verify_password_async(
+  value: String,
+  encoded: String,
+) -> Result<bool, HttpError> {
+  let permit = password_workers()
+    .clone()
+    .acquire_owned()
+    .await
+    .map_err(|_| HttpError::internal())?;
+  tokio::task::spawn_blocking(move || {
+    let _permit = permit;
+    verify_password(&value, &encoded)
+  })
+  .await
+  .map_err(|error| {
+    tracing::error!(%error, "password verification worker failed");
+    HttpError::internal()
   })
 }
 

@@ -1,0 +1,3 @@
+DROP INDEX sessions_absolute_retention_idx;
+DROP INDEX sessions_idle_retention_idx;
+DROP INDEX sessions_revoked_retention_idx;
