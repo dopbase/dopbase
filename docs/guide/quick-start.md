@@ -5,33 +5,43 @@ description: "Install Dopbase, start a local secrets server, import an existing 
 
 # Quick start
 
-This walkthrough installs Dopbase 0.0.8, starts a local server, imports an
+This walkthrough installs Dopbase 0.0.12, starts a local server, imports an
 existing `.env` file, and runs an application with its secrets.
 
 ::: warning Testing release
-Dopbase 0.0.8 is intended for testing and evaluation. The first public release
+Dopbase 0.0.12 is intended for testing and evaluation. The first public release
 will be 0.1.0.
 :::
 
 ## 1. Install Dopbase
 
-The installer downloads the correct macOS or Linux archive from GitHub
-Releases, verifies its SHA-256 checksum, and places `dopbase` in
-`~/.local/bin`:
+The installers download the correct release archive from GitHub Releases and
+verify its SHA-256 checksum.
+
+On macOS or Linux, install to `~/.local/bin`:
 
 ```bash
 curl -fsSL https://dopbase.com/install.sh | sh
 ```
 
-Add `~/.local/bin` to `PATH` if the installer asks you to, then confirm the
-installation:
+On Windows x64, run PowerShell and install to `%LOCALAPPDATA%\Dopbase\bin`:
+
+```powershell
+irm https://raw.githubusercontent.com/dopbase/dopbase/v0.0.12/scripts/install.ps1 -OutFile install.ps1
+.\install.ps1
+Remove-Item install.ps1
+```
+
+Add the reported installation directory to `PATH` if the installer asks you
+to, then confirm the installation:
 
 ```bash
 dopbase --version
 ```
 
-Set `DOPBASE_INSTALL_DIR` to choose another directory. Set `DOPBASE_VERSION` to
-install a specific release.
+Set `DOPBASE_INSTALL_DIR` to choose another directory and
+`DOPBASE_VERSION` to install a specific release. The PowerShell installer also
+accepts `-InstallDir` and `-Version` parameters.
 
 ## 2. Start the server
 

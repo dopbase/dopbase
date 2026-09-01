@@ -126,12 +126,12 @@ tag from the release commit:
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v0.0.8 -m "v0.0.8"
-git push origin v0.0.8
+git tag -a v0.0.12 -m "v0.0.12"
+git push origin v0.0.12
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
-matches the Rust package version, builds the Linux and macOS archives, creates
+matches the Rust package version, builds the Linux, macOS, and Windows archives, creates
 `checksums.txt`, and publishes the release only after every target succeeds.
 
 ## Review expectations

@@ -1,7 +1,7 @@
 {
   "name": "dopbase",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.12",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

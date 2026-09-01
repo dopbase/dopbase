@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 fn parses_version_triplets() {
   assert_eq!(parse_version("1.2.3"), Some((1, 2, 3)));
   assert_eq!(parse_version("v1.2.3"), Some((1, 2, 3)));
-  assert_eq!(parse_version(" v0.0.8 "), Some((0, 0, 8)));
+  assert_eq!(parse_version(" v0.0.12 "), Some((0, 0, 12)));
   assert_eq!(parse_version("1.2"), None);
   assert_eq!(parse_version("1.2.3.4"), None);
   assert_eq!(parse_version("1.2.3-rc1"), None);
@@ -45,7 +45,7 @@ fn rejects_release_without_tag() {
 #[test]
 fn update_status_serializes_the_documented_shape() {
   let status = UpdateStatus {
-    current_version: "0.0.8",
+    current_version: "0.0.12",
     latest_version: "v0.1.0".into(),
     update_available: true,
     release_url: "https://github.com/dopbase/dopbase/releases/tag/v0.1.0".into(),
@@ -54,7 +54,7 @@ fn update_status_serializes_the_documented_shape() {
   assert_eq!(
     value,
     json!({
-        "current_version": "0.0.8",
+        "current_version": "0.0.12",
         "latest_version": "v0.1.0",
         "update_available": true,
         "release_url": "https://github.com/dopbase/dopbase/releases/tag/v0.1.0"

@@ -1,11 +1,11 @@
 ---
 title: "Command reference"
-description: "Reference for every Dopbase CLI command in v0.0.8: connections, authentication, projects, environments, and secret operations."
+description: "Reference for every Dopbase CLI command in v0.0.12: connections, authentication, projects, environments, and secret operations."
 ---
 
 # Command reference
 
-This page defines the implemented v0.0.8 command surface. Dopbase does not infer a
+This page defines the implemented v0.0.12 command surface. Dopbase does not infer a
 project or environment from the current directory and does not store an active
 project or environment. Commands that work with secrets receive an environment
 reference directly.
@@ -42,12 +42,12 @@ force-stopped (default 10).
 GitHub. It is informational only and never modifies the binary:
 
 ```text
-dopbase 0.0.8 is up to date (latest release v0.1.0).
+dopbase 0.0.12 is up to date (latest release v0.1.0).
 ```
 
 When a newer release exists, the command prints the current version, the latest
 version, the release URL, and a reminder that Dopbase does not self-update.
-Install the new release with `scripts/install.sh` or the release archive. The
+Install the new release with `scripts/install.sh`, `scripts/install.ps1`, or the release archive. The
 command exits with status 0 whether or not an update is available, and with
 status 1 when the release cannot be queried. Run it with `--json` for
 automation; no other command contacts GitHub.

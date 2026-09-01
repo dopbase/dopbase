@@ -4,6 +4,24 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+## 0.0.12 - 2026-09-01
+
+### Added
+
+- Revision-protected secret import previews that reject stale replace operations.
+- Windows x64 release archives and a checksum-verifying PowerShell installer.
+- Session-history retention with automatic cleanup after 30 days.
+
+### Changed
+
+- Serialized concurrent secret writes and token revocations so versions and audit
+  records remain consistent.
+- Made project, environment, authentication, and audit mutations transactional.
+- Moved password hashing and verification to bounded blocking workers.
+- Hardened daemon PID ownership, private-file writes, and rate-limiter storage.
+- Cancelled stale Admin UI requests and queued concurrent reauthentication work.
+- Expanded release verification across Linux, macOS, and Windows artifacts.
+
 ## 0.0.8 - 2026-08-30
 
 ### Added

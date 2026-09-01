@@ -1,13 +1,13 @@
 ---
 title: "Roadmap"
-description: "The Dopbase roadmap: what ships in the 0.0.8 testing release and what is planned toward the first public release."
+description: "The Dopbase roadmap: what ships in the 0.0.12 testing release and what is planned toward the first public release."
 ---
 
 # Roadmap
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## Current testing release: v0.0.8
+## Current testing release: v0.0.12
 
 - Authentication
 - Projects and environments
