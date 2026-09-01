@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
@@ -24,6 +24,8 @@ export function useWorkspaceController() {
   const environments = ref<Environment[] | null>(null);
   const environmentsLoading = ref(false);
   const environmentsError = ref<string | null>(null);
+  let projectsRequest: AbortController | null = null;
+  let environmentsRequest: AbortController | null = null;
 
   const projectRef = computed(() =>
     typeof route.params.projectRef === "string"
@@ -55,36 +57,55 @@ export function useWorkspaceController() {
   );
 
   async function loadProjects(): Promise<void> {
+    projectsRequest?.abort();
+    const request = new AbortController();
+    projectsRequest = request;
     projectsError.value = null;
     try {
-      projects.value = await projectsApi.listProjects();
+      const result = await projectsApi.listProjects(request.signal);
+      if (!request.signal.aborted) projects.value = result;
     } catch {
+      if (request.signal.aborted) return;
       projectsError.value = "Could not load projects.";
       projects.value = null;
     }
   }
 
   async function loadEnvironments(): Promise<void> {
-    if (!projectRef.value) {
+    environmentsRequest?.abort();
+    const reference = projectRef.value;
+    if (!reference) {
       environments.value = null;
+      environmentsLoading.value = false;
       return;
     }
+    const request = new AbortController();
+    environmentsRequest = request;
     environmentsLoading.value = true;
     environmentsError.value = null;
     try {
-      environments.value = await environmentsApi.listEnvironments(
-        projectRef.value,
+      const result = await environmentsApi.listEnvironments(
+        reference,
+        request.signal,
       );
+      if (!request.signal.aborted && projectRef.value === reference) {
+        environments.value = result;
+      }
     } catch {
+      if (request.signal.aborted || projectRef.value !== reference) return;
       environmentsError.value = "Could not load environments.";
       environments.value = null;
     } finally {
-      environmentsLoading.value = false;
+      if (environmentsRequest === request) environmentsLoading.value = false;
     }
   }
 
   watch(projectRef, loadEnvironments, { immediate: true });
   onMounted(loadProjects);
+  onUnmounted(() => {
+    projectsRequest?.abort();
+    environmentsRequest?.abort();
+  });
 
   // Landing on /workspace with existing projects opens the first project.
   watch(projects, (list) => {
