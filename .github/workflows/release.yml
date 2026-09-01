@@ -404,5 +404,7 @@ jobs:
         run: |
           gh api "repos/${GH_REPO}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
           gh release create "${GITHUB_REF_NAME}" release/* \
+            --repo "${GH_REPO}" \
+            --target "${GITHUB_SHA}" \
             --generate-notes \
             --title "${GITHUB_REF_NAME} Release"
