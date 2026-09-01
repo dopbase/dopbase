@@ -18,10 +18,13 @@ const BASE = "/api/v1/environments";
  */
 export async function listEnvironments(
   project?: string,
+  signal?: AbortSignal,
 ): Promise<Environment[]> {
   const query =
     project === undefined ? "" : `?project=${encodeURIComponent(project)}`;
-  const { data } = await apiRequest<Environment[]>(`${BASE}${query}`);
+  const { data } = await apiRequest<Environment[]>(`${BASE}${query}`, {
+    signal,
+  });
   return data;
 }
 

@@ -33,8 +33,8 @@ export interface InitProjectResponse {
 
 const BASE = "/api/v1/projects";
 
-export async function listProjects(): Promise<Project[]> {
-  const { data } = await apiRequest<Project[]>(BASE);
+export async function listProjects(signal?: AbortSignal): Promise<Project[]> {
+  const { data } = await apiRequest<Project[]>(BASE, { signal });
   return data;
 }
 

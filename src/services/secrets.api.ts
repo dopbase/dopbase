@@ -26,6 +26,8 @@ export interface ImportSecretsRequest {
    * values). Persisted alongside a non-dry-run import.
    */
   envLayout?: string;
+  /** Revision returned by the dry run being confirmed. */
+  expectedRevision?: string;
 }
 
 export interface ImportSecretsResponse {
@@ -34,6 +36,7 @@ export interface ImportSecretsResponse {
   unchangedKeys: string[];
   deletedKeys: string[];
   dryRun: boolean;
+  revision: string;
 }
 
 export interface ExportSecretsResponse {
@@ -45,8 +48,11 @@ const base = (environmentId: string): string =>
 
 export async function listSecrets(
   environmentId: string,
+  signal?: AbortSignal,
 ): Promise<SecretMetadata[]> {
-  const { data } = await apiRequest<SecretMetadata[]>(base(environmentId));
+  const { data } = await apiRequest<SecretMetadata[]>(base(environmentId), {
+    signal,
+  });
   return data;
 }
 

@@ -25,8 +25,11 @@ const base = (environmentId: string): string =>
 
 export async function listTokens(
   environmentId: string,
+  signal?: AbortSignal,
 ): Promise<RunnerToken[]> {
-  const { data } = await apiRequest<RunnerToken[]>(base(environmentId));
+  const { data } = await apiRequest<RunnerToken[]>(base(environmentId), {
+    signal,
+  });
   return data;
 }
 
