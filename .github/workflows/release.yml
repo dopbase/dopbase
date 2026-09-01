@@ -402,7 +402,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          gh api "repos/${GH_REPO}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
           gh release create "${GITHUB_REF_NAME}" release/* \
-            --verify-tag \
             --generate-notes \
             --title "${GITHUB_REF_NAME} Release"
