@@ -2,3 +2,11 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Generated build and tool output
+app/target/
+dist/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+node_modules/
+coverage/
