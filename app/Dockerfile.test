@@ -12,7 +12,7 @@ COPY src ./src
 COPY tests ./tests
 RUN bun run build
 
-FROM rust:1.97-bookworm
+FROM rust:1.98-bookworm
 
 LABEL dopbase.test="true"
 

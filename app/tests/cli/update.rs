@@ -24,14 +24,15 @@ fn compares_versions() {
 #[test]
 fn parses_release_payload() {
   let release = parse_release(&json!({
-      "tag_name": "v0.1.0",
-      "html_url": "https://github.com/dopbase/dopbase/releases/tag/v0.1.0"
+      "tag_name": "0.1.0",
+      "html_url": "https://github.com/dopbase/dopbase/releases/tag/0.1.0"
   }))
   .unwrap();
+  assert_eq!(release.tag, "0.1.0");
   assert_eq!(release.version, Some((0, 1, 0)));
   assert_eq!(
     release.url,
-    "https://github.com/dopbase/dopbase/releases/tag/v0.1.0"
+    "https://github.com/dopbase/dopbase/releases/tag/0.1.0"
   );
 }
 
@@ -46,18 +47,18 @@ fn rejects_release_without_tag() {
 fn update_status_serializes_the_documented_shape() {
   let status = UpdateStatus {
     current_version: "0.0.12",
-    latest_version: "v0.1.0".into(),
+    latest_version: "0.1.0".into(),
     update_available: true,
-    release_url: "https://github.com/dopbase/dopbase/releases/tag/v0.1.0".into(),
+    release_url: "https://github.com/dopbase/dopbase/releases/tag/0.1.0".into(),
   };
   let value = serde_json::to_value(&status).unwrap();
   assert_eq!(
     value,
     json!({
         "current_version": "0.0.12",
-        "latest_version": "v0.1.0",
+        "latest_version": "0.1.0",
         "update_available": true,
-        "release_url": "https://github.com/dopbase/dopbase/releases/tag/v0.1.0"
+        "release_url": "https://github.com/dopbase/dopbase/releases/tag/0.1.0"
     })
   );
 }

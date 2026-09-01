@@ -16,6 +16,7 @@ env:
   BUN_VERSION: "1.4.0"
   CARGO_TERM_COLOR: always
   RUST_VERSION: "1.98.0"
+  SMOKE_PORT: "18376"
 
 jobs:
   prepare:
@@ -46,15 +47,24 @@ jobs:
             exit 1
           fi
 
-          tag_version="${GITHUB_REF_NAME#v}"
+          release_version="${GITHUB_REF_NAME}"
           package_version="$(cargo metadata \
             --manifest-path app/Cargo.toml \
             --locked \
             --no-deps \
             --format-version 1 | jq -r '.packages[] | select(.name == "app") | .version')"
+          frontend_version="$(jq -r '.version' package.json)"
 
-          if [[ "${tag_version}" != "${package_version}" ]]; then
-            echo "Tag version ${tag_version} does not match app version ${package_version}" >&2
+          if [[ "${release_version}" != "${package_version}" ]]; then
+            echo "Tag version ${release_version} does not match app version ${package_version}" >&2
+            exit 1
+          fi
+          if [[ "${release_version}" != "${frontend_version}" ]]; then
+            echo "Tag version ${release_version} does not match frontend version ${frontend_version}" >&2
+            exit 1
+          fi
+          if ! grep --fixed-strings --quiet "## ${release_version} -" CHANGELOG.md; then
+            echo "CHANGELOG.md has no release heading for ${release_version}" >&2
             exit 1
           fi
 
@@ -173,10 +183,13 @@ jobs:
         run: |
           set -euo pipefail
           binary="app/target/${{ matrix.target }}/release/dopbase"
-          version="${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME}"
+          bind_address="127.0.0.1:${SMOKE_PORT}"
+          public_url="http://${bind_address}"
           test "$("${binary}" --version)" = "dopbase ${version}"
 
           runtime_root="$(mktemp -d)"
+          data_dir="${runtime_root}/data"
           server_log="${runtime_root}/server.log"
           server_pid=""
           cleanup() {
@@ -188,15 +201,16 @@ jobs:
           }
           trap cleanup EXIT
 
-          "${binary}" --data-dir "${runtime_root}/data" serve \
-            --bind-address 127.0.0.1:18376 \
-            --public-url http://127.0.0.1:18376 \
+          "${binary}" --data-dir "${data_dir}" serve \
+            --docs \
+            --bind-address "${bind_address}" \
+            --public-url "${public_url}" \
             >"${server_log}" 2>&1 &
           server_pid=$!
 
           ready=false
           for _ in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:18376/api/v1/health >/dev/null; then
+            if curl --fail --silent "${public_url}/api/v1/health" >/dev/null; then
               ready=true
               break
             fi
@@ -211,8 +225,25 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent http://127.0.0.1:18376/ | grep --quiet '<div id="app"></div>'
-          curl --fail --silent http://127.0.0.1:18376/api/v1/health | grep --quiet "\"version\":\"${version}\""
+          health="$(curl --fail --silent "${public_url}/api/v1/health")"
+          grep --quiet '"success":true' <<<"${health}"
+          grep --quiet '"product":"dopbase"' <<<"${health}"
+          grep --quiet "\"version\":\"${version}\"" <<<"${health}"
+          grep --quiet '"apiVersion":"v1"' <<<"${health}"
+          grep --quiet '"status":"ok"' <<<"${health}"
+          curl --fail --silent "${public_url}/" | grep --quiet '<div id="app"></div>'
+          curl --fail --silent "${public_url}/api/v1/openapi.json" | grep --quiet '"openapi"'
+          curl --fail --silent --location "${public_url}/api/docs/" >/dev/null
+
+          test -f "${data_dir}/dopbase.db"
+          test -f "${data_dir}/master.key"
+          test -f "${data_dir}/dopbase.db.lock"
+          test ! -e "${runtime_root}/dopbase.db"
+          grep --fixed-strings --quiet "Config:     ${data_dir}" "${server_log}"
+
+          kill -TERM "${server_pid}"
+          wait "${server_pid}"
+          server_pid=""
 
       - name: Smoke-test Windows release binary
         if: matrix.asset_os == 'windows'
@@ -220,7 +251,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $binary = "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          $version = "${{ github.ref_name }}"
           $actualVersion = (& $binary --version).Trim()
           if ($actualVersion -ne "dopbase $version") {
             throw "unexpected Dopbase version: $actualVersion"
@@ -229,19 +260,21 @@ jobs:
           $runtimeRoot = Join-Path $env:RUNNER_TEMP ("dopbase-smoke-" + [guid]::NewGuid())
           $serverLog = Join-Path $runtimeRoot "server.log"
           $serverError = Join-Path $runtimeRoot "server-error.log"
+          $dataDir = Join-Path $runtimeRoot "data"
+          $publicUrl = "http://127.0.0.1:$env:SMOKE_PORT"
           New-Item -ItemType Directory -Path $runtimeRoot | Out-Null
           $process = $null
           try {
             $process = Start-Process -FilePath $binary -ArgumentList @(
-              "--data-dir", (Join-Path $runtimeRoot "data"),
-              "serve", "--bind-address", "127.0.0.1:18376",
-              "--public-url", "http://127.0.0.1:18376"
+              "--data-dir", $dataDir,
+              "serve", "--docs", "--bind-address", "127.0.0.1:$env:SMOKE_PORT",
+              "--public-url", $publicUrl
             ) -RedirectStandardOutput $serverLog -RedirectStandardError $serverError -PassThru
 
             $ready = $false
             for ($attempt = 0; $attempt -lt 60; $attempt++) {
               try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18376/api/v1/health"
+                $health = Invoke-RestMethod -Uri "$publicUrl/api/v1/health"
                 $ready = $true
                 break
               } catch {
@@ -255,12 +288,35 @@ jobs:
             if (-not $ready) {
               throw "Dopbase did not become ready"
             }
-            if ($health.success -ne $true -or $health.data.version -ne $version) {
+            if (
+              $health.success -ne $true -or
+              $health.data.product -ne "dopbase" -or
+              $health.data.version -ne $version -or
+              $health.data.apiVersion -ne "v1" -or
+              $health.data.status -ne "ok"
+            ) {
               throw "unexpected health response"
             }
-            $root = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:18376/"
+            $root = Invoke-WebRequest -UseBasicParsing -Uri "$publicUrl/"
             if ($root.Content -notmatch '<div id="app"></div>') {
               throw "embedded Admin UI is unavailable"
+            }
+            $openApi = Invoke-RestMethod -Uri "$publicUrl/api/v1/openapi.json"
+            if (-not $openApi.openapi) {
+              throw "OpenAPI document is unavailable"
+            }
+            Invoke-WebRequest -UseBasicParsing -Uri "$publicUrl/api/docs/" | Out-Null
+
+            foreach ($file in @("dopbase.db", "master.key", "dopbase.db.lock")) {
+              if (-not (Test-Path -LiteralPath (Join-Path $dataDir $file) -PathType Leaf)) {
+                throw "runtime data file is missing: $file"
+              }
+            }
+            if (Test-Path -LiteralPath (Join-Path $runtimeRoot "dopbase.db")) {
+              throw "database was created outside the configured data directory"
+            }
+            if ((Get-Content -Raw -LiteralPath $serverError) -notmatch [regex]::Escape("Config:     $dataDir")) {
+              throw "runtime log does not report the configured data directory"
             }
           } finally {
             if ($process -and -not $process.HasExited) {
@@ -275,7 +331,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME}"
           archive="dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
           package_dir="$(mktemp -d)"
           cp "app/target/${{ matrix.target }}/release/dopbase" "${package_dir}/dopbase"
@@ -289,7 +345,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          $version = "${{ github.ref_name }}"
           $archive = "dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
           $packageDir = Join-Path $env:RUNNER_TEMP ("dopbase-package-" + [guid]::NewGuid())
           New-Item -ItemType Directory -Path $packageDir | Out-Null
@@ -326,7 +382,7 @@ jobs:
         working-directory: release
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME}"
           expected=(
             "dopbase_${version}_darwin_amd64.zip"
             "dopbase_${version}_darwin_arm64.zip"
@@ -344,6 +400,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" release/* \
             --verify-tag \

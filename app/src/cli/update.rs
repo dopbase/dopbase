@@ -63,9 +63,7 @@ async fn check(current: &'static str) -> Result<UpdateStatus> {
     .version
     .map(|latest| is_newer(latest, current_version))
     .unwrap_or(false);
-  let latest_version = release
-    .version
-    .map_or_else(|| release.tag.clone(), version_string);
+  let latest_version = release.tag;
   Ok(UpdateStatus {
     current_version: current,
     latest_version,
@@ -100,7 +98,7 @@ pub fn parse_release(payload: &Value) -> Result<ReleaseInfo> {
   } else {
     // Pre-release or malformed tags cannot be ordered against the current
     // version — fail closed instead of claiming "up to date".
-    bail!("the latest release tag {tag:?} is not a vMAJOR.MINOR.PATCH version");
+    bail!("the latest release tag {tag:?} is not a MAJOR.MINOR.PATCH version");
   }
 }
 
@@ -132,8 +130,4 @@ pub fn is_newer(
   current: (u64, u64, u64),
 ) -> bool {
   latest > current
-}
-
-fn version_string(version: (u64, u64, u64)) -> String {
-  format!("v{}.{}.{}", version.0, version.1, version.2)
 }
