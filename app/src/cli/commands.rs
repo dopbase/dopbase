@@ -13,7 +13,7 @@ use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
 use std::{
-  env, fs,
+  env,
   io::{self, IsTerminal, Read, Write},
   path::{Path, PathBuf},
   time::Duration,
@@ -534,6 +534,7 @@ async fn import(
   let entries = dotenv::parse_file(path)?;
   let mode = if replace { "replace" } else { "merge" };
   let endpoint = format!("/api/v1/environments/{id}/secrets/import");
+  let mut expected_revision = None;
   if replace && !dry_run {
     let preview = api
       .request(
@@ -542,6 +543,10 @@ async fn import(
         Some(json!({"mode":mode,"dryRun":true,"entries":entries})),
       )
       .await?;
+    expected_revision = preview
+      .get("revision")
+      .and_then(Value::as_str)
+      .map(str::to_owned);
     let deleted = preview
       .get("deletedKeys")
       .and_then(Value::as_array)
@@ -563,7 +568,7 @@ async fn import(
     .request(
       Method::POST,
       &endpoint,
-      Some(json!({"mode":mode,"dryRun":dry_run,"entries":entries})),
+      Some(json!({"mode":mode,"dryRun":dry_run,"entries":entries,"expectedRevision":expected_revision})),
     )
     .await?;
   print_value(json_output, &data);
@@ -886,30 +891,9 @@ fn print_value(
   }
 }
 fn write_private(
-  path: &PathBuf,
+  path: &Path,
   contents: &[u8],
   force: bool,
 ) -> Result<()> {
-  if path.exists() && !force {
-    bail!(
-      "{} already exists; pass --force to overwrite it",
-      path.display()
-    );
-  }
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent)?;
-  }
-  let temporary = path.with_extension("dopbase.tmp");
-  let mut options = fs::OpenOptions::new();
-  options.write(true).create(true).truncate(true);
-  #[cfg(unix)]
-  {
-    use std::os::unix::fs::OpenOptionsExt;
-    options.mode(0o600);
-  }
-  let mut file = options.open(&temporary)?;
-  file.write_all(contents)?;
-  file.sync_all()?;
-  fs::rename(temporary, path)?;
-  Ok(())
+  crate::utils::private_file::write(path, contents, force)
 }
