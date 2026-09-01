@@ -14,14 +14,6 @@ $archivePath = Join-Path $releaseDir $archiveName
 $releaseUrl = ([uri]$releaseDir).AbsoluteUri
 $legacyReleaseUrl = ([uri]$legacyReleaseDir).AbsoluteUri
 
-function Invoke-RestMethod {
-  param([string]$Uri)
-  if ($Uri -ne "https://api.github.com/repos/dopbase/dopbase/releases/latest") {
-    throw "installer test: unexpected API request: $Uri"
-  }
-  return [pscustomobject]@{ tag_name = $version }
-}
-
 try {
   New-Item -ItemType Directory -Path $releaseDir, $legacyReleaseDir, $payloadDir, $installDir | Out-Null
   $payload = "dopbase $version"
@@ -46,6 +38,7 @@ try {
   }
 
   & (Join-Path $rootDir "scripts\install.ps1") `
+    -Version $version `
     -InstallDir $installDir `
     -DownloadBaseUrl $releaseUrl
 
