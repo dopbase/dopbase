@@ -8,6 +8,7 @@ $releaseDir = Join-Path $repositoryDir "releases\download\0.0.12"
 $legacyReleaseDir = Join-Path $repositoryDir "releases\download\v0.0.12"
 $payloadDir = Join-Path $testDir "payload"
 $installDir = Join-Path $testDir "install"
+$legacyInstallDir = Join-Path $testDir "legacy-install"
 $version = "0.0.12"
 $archiveName = "dopbase_${version}_windows_amd64.zip"
 $archivePath = Join-Path $releaseDir $archiveName
@@ -15,7 +16,7 @@ $releaseUrl = ([uri]$releaseDir).AbsoluteUri
 $legacyReleaseUrl = ([uri]$legacyReleaseDir).AbsoluteUri
 
 try {
-  New-Item -ItemType Directory -Path $releaseDir, $legacyReleaseDir, $payloadDir, $installDir | Out-Null
+  New-Item -ItemType Directory -Path $releaseDir, $legacyReleaseDir, $payloadDir, $installDir, $legacyInstallDir | Out-Null
   $payload = "dopbase $version"
   Set-Content -NoNewline -LiteralPath (Join-Path $payloadDir "dopbase.exe") -Value $payload
   Compress-Archive -LiteralPath (Join-Path $payloadDir "dopbase.exe") -DestinationPath $archivePath
@@ -44,7 +45,7 @@ try {
 
   & (Join-Path $rootDir "scripts\install.ps1") `
     -Version "v$version" `
-    -InstallDir $installDir `
+    -InstallDir $legacyInstallDir `
     -DownloadBaseUrl $legacyReleaseUrl
 
   Set-Content -LiteralPath (Join-Path $releaseDir "checksums.txt") -Value ("0" * 64 + "  $archiveName")
