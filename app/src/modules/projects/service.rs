@@ -78,15 +78,22 @@ pub async fn rename(
   let (admin_id, email) = crate::extractors::require_admin(identity)?;
   let project = show(state, reference).await?;
   let now = Utc::now().to_rfc3339();
-  sqlx::query("UPDATE projects SET name=?,updated_at=? WHERE id=?")
+  let mut tx = state.db.pool().begin().await?;
+  let updated = sqlx::query("UPDATE projects SET name=?,updated_at=? WHERE id=?")
     .bind(&request.name)
     .bind(&now)
     .bind(&project.id)
-    .execute(state.db.pool())
+    .execute(&mut *tx)
     .await
     .map_err(map_unique)?;
+  if updated.rows_affected() != 1 {
+    return Err(HttpError::not_found(
+      "PROJECT_NOT_FOUND",
+      "The requested project was not found.",
+    ));
+  }
   common::audit(
-    state.db.pool(),
+    &mut *tx,
     "admin",
     Some(admin_id),
     Some(email),
@@ -98,6 +105,7 @@ pub async fn rename(
     serde_json::json!({"oldName":project.name,"newName":request.name}),
   )
   .await?;
+  tx.commit().await?;
   show(state, &project.id).await
 }
 pub async fn delete(
@@ -107,7 +115,7 @@ pub async fn delete(
 ) -> Result<DeleteProjectResponse, HttpError> {
   let (admin_id, email) = crate::extractors::require_admin(identity)?;
   let project = show(state, reference).await?;
-  let mut tx = state.db.pool().begin().await?;
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let environments: i64 =
     sqlx::query_scalar("SELECT COUNT(*) FROM environments WHERE project_id=?")
       .bind(&project.id)
@@ -115,10 +123,16 @@ pub async fn delete(
       .await?;
   let secrets:i64=sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id IN(SELECT id FROM environments WHERE project_id=?)").bind(&project.id).fetch_one(&mut *tx).await?;
   let tokens:i64=sqlx::query_scalar("SELECT COUNT(*) FROM runner_tokens WHERE environment_id IN(SELECT id FROM environments WHERE project_id=?)").bind(&project.id).fetch_one(&mut *tx).await?;
-  sqlx::query("DELETE FROM projects WHERE id=?")
+  let deleted = sqlx::query("DELETE FROM projects WHERE id=?")
     .bind(&project.id)
     .execute(&mut *tx)
     .await?;
+  if deleted.rows_affected() != 1 {
+    return Err(HttpError::not_found(
+      "PROJECT_NOT_FOUND",
+      "The requested project was not found.",
+    ));
+  }
   common::audit(&mut *tx,"admin",Some(admin_id),Some(email),"project.deleted",Some(&project.id),None,Some("project"),Some(&project.id),serde_json::json!({"name":project.name,"environments":environments,"secrets":secrets,"tokens":tokens})).await?;
   tx.commit().await?;
   Ok(DeleteProjectResponse {

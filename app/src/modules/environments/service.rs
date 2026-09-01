@@ -76,6 +76,7 @@ pub async fn create(
   let project = crate::modules::projects::service::show(state, project_ref).await?;
   let id = token::public_id(ENVIRONMENT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
+  let mut tx = state.db.pool().begin().await?;
   sqlx::query(
     "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?)",
   )
@@ -84,11 +85,11 @@ pub async fn create(
   .bind(&request.name)
   .bind(&now)
   .bind(&now)
-  .execute(state.db.pool())
+  .execute(&mut *tx)
   .await
   .map_err(unique)?;
   common::audit(
-    state.db.pool(),
+    &mut *tx,
     "admin",
     Some(admin_id),
     Some(email),
@@ -100,6 +101,7 @@ pub async fn create(
     serde_json::json!({"name":request.name}),
   )
   .await?;
+  tx.commit().await?;
   show(state, &id).await
 }
 pub async fn rename(
@@ -111,15 +113,22 @@ pub async fn rename(
   common::validate_slug(&request.name, ENVIRONMENT_NAME_INVALID, "Environment name")?;
   let (admin_id, email) = crate::extractors::require_admin(identity)?;
   let environment = show(state, id).await?;
-  sqlx::query("UPDATE environments SET name=?,updated_at=? WHERE id=?")
+  let mut tx = state.db.pool().begin().await?;
+  let updated = sqlx::query("UPDATE environments SET name=?,updated_at=? WHERE id=?")
     .bind(&request.name)
     .bind(Utc::now().to_rfc3339())
     .bind(id)
-    .execute(state.db.pool())
+    .execute(&mut *tx)
     .await
     .map_err(unique)?;
+  if updated.rows_affected() != 1 {
+    return Err(HttpError::not_found(
+      "ENVIRONMENT_NOT_FOUND",
+      "The requested environment was not found.",
+    ));
+  }
   common::audit(
-    state.db.pool(),
+    &mut *tx,
     "admin",
     Some(admin_id),
     Some(email),
@@ -131,6 +140,7 @@ pub async fn rename(
     serde_json::json!({"oldName":environment.name,"newName":request.name}),
   )
   .await?;
+  tx.commit().await?;
   show(state, id).await
 }
 pub async fn delete(
@@ -140,7 +150,7 @@ pub async fn delete(
 ) -> Result<DeleteEnvironmentResponse, HttpError> {
   let (admin_id, email) = crate::extractors::require_admin(identity)?;
   let environment = show(state, id).await?;
-  let mut tx = state.db.pool().begin().await?;
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let secrets: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id=?")
     .bind(id)
     .fetch_one(&mut *tx)
@@ -149,10 +159,16 @@ pub async fn delete(
     .bind(id)
     .fetch_one(&mut *tx)
     .await?;
-  sqlx::query("DELETE FROM environments WHERE id=?")
+  let deleted = sqlx::query("DELETE FROM environments WHERE id=?")
     .bind(id)
     .execute(&mut *tx)
     .await?;
+  if deleted.rows_affected() != 1 {
+    return Err(HttpError::not_found(
+      "ENVIRONMENT_NOT_FOUND",
+      "The requested environment was not found.",
+    ));
+  }
   common::audit(
     &mut *tx,
     "admin",
