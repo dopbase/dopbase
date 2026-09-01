@@ -47,7 +47,9 @@ if (!valid.value) {
 onUnmounted(() => importStore.clear());
 
 const fileName = computed(() => importStore.pending?.fileName ?? "");
-const keys = computed(() => importStore.pending?.entries.map((e) => e.key) ?? []);
+const keys = computed(
+  () => importStore.pending?.entries.map((e) => e.key) ?? [],
+);
 const parseErrors = computed(() => importStore.pending?.errors ?? []);
 
 const stage = ref<"review" | "dry">("review");
@@ -103,6 +105,7 @@ async function apply(): Promise<void> {
       mode: mode.value,
       dryRun: false,
       entries: importStore.pending.entries,
+      expectedRevision: dryResult.value?.revision,
     });
     // The timestamp query makes the secrets table refetch on return; the
     // pending import is cleared by onUnmounted during this navigation.
@@ -226,7 +229,10 @@ async function apply(): Promise<void> {
         </div>
         <DbAlert v-if="actionError">{{ actionError }}</DbAlert>
         <div class="flex items-center justify-end gap-2">
-          <DbButton variant="ghost" :disabled="working" @click="stage = 'review'">
+          <DbButton
+            variant="ghost"
+            :disabled="working"
+            @click="stage = 'review'">
             Back
           </DbButton>
           <DbButton variant="primary" :loading="working" @click="apply">

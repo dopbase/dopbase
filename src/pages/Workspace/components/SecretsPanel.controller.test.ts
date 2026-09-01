@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import {
   REVEAL_SECONDS,
@@ -38,6 +38,25 @@ function makeController(environmentId = "env_1") {
 }
 
 describe("useSecretsPanelController", () => {
+  it("ignores an older environment response that resolves last", async () => {
+    let resolveFirst!: (value: (typeof metadata)[]) => void;
+    let resolveSecond!: (value: (typeof metadata)[]) => void;
+    vi.mocked(secretsApi.listSecrets)
+      .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+      .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
+    const environmentId = ref("env_1");
+    const c = useSecretsPanelController(environmentId);
+    environmentId.value = "env_2";
+    await nextTick();
+    const current = { ...metadata, key: "CURRENT" };
+    resolveSecond([current]);
+    await vi.waitFor(() => expect(c.secrets.value).toEqual([current]));
+    resolveFirst([{ ...metadata, key: "STALE" }]);
+    await nextTick();
+    expect(c.secrets.value).toEqual([current]);
+    expect(c.loading.value).toBe(false);
+  });
+
   it("loads metadata only, never values", async () => {
     vi.mocked(secretsApi.listSecrets).mockResolvedValueOnce([metadata]);
     const c = makeController();
@@ -107,7 +126,10 @@ describe("useSecretsPanelController", () => {
         version: 2,
       });
     const c = makeController();
-    await c.reveal("DATABASE_URL");
+    const reveal = c.reveal("DATABASE_URL");
+    await vi.waitFor(() =>
+      expect(secretsApi.revealSecret).toHaveBeenCalledTimes(1),
+    );
     // Parked: nothing revealed yet, exactly one attempted call.
     expect(c.revealedKey.value).toBeNull();
     expect(secretsApi.revealSecret).toHaveBeenCalledTimes(1);
@@ -116,6 +138,7 @@ describe("useSecretsPanelController", () => {
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce();
     const reauth = useReauthentication();
     const ok = await reauth.submit("correct-password");
+    await reveal;
     expect(ok).toBe(true);
     expect(secretsApi.revealSecret).toHaveBeenCalledTimes(2);
     expect(c.revealedKey.value).toBe("DATABASE_URL");
@@ -169,7 +192,11 @@ describe("useSecretsPanelController — .env editor", () => {
   it("openEditor merges the stored layout with the revealed values", async () => {
     mockEditorLoad();
     const c = makeController();
-    await c.openEditor();
+    const opening = c.openEditor();
+    await vi.waitFor(() =>
+      expect(secretsApi.exportSecrets).toHaveBeenCalledTimes(1),
+    );
+    await opening;
     expect(c.editorOpen.value).toBe(true);
     expect(c.editorContent.value).toBe(
       "# app\nDATABASE_URL=postgres://secret\nAPI_KEY=k-123\n",
@@ -209,7 +236,10 @@ describe("useSecretsPanelController — .env editor", () => {
       )
       .mockResolvedValueOnce(exported);
     const c = makeController();
-    await c.openEditor();
+    const opening = c.openEditor();
+    await vi.waitFor(() =>
+      expect(secretsApi.exportSecrets).toHaveBeenCalledTimes(1),
+    );
     // Parked: nothing loaded yet, exactly one attempted export.
     expect(c.editorContent.value).toBeNull();
     expect(c.editorAwaitingReauth.value).toBe(true);
@@ -219,6 +249,7 @@ describe("useSecretsPanelController — .env editor", () => {
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce();
     const reauth = useReauthentication();
     const ok = await reauth.submit("correct-password");
+    await opening;
     expect(ok).toBe(true);
     expect(secretsApi.exportSecrets).toHaveBeenCalledTimes(2);
     expect(c.editorContent.value).toBe(
@@ -294,6 +325,7 @@ describe("useSecretsPanelController — .env editor save flow", () => {
         unchangedKeys: ["API_KEY"],
         deletedKeys: [],
         dryRun: true,
+        revision: "rev-1",
       })
       .mockResolvedValueOnce({
         addedKeys: ["DATABASE_URL"],
@@ -301,6 +333,7 @@ describe("useSecretsPanelController — .env editor save flow", () => {
         unchangedKeys: ["API_KEY"],
         deletedKeys: [],
         dryRun: false,
+        revision: "rev-2",
       });
     const c = makeController();
     await c.openEditor();
@@ -325,6 +358,7 @@ describe("useSecretsPanelController — .env editor save flow", () => {
         { key: "API_KEY", value: "k-123" },
       ],
       envLayout: "# app\nDATABASE_URL=\nAPI_KEY=\n",
+      expectedRevision: "rev-1",
     });
     expect(c.editorDirty.value).toBe(false);
     expect(c.editorDiff.value).toBeNull();
@@ -339,6 +373,7 @@ describe("useSecretsPanelController — .env editor save flow", () => {
         unchangedKeys: [],
         deletedKeys: [],
         dryRun: true,
+        revision: "rev-1",
       })
       .mockRejectedValueOnce(new Error("down"));
     const c = makeController();
@@ -376,6 +411,7 @@ describe("useSecretsPanelController — .env editor save flow", () => {
       unchangedKeys: [],
       deletedKeys: [],
       dryRun: true,
+      revision: "rev-1",
     };
     c.backToEditing();
     expect(c.editorDiff.value).toBeNull();

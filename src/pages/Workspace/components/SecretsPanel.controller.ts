@@ -37,6 +37,9 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   const loadError = ref<string | null>(null);
   const actionError = ref<string | null>(null);
   const { runWithReauth } = useReauthentication();
+  let loadRequest: AbortController | null = null;
+  let operationScope = new AbortController();
+  let editorScope = new AbortController();
 
   const revealedKey = ref<string | null>(null);
   const revealedValue = ref<string | null>(null);
@@ -69,29 +72,43 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     }
   }
 
-  async function load(): Promise<void> {
+  async function load(target = environmentId.value): Promise<void> {
+    loadRequest?.abort();
+    const request = new AbortController();
+    loadRequest = request;
     loading.value = true;
     loadError.value = null;
     try {
-      secrets.value = await secretsApi.listSecrets(environmentId.value);
+      const result = await secretsApi.listSecrets(target, request.signal);
+      if (!request.signal.aborted && environmentId.value === target) {
+        secrets.value = result;
+      }
     } catch {
+      if (request.signal.aborted || environmentId.value !== target) return;
       loadError.value = "Could not load secrets.";
       secrets.value = null;
     } finally {
-      loading.value = false;
+      if (loadRequest === request) loading.value = false;
     }
   }
 
   watch(
     environmentId,
-    () => {
+    (target) => {
+      operationScope.abort();
+      operationScope = new AbortController();
+      editorScope.abort();
+      editorScope = new AbortController();
       hideRevealed();
       wipeEditor();
-      load();
+      void load(target);
     },
     { immediate: true },
   );
   onUnmounted(() => {
+    loadRequest?.abort();
+    operationScope.abort();
+    editorScope.abort();
     hideRevealed();
     wipeEditor();
   });
@@ -109,13 +126,13 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   }
 
   async function reveal(key: string): Promise<void> {
+    const target = environmentId.value;
+    const signal = operationScope.signal;
     actionError.value = null;
     try {
       await runWithReauth(async () => {
-        const revealed = await secretsApi.revealSecret(
-          environmentId.value,
-          key,
-        );
+        const revealed = await secretsApi.revealSecret(target, key);
+        if (signal.aborted || environmentId.value !== target) return;
         hideRevealed();
         revealedKey.value = revealed.key;
         revealedValue.value = revealed.value;
@@ -124,17 +141,19 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
           revealSecondsLeft.value -= 1;
           if (revealSecondsLeft.value <= 0) hideRevealed();
         }, 1000);
-      });
+      }, signal);
     } catch (cause) {
+      if (signal.aborted) return;
       actionError.value = describeError(cause, "Could not reveal the secret.");
     }
   }
 
   async function setSecret(key: string, value: string): Promise<void> {
+    const target = environmentId.value;
     actionError.value = null;
     try {
-      await secretsApi.setSecret(environmentId.value, key, value);
-      await load();
+      await secretsApi.setSecret(target, key, value);
+      if (environmentId.value === target) await load(target);
     } catch (cause) {
       actionError.value = describeError(cause, "Could not save the secret.");
       throw cause;
@@ -142,11 +161,13 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   }
 
   async function deleteSecret(key: string): Promise<void> {
+    const target = environmentId.value;
     actionError.value = null;
     try {
-      await secretsApi.deleteSecret(environmentId.value, key);
+      await secretsApi.deleteSecret(target, key);
+      if (environmentId.value !== target) return;
       if (revealedKey.value === key) hideRevealed();
-      await load();
+      await load(target);
     } catch (cause) {
       actionError.value = describeError(cause, "Could not delete the secret.");
       throw cause;
@@ -201,6 +222,10 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
    * parked retry once the password is confirmed.
    */
   async function openEditor(): Promise<void> {
+    const target = environmentId.value;
+    editorScope.abort();
+    editorScope = new AbortController();
+    const signal = editorScope.signal;
     editorOpen.value = true;
     editorLoading.value = true;
     editorLoadError.value = null;
@@ -209,83 +234,113 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     editorAwaitingReauth.value = false;
     let loaded = false;
     try {
-      const stored = await secretsApi.getEnvLayout(environmentId.value);
-      await runWithReauth(async () => {
-        // The merge happens inside the closure so a parked reauthentication
-        // retry fills the buffer when the password is confirmed.
-        if (!editorOpen.value) return;
-        const exported = await secretsApi.exportSecrets(environmentId.value);
-        const content = mergeLayoutValues(stored.layout, exported.entries);
-        editorContent.value = content;
-        editorBaseline.value = content;
-        editorAwaitingReauth.value = false;
-        loaded = true;
-      });
+      const stored = await secretsApi.getEnvLayout(target);
+      if (signal.aborted || environmentId.value !== target) return;
+      await runWithReauth(
+        async () => {
+          // The merge happens inside the closure so a parked reauthentication
+          // retry fills the buffer when the password is confirmed.
+          if (!editorOpen.value || signal.aborted) return;
+          const exported = await secretsApi.exportSecrets(target);
+          if (signal.aborted || environmentId.value !== target) return;
+          const content = mergeLayoutValues(stored.layout, exported.entries);
+          editorContent.value = content;
+          editorBaseline.value = content;
+          editorAwaitingReauth.value = false;
+          loaded = true;
+        },
+        signal,
+        () => {
+          if (!signal.aborted && environmentId.value === target) {
+            editorLoading.value = false;
+            editorAwaitingReauth.value = true;
+          }
+        },
+      );
     } catch (cause) {
+      if (signal.aborted) return;
       editorLoadError.value = describeError(
         cause,
         "Could not load the secrets for editing.",
       );
     } finally {
-      editorLoading.value = false;
+      if (!signal.aborted && environmentId.value === target) {
+        editorLoading.value = false;
+      }
     }
-    if (!loaded && editorLoadError.value === null) {
+    if (
+      !signal.aborted &&
+      environmentId.value === target &&
+      !loaded &&
+      editorLoadError.value === null
+    ) {
       editorAwaitingReauth.value = true;
     }
   }
 
   function closeEditor(): void {
+    editorScope.abort();
+    editorScope = new AbortController();
     wipeEditor();
   }
 
   /** Runs the server dry-run and parks the result for confirmation. */
   async function saveDraft(): Promise<boolean> {
     if (!editorCanSave.value || editorContent.value === null) return false;
+    const target = environmentId.value;
     editorSaving.value = true;
     editorError.value = null;
     try {
-      editorDiff.value = await secretsApi.importSecrets(environmentId.value, {
+      const result = await secretsApi.importSecrets(target, {
         mode: "replace",
         dryRun: true,
         entries: editorEntries.value,
       });
+      if (environmentId.value !== target) return false;
+      editorDiff.value = result;
       return true;
     } catch (cause) {
+      if (environmentId.value !== target) return false;
       editorError.value = describeError(
         cause,
         "The changes are not valid. Check the editor and try again.",
       );
       return false;
     } finally {
-      editorSaving.value = false;
+      if (environmentId.value === target) editorSaving.value = false;
     }
   }
 
   /** Applies the confirmed diff and persists the value-free layout. */
   async function applyDraft(): Promise<boolean> {
-    if (editorContent.value === null) return false;
+    if (editorContent.value === null || editorDiff.value === null) return false;
+    const target = environmentId.value;
+    const revision = editorDiff.value.revision;
     editorSaving.value = true;
     editorError.value = null;
     try {
-      await secretsApi.importSecrets(environmentId.value, {
+      await secretsApi.importSecrets(target, {
         mode: "replace",
         dryRun: false,
         entries: editorEntries.value,
         envLayout: stripLayoutValues(editorContent.value),
+        expectedRevision: revision,
       });
+      if (environmentId.value !== target) return false;
       editorBaseline.value = editorContent.value;
       editorDiff.value = null;
       hideRevealed();
-      await load();
+      await load(target);
       return true;
     } catch (cause) {
+      if (environmentId.value !== target) return false;
       editorError.value = describeError(
         cause,
         "The changes could not be saved. Nothing may have changed — review and try again.",
       );
       return false;
     } finally {
-      editorSaving.value = false;
+      if (environmentId.value === target) editorSaving.value = false;
     }
   }
 
