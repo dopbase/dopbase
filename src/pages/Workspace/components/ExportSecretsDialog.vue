@@ -23,13 +23,18 @@ const emit = defineEmits<{ close: []; exported: [] }>();
 const working = ref(false);
 const error = ref<string | null>(null);
 const { runWithReauth } = useReauthentication();
+let operation = new AbortController();
 
 watch(
   () => props.open,
   (open) => {
     if (open) {
+      operation.abort();
+      operation = new AbortController();
       working.value = false;
       error.value = null;
+    } else {
+      operation.abort();
     }
   },
 );
@@ -45,19 +50,28 @@ function download(content: string, fileName: string): void {
 }
 
 async function confirmExport(): Promise<void> {
+  const target = {
+    environmentId: props.environmentId,
+    environmentName: props.environmentName,
+    projectName: props.projectName,
+  };
+  const signal = operation.signal;
   working.value = true;
   error.value = null;
   try {
     await runWithReauth(async () => {
-      const result = await secretsApi.exportSecrets(props.environmentId);
+      const result = await secretsApi.exportSecrets(target.environmentId);
+      if (signal.aborted) return;
       download(
         serializeEnvFile(result.entries),
-        `${props.projectName}_${props.environmentName}.env`,
+        `${target.projectName}_${target.environmentName}.env`,
       );
-    });
+    }, signal);
+    if (signal.aborted) return;
     emit("exported");
     emit("close");
   } catch {
+    if (signal.aborted) return;
     error.value = "The export failed. Try again.";
   } finally {
     working.value = false;
