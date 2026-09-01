@@ -410,7 +410,7 @@ jobs:
             --field "tag_name=${GITHUB_REF_NAME}" \
             --field "target_commitish=${GITHUB_SHA}" \
             --field "name=${GITHUB_REF_NAME} Release" \
-            --raw-field generate_release_notes=true \
+            --field generate_release_notes=true \
             --jq '.upload_url' | sed 's/{?name,label}//')"
           for asset in release/*; do
             asset_name="$(basename "${asset}")"
