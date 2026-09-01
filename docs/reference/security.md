@@ -5,7 +5,7 @@ description: "The Dopbase security model: encryption of secret values, separatio
 
 # Security model
 
-Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Security is part of the product behavior, not a layer added after storage and APIs are complete.
+Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Its security controls apply when those credentials are stored, served, revealed, and audited.
 
 ::: info Review the security model
 This page documents the 0.0.8 security model. Public source makes independent
@@ -55,6 +55,6 @@ Authorized users may need to reveal or export a value. These operations should b
 
 ## Reporting vulnerabilities
 
-Dopbase accepts private vulnerability reports through GitHub's private vulnerability reporting feature. Open the repository's **Security** tab, select **Report a vulnerability**, and complete the private advisory form.
+Dopbase accepts private vulnerability reports through [GitHub's private vulnerability reporting form](https://github.com/dopbase/dopbase/security/advisories/new).
 
-Do not publish an undisclosed vulnerability in an issue, discussion, or pull request. Reports must not contain live credentials, customer data, private service URLs, or secrets from a system the reporter does not own. The full reporting and disclosure policy is in the repository's `SECURITY.md`.
+Do not publish an undisclosed vulnerability in an issue, discussion, or pull request. Reports must not contain live credentials, customer data, private service URLs, or secrets from a system the reporter does not own. Read the repository's [security policy](https://github.com/dopbase/dopbase/security/policy) for the complete reporting and disclosure process.

@@ -23,24 +23,23 @@ Reveal shows the plaintext next to the key, with a countdown starting at
 thirty seconds. When the countdown ends, the value hides itself. Switching
 environments or leaving the page hides it immediately too.
 
-Copying the value does not extend the timer. The revealed plaintext lives in
-the page only — nothing stores it, and a reload is enough to lose it.
+Copying the value does not extend the timer. The page keeps the revealed
+plaintext only in memory and removes it when reloaded.
 
 ## Password re-confirmation
 
 Revealing and exporting require a recent password confirmation. If you have
 not entered your password in the last ten minutes, the server asks for it
-first: a dialog opens, you confirm the password, and the action you originally
-requested continues on its own. Nothing else gets submitted.
+first. After the dialog confirms your password, the pending reveal or export
+continues.
 
 The ten-minute window applies to reveal, export, and the `.env` editor. After
 it expires, the next sensitive action asks once more.
 
 ## Editing a whole environment as `.env`
 
-Sometimes row-by-row is the wrong shape for the job. The **Edit as .env**
-control opens an editor holding every secret in the environment as `.env`
-text:
+Use **Edit as .env** to edit several values together. The editor loads every
+secret in the environment as `.env` text:
 
 ```text
 # Payment provider keys
@@ -50,16 +49,15 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 DATABASE_URL=postgres://...
 ```
 
-What the editor gives you:
+The editor provides:
 
 - Syntax highlighting with a line-number gutter, and malformed lines flagged
   both inline and in a list below the editor.
 - Comments and blank lines are yours to keep. Dopbase remembers the layout
   (ordering and comments) separately from the values, so they survive reloads
   and deploys.
-- Saving never happens blind. First you review a summary of what will change:
-  which keys are added, updated, unchanged, and deleted. Only after you accept
-  that summary does anything get stored.
+- A change summary before saving, grouped by added, updated, unchanged, and
+  deleted keys. Dopbase stores the changes only after you accept the summary.
 
 The editor content is wiped when you close it, switch environments, or leave
 the page. Closing the browser tab counts.

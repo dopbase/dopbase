@@ -5,7 +5,7 @@ description: "Operate a Dopbase server safely: network and TLS setup, monitoring
 
 # Operations
 
-Running a secrets manager means protecting both availability and confidentiality. A working process is not enough by itself.
+Operating a secrets manager requires protecting both service availability and stored credentials.
 
 ## Network and TLS
 

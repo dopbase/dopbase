@@ -23,26 +23,25 @@ Open the Admin UI and you land on the setup page. Enter three things:
 2. An email address for the administrator account.
 3. A password of at least 12 characters (128 at most).
 
-The token works once. After setup completes, the page is gone — visiting
-`/setup` again just sends you to the workspace. If the server reports it has
-already been set up, sign in instead.
+The token works once. After setup completes, visiting `/setup` redirects to the
+workspace. If the server reports that setup is complete, sign in instead.
 
-There is no second administrator, no invitations, and no password reset by
-email. Dopbase has no mail server to trust. Offline recovery with the master
-key is the fallback; see [identity and tokens](/reference/identity).
+There is no second administrator, no invitation flow, and no password reset by
+email. Offline recovery with the master key is the fallback; see
+[identity and tokens](/reference/identity).
 
 ## Signing in
 
 Sign in with the email and password you chose during setup.
 
-A few details worth knowing:
+Sign-in behavior:
 
 - Too many failed attempts triggers a rate limit. Wait a moment and try again.
 - A wrong email or a wrong password shows the same message. The login screen
   does not reveal whether an account exists.
 - If you followed a link to a specific page, signing in returns you there.
 - The login screen shows whether the server is reachable. That status check is
-  public on purpose — it carries no secret data.
+  public and carries no secret data.
 
 ## Sessions
 
@@ -51,7 +50,7 @@ eight hours idle or twenty-four hours total, whichever comes first. When a
 session ends, the next navigation sends you back to the login screen and keeps
 your destination.
 
-Logging out revokes the session on the server, not just in the browser.
+Logging out revokes the server session and clears it from the browser.
 
 ## Your account
 
@@ -59,5 +58,4 @@ The Account page shows the signed-in email and lets you change the password.
 Changing the password signs out every human session everywhere, including the
 one that changed it. You sign back in with the new password.
 
-If another browser was still signed in, it is signed out too. That is the
-point.
+Any other signed-in browser is also signed out.

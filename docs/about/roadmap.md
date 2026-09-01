@@ -17,7 +17,7 @@ The roadmap describes intent, not a release commitment. Work may move as impleme
 - CLI, `.env` import and export, and `dopbase run`
 - Service tokens and audit records
 
-## v0.1.0 — first public release
+## v0.1.0: first public release
 
 - Stabilize and validate the current server, CLI, Admin UI, and self-hosting
   workflows for the first public release

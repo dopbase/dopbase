@@ -26,7 +26,7 @@ API documentation is enabled (with `--docs` or `docs = true` in server.toml).
 
 ## Server configuration
 
-The easy path only needs a port — Dopbase derives everything else:
+A basic configuration only needs a port. Dopbase derives the remaining local settings:
 
 ```toml
 version = 1
@@ -40,8 +40,8 @@ With no `public_url` configured, a loopback server derives it from the port
 dopbase serve --port 8840
 ```
 
-To expose the server beyond localhost, set a host and tell Dopbase its public
-address — it refuses to guess (it does not trust the `Host` header):
+To expose the server beyond localhost, set a host and provide its public
+address. Dopbase does not derive the public URL from the `Host` header:
 
 ```bash
 dopbase serve --host 0.0.0.0 --public-url https://dopbase.example.com

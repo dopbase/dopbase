@@ -13,9 +13,9 @@ the server and open it:
 http://localhost:8840
 ```
 
-The UI talks to the same REST API the CLI uses. Anything you set up through the
-browser shows up for `dopbase run`, `dopbase export`, and the other client
-commands, and the other way around.
+The UI and CLI use the same REST API and server data. Changes made in the
+browser are available to `dopbase run`, `dopbase export`, and other client
+commands. CLI changes appear in the UI.
 
 ## What you can do in the browser
 
@@ -36,12 +36,12 @@ runner tokens instead; see [identity and tokens](/reference/identity).
 
 ## Where the UI fits
 
-The UI and the CLI cover different moments of the same work:
+Use the UI and CLI for different parts of the workflow:
 
 - Day-to-day secret editing, imports, and reviews happen comfortably in the
   browser.
 - Servers, CI jobs, and scripts use the CLI and runner tokens.
-- Both produce audit events, so the log tells one complete story.
+- Actions from both interfaces appear in the audit log.
 
 Start the server, open the address above, and follow the
 [setup guide](./setup-and-sign-in).

@@ -1,22 +1,31 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineConfig, type HeadConfig } from "vitepress";
-import { assetFileNames } from "../../config/asset-file-names";
+import { assetFileNames } from "../../config/asset-file-names.ts";
 
 const siteUrl = "https://docs.dopbase.com";
 const siteName = "Dopbase";
+const projectUrl = "https://github.com/dopbase/dopbase";
 const siteDescription =
-  "Open-source secrets manager in a single file. Self-host projects, environments, and encrypted secrets, then inject them into any process.";
+  "Dopbase is an open-source secrets manager for developers. Self-host one executable, organize secrets by environment, and inject them into applications.";
 const ogImage = `${siteUrl}/og-image.jpg`;
 
 function buildJsonLd(pageData: {
   relativePath: string;
   title: string;
+  description: string;
+  url: string;
 }): string {
+  const project = {
+    "@type": "Organization",
+    name: "Dopbase project",
+    url: "https://dopbase.com",
+    sameAs: projectUrl,
+  };
   const website = {
     "@type": "WebSite",
     "@id": `${siteUrl}/#website`,
-    url: siteUrl,
+    url: `${siteUrl}/`,
     name: siteName,
     description: siteDescription,
     inLanguage: "en-US",
@@ -31,11 +40,12 @@ function buildJsonLd(pageData: {
           "@type": "SoftwareApplication",
           name: siteName,
           applicationCategory: "DeveloperApplication",
-          operatingSystem: "Linux, macOS, Windows",
-          description: siteDescription,
-          url: siteUrl,
+          operatingSystem: "Linux, macOS",
+          description: pageData.description,
+          url: pageData.url,
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
           license: "https://spdx.org/licenses/Apache-2.0.html",
+          author: project,
         },
       ],
     });
@@ -45,11 +55,13 @@ function buildJsonLd(pageData: {
     "@context": "https://schema.org",
     "@type": "TechArticle",
     headline: pageData.title,
-    description: siteDescription,
-    url: siteUrl,
+    description: pageData.description,
+    url: pageData.url,
+    mainEntityOfPage: pageData.url,
     inLanguage: "en-US",
     isPartOf: { "@id": `${siteUrl}/#website` },
-    publisher: { "@type": "Organization", name: siteName, url: siteUrl },
+    author: project,
+    publisher: project,
   });
 }
 
@@ -96,7 +108,16 @@ export default defineConfig({
       ["meta", { name: "twitter:title", content: title }],
       ["meta", { name: "twitter:description", content: description }],
       ["meta", { name: "twitter:image", content: ogImage }],
-      ["script", { type: "application/ld+json" }, buildJsonLd(pageData)],
+      [
+        "script",
+        { type: "application/ld+json" },
+        buildJsonLd({
+          relativePath: pageData.relativePath,
+          title,
+          description,
+          url,
+        }),
+      ],
     ];
     return head;
   },
@@ -121,6 +142,11 @@ export default defineConfig({
     logo: "/favicon.svg",
     siteTitle: "Dopbase",
     search: { provider: "local" },
+    socialLinks: [{ icon: "github", link: projectUrl }],
+    editLink: {
+      pattern: `${projectUrl}/edit/main/docs/:path`,
+      text: "Edit this page on GitHub",
+    },
     nav: [
       { text: "Guide", link: "/guide/" },
       { text: "CLI", link: "/cli/" },
@@ -251,8 +277,8 @@ export default defineConfig({
     sidebarMenuLabel: "Menu",
     darkModeSwitchLabel: "Appearance",
     footer: {
-      message: "Secrets manager in a single file.",
-      copyright: "Dopbase documentation",
+      message: "Open-source secrets management for developers.",
+      copyright: "Documentation maintained by the Dopbase project",
     },
   },
 });

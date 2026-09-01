@@ -2,7 +2,7 @@
   <div class="dopbase-terminal" aria-label="Dopbase server and client example">
     <div class="dopbase-terminal__bar">
       <span class="dopbase-terminal__light"></span>
-      server and client handshake
+      local secrets workflow
     </div>
     <pre><span class="prompt">$</span> dopbase serve
 <span class="quiet">Admin UI</span>  http://localhost:8840

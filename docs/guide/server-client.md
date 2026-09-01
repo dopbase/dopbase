@@ -84,7 +84,8 @@ dopbase client connect https://dopbase.internal.example
 dopbase client connect <dopbase-cloud-url>
 ```
 
-Dopbase Cloud is a managed server endpoint. It does not control or depend on an independent self-hosted installation.
+Dopbase Cloud is planned as a managed server endpoint. It will not control or
+depend on an independent self-hosted installation.
 
 ## Connection failures
 

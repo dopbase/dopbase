@@ -23,16 +23,15 @@ Dopbase; export gets values back out when something needs the file form.
      removing keys the file does not have.
 5. **Validate** runs a dry run on the server. You get the result grouped into
    added, updated, unchanged, and deleted keys. Nothing is stored yet.
-6. **Apply** performs the import. A second look at the deleted-keys group
-   before this step costs nothing.
+6. **Apply** performs the import. Review the deleted-keys group before
+   continuing.
 
-Two properties worth knowing:
+The review process has two constraints:
 
-- The review page exists so large files can breathe. It is a full page, not a
-  popup.
+- Large files use a full review page instead of a popup.
 - The parsed file lives in memory only. Reload the review page or navigate
-  away and the import is dropped — start over from the file. No half-applied
-  imports, and no plaintext lingering in the browser.
+  away and the browser discards it. Select the file again to restart. The
+  server receives no changes until you apply the import.
 
 ## Exporting a `.env` file
 
@@ -58,6 +57,6 @@ dopbase export payment-service/staging --output .env.staging
 ```
 
 The command reference covers the CLI flags, including `--dry-run`,
-`--replace`, and `--stdout`. See [CLI commands](/cli/commands). Use whichever
-is closer to the work; both write the same records and both create audit
+`--replace`, and `--stdout`. See [CLI commands](/cli/commands). Choose the
+interface that fits the workflow. Both write the same records and create audit
 events.

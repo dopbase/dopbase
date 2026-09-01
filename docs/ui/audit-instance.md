@@ -10,10 +10,10 @@ server doing?".
 
 ## The audit log
 
-Every meaningful action in Dopbase creates an audit event: secret changes,
-imports, exports, reveals, token creation and revocation, deletions, sign-ins.
-The Audit page lists them, newest first, twenty-five at a time with a
-**Load more** control for the next page.
+Dopbase records sensitive actions such as secret changes, imports, exports,
+reveals, token creation and revocation, deletions, and sign-ins. The Audit page
+lists the events newest first, twenty-five at a time, with a **Load more**
+control for the next page.
 
 Four filters narrow the list:
 
@@ -22,7 +22,7 @@ Four filters narrow the list:
 | Action      | "Show me every reveal" or every delete           |
 | Project     | Everything that happened inside one project      |
 | Environment | One environment only                             |
-| Actor       | Who did it — the administrator or a runner token |
+| Actor       | The administrator or runner token that acted     |
 
 Changing any filter reloads the list from the start.
 
@@ -32,24 +32,21 @@ one specific value, filter by environment and action rather than scrolling.
 
 ## Instance status
 
-The Instance page reports the state of the server, read-only:
+The read-only Instance page reports:
 
-- **Version** — the running Dopbase version.
-- **Endpoint** — the public address of this server.
-- **Database** — whether the SQLite storage is healthy.
-- **Master key** — whether the encryption key is available. If this shows a
+- The running Dopbase version
+- The server's public endpoint
+- Whether the SQLite storage is healthy
+- Whether the master key is available. If this shows a
   problem, nothing that needs encryption or decryption will work, and the
   fix lives on the host, not in the browser.
 
-The page also states plainly that configuration is restart-only. Server
-settings come from `~/.dopbase/server.toml` and the process environment, read
-once at startup. The Admin UI deliberately offers no configuration editing:
-changing a server's settings from its own web interface is a risk this product
-declines. See [self-hosting operations](/self-hosting/operations) for what to
-change on the host and how.
+The page also shows that configuration changes require a restart. Dopbase reads
+settings from `~/.dopbase/server.toml` and the process environment at startup.
+The Admin UI does not edit these settings. See
+[self-hosting operations](/self-hosting/operations) for the host configuration.
 
 ## What these pages do not do
 
-Neither page changes anything. The audit log is append-only, and the instance
-page exposes no file paths, keys, or private configuration. They are for
-checking, not fixing.
+Neither page changes server state. The audit log is append-only, and the
+instance page exposes no file paths, keys, or private configuration.

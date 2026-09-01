@@ -1,6 +1,6 @@
 ---
 title: "Product boundaries"
-description: "What Dopbase is not: no certificate authority, PKI, SSH platform, database proxy, or identity provider — a focused secrets manager."
+description: "Dopbase focuses on application secrets management rather than PKI, SSH access, database proxying, identity, or infrastructure management."
 ---
 
 # Product boundaries

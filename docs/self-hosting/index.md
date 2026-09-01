@@ -1,17 +1,17 @@
 ---
-title: "Self-hosting Dopbase"
-description: "Run Dopbase on your own infrastructure: one executable with SQLite storage and an embedded Admin UI, plus the decisions safe operation requires."
+title: "Self-hosted secrets manager"
+description: "Run Dopbase as a self-hosted secrets manager with one executable, SQLite storage, an embedded Admin UI, and a separate master key."
 ---
 
-# Self-hosting Dopbase
+# Self-hosted secrets manager
 
-Self-hosting is a first-class Dopbase workflow. The Community edition runs as one executable with SQLite storage and an embedded Admin UI.
+Dopbase runs as one self-hosted executable with SQLite storage and an embedded Admin UI.
 
 ```bash
 dopbase serve
 ```
 
-That command is intentionally simple. Operating a secrets server safely still requires decisions about networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.
+The command starts the service with local defaults. Operators still need to configure networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.
 
 ## What you operate
 
@@ -24,7 +24,8 @@ A self-hosted installation owns:
 - Backups and restore testing
 - Updates, monitoring, and incident response
 
-Dopbase Cloud handles these responsibilities for its managed endpoint. It does not manage independent self-hosted servers.
+Dopbase Cloud is planned to handle these responsibilities for its managed
+endpoint. It will not manage independent self-hosted servers.
 
 ## Start small
 

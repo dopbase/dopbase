@@ -1,17 +1,17 @@
 ---
-title: "Introduction"
-description: "Dopbase is an open-source secrets manager for application configuration: one place for database URLs, API keys, and credentials across environments."
+title: "Secrets management for developers"
+description: "Learn how Dopbase gives developers an open-source way to store application secrets by project and environment and load them into processes."
 ---
 
-# Introduction
+# Secrets management for developers
 
-Dopbase is an open-source secrets manager for application configuration. It gives developers one place to store values such as database URLs, API keys, and service credentials across development, staging, and production.
+Dopbase is an open-source secrets manager for developers. It stores application configuration such as database URLs, API keys, and service credentials across development, staging, and production.
 
 The product has three parts:
 
 - A server that stores encrypted secrets and exposes an API and admin interface.
 - A command-line client that connects to a Dopbase server.
-- An optional managed service, Dopbase Cloud, that runs the server for you.
+- The planned Dopbase Cloud service, which will provide a managed server.
 
 Both the server and client ship in the same `dopbase` executable. You choose the role through commands such as `dopbase serve` and `dopbase client connect`.
 

@@ -1,6 +1,6 @@
 ---
 title: "Audit events"
-description: "The audit events Dopbase records — who performed a sensitive action, where, and when — without storing secret values."
+description: "See which sensitive actions Dopbase records, who performed them, where they happened, and which secret data is excluded."
 ---
 
 # Audit events
@@ -9,14 +9,14 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 
 ## Audit events in 0.0.8
 
-| Area           | Events                                                                                     |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| Secrets        | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.exported` |
-| Projects       | `project.created`, `project.deleted`                                                       |
-| Environments   | `environment.created`, `environment.deleted`                                               |
-| Members        | `member.invited`, `member.removed`                                                         |
-| Tokens         | `token.created`, `token.revoked`                                                           |
-| Authentication | `login.succeeded`, `login.failed`                                                          |
+| Area           | Events                                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secrets        | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.imported`, `secret.exported`, `secret.runtime_accessed`    |
+| Projects       | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                 |
+| Environments   | `environment.created`, `environment.renamed`, `environment.deleted`                                                                            |
+| Tokens         | `token.created`, `token.revoked`                                                                                                                |
+| Authentication | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                           |
+| Administrator  | `admin.bootstrapped`, `admin.reauthenticated`, `admin.password_changed`                                                                          |
 
 The API schema defines the event names used by this release.
 

@@ -34,11 +34,7 @@ different from `DATABASE_URL` in `production`.
   `production`.
 - **Rename** it from its menu.
 - **Delete** it and Dopbase counts what will be removed, secrets and runner
-  tokens alike, before you confirm. Deleting the wrong
-  environment is the expensive mistake this dialog exists to prevent.
-
-Deleting is done deliberately: confirmation dialogs first, affected counts
-always.
+  tokens alike, before you confirm.
 
 ## Addresses you can share
 
@@ -61,12 +57,12 @@ Each environment has a **Tokens** tab next to its secrets. This is where
 machine identities come from:
 
 - **Create** a token with a name such as `production-server`. Dopbase shows
-  the plaintext token once, in one dialog. Copy it then; after you close the
-  dialog it is gone for good.
+  the plaintext token once. Copy it before closing the dialog because Dopbase
+  cannot display it again.
 - **Revoke** a token when a server is decommissioned or a token may have
   leaked. Revocation is immediate.
 
 A runner token can read the values of its one environment so `dopbase run` can
 inject them. It cannot change secrets, export them, or see any other
-environment. Give each deployed thing its own token. See
+environment. Give each deployed workload its own token. See
 [identity and tokens](/reference/identity) for the full rules.

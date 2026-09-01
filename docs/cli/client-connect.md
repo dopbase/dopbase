@@ -59,8 +59,8 @@ dopbase client connect <dopbase-cloud-url>
 dopbase login
 ```
 
-The Cloud URL has not been published. Dopbase Cloud follows the same client and
-REST model as a self-hosted server.
+The Cloud URL has not been published. Dopbase Cloud is planned to use the same
+client and REST model as a self-hosted server.
 
 ## Machine-global state
 
