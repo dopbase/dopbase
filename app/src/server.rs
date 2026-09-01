@@ -145,13 +145,15 @@ pub async fn serve_with_ready(
     .await
     .with_context(|| format!("failed to bind {address}"))?;
   let daemonized = state.config.daemonized;
-  if daemonized {
-    crate::daemon::write_pid_file(
+  let _pid_file_lock = if daemonized {
+    Some(crate::daemon::write_pid_file(
       &crate::daemon::pid_file_path(&state.config.data_dir),
       std::process::id(),
       &state.config.bind_address,
-    )?;
-  }
+    )?)
+  } else {
+    None
+  };
   if let Some(ready) = ready {
     ready.ok(std::process::id(), setup_token.as_deref());
   }

@@ -10,6 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -125,7 +126,7 @@ pub fn write_pid_file(
   path: &Path,
   pid: u32,
   bind_address: &str,
-) -> Result<()> {
+) -> Result<File> {
   let payload = PidFile {
     pid,
     started_at: chrono::Utc::now().to_rfc3339(),
@@ -133,22 +134,12 @@ pub fn write_pid_file(
     bind_address: bind_address.to_string(),
   };
   let json = serde_json::to_string_pretty(&payload)?;
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent)?;
-  }
-  let temporary = path.with_extension("dopbase.tmp");
-  let mut options = OpenOptions::new();
-  options.write(true).create(true).truncate(true);
-  #[cfg(unix)]
-  {
-    use std::os::unix::fs::OpenOptionsExt;
-    options.mode(0o600);
-  }
-  let mut file = options.open(&temporary)?;
-  file.write_all(json.as_bytes())?;
-  file.sync_all()?;
-  fs::rename(temporary, path)?;
-  Ok(())
+  crate::utils::private_file::write(path, json.as_bytes(), true)?;
+  let file = OpenOptions::new().read(true).write(true).open(path)?;
+  file
+    .try_lock_exclusive()
+    .context("failed to claim the daemon PID file")?;
+  Ok(file)
 }
 
 pub fn remove_pid_file(path: &Path) -> Result<()> {
@@ -379,6 +370,23 @@ pub async fn stop(
       )));
     }
   };
+  // The daemon holds an exclusive advisory lock on its PID file for its
+  // entire lifetime. An unlocked file is stale even if its PID has since
+  // been reused by an unrelated live process, so it must never be signalled.
+  let ownership = OpenOptions::new().read(true).write(true).open(&path)?;
+  match ownership.try_lock_exclusive() {
+    Ok(()) => {
+      let _ = ownership.unlock();
+      let _ = remove_pid_file(&path);
+      bail!(
+        "no running Dopbase daemon owns {}; refusing to signal pid {} and removing the stale PID file",
+        path.display(),
+        pid_file.pid,
+      );
+    }
+    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+    Err(error) => return Err(error).context("failed to verify daemon PID-file ownership"),
+  }
   let pid = Pid::from_raw(pid_file.pid as i32);
   match kill(pid, None) {
     Err(Errno::ESRCH) => {

@@ -37,7 +37,7 @@ fn paths_derive_from_the_data_directory() {
 fn pid_file_round_trips() {
   let directory = tempfile::TempDir::new().unwrap();
   let path = directory.path().join("dopbase.pid");
-  write_pid_file(&path, 4242, "127.0.0.1:8840").unwrap();
+  let _lock = write_pid_file(&path, 4242, "127.0.0.1:8840").unwrap();
   let pid_file = read_pid_file(&path).unwrap();
   assert_eq!(pid_file.pid, 4242);
   assert_eq!(pid_file.bind_address, "127.0.0.1:8840");
@@ -90,7 +90,8 @@ async fn stop_reports_stale_pid_files() {
     pid
   };
   let path = pid_file_path(directory.path());
-  write_pid_file(&path, stale_pid, "127.0.0.1:8840").unwrap();
+  let lock = write_pid_file(&path, stale_pid, "127.0.0.1:8840").unwrap();
+  drop(lock);
   let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;
   let message = result.unwrap_err().to_string();
   assert!(message.contains("no running Dopbase daemon"), "{message}");
@@ -104,4 +105,22 @@ async fn stop_without_pid_file_fails() {
   let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;
   let message = result.unwrap_err().to_string();
   assert!(message.contains("no running Dopbase daemon"), "{message}");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn stop_never_signals_a_live_process_from_an_unowned_stale_pid_file() {
+  use std::process::Command;
+  let directory = tempfile::TempDir::new().unwrap();
+  let mut unrelated = Command::new("sleep").arg("30").spawn().unwrap();
+  let path = pid_file_path(directory.path());
+  let lock = write_pid_file(&path, unrelated.id(), "127.0.0.1:8840").unwrap();
+  drop(lock); // Simulate the original daemon exiting without removing its file.
+
+  let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;
+  let message = result.unwrap_err().to_string();
+  assert!(message.contains("refusing to signal"), "{message}");
+  assert!(unrelated.try_wait().unwrap().is_none());
+  unrelated.kill().unwrap();
+  let _ = unrelated.wait();
 }
