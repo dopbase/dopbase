@@ -6,6 +6,7 @@ use axum::{
 };
 use serde_json::{Value, json};
 use tempfile::TempDir;
+use tokio::sync::Barrier;
 use tower::ServiceExt;
 
 async fn test_app() -> (TempDir, app::state::AppState, Router) {
@@ -53,6 +54,198 @@ async fn call(
   let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
   let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
   (status, json, headers)
+}
+
+async fn admin_environment() -> (TempDir, app::state::AppState, Router, String, String) {
+  let (directory, state, router) = test_app().await;
+  let setup = state.setup.read().await.token.clone().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/bootstrap/admin",
+    None,
+    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (_, login, _) = call(
+    &router,
+    "POST",
+    "/api/v1/auth/login",
+    None,
+    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+  )
+  .await;
+  let token = login["data"]["token"].as_str().unwrap().to_owned();
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"concurrency-test"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (status, environment, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/concurrency-test/environments",
+    Some(&token),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let environment_id = environment["data"]["id"].as_str().unwrap().to_owned();
+  (directory, state, router, token, environment_id)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_secret_sets_increment_every_version() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let path = format!("/api/v1/environments/{environment_id}/secrets/SHARED");
+  let barrier = std::sync::Arc::new(Barrier::new(20));
+  let mut tasks = Vec::new();
+  for value in 0..20 {
+    let router = router.clone();
+    let token = token.clone();
+    let path = path.clone();
+    let barrier = barrier.clone();
+    tasks.push(tokio::spawn(async move {
+      barrier.wait().await;
+      call(
+        &router,
+        "PUT",
+        &path,
+        Some(&token),
+        Some(json!({"value":format!("value-{value}")})),
+      )
+      .await
+      .0
+    }));
+  }
+  for task in tasks {
+    assert_eq!(task.await.unwrap(), 200);
+  }
+  let (_, listed, _) = call(
+    &router,
+    "GET",
+    &format!("/api/v1/environments/{environment_id}/secrets"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(listed["data"][0]["version"], 20);
+  let audit_count: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM audit_events WHERE action IN ('secret.created','secret.updated')",
+  )
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(audit_count, 20);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn import_apply_rejects_a_stale_preview_revision() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let base = format!("/api/v1/environments/{environment_id}/secrets");
+  let (_, preview, _) = call(
+    &router,
+    "POST",
+    &format!("{base}/import"),
+    Some(&token),
+    Some(json!({"mode":"replace","dryRun":true,"entries":[{"key":"A","value":"one"}]})),
+  )
+  .await;
+  let revision = preview["data"]["revision"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "PUT",
+    &format!("{base}/B"),
+    Some(&token),
+    Some(json!({"value":"concurrent"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    &format!("{base}/import"),
+    Some(&token),
+    Some(json!({"mode":"replace","dryRun":false,"expectedRevision":revision,"entries":[{"key":"A","value":"one"}]})),
+  )
+  .await;
+  assert_eq!(status, 409);
+  assert!(body["error"]["IMPORT_PREVIEW_STALE"].is_string());
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn failed_audit_insert_rolls_back_project_rename() {
+  let (_directory, state, router, token, _environment_id) = admin_environment().await;
+  sqlx::query(
+    "CREATE TRIGGER reject_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(FAIL, 'audit disabled'); END",
+  )
+  .execute(state.db.pool())
+  .await
+  .unwrap();
+  let (status, _, _) = call(
+    &router,
+    "PATCH",
+    "/api/v1/projects/concurrency-test",
+    Some(&token),
+    Some(json!({"name":"should-not-stick"})),
+  )
+  .await;
+  assert_eq!(status, 500);
+  let name: String = sqlx::query_scalar("SELECT name FROM projects WHERE name='concurrency-test'")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(name, "concurrency-test");
+  state.db.close().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn concurrent_token_revokes_create_one_transition_and_one_audit() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let (_, created, _) = call(
+    &router,
+    "POST",
+    &format!("/api/v1/environments/{environment_id}/tokens"),
+    Some(&token),
+    Some(json!({"name":"deploy","role":"runner"})),
+  )
+  .await;
+  let token_id = created["data"]["token"]["id"].as_str().unwrap().to_owned();
+  let path = format!("/api/v1/tokens/{token_id}/revoke");
+  let barrier = std::sync::Arc::new(Barrier::new(2));
+  let mut tasks = Vec::new();
+  for _ in 0..2 {
+    let router = router.clone();
+    let admin_token = token.clone();
+    let path = path.clone();
+    let barrier = barrier.clone();
+    tasks.push(tokio::spawn(async move {
+      barrier.wait().await;
+      call(&router, "POST", &path, Some(&admin_token), None)
+        .await
+        .0
+    }));
+  }
+  let mut statuses = Vec::new();
+  for task in tasks {
+    statuses.push(task.await.unwrap());
+  }
+  statuses.sort_unstable();
+  assert_eq!(statuses, [200, 409]);
+  let audit_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='token.revoked'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(audit_count, 1);
+  state.db.close().await;
 }
 
 #[tokio::test]
@@ -356,6 +549,7 @@ async fn env_layout_persists_with_import_and_omits_values() {
   .await;
   assert_eq!(status, 200);
   assert_eq!(dry["data"]["addedKeys"].as_array().unwrap().len(), 2);
+  let revision = dry["data"]["revision"].clone();
   let (status, body, _) = call(&router, "GET", &format!("{base}/layout"), Some(token), None).await;
   assert_eq!(status, 200);
   assert!(body["data"]["layout"].is_null());
@@ -374,7 +568,8 @@ async fn env_layout_persists_with_import_and_omits_values() {
             {"key":"DATABASE_URL","value":"postgres://private"},
             {"key":"API_KEY","value":"k-123"}
         ],
-        "envLayout":layout_text
+        "envLayout":layout_text,
+        "expectedRevision":revision
     })),
   )
   .await;
