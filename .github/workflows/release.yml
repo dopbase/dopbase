@@ -402,9 +402,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           gh api "repos/${GH_REPO}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
-          gh release create "${GITHUB_REF_NAME}" release/* \
-            --repo "${GH_REPO}" \
-            --target "${GITHUB_SHA}" \
-            --generate-notes \
-            --title "${GITHUB_REF_NAME} Release"
+          upload_url="$(gh api \
+            --method POST \
+            "repos/${GH_REPO}/releases" \
+            --field "tag_name=${GITHUB_REF_NAME}" \
+            --field "target_commitish=${GITHUB_SHA}" \
+            --field "name=${GITHUB_REF_NAME} Release" \
+            --raw-field generate_release_notes=true \
+            --jq '.upload_url' | sed 's/{?name,label}//')"
+          for asset in release/*; do
+            asset_name="$(basename "${asset}")"
+            gh api \
+              --method POST \
+              --header 'Content-Type: application/octet-stream' \
+              --input "${asset}" \
+              "${upload_url}?name=${asset_name}" >/dev/null
+          done
