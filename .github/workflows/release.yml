@@ -430,7 +430,16 @@ jobs:
               "${api_url}/releases")"
           fi
 
-          for asset in release/*; do
+          assets=(
+            "release/checksums.txt"
+            "release/dopbase_${GITHUB_REF_NAME}_darwin_amd64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_darwin_arm64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_linux_amd64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_linux_arm64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_windows_amd64.zip"
+          )
+          for asset in "${assets[@]}"; do
+            test -f "${asset}"
             uploaded=false
             for attempt in 1 2 3; do
               if gh release upload \
