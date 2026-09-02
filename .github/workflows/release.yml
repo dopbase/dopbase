@@ -403,19 +403,53 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh api "repos/${GH_REPO}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
-          if gh release view "${GITHUB_REF_NAME}" --repo "${GH_REPO}" >/dev/null 2>&1; then
-            gh release upload \
-              "${GITHUB_REF_NAME}" \
-              release/* \
-              --repo "${GH_REPO}" \
-              --clobber
-          else
-            gh release create \
-              "${GITHUB_REF_NAME}" \
-              release/* \
-              --repo "${GH_REPO}" \
-              --target "${GITHUB_SHA}" \
-              --title "${GITHUB_REF_NAME} Release" \
-              --generate-notes
+          api_url="https://api.github.com/repos/${GH_REPO}"
+          api_headers=(
+            --header "Authorization: Bearer ${GH_TOKEN}"
+            --header 'Accept: application/vnd.github+json'
+            --header 'X-GitHub-Api-Version: 2022-11-28'
+          )
+
+          curl --fail --silent --show-error \
+            "${api_headers[@]}" \
+            "${api_url}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
+
+          release_json="$(curl --silent --show-error \
+            "${api_headers[@]}" \
+            "${api_url}/releases/tags/${GITHUB_REF_NAME}" || true)"
+          if ! jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
+            release_json="$(curl --fail --silent --show-error \
+              "${api_headers[@]}" \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --data "$(jq -n \
+                --arg tag "${GITHUB_REF_NAME}" \
+                --arg target "${GITHUB_SHA}" \
+                --arg name "${GITHUB_REF_NAME} Release" \
+                '{tag_name: $tag, target_commitish: $target, name: $name, generate_release_notes: true}')" \
+              "${api_url}/releases")"
           fi
+
+          release_id="$(jq -er '.id' <<<"${release_json}")"
+          upload_url="$(jq -er '.upload_url' <<<"${release_json}")"
+          upload_url="${upload_url%%\{*}"
+
+          for asset in release/*; do
+            asset_name="$(basename "${asset}")"
+            existing_asset_id="$(jq -r --arg name "${asset_name}" \
+              '.assets[]? | select(.name == $name) | .id' <<<"${release_json}")"
+            if [[ -n "${existing_asset_id}" ]]; then
+              curl --fail --silent --show-error \
+                "${api_headers[@]}" \
+                --request DELETE \
+                "${api_url}/releases/assets/${existing_asset_id}"
+            fi
+            curl --fail --silent --show-error \
+              "${api_headers[@]}" \
+              --request POST \
+              --header 'Content-Type: application/octet-stream' \
+              --data-binary "@${asset}" \
+              "${upload_url}?name=${asset_name}" \
+              --output /dev/null
+            echo "Uploaded ${asset_name} to release ${release_id}"
+          done
