@@ -430,26 +430,8 @@ jobs:
               "${api_url}/releases")"
           fi
 
-          release_id="$(jq -er '.id' <<<"${release_json}")"
-          upload_url="$(jq -er '.upload_url' <<<"${release_json}")"
-          upload_url="${upload_url%%\{*}"
-
-          for asset in release/*; do
-            asset_name="$(basename "${asset}")"
-            existing_asset_id="$(jq -r --arg name "${asset_name}" \
-              '.assets[]? | select(.name == $name) | .id' <<<"${release_json}")"
-            if [[ -n "${existing_asset_id}" ]]; then
-              curl --fail --silent --show-error \
-                "${api_headers[@]}" \
-                --request DELETE \
-                "${api_url}/releases/assets/${existing_asset_id}"
-            fi
-            curl --fail --silent --show-error \
-              "${api_headers[@]}" \
-              --request POST \
-              --header 'Content-Type: application/octet-stream' \
-              --data-binary "@${asset}" \
-              "${upload_url}?name=${asset_name}" \
-              --output /dev/null
-            echo "Uploaded ${asset_name} to release ${release_id}"
-          done
+          gh release upload \
+            "${GITHUB_REF_NAME}" \
+            release/* \
+            --repo "${GH_REPO}" \
+            --clobber
