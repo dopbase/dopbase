@@ -431,9 +431,22 @@ jobs:
           fi
 
           for asset in release/*; do
-            gh release upload \
-              "${GITHUB_REF_NAME}" \
-              "${asset}" \
-              --repo "${GH_REPO}" \
-              --clobber
+            uploaded=false
+            for attempt in 1 2 3; do
+              if gh release upload \
+                "${GITHUB_REF_NAME}" \
+                "${asset}" \
+                --repo "${GH_REPO}" \
+                --clobber; then
+                uploaded=true
+                break
+              fi
+              if [[ "${attempt}" != 3 ]]; then
+                sleep 5
+              fi
+            done
+            if [[ "${uploaded}" != true ]]; then
+              echo "Failed to upload ${asset} after three attempts" >&2
+              exit 1
+            fi
           done
