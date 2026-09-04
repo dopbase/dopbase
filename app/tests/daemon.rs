@@ -8,7 +8,8 @@ use std::{
 
 use app::constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME};
 use app::daemon::{
-  Ready, log_file_path, pid_file_path, read_pid_file, remove_pid_file, stop, write_pid_file,
+  ManagedDaemonState, Ready, inspect, log_file_path, pid_file_path, read_pid_file, remove_pid_file,
+  stop, write_pid_file,
 };
 
 #[derive(Clone, Default)]
@@ -37,14 +38,54 @@ fn paths_derive_from_the_data_directory() {
 fn pid_file_round_trips() {
   let directory = tempfile::TempDir::new().unwrap();
   let path = directory.path().join("dopbase.pid");
-  let _lock = write_pid_file(&path, 4242, "127.0.0.1:8840").unwrap();
+  let _lock = write_pid_file(&path, 4242, "127.0.0.1:8840", "http://localhost:8840").unwrap();
   let pid_file = read_pid_file(&path).unwrap();
   assert_eq!(pid_file.pid, 4242);
   assert_eq!(pid_file.bind_address, "127.0.0.1:8840");
+  assert_eq!(
+    pid_file.resolved_public_url().as_deref(),
+    Some("http://localhost:8840")
+  );
   assert_eq!(pid_file.version, env!("CARGO_PKG_VERSION"));
   remove_pid_file(&path).unwrap();
   assert!(!path.exists());
   remove_pid_file(&path).unwrap(); // idempotent
+}
+
+#[test]
+fn old_pid_files_derive_a_loopback_public_url() {
+  let pid_file: app::daemon::PidFile = serde_json::from_value(serde_json::json!({
+    "pid": 4242,
+    "started_at": "2026-01-01T00:00:00Z",
+    "version": "0.0.12",
+    "bind_address": "127.0.0.1:9123"
+  }))
+  .unwrap();
+
+  assert_eq!(
+    pid_file.resolved_public_url().as_deref(),
+    Some("http://localhost:9123")
+  );
+}
+
+#[test]
+fn inspect_distinguishes_absent_running_and_stale_daemons() {
+  let directory = tempfile::TempDir::new().unwrap();
+  assert!(matches!(
+    inspect(directory.path()).unwrap(),
+    ManagedDaemonState::Absent
+  ));
+
+  let path = pid_file_path(directory.path());
+  let lock = write_pid_file(&path, 4242, "127.0.0.1:8840", "http://localhost:8840").unwrap();
+  let running = inspect(directory.path()).unwrap();
+  assert!(matches!(running, ManagedDaemonState::Running(pid) if pid.pid == 4242));
+
+  drop(lock);
+  assert!(matches!(
+    inspect(directory.path()).unwrap(),
+    ManagedDaemonState::Stale
+  ));
 }
 
 #[test]
@@ -90,7 +131,7 @@ async fn stop_reports_stale_pid_files() {
     pid
   };
   let path = pid_file_path(directory.path());
-  let lock = write_pid_file(&path, stale_pid, "127.0.0.1:8840").unwrap();
+  let lock = write_pid_file(&path, stale_pid, "127.0.0.1:8840", "http://localhost:8840").unwrap();
   drop(lock);
   let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;
   let message = result.unwrap_err().to_string();
@@ -114,7 +155,13 @@ async fn stop_never_signals_a_live_process_from_an_unowned_stale_pid_file() {
   let directory = tempfile::TempDir::new().unwrap();
   let mut unrelated = Command::new("sleep").arg("30").spawn().unwrap();
   let path = pid_file_path(directory.path());
-  let lock = write_pid_file(&path, unrelated.id(), "127.0.0.1:8840").unwrap();
+  let lock = write_pid_file(
+    &path,
+    unrelated.id(),
+    "127.0.0.1:8840",
+    "http://localhost:8840",
+  )
+  .unwrap();
   drop(lock); // Simulate the original daemon exiting without removing its file.
 
   let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;

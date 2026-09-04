@@ -126,6 +126,40 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
   serve_with_ready(config, None).await
 }
 
+pub fn startup_banner(
+  public_url: &str,
+  data_dir: &std::path::Path,
+  docs_enabled: bool,
+) -> String {
+  let public_url = public_url.trim_end_matches('/');
+  let mut rows = vec![
+    "Dopbase".to_string(),
+    "Secure, Simple and Private".to_string(),
+    format!("Version {}", env!("CARGO_PKG_VERSION")),
+    String::new(),
+    format!("Admin UI:   {public_url}"),
+    format!("API:        {public_url}/api/v1"),
+    format!("Config:     {}", data_dir.display()),
+  ];
+  if docs_enabled {
+    rows.push(format!("Swagger:    {public_url}/api/docs"));
+  }
+  let width = rows
+    .iter()
+    .map(|row| row.chars().count())
+    .max()
+    .unwrap_or(0)
+    .max(62);
+  let border = "─".repeat(width + 4);
+  let mut lines = Vec::with_capacity(rows.len() + 2);
+  lines.push(format!("╭{border}╮"));
+  for row in rows {
+    lines.push(format!("│  {row:<width$}  │"));
+  }
+  lines.push(format!("╰{border}╯"));
+  lines.join("\n")
+}
+
 /// Run the server, optionally reporting readiness (or the startup failure) to
 /// the foreground command that spawned it in background mode.
 pub async fn serve_with_ready(
@@ -136,9 +170,6 @@ pub async fn serve_with_ready(
   let _lock = InstanceLock::acquire(&config.database_url)?;
   let state = build_state(config).await?;
   let setup_token = state.setup.read().await.token.clone();
-  if let Some(setup) = setup_token.as_deref() {
-    eprintln!("\nDopbase setup token (shown once):\n{setup}\n");
-  }
   let address = state.config.bind_addr()?;
   let grace = state.config.shutdown_grace_seconds;
   let listener = tokio::net::TcpListener::bind(address)
@@ -150,6 +181,7 @@ pub async fn serve_with_ready(
       &crate::daemon::pid_file_path(&state.config.data_dir),
       std::process::id(),
       &state.config.bind_address,
+      &state.config.public_url,
     )?)
   } else {
     None
@@ -158,16 +190,17 @@ pub async fn serve_with_ready(
     ready.ok(std::process::id(), setup_token.as_deref());
   }
   let public_url = state.config.public_url.trim_end_matches('/');
-  eprintln!("Admin UI:   {public_url}");
-  let mut banner = format!("API:        {public_url}/api/v1");
-  if state.config.docs_enabled {
-    banner.push_str(&format!("\nSwagger:    {public_url}/api/docs"));
+  eprintln!(
+    "\n{}\n",
+    startup_banner(
+      public_url,
+      &state.config.data_dir,
+      state.config.docs_enabled
+    )
+  );
+  if let Some(setup) = setup_token.as_deref() {
+    eprintln!("\nDopbase setup token (shown once):\n{setup}\n");
   }
-  banner.push_str(&format!(
-    "\nConfig:     {}",
-    state.config.data_dir.display()
-  ));
-  eprintln!("{banner}");
   tracing::info!(%address,"Dopbase server started");
   let serve_result = axum::serve(listener, router(state.clone()))
     .with_graceful_shutdown(shutdown_signal())
@@ -202,14 +235,39 @@ async fn shutdown_signal() {
   tokio::select! {_=ctrl_c=>{},_=terminate=>{}}
 }
 
-pub(crate) struct InstanceLock {
+pub struct InstanceLock {
   file: File,
 }
 impl InstanceLock {
-  pub(crate) fn acquire(database_url: &str) -> Result<Option<Self>> {
+  pub fn acquire(database_url: &str) -> Result<Option<Self>> {
     if database_url.contains(":memory:") {
       return Ok(None);
     }
+    let file = Self::open(database_url)?;
+    file
+      .try_lock_exclusive()
+      .context(
+        "Dopbase server is already running for this database. \nStop the running server before starting another one",
+      )?;
+    Ok(Some(Self { file }))
+  }
+
+  pub fn is_held(database_url: &str) -> Result<bool> {
+    if database_url.contains(":memory:") {
+      return Ok(false);
+    }
+    let file = Self::open(database_url)?;
+    match file.try_lock_exclusive() {
+      Ok(()) => {
+        file.unlock()?;
+        Ok(false)
+      }
+      Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
+      Err(error) => Err(error).context("failed to inspect the Dopbase database lock"),
+    }
+  }
+
+  fn open(database_url: &str) -> Result<File> {
     let database = database_path(database_url)?;
     let lock = std::path::PathBuf::from(format!("{}.lock", database.display()));
     if let Some(parent) = lock.parent() {
@@ -221,10 +279,7 @@ impl InstanceLock {
       .read(true)
       .write(true)
       .open(&lock)?;
-    file
-      .try_lock_exclusive()
-      .context("another Dopbase process is using this database")?;
-    Ok(Some(Self { file }))
+    Ok(file)
   }
 }
 impl Drop for InstanceLock {

@@ -105,6 +105,34 @@ pub struct PidFile {
   pub started_at: String,
   pub version: String,
   pub bind_address: String,
+  #[serde(default)]
+  pub public_url: Option<String>,
+}
+
+impl PidFile {
+  pub fn resolved_public_url(&self) -> Option<String> {
+    self.public_url.clone().or_else(|| {
+      self
+        .bind_address
+        .parse::<std::net::SocketAddr>()
+        .ok()
+        .filter(|address| address.ip().is_loopback())
+        .map(|address| format!("http://localhost:{}", address.port()))
+    })
+  }
+}
+
+#[derive(Clone, Debug)]
+pub enum ManagedDaemonState {
+  Absent,
+  Running(PidFile),
+  Stale,
+}
+
+#[derive(Clone, Debug)]
+pub struct Stopped {
+  pub pid: u32,
+  pub forced: bool,
 }
 
 pub fn pid_file_path(data_dir: &Path) -> PathBuf {
@@ -126,12 +154,14 @@ pub fn write_pid_file(
   path: &Path,
   pid: u32,
   bind_address: &str,
+  public_url: &str,
 ) -> Result<File> {
   let payload = PidFile {
     pid,
     started_at: chrono::Utc::now().to_rfc3339(),
     version: env!("CARGO_PKG_VERSION").to_string(),
     bind_address: bind_address.to_string(),
+    public_url: Some(public_url.to_string()),
   };
   let json = serde_json::to_string_pretty(&payload)?;
   crate::utils::private_file::write(path, json.as_bytes(), true)?;
@@ -147,6 +177,25 @@ pub fn remove_pid_file(path: &Path) -> Result<()> {
     Ok(()) => Ok(()),
     Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
     Err(error) => Err(error).with_context(|| format!("failed to remove {}", path.display())),
+  }
+}
+
+pub fn inspect(data_dir: &Path) -> Result<ManagedDaemonState> {
+  let path = pid_file_path(data_dir);
+  if !path.exists() {
+    return Ok(ManagedDaemonState::Absent);
+  }
+  let pid_file = read_pid_file(&path)?;
+  let ownership = OpenOptions::new().read(true).write(true).open(&path)?;
+  match ownership.try_lock_exclusive() {
+    Ok(()) => {
+      ownership.unlock()?;
+      Ok(ManagedDaemonState::Stale)
+    }
+    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+      Ok(ManagedDaemonState::Running(pid_file))
+    }
+    Err(error) => Err(error).context("failed to inspect daemon PID-file ownership"),
   }
 }
 
@@ -186,28 +235,48 @@ pub(crate) async fn start(
   if let Ok(existing) = read_pid_file(&pid_path) {
     if kill(Pid::from_raw(existing.pid as i32), None).is_ok() {
       bail!(
-        "a Dopbase daemon is already running (pid {}, {})",
+        "Dopbase server is already running (pid {}, data directory {}). Stop it before starting another one",
         existing.pid,
-        pid_path.display()
+        data_dir.display()
       );
     }
     let _ = remove_pid_file(&pid_path);
   }
+  // A foreground server does not write a PID file, so also check the shared
+  // database lock before spawning a detached child.
+  let _lock = crate::server::InstanceLock::acquire(&config.database_url)?;
+  drop(_lock);
   let started = spawn(&data_dir, flags).await?;
+  if !json_output {
+    eprintln!(
+      "\n{}\n",
+      crate::server::startup_banner(&config.public_url, &data_dir, config.docs_enabled,)
+    );
+  }
   if let Some(token) = &started.setup_token {
     eprintln!("\nDopbase setup token (shown once):\n{token}\n");
   }
   let stop_command = format!("dopbase --data-dir {} stop", data_dir.display());
-  print_value(
-    json_output,
-    &serde_json::json!({
-        "started": true,
-        "pid": started.pid,
-        "log_file": started.log_path.display().to_string(),
-        "pid_file": started.pid_file.display().to_string(),
-        "stop_command": stop_command,
-    }),
-  );
+  if json_output {
+    print_value(
+      true,
+      &serde_json::json!({
+          "started": true,
+          "version": env!("CARGO_PKG_VERSION"),
+          "pid": started.pid,
+          "log_file": started.log_path.display().to_string(),
+          "pid_file": started.pid_file.display().to_string(),
+          "stop_command": stop_command,
+      }),
+    );
+  } else {
+    println!(
+      "Server started in the background.\nPID:        {}\nLog:        {}\nStop with:  {}",
+      started.pid,
+      started.log_path.display(),
+      stop_command
+    );
+  }
   Ok(0)
 }
 
@@ -335,20 +404,18 @@ async fn spawn(
 /// handles), waits for the process to exit, and escalates to `SIGKILL` after
 /// the grace period. Stale PID files are reported and removed.
 #[cfg(not(unix))]
-pub async fn stop(
+pub async fn stop_managed(
   _data_dir: Option<&Path>,
   _grace: Duration,
-  _json_output: bool,
-) -> Result<i32> {
+) -> Result<Stopped> {
   bail!("stopping the background server is only supported on macOS and Linux");
 }
 
 #[cfg(unix)]
-pub async fn stop(
+pub async fn stop_managed(
   data_dir: Option<&Path>,
   grace: Duration,
-  json_output: bool,
-) -> Result<i32> {
+) -> Result<Stopped> {
   use nix::{
     errno::Errno,
     sys::signal::{Signal, kill},
@@ -422,9 +489,21 @@ pub async fn stop(
     );
   }
   let _ = remove_pid_file(&path);
+  Ok(Stopped {
+    pid: pid_file.pid,
+    forced,
+  })
+}
+
+pub async fn stop(
+  data_dir: Option<&Path>,
+  grace: Duration,
+  json_output: bool,
+) -> Result<i32> {
+  let stopped = stop_managed(data_dir, grace).await?;
   print_value(
     json_output,
-    &serde_json::json!({"stopped": true, "pid": pid_file.pid, "forced": forced}),
+    &serde_json::json!({"stopped": true, "pid": stopped.pid, "forced": stopped.forced}),
   );
   Ok(0)
 }
