@@ -19,7 +19,7 @@ The local defaults are:
 ╭──────────────────────────────────────────────────────────────────╮
 │  Dopbase                                                     │
 │  Secure, Simple and Private                                  │
-│  Version 0.0.12                                              │
+│  Version 0.0.13                                              │
 │                                                              │
 │  Admin UI:   http://localhost:8840                           │
 │  API:        http://localhost:8840/api/v1                    │
@@ -83,7 +83,7 @@ with the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR`. Data-directory
 selection resolves in this order: CLI option, environment variable, default.
 
 `public_url` is required when binding beyond loopback. Dopbase does not trust
-forwarded headers in v0.0.12, and TLS termination remains an operator concern.
+forwarded headers in v0.0.13, and TLS termination remains an operator concern.
 
 ## API documentation
 

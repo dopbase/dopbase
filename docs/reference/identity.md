@@ -9,7 +9,7 @@ Dopbase needs identities for people and for software.
 
 ## Human users
 
-v0.0.12 supports exactly one human administrator with full access to the Admin UI
+v0.0.13 supports exactly one human administrator with full access to the Admin UI
 and human CLI operations.
 
 Passwords are hashed with Argon2id. Browser sessions have an eight-hour idle
@@ -58,7 +58,7 @@ use different runner tokens.
 
 ## Permission model
 
-The single administrator has full v0.0.12 access. Runner tokens can resolve and
+The single administrator has full v0.0.13 access. Runner tokens can resolve and
 retrieve runtime values only for their assigned environment. Organizations,
 additional humans, invitations, and advanced policy rules remain later work.
 

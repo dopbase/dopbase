@@ -31,7 +31,7 @@ pub async fn create(
   if request.role != "runner" {
     return Err(HttpError::validation(std::collections::BTreeMap::from([(
       TOKEN_SCOPE_INVALID.into(),
-      "Only the runner role is supported in v0.0.12.".into(),
+      "Only the runner role is supported in v0.0.13.".into(),
     )])));
   }
   let name = request.name.trim();

@@ -1,11 +1,11 @@
 ---
 title: "Command reference"
-description: "Reference for every Dopbase CLI command in v0.0.12: connections, authentication, projects, environments, and secret operations."
+description: "Reference for every Dopbase CLI command in v0.0.13: connections, authentication, projects, environments, and secret operations."
 ---
 
 # Command reference
 
-This page defines the implemented v0.0.12 command surface. Dopbase does not infer a
+This page defines the implemented v0.0.13 command surface. Dopbase does not infer a
 project or environment from the current directory. Management commands receive
 an environment reference directly; `run` may use a server-scoped default from
 the user configuration.
@@ -45,7 +45,7 @@ force-stopped (default 10).
 GitHub. It is informational only and never modifies the binary:
 
 ```text
-dopbase 0.0.12 is up to date (latest release 0.1.0).
+dopbase 0.0.13 is up to date (latest release 0.1.0).
 ```
 
 When a newer release exists, the command prints the current version, the latest

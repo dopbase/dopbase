@@ -4,6 +4,26 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+## 0.0.13 - 2026-09-04
+
+### Added
+
+- Encrypted, server-scoped CLI sessions with cached identity metadata and safe
+  offline status reporting.
+- Server-scoped default environments for `dopbase run`, with explicit argument
+  and `DOPBASE_ENV` precedence.
+- Single-instance server locking and branded foreground and background startup
+  banners.
+
+### Changed
+
+- Made server switching validate and confirm the destination, coordinate with
+  matching local servers, and clear obsolete sessions and environment defaults.
+- Required interactive password confirmation before CLI secret reveal and export
+  operations return plaintext values.
+- Refreshed Dopbase branding, CLI documentation, and frontend/backend build
+  commands.
+
 ## 0.0.12 - 2026-09-01
 
 ### Added

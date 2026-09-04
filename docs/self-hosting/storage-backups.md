@@ -47,7 +47,7 @@ A database backup without the correct master key cannot restore plaintext secret
 
 ## Offline file backup
 
-For v0.0.12, stop Dopbase cleanly and wait for the process to exit before copying
+For v0.0.13, stop Dopbase cleanly and wait for the process to exit before copying
 `dopbase.db`. Clean shutdown checkpoints the WAL into the main database. Back up
 the matching master key separately; never place the database and key copies in
 the same backup location.

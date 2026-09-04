@@ -29,7 +29,7 @@ commands. CLI changes appear in the UI.
 
 ## Who can sign in
 
-v0.0.12 supports exactly one human administrator. The first person to reach an
+v0.0.13 supports exactly one human administrator. The first person to reach an
 uninitialized server claims it with the setup token printed at startup. After
 that, only that administrator signs in. Machine work uses environment-scoped
 runner tokens instead; see [identity and tokens](/reference/identity).
