@@ -16,6 +16,13 @@ pub struct ClientConfig {
   pub version: u32,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub server_url: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_environment: Option<DefaultEnvironment>,
+}
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct DefaultEnvironment {
+  pub server_url: String,
+  pub environment_id: String,
 }
 #[derive(Clone, Copy, Debug)]
 pub enum ServerSource {
@@ -39,6 +46,16 @@ pub struct ResolvedServer {
   pub source: ServerSource,
   pub config_path: PathBuf,
   pub config: ClientConfig,
+}
+impl ResolvedServer {
+  pub fn default_environment(&self) -> Option<&str> {
+    self
+      .config
+      .default_environment
+      .as_ref()
+      .filter(|default| default.server_url == self.url)
+      .map(|default| default.environment_id.as_str())
+  }
 }
 pub fn resolve(
   argument: Option<&str>,
@@ -73,11 +90,37 @@ pub fn read(path: &Path) -> Result<ClientConfig> {
     return Ok(ClientConfig {
       version: 1,
       server_url: None,
+      default_environment: None,
     });
   }
   let text =
     fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
   toml::from_str(&text).context("failed to parse client configuration")
+}
+pub fn save_default_environment(
+  server: &ResolvedServer,
+  environment_id: &str,
+) -> Result<()> {
+  let mut config = server.config.clone();
+  config.default_environment = Some(DefaultEnvironment {
+    server_url: server.url.clone(),
+    environment_id: environment_id.into(),
+  });
+  write(&server.config_path, &config)
+}
+pub fn clear_default_environment(server: &ResolvedServer) -> Result<bool> {
+  let matches_server = server
+    .config
+    .default_environment
+    .as_ref()
+    .is_some_and(|default| default.server_url == server.url);
+  if !matches_server {
+    return Ok(false);
+  }
+  let mut config = server.config.clone();
+  config.default_environment = None;
+  write(&server.config_path, &config)?;
+  Ok(true)
 }
 pub fn write(
   path: &Path,

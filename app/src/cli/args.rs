@@ -9,6 +9,11 @@ Quickstart:
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 
+Common serve options:
+  --host <HOST>    Bind host (default: 127.0.0.1)
+  --port <PORT>    Listen port (default: 8840)
+  --background     Run detached on macOS or Linux
+
 Run 'dopbase help <command>' for details on any command.
 ";
 
@@ -60,8 +65,8 @@ pub enum Command {
   Logout,
   /// Show effective client settings: config path, server, and auth status.
   ///
-  /// Example: dopbase config
-  Config,
+  /// Example: dopbase status
+  Status,
   /// Create a project, its first environment, and import secrets.
   ///
   /// Bootstraps a new project on the server from an existing dotenv file.
@@ -121,7 +126,7 @@ pub enum Command {
   /// Export an environment's secrets to a dotenv file or stdout.
   ///
   /// Requires --output <FILE> or --stdout; --force overwrites an existing
-  /// file.
+  /// file. Every export requires interactive password confirmation.
   ///
   /// Example: dopbase export payment-service/production --output .env.prod
   Export {
@@ -146,9 +151,10 @@ pub enum Command {
   },
   /// Run a command with an environment's secrets injected as env vars.
   ///
-  /// Falls back to the DOPBASE_ENV environment variable when no environment
-  /// argument is given. Secret values are passed to the child process only
-  /// and are never printed. Everything after `--` is the command to run.
+  /// Falls back to DOPBASE_ENV, then the active server's saved default, when
+  /// no environment argument is given. Secret values are passed to the child
+  /// process only and are never printed. Everything after `--` is the command
+  /// to run.
   ///
   /// Example: dopbase run payment-service/production -- node server.js
   Run {
@@ -237,8 +243,9 @@ pub enum ClientCommand {
   /// Validate a server URL and save it as the active server.
   ///
   /// Accepts a full URL or the `local` alias to return to the implicit
-  /// local default (http://localhost:8840). Connecting clears the saved
-  /// credential from the previous server; run `dopbase login` afterwards.
+  /// local default (http://localhost:8840). Changing servers requires
+  /// interactive confirmation, stops the current managed background server,
+  /// clears the saved CLI session and default, and then requires a new login.
   ///
   /// Example: dopbase client connect https://dopbase.example.com
   Connect { server_url: String },
@@ -285,6 +292,17 @@ pub enum ProjectCommand {
 }
 #[derive(Subcommand, Debug)]
 pub enum EnvCommand {
+  /// Set or clear the default environment used by `dopbase run`.
+  ///
+  /// Example: dopbase env default payment-service/development
+  Default {
+    /// Environment ID or `project/environment` reference to make the default.
+    #[arg(value_name = "ENVIRONMENT", required_unless_present = "clear")]
+    environment: Option<String>,
+    /// Clear the default environment for the active server.
+    #[arg(long, conflicts_with = "environment")]
+    clear: bool,
+  },
   /// Create an environment inside a project.
   ///
   /// Example: dopbase env create payment-service production
@@ -359,7 +377,7 @@ pub enum SecretCommand {
     environment: String,
     /// Secret key name.
     key: String,
-    /// Print the actual value instead of a mask.
+    /// Print the actual value after interactive password confirmation.
     #[arg(long)]
     reveal: bool,
   },

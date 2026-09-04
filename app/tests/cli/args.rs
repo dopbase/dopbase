@@ -1,5 +1,5 @@
 use app::cli::args::{Cli, Command};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 #[test]
 fn parses_every_v0_1_command_shape() {
@@ -21,7 +21,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "client", "connect", "http://localhost:8840"],
     &["dopbase", "login"],
     &["dopbase", "logout"],
-    &["dopbase", "config"],
+    &["dopbase", "status"],
     &["dopbase", "init", "billing", "production", "--from", ".env"],
     &["dopbase", "project", "create", "billing"],
     &["dopbase", "project", "list"],
@@ -31,6 +31,8 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "env", "create", "billing", "production"],
     &["dopbase", "env", "list", "billing"],
     &["dopbase", "env", "show", "billing/production"],
+    &["dopbase", "env", "default", "billing/production"],
+    &["dopbase", "env", "default", "--clear"],
     &["dopbase", "env", "rename", "env_01", "staging"],
     &["dopbase", "env", "delete", "env_01", "--yes"],
     &["dopbase", "secret", "list", "billing/production"],
@@ -80,13 +82,28 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "update"],
     &["dopbase", "--json", "project", "list"],
-    &["dopbase", "--data-dir", "/tmp/dopbase", "config"],
+    &["dopbase", "--data-dir", "/tmp/dopbase", "status"],
   ];
 
   for command in commands {
     Cli::try_parse_from(*command)
       .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
   }
+}
+
+#[test]
+fn default_environment_requires_a_value_or_clear() {
+  assert!(Cli::try_parse_from(["dopbase", "env", "default"]).is_err());
+  assert!(
+    Cli::try_parse_from(["dopbase", "env", "default", "billing/production", "--clear",]).is_err()
+  );
+}
+
+#[test]
+fn status_replaces_config_command() {
+  let cli = Cli::try_parse_from(["dopbase", "status"]).unwrap();
+  assert!(matches!(cli.command, Command::Status));
+  assert!(Cli::try_parse_from(["dopbase", "config"]).is_err());
 }
 
 #[test]
@@ -158,4 +175,13 @@ fn rejects_conflicting_file_options() {
     ])
     .is_err()
   );
+}
+
+#[test]
+fn top_level_help_lists_common_serve_options() {
+  let help = Cli::command().render_long_help().to_string();
+  assert!(help.contains("Common serve options:"), "{help}");
+  assert!(help.contains("--host <HOST>"), "{help}");
+  assert!(help.contains("--port <PORT>"), "{help}");
+  assert!(help.contains("--background"), "{help}");
 }

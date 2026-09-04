@@ -1,12 +1,13 @@
 use super::{
   args::*,
-  client::{self, ApiClient},
+  client::{self, ApiClient, Credential, CredentialSource},
   dotenv,
   local_config::{self, ClientConfig},
 };
 use crate::{
   config::{ServerConfig, ServerOverrides, ensure_data_dir},
-  constants::config::DEFAULT_PUBLIC_URL,
+  constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
+  daemon::ManagedDaemonState,
   models::SecretInput,
 };
 use anyhow::{Context, Result, bail};
@@ -71,6 +72,11 @@ pub async fn execute(cli: Cli) -> Result<i32> {
     Command::Client {
       command: ClientCommand::Connect { server_url },
     } => {
+      if server_argument.is_some() {
+        bail!(
+          "--server cannot be used with `dopbase client connect`; pass the destination as the positional server URL"
+        );
+      }
       connect(&server_url, data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
@@ -79,21 +85,22 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       let _ = client::login(&server, true).await?;
       print_value(
         json_output,
-        &json!({"server_url":server.url,"authentication":"credential_store"}),
+        &json!({"server_url":server.url,"authentication":"encrypted_session"}),
       );
       Ok(0)
     }
     Command::Logout => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
-      client::remove_credential(&server.url)?;
+      client::remove_credential(&server)?;
+      let credential = client::credential(&server)?;
       print_value(
         json_output,
-        &json!({"server_url":server.url,"authentication":"none"}),
+        &json!({"server_url":server.url,"authentication":credential.source.as_str()}),
       );
       Ok(0)
     }
-    Command::Config => {
-      show_config(server_argument.as_deref(), data_dir.as_deref(), json_output)?;
+    Command::Status => {
+      show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
     Command::Admin { command } => admin(command, data_dir).await,
@@ -169,6 +176,11 @@ async fn connect(
   data_dir: Option<&Path>,
   json_output: bool,
 ) -> Result<()> {
+  if env::var_os(ENV_SERVER_URL).is_some() {
+    bail!(
+      "DOPBASE_URL is set and would override the saved server. Unset DOPBASE_URL before changing the active server"
+    );
+  }
   let current = local_config::resolve(None, data_dir)?;
   let target = if value == "local" {
     DEFAULT_PUBLIC_URL.to_owned()
@@ -187,37 +199,241 @@ async fn connect(
   {
     bail!("the endpoint is not a compatible Dopbase v1 server");
   }
+
+  if current.url == target {
+    let config = ClientConfig {
+      version: 1,
+      server_url: (value != "local").then_some(target.clone()),
+      default_environment: current.config.default_environment.clone(),
+    };
+    local_config::write(&current.config_path, &config)?;
+    print_connection_result(
+      json_output,
+      &current.url,
+      &target,
+      false,
+      false,
+      false,
+      false,
+    );
+    return Ok(());
+  }
+
+  let server_config = ServerConfig::load(&ServerOverrides {
+    data_dir: data_dir.map(Path::to_path_buf),
+    ..ServerOverrides::default()
+  })?;
+  let daemon_state = crate::daemon::inspect(&server_config.data_dir)?;
+  let switching_away_from_background_server = match &daemon_state {
+    ManagedDaemonState::Running(pid_file) => pid_file
+      .resolved_public_url()
+      .and_then(|url| local_config::normalize(&url).ok())
+      .is_some_and(|url| url == current.url),
+    ManagedDaemonState::Absent | ManagedDaemonState::Stale => false,
+  };
+  let foreground_running = match &daemon_state {
+    ManagedDaemonState::Running(_) => false,
+    ManagedDaemonState::Absent | ManagedDaemonState::Stale => {
+      crate::server::InstanceLock::is_held(&server_config.database_url)?
+    }
+  };
+  if foreground_running {
+    bail!(
+      "A foreground Dopbase server is running for {}. Stop it with Ctrl+C, then run `dopbase client connect` again",
+      server_config.data_dir.display()
+    );
+  }
+
+  confirm_server_switch(&current.url, &target, switching_away_from_background_server).await?;
+
+  let background_server_stopped = if switching_away_from_background_server {
+    crate::daemon::stop_managed(Some(&server_config.data_dir), Duration::from_secs(10)).await?;
+    true
+  } else {
+    if matches!(&daemon_state, ManagedDaemonState::Stale) {
+      crate::daemon::remove_pid_file(&crate::daemon::pid_file_path(&server_config.data_dir))?;
+    }
+    false
+  };
+
+  let session_removed = client::remove_credential(&current)?;
+  let default_environment_cleared = current.config.default_environment.is_some();
   let config = ClientConfig {
     version: 1,
     server_url: (value != "local").then_some(target.clone()),
+    default_environment: None,
   };
   local_config::write(&current.config_path, &config)?;
-  if current.url != target {
-    client::remove_credential(&current.url)?;
-  }
-  print_value(json_output, &json!({"server_url":target,"connected":true}));
+  print_connection_result(
+    json_output,
+    &current.url,
+    &target,
+    true,
+    background_server_stopped,
+    session_removed,
+    default_environment_cleared,
+  );
   Ok(())
 }
-fn show_config(
+
+async fn confirm_server_switch(
+  current: &str,
+  target: &str,
+  background_server_running: bool,
+) -> Result<()> {
+  if !io::stdin().is_terminal() {
+    bail!("interactive confirmation is required to change the active Dopbase server");
+  }
+  eprintln!("Change active Dopbase server?\nCurrent: {current}\nNew:     {target}\n\nThis will:");
+  if background_server_running {
+    eprintln!("- stop the managed background server");
+  }
+  eprintln!("- delete the saved CLI session and session key");
+  eprintln!("- clear the saved default environment");
+  eprint!("Continue? [y/N] ");
+  io::stderr().flush()?;
+
+  let mut prompt = tokio::task::spawn_blocking(read_server_switch_confirmation);
+  let confirmed = tokio::select! {
+    result = &mut prompt => result.context("server switch confirmation task failed")??,
+    signal = tokio::signal::ctrl_c() => {
+      signal?;
+      let _ = tokio::time::timeout(Duration::from_millis(250), &mut prompt).await;
+      return Err(client::CliCancelled::ServerSwitch.into());
+    }
+  };
+  if !confirmed {
+    return Err(client::CliCancelled::ServerSwitch.into());
+  }
+  Ok(())
+}
+
+fn read_server_switch_confirmation() -> Result<bool> {
+  let mut answer = String::new();
+  match io::stdin().read_line(&mut answer) {
+    Ok(_) => Ok(server_switch_confirmed(&answer)),
+    Err(error) if error.kind() == io::ErrorKind::Interrupted => {
+      Err(client::CliCancelled::ServerSwitch.into())
+    }
+    Err(error) => Err(error.into()),
+  }
+}
+
+pub fn server_switch_confirmed(answer: &str) -> bool {
+  matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+}
+
+fn print_connection_result(
+  json_output: bool,
+  previous_server_url: &str,
+  server_url: &str,
+  changed: bool,
+  background_server_stopped: bool,
+  session_removed: bool,
+  default_environment_cleared: bool,
+) {
+  let value = json!({
+    "server_url": server_url,
+    "previous_server_url": previous_server_url,
+    "connected": true,
+    "changed": changed,
+    "background_server_stopped": background_server_stopped,
+    "session_removed": session_removed,
+    "default_environment_cleared": default_environment_cleared,
+  });
+  if json_output {
+    print_value(true, &value);
+  } else if changed {
+    println!(
+      "Connected to {server_url}.\nPrevious server: {previous_server_url}\nBackground server stopped: {}\nCLI session removed: {}\nDefault environment cleared: {}\nRun `dopbase login` to authenticate with the new server.",
+      yes_no(background_server_stopped),
+      yes_no(session_removed),
+      yes_no(default_environment_cleared),
+    );
+  } else {
+    println!("Already connected to {server_url}.");
+  }
+}
+
+fn yes_no(value: bool) -> &'static str {
+  if value { "yes" } else { "no" }
+}
+
+async fn show_status(
   argument: Option<&str>,
   data_dir: Option<&Path>,
   json_output: bool,
 ) -> Result<()> {
   let server = local_config::resolve(argument, data_dir)?;
-  let (_, auth) = client::credential(&server)?;
-  let value = json!({"config_file":server.config_path,"server_url":server.url,"server_source":server.source.as_str(),"authentication":auth,"environment":Value::Null});
+  let credential = client::credential(&server)?;
+  let connected = server_is_connected(&server).await;
+  let value = status_document(&server, &credential, connected);
   if json_output {
     println!("{}", serde_json::to_string_pretty(&value)?);
   } else {
+    let email = match (&credential.email, credential.source) {
+      (Some(email), _) => email.as_str(),
+      (None, CredentialSource::EncryptedSession) => "unknown (run dopbase login again to refresh)",
+      _ => "none",
+    };
+    let environment = server.default_environment().map_or_else(
+      || "none (set with `dopbase env default <project/environment>`)".to_owned(),
+      |id| format!("{id} (default)"),
+    );
+    let server_status = if connected {
+      "connected (live)"
+    } else {
+      "offline (cache)"
+    };
     println!(
-      "Config file:     {}\nServer:          {}\nServer source:   {}\nAuthentication:  {}\nEnvironment:     none (pass one explicitly)",
+      "Config file:     {}\nServer:          {}\nServer status:   {}\nServer source:   {}\nAuthentication:  {}\nIdentity:        {}\nEmail:           {}\nEnvironment:     {}",
       server.config_path.display(),
       server.url,
+      server_status,
       server.source.as_str(),
-      auth
+      credential.source.as_str(),
+      credential_identity(&credential),
+      email,
+      environment,
     );
   }
   Ok(())
+}
+
+async fn server_is_connected(server: &local_config::ResolvedServer) -> bool {
+  let Ok(api) = client::ApiClient::new(server, None) else {
+    return false;
+  };
+  matches!(
+    tokio::time::timeout(Duration::from_secs(3), api.health()).await,
+    Ok(Ok(_))
+  )
+}
+
+pub fn status_document(
+  server: &local_config::ResolvedServer,
+  credential: &Credential,
+  connected: bool,
+) -> Value {
+  json!({
+    "config_file": server.config_path,
+    "server_url": server.url,
+    "server_source": server.source.as_str(),
+    "authentication": credential.source.as_str(),
+    "identity": credential_identity(credential),
+    "email": credential.email,
+    "environment": server.default_environment(),
+    "server_status": if connected { "connected" } else { "offline" },
+    "status_source": if connected { "live" } else { "cache" },
+  })
+}
+
+fn credential_identity(credential: &Credential) -> &'static str {
+  match credential.source {
+    CredentialSource::Environment => "runner",
+    CredentialSource::EncryptedSession => "admin",
+    CredentialSource::None => "none",
+  }
 }
 
 async fn execute_client(
@@ -358,8 +574,32 @@ async fn environment(
   server: &local_config::ResolvedServer,
   json_output: bool,
 ) -> Result<i32> {
+  let command = match command {
+    EnvCommand::Default { environment, clear } => {
+      if clear {
+        let cleared = local_config::clear_default_environment(server)?;
+        print_value(
+          json_output,
+          &json!({"server_url":server.url,"environment":Value::Null,"cleared":cleared}),
+        );
+        return Ok(0);
+      }
+      let reference = environment.context("default environment is required")?;
+      let api = client::human_client(server).await?;
+      let environment = resolve_environment(&api, &reference).await?;
+      let id = env_id(&environment)?;
+      local_config::save_default_environment(server, id)?;
+      print_value(
+        json_output,
+        &json!({"server_url":server.url,"environment":environment,"default":true}),
+      );
+      return Ok(0);
+    }
+    command => command,
+  };
   let api = client::human_client(server).await?;
   let data = match command {
+    EnvCommand::Default { .. } => unreachable!(),
     EnvCommand::Create { project, name } => {
       api
         .request(
@@ -441,7 +681,11 @@ async fn secret(
   server: &local_config::ResolvedServer,
   json_output: bool,
 ) -> Result<i32> {
-  let api = client::human_client(server).await?;
+  let api = if matches!(&command, SecretCommand::Get { reveal: true, .. }) {
+    client::password_confirmed_human_client(server).await?
+  } else {
+    client::human_client(server).await?
+  };
   let data = match command {
     SecretCommand::List { environment } => {
       let env = resolve_environment(&api, &environment).await?;
@@ -588,7 +832,7 @@ async fn export(
   if stdout && json_output {
     bail!("--stdout and --json cannot be combined");
   }
-  let api = client::human_client(server).await?;
+  let api = client::password_confirmed_human_client(server).await?;
   let env = resolve_environment(&api, reference).await?;
   let data = api
     .request(
@@ -662,11 +906,25 @@ async fn run(
   environment: Option<String>,
   command: Vec<String>,
 ) -> Result<i32> {
-  let reference = environment
-    .or_else(|| env::var("DOPBASE_ENV").ok())
-    .context("run requires an environment argument or DOPBASE_ENV")?;
+  let selection = run_environment(
+    environment,
+    env::var("DOPBASE_ENV"),
+    server.default_environment(),
+  )?;
   let api = client::any_authenticated_client(server).await?;
-  let env = resolve_environment(&api, &reference).await?;
+  let environment = resolve_environment(&api, &selection.reference).await;
+  let env = match environment {
+    Err(error)
+      if selection.source == RunEnvironmentSource::Default
+        && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
+    {
+      bail!(
+        "Saved default environment {} is unavailable. Set a new one with `dopbase env default <project/environment>` or clear it with `dopbase env default --clear`.",
+        selection.reference
+      )
+    }
+    result => result?,
+  };
   let id = env_id(&env)?;
   let runtime = api
     .request(
@@ -723,6 +981,49 @@ async fn run(
   {
     Ok(child.wait().await?.code().unwrap_or(1))
   }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RunEnvironmentSource {
+  Argument,
+  Environment,
+  Default,
+}
+
+pub struct RunEnvironment {
+  pub reference: String,
+  source: RunEnvironmentSource,
+}
+
+pub fn run_environment(
+  argument: Option<String>,
+  environment: Result<String, env::VarError>,
+  default: Option<&str>,
+) -> Result<RunEnvironment> {
+  if let Some(reference) = argument {
+    return Ok(RunEnvironment {
+      reference,
+      source: RunEnvironmentSource::Argument,
+    });
+  }
+  match environment {
+    Ok(reference) if reference.is_empty() => bail!("DOPBASE_ENV is set but empty"),
+    Ok(reference) => {
+      return Ok(RunEnvironment {
+        reference,
+        source: RunEnvironmentSource::Environment,
+      });
+    }
+    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_ENV contains invalid Unicode"),
+    Err(env::VarError::NotPresent) => {}
+  }
+  if let Some(reference) = default {
+    return Ok(RunEnvironment {
+      reference: reference.into(),
+      source: RunEnvironmentSource::Default,
+    });
+  }
+  bail!("No default environment is set. Set one with: dopbase env default <project/environment>")
 }
 #[cfg(unix)]
 async fn terminate_signal() {
@@ -815,7 +1116,7 @@ async fn reset_password(
   tx.commit().await?;
   db.checkpoint().await?;
   db.close().await;
-  println!("Password reset complete; all human sessions were revoked.");
+  println!("Password reset complete.\nAll human sessions were revoked.");
   Ok(())
 }
 
