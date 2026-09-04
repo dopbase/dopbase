@@ -113,6 +113,26 @@ key protects a copied `session` file by itself, but an attacker that can read
 both files can decrypt the token. Use `DOPBASE_TOKEN` when the credential must
 be managed externally.
 
+## Encrypted run cache
+
+`dopbase run` stores its latest successfully fetched runtime environments under
+`run-cache/` beside `config.toml`. Cache payloads use authenticated
+XChaCha20-Poly1305 encryption and an independent random key in `run-cache-key`.
+Server-derived cache filenames and lock files contain no secret values; cache
+files and the key are mode `0600` inside mode `0700` directories on Unix.
+
+The encryption key for each server cache is derived from the local cache key,
+the normalized server URL, and the exact active session or `DOPBASE_TOKEN`.
+Consequently, another credential cannot unlock an existing cache, even if it
+can access the same environment. A successful live run under a new credential
+replaces the inaccessible cache for that server.
+
+The cache has no automatic expiry because it exists to support extended
+outages. Offline use can therefore inject values that were changed or revoked
+on the unavailable server. `run` always reports cached use, its UTC fetch time,
+and its age. Delete `run-cache/` and `run-cache-key` to remove all locally
+cached runtime values; the next successful live run creates fresh material.
+
 ## Inspect effective configuration
 
 `dopbase status` displays safe connection status:

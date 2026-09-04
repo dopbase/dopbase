@@ -30,6 +30,34 @@ impl fmt::Display for CliCancelled {
 
 impl std::error::Error for CliCancelled {}
 
+#[derive(Debug)]
+pub(crate) struct AvailabilityError {
+  message: String,
+}
+
+impl AvailabilityError {
+  pub(crate) fn new(message: impl Into<String>) -> Self {
+    Self {
+      message: message.into(),
+    }
+  }
+}
+
+impl fmt::Display for AvailabilityError {
+  fn fmt(
+    &self,
+    formatter: &mut fmt::Formatter<'_>,
+  ) -> fmt::Result {
+    formatter.write_str(&self.message)
+  }
+}
+
+impl std::error::Error for AvailabilityError {}
+
+pub(crate) fn is_availability_error(error: &anyhow::Error) -> bool {
+  error.downcast_ref::<AvailabilityError>().is_some()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
   Environment,
@@ -58,6 +86,9 @@ pub struct ApiClient {
   client: reqwest::Client,
   token: Option<String>,
 }
+
+const MAX_RUNTIME_RESPONSE_BYTES: u64 = 4 * 1024 * 1024;
+
 impl ApiClient {
   pub fn new(
     server: &ResolvedServer,
@@ -77,6 +108,25 @@ impl ApiClient {
     path: &str,
     body: Option<Value>,
   ) -> Result<Value> {
+    self.request_inner(method, path, body, false).await
+  }
+
+  pub(crate) async fn request_runtime(
+    &self,
+    method: Method,
+    path: &str,
+    body: Option<Value>,
+  ) -> Result<Value> {
+    self.request_inner(method, path, body, true).await
+  }
+
+  async fn request_inner(
+    &self,
+    method: Method,
+    path: &str,
+    body: Option<Value>,
+    classify_availability: bool,
+  ) -> Result<Value> {
     let mut request = self
       .client
       .request(method, format!("{}{}", self.base_url, path));
@@ -89,12 +139,22 @@ impl ApiClient {
     let response = request
       .send()
       .await
-      .map_err(|error| transport_error(error, &self.base_url))?;
+      .map_err(|error| transport_error(error, &self.base_url, classify_availability))?;
     let status = response.status();
-    let value: Value = response
-      .json()
-      .await
-      .context("server returned an invalid JSON response")?;
+    if classify_availability && status.is_server_error() {
+      return Err(
+        AvailabilityError::new(format!("Dopbase at {} returned {status}", self.base_url)).into(),
+      );
+    }
+    let value: Value = if classify_availability {
+      let bytes = read_limited_response(response, MAX_RUNTIME_RESPONSE_BYTES).await?;
+      serde_json::from_slice(&bytes).context("server returned an invalid JSON response")?
+    } else {
+      response
+        .json()
+        .await
+        .context("server returned an invalid JSON response")?
+    };
     if !status.is_success() {
       let errors = value
         .get("error")
@@ -116,28 +176,60 @@ impl ApiClient {
   pub async fn health(&self) -> Result<Value> {
     self.request(Method::GET, "/api/v1/health", None).await
   }
+
+  pub(crate) fn credential_token(&self) -> Result<&str> {
+    self
+      .token
+      .as_deref()
+      .context("Dopbase authentication is required")
+  }
 }
 
 fn transport_error(
   error: reqwest::Error,
   base_url: &str,
+  classify_availability: bool,
 ) -> anyhow::Error {
-  if error.is_timeout() {
-    return anyhow::anyhow!(
+  let message = if error.is_timeout() {
+    format!(
       "Dopbase at {base_url} did not respond within 30 seconds.\n\
 Check the server health and network connection, then try again."
-    );
-  }
-  if error.is_connect() {
-    return anyhow::anyhow!(
+    )
+  } else if error.is_connect() {
+    format!(
       "Could not connect to Dopbase at {base_url}.\n\
 Check that the server is running and verify the active endpoint with `dopbase status`. For local development, start it with `dopbase serve`."
-    );
-  }
-  anyhow::anyhow!(
-    "The request to Dopbase at {base_url} failed before a response was received.\n\
+    )
+  } else {
+    format!(
+      "The request to Dopbase at {base_url} failed before a response was received.\n\
 Check DNS, TLS, proxy, and network settings, then try again."
-  )
+    )
+  };
+  if classify_availability {
+    return AvailabilityError::new(message).into();
+  }
+  anyhow::anyhow!(message)
+}
+
+async fn read_limited_response(
+  mut response: reqwest::Response,
+  limit: u64,
+) -> Result<Vec<u8>> {
+  if response
+    .content_length()
+    .is_some_and(|length| length > limit)
+  {
+    bail!("server runtime response exceeded the maximum allowed size");
+  }
+  let mut body = Vec::new();
+  while let Some(chunk) = response.chunk().await? {
+    if body.len() as u64 + chunk.len() as u64 > limit {
+      bail!("server runtime response exceeded the maximum allowed size");
+    }
+    body.extend_from_slice(&chunk);
+  }
+  Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
   if let Ok(token) = env::var("DOPBASE_TOKEN") {

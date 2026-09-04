@@ -153,8 +153,10 @@ pub enum Command {
   ///
   /// Falls back to DOPBASE_ENV, then the active server's saved default, when
   /// no environment argument is given. Secret values are passed to the child
-  /// process only and are never printed. Everything after `--` is the command
-  /// to run.
+  /// process only and are never printed. A successful fetch refreshes an
+  /// encrypted local cache; if the server is unavailable, the last cache for
+  /// the same server, environment, and credential is used. Everything after
+  /// `--` is the command to run.
   ///
   /// Example: dopbase run payment-service/production -- node server.js
   Run {

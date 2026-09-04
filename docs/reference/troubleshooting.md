@@ -51,6 +51,20 @@ server's default with:
 dopbase env default payment-service/staging
 ```
 
+## `dopbase run` cannot reach the server
+
+After a successful live run, Dopbase can use the latest encrypted cache for the
+same server, environment, and credential. The fallback warning includes when
+the cache was fetched and how old it is. If no usable cache exists, Dopbase does
+not inject variables or start the child.
+
+An old cache cannot be unlocked after logout or token rotation. A damaged cache
+or missing `run-cache-key` also fails closed. When the server is available, run
+the command successfully to replace that server's cache. To discard all cached
+runtime values, remove `run-cache/` and `run-cache-key` from the Dopbase data
+directory; do not remove the separate `session-key` unless you also intend to
+invalidate the saved CLI login.
+
 ## A secret appeared in logs
 
 Treat the value as exposed. Remove or restrict the log, rotate the credential at its source, update Dopbase, and review where else the log was shipped or retained. Do not copy the value into a public issue.

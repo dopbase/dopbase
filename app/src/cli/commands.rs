@@ -3,6 +3,7 @@ use super::{
   client::{self, ApiClient, Credential, CredentialSource},
   dotenv,
   local_config::{self, ClientConfig},
+  runtime_cache::{self, RuntimeSource},
 };
 use crate::{
   config::{ServerConfig, ServerOverrides, ensure_data_dir},
@@ -912,8 +913,8 @@ async fn run(
     server.default_environment(),
   )?;
   let api = client::any_authenticated_client(server).await?;
-  let environment = resolve_environment(&api, &selection.reference).await;
-  let env = match environment {
+  let loaded = runtime_cache::load(server, &api, &selection.reference).await;
+  let loaded = match loaded {
     Err(error)
       if selection.source == RunEnvironmentSource::Default
         && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
@@ -925,33 +926,36 @@ async fn run(
     }
     result => result?,
   };
-  let id = env_id(&env)?;
-  let runtime = api
-    .request(
-      Method::GET,
-      &format!("/api/v1/environments/{id}/secrets/runtime"),
-      None,
-    )
-    .await?;
-  let entries = parse_entries(&runtime)?;
+  match &loaded.source {
+    RuntimeSource::Live { cache_warning } => {
+      if let Some(warning) = cache_warning {
+        eprintln!("Dopbase warning: {warning}");
+      }
+    }
+    RuntimeSource::Cache {
+      fetched_at,
+      age,
+      reason,
+    } => {
+      eprintln!(
+        "Dopbase warning: {reason}; using encrypted cache fetched at {fetched_at} ({age} old)."
+      );
+    }
+  }
   eprintln!(
-    "Dopbase: {}/{} ({id}), {} key(s)",
-    runtime
-      .get("project")
-      .and_then(Value::as_str)
-      .unwrap_or("?"),
-    runtime
-      .get("environment")
-      .and_then(Value::as_str)
-      .unwrap_or("?"),
-    entries.len()
+    "Dopbase: {}/{} ({}), {} key(s), source={}",
+    loaded.project,
+    loaded.environment,
+    loaded.environment_id,
+    loaded.entries.len(),
+    loaded.source.as_str(),
   );
   let program = command.first().context("run requires a child command")?;
   let mut child_command = tokio::process::Command::new(program);
   child_command
     .args(&command[1..])
     .env_remove("DOPBASE_TOKEN");
-  for entry in entries {
+  for entry in loaded.entries {
     child_command.env(entry.key, entry.value);
   }
   #[cfg(unix)]

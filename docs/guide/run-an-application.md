@@ -64,12 +64,24 @@ two-server example.
 Dopbase server
       ↓ authenticated encrypted connection
 Dopbase client
+      ↕ credential-bound encrypted cache in ~/.dopbase
       ↓ selected environment values
 Application process
 ```
 
 The client retrieves the allowed values and injects them into the child process.
 It does not create a `.env` file.
+
+Each successful runtime fetch refreshes the latest encrypted cache entry for
+that environment. If the server cannot be reached, times out, or returns a 5xx
+response, `run` uses the matching cache after waiting up to five seconds for the
+complete live fetch. Authentication, authorization, not-found, and invalid
+response errors never fall back to cache.
+
+The cache is bound to the normalized server URL and exact session or runner
+token that populated it. A logout or token rotation therefore makes the old
+cache unavailable. Cache entries do not expire automatically; an offline run
+prints the original fetch time and age so operators can judge staleness.
 
 Managed values override same-named variables inherited from the parent process.
 Dopbase removes its own authentication variables before starting the child so
@@ -78,13 +90,15 @@ the application does not receive the credential used to retrieve its secrets.
 ## Runtime behavior
 
 Before starting the application, Dopbase writes the resolved project,
-environment, immutable ID, and loaded key count to standard error. Values are
+environment, immutable ID, loaded key count, and `live` or `cache` source to
+standard error. Cached runs also print the fetch timestamp and age. Values are
 never printed.
 
 Dopbase then:
 
-- Stops before launch if connection, authentication, authorization, or secret
-  retrieval fails.
+- Stops before launch if live retrieval fails and no usable matching cache is
+  available, or when authentication, authorization, environment resolution,
+  response validation, or cache authentication fails.
 - Forwards operating-system signals to the child process.
 - Returns the child's exit status to the calling shell.
 - Avoids retaining plaintext values after the child starts where practical.

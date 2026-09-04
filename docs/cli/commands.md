@@ -256,14 +256,19 @@ how to set the default. Use `dopbase env default --clear` to remove it. An empty
 `DOPBASE_ENV` is an error and does not fall back.
 
 Before starting the child, Dopbase writes the resolved project, environment,
-immutable ID, and loaded key count to standard error. It does not print values.
+immutable ID, loaded key count, and whether values came from the live server or
+encrypted cache to standard error. It does not print values.
 Managed values override same-named variables inherited from the parent process.
 Dopbase authentication variables are removed from the child environment so the
 child application does not receive the credential used to contact Dopbase.
 
-Connection, authentication, authorization, or retrieval failures stop before
-the child starts. Once started, signals are forwarded and the child's exit
-status is returned to the calling shell.
+Every successful live retrieval refreshes the credential-bound encrypted cache.
+Connection failures, timeouts, and 5xx responses fall back to the latest
+matching cache after a five-second live-fetch deadline. Cached entries do not
+expire, so the warning includes their fetch time and age. Authentication,
+authorization, not-found, malformed-response, missing-cache, or cache-integrity
+failures stop before the child starts. Once started, signals are forwarded and
+the child's exit status is returned to the calling shell.
 
 ## Structured output
 
