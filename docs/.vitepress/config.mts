@@ -9,6 +9,8 @@ const projectUrl = "https://github.com/dopbase/dopbase";
 const siteDescription =
   "Dopbase is an open-source secrets manager for developers. Self-host one executable, organize secrets by environment, and inject them into applications.";
 const ogImage = `${siteUrl}/og-image.jpg`;
+const ogImageAlt =
+  "Dopbase documentation for the CLI, Admin UI, API, and self-hosting";
 
 function buildJsonLd(pageData: {
   relativePath: string;
@@ -103,11 +105,16 @@ export default defineConfig({
       ],
       ["meta", { property: "og:site_name", content: siteName }],
       ["meta", { property: "og:image", content: ogImage }],
+      ["meta", { property: "og:image:type", content: "image/jpeg" }],
+      ["meta", { property: "og:image:width", content: "1200" }],
+      ["meta", { property: "og:image:height", content: "630" }],
+      ["meta", { property: "og:image:alt", content: ogImageAlt }],
       ["meta", { property: "og:locale", content: "en-US" }],
       ["meta", { name: "twitter:card", content: "summary_large_image" }],
       ["meta", { name: "twitter:title", content: title }],
       ["meta", { name: "twitter:description", content: description }],
       ["meta", { name: "twitter:image", content: ogImage }],
+      ["meta", { name: "twitter:image:alt", content: ogImageAlt }],
       [
         "script",
         { type: "application/ld+json" },
@@ -122,7 +129,15 @@ export default defineConfig({
     return head;
   },
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
+    [
+      "link",
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        sizes: "any",
+        href: "/favicon.svg",
+      },
+    ],
     ["meta", { name: "theme-color", content: "#863bff" }],
   ],
   markdown: {
@@ -139,7 +154,7 @@ export default defineConfig({
     },
   },
   themeConfig: {
-    logo: "/favicon.svg",
+    logo: "/logo.svg",
     siteTitle: "Dopbase",
     search: { provider: "local" },
     socialLinks: [{ icon: "github", link: projectUrl }],

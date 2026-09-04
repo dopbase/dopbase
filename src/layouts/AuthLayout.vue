@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useServerStatus } from "~/composable";
-import { TerminalIcon } from "~/assets/icons";
+import { DopbaseIcon } from "~/assets/icons";
 
 /**
  * AuthLayout — split screen for `/login` and `/setup`.
@@ -20,7 +20,7 @@ const { health, reachable, endpoint } = useServerStatus();
       <div class="flex items-center gap-3">
         <div
           class="flex h-10 w-10 items-center justify-center rounded-lg border border-accent/40 bg-accent-soft text-accent-strong">
-          <TerminalIcon class="h-5 w-5" />
+          <DopbaseIcon class="h-6 w-6" />
         </div>
         <div>
           <p class="font-mono text-sm font-semibold text-ink-strong">dopbase</p>

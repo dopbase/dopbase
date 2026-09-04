@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="terminal-line" x1="72" y1="0" x2="1128" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#863BFF"/>
+      <stop offset="1" stop-color="#47BFFF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(600 350) rotate(90) scale(380 760)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5A2B8F" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#17131F" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="grid-fade" cx="0" cy="0" r="1" gradientTransform="translate(600 315) rotate(90) scale(340 650)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".52" stop-color="#FFFFFF" stop-opacity=".88"/>
+      <stop offset=".82" stop-color="#FFFFFF" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#514267" stroke-width="1"/>
+      <circle r="1.5" fill="#8B5BC5" fill-opacity=".58"/>
+    </pattern>
+    <mask id="grid-mask" x="0" y="0" width="1200" height="630" maskUnits="userSpaceOnUse">
+      <rect width="1200" height="630" fill="url(#grid-fade)"/>
+    </mask>
+  </defs>
+  <rect width="1200" height="630" fill="#17131F"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity=".9" mask="url(#grid-mask)"/>
+  <g transform="translate(72 48) scale(1.2)">
+    <path fill="#863BFF" fill-rule="evenodd" d="M24 2C11.85 2 2 11.85 2 24s9.85 22 22 22 22-9.85 22-22S36.15 2 24 2Zm0 4c9.94 0 18 8.06 18 18s-8.06 18-18 18S6 33.94 6 24 14.06 6 24 6Zm-7.5 6.75h8.05C32.1 12.75 36.5 16.95 36.5 24s-4.4 11.25-11.95 11.25H16.5v-22.5Zm5.25 4.5v13.5h2.6c4.6 0 6.9-2.25 6.9-6.75s-2.3-6.75-6.9-6.75h-2.6Z"/>
+  </g>
+  <text x="142" y="92" fill="#F8F7FB" font-family="IBM Plex Sans, Arial, sans-serif" font-size="40" font-weight="650">Dopbase Docs</text>
+  <text x="72" y="208" fill="#F8F7FB" font-family="IBM Plex Sans, Arial, sans-serif" font-size="64" font-weight="650" letter-spacing="-2.5">Secret manager in a single file</text>
+  <text x="74" y="270" fill="#B9B2C5" font-family="IBM Plex Sans, Arial, sans-serif" font-size="26">Guides for the CLI, Admin UI, API and self-hosting</text>
+  <rect x="72" y="312" width="1056" height="224" rx="16" fill="#1B1725" stroke="#554863" stroke-width="2"/>
+  <path d="M88 313H1112" stroke="url(#terminal-line)" stroke-width="2"/>
+  <circle cx="108" cy="350" r="6" fill="#625E6D"/>
+  <circle cx="130" cy="350" r="6" fill="#863BFF"/>
+  <circle cx="152" cy="350" r="6" fill="#47BFFF"/>
+  <text x="184" y="357" fill="#858091" font-family="Fira Code, monospace" font-size="17">quick start</text>
+  <text x="108" y="427" fill="#47BFFF" font-family="Fira Code, monospace" font-size="22">$</text>
+  <text x="140" y="427" fill="#EDE6FF" font-family="Fira Code, monospace" font-size="22">dopbase run api/dev -- bun run dev</text>
+  <circle cx="114" cy="478" r="5" fill="#70E09B"/>
+  <text x="140" y="485" fill="#B9B2C5" font-family="Fira Code, monospace" font-size="19">secrets injected · application started</text>
+  <text x="72" y="588" fill="#AAA4B4" font-family="Fira Code, monospace" font-size="18">CLI  /  Admin UI  /  API  /  Self-hosting</text>
+  <text x="1128" y="588" fill="#AAA4B4" font-family="Fira Code, monospace" font-size="18" text-anchor="end">docs.dopbase.com</text>
+</svg>

@@ -15,6 +15,7 @@ export { default as ClockIcon } from "./Clock.icon.vue";
 export { default as CopyIcon } from "./Copy.icon.vue";
 export { default as DeskIcon } from "./Desk.icon.vue";
 export { default as DownloadIcon } from "./Download.icon.vue";
+export { default as DopbaseIcon } from "./Dopbase.icon.vue";
 export { default as DumbbellIcon } from "./Dumbbell.icon.vue";
 export { default as ElevatorIcon } from "./Elevator.icon.vue";
 export { default as EyeIcon } from "./Eye.icon.vue";

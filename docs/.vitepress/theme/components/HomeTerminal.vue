@@ -5,11 +5,17 @@
       local secrets workflow
     </div>
     <pre><span class="prompt">$</span> dopbase serve
-<span class="quiet">Admin UI</span>  http://localhost:8840
-<span class="quiet">API</span>       http://localhost:8840/api
-<span class="success">Ready.</span>
+╭──────────────────────────────────────────────────────────────────╮
+│  <span class="success">Dopbase</span>                                                         │
+│  Secure, Simple and Private                                      │
+│  Version 0.0.12                                                  │
+│                                                                  │
+│  <span class="quiet">Admin UI:</span>   http://localhost:8840                               │
+│  <span class="quiet">API:</span>        http://localhost:8840/api/v1                        │
+│  <span class="quiet">Config:</span>     /Users/venobi/.dopbase                              │
+╰──────────────────────────────────────────────────────────────────╯
 
-<span class="prompt">$</span> dopbase config
+<span class="prompt">$</span> dopbase status
 <span class="success">Server: http://localhost:8840 (default)</span>
 
 <span class="prompt">$</span> dopbase init storefront development --from .env

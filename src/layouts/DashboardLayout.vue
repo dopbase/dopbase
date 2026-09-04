@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import {
-  TerminalIcon,
+  DopbaseIcon,
   FolderIcon,
   HistoryIcon,
   ServerIcon,
@@ -62,7 +62,7 @@ const isActive = (item: (typeof navItems)[number]): boolean =>
         class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4">
         <div
           class="flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 bg-accent-soft text-accent-strong">
-          <TerminalIcon class="h-4 w-4" />
+          <DopbaseIcon class="h-5 w-5" />
         </div>
         <div class="leading-tight">
           <p class="font-mono text-sm font-semibold text-ink-strong">dopbase</p>
