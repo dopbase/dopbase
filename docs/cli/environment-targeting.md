@@ -1,13 +1,13 @@
 ---
 title: "Target projects and environments"
-description: "Target a Dopbase project and environment explicitly without saving an active environment or adding configuration to an application repository."
+description: "Target a Dopbase project and environment explicitly or save a server-scoped default for dopbase run."
 ---
 
 # Target projects and environments
 
-Dopbase uses explicit environment targeting. It does not place configuration
-in an application repository and does not remember an active project or active
-environment.
+Dopbase uses explicit environment targeting for management commands. It does
+not place configuration in an application repository. For `dopbase run`, it
+can remember one server-scoped default environment in the user configuration.
 
 The server connection is separate machine-global state. With no configured
 server, Dopbase uses `http://localhost:8840`; `client connect` can select another
@@ -21,6 +21,17 @@ dopbase secret list storefront/production
 dopbase import storefront/staging .env.staging
 dopbase run env_01ABCDEF -- ./storefront
 ```
+
+For repeated interactive runs, save the immutable environment ID as the
+default:
+
+```bash
+dopbase env default storefront/development
+dopbase run -- ./storefront
+```
+
+The positional reference and `DOPBASE_ENV` still take precedence. Clear the
+saved value with `dopbase env default --clear`.
 
 ## Why the environment is enough
 
@@ -111,8 +122,8 @@ export DOPBASE_ENV=env_<production-id>
 dopbase run -- ./storefront
 ```
 
-This is still explicit deployment configuration. Dopbase does not persist it
-as an active environment.
+This is explicit deployment configuration and takes precedence over any saved
+default.
 
 ## Different Dopbase servers
 

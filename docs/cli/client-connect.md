@@ -33,8 +33,19 @@ The command normalizes the URL and verifies that it is a compatible Dopbase
 server before changing machine-global state. If validation fails, the previous
 server and credential remain active.
 
-Connecting does not authenticate. A successful server change removes the old
-saved credential, so sign in separately:
+An actual server change requires a yes/no confirmation. The warning identifies
+the current and destination endpoints and explains that Dopbase will stop the
+current managed background server when present, delete the encrypted local CLI
+session, and clear the saved default environment. There is no non-interactive
+bypass.
+
+If a foreground `dopbase serve` process is using the same data directory, stop
+it with Ctrl+C before switching. A `serve --background` process representing
+the current endpoint is stopped automatically after confirmation. Remote
+servers, unrelated local servers, and browser sessions are never stopped or
+revoked.
+
+Connecting does not authenticate. Sign in separately after switching:
 
 ```bash
 dopbase login
@@ -52,6 +63,9 @@ dopbase login
 After validating `http://localhost:8840`, Dopbase removes the configured server
 override and returns to the implicit local default.
 
+`DOPBASE_URL` must be unset before changing the saved endpoint; otherwise its
+environment override would remain active instead of the newly selected server.
+
 ## Cloud uses the same command
 
 ```bash
@@ -66,10 +80,10 @@ client and REST model as a self-hosted server.
 
 The selected endpoint is stored in the user's global Dopbase configuration,
 not in an application repository. Login credentials are stored separately in
-the operating system credential store. No active project or environment is
-saved.
+the encrypted local session file. An optional `dopbase run` default is saved as
+an immutable environment ID scoped to this server.
 
-Use `dopbase config` to inspect the effective endpoint and authentication
+Use `dopbase status` to inspect the effective endpoint and authentication
 status without displaying token contents. Read [client configuration](./configuration)
 for the file format, precedence rules, and multi-instance behavior.
 

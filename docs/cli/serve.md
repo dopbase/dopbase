@@ -16,10 +16,18 @@ dopbase serve
 The local defaults are:
 
 ```text
-Admin UI:   http://localhost:8840
-API:        http://localhost:8840/api/v1
-Config:     ~/.dopbase/server.toml
+╭──────────────────────────────────────────────────────────────────╮
+│  Dopbase                                                     │
+│  Secure, Simple and Private                                  │
+│  Version 0.0.12                                              │
+│                                                              │
+│  Admin UI:   http://localhost:8840                           │
+│  API:        http://localhost:8840/api/v1                    │
+│  Config:     /Users/venobi/.dopbase                          │
+╰──────────────────────────────────────────────────────────────────╯
 ```
+
+The banner always shows the version of the running Dopbase binary.
 
 The `Swagger: http://localhost:8840/api/docs` line is printed only when the
 API documentation is enabled (with `--docs` or `docs = true` in server.toml).
@@ -96,10 +104,19 @@ a bind failure, is reported to the terminal:
 dopbase serve --background
 ```
 
+Only one server can use a data directory at a time. If Dopbase is already
+running, a second `serve` command exits with a clear message instead of
+starting another application instance. Stop the existing server first with
+`dopbase stop` when it is running in the background.
+
+Human-readable output includes the same branded version banner followed by the
+daemon PID, log path, and stop command. With `--json`, those details remain
+machine-readable and include a `version` field.
+
 The daemon writes two files into the data directory:
 
 ```text
-~/.dopbase/dopbase.pid   PID file (process ID, version, bind address)
+~/.dopbase/dopbase.pid   PID file (process ID, version, bind address, public URL)
 ~/.dopbase/serve.log     stdout and stderr of the server
 ```
 

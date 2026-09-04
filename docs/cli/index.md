@@ -15,7 +15,7 @@ Both server and client commands ship in the same `dopbase` executable:
 dopbase serve
 
 # Client role
-dopbase config
+dopbase status
 dopbase login
 dopbase init payment-service development --from .env
 dopbase env create payment-service staging

@@ -6,9 +6,9 @@ description: "Reference for every Dopbase CLI command in v0.0.12: connections, a
 # Command reference
 
 This page defines the implemented v0.0.12 command surface. Dopbase does not infer a
-project or environment from the current directory and does not store an active
-project or environment. Commands that work with secrets receive an environment
-reference directly.
+project or environment from the current directory. Management commands receive
+an environment reference directly; `run` may use a server-scoped default from
+the user configuration.
 
 ## Connections and authentication
 
@@ -21,13 +21,16 @@ reference directly.
 | `dopbase client connect local`        | Return to the implicit local server |
 | `dopbase login`                       | Authenticate with the active server |
 | `dopbase logout`                      | Remove the active saved credential  |
-| `dopbase config`                      | Show safe effective client settings |
+| `dopbase status`                      | Show safe effective client settings |
 | `dopbase update`                      | Check GitHub for a newer release    |
 
 When no server is configured, client commands use `http://localhost:8840`.
-`client connect` validates a new endpoint before saving it in the machine-global
-config and clears the credential from the previous connection. It does not
-select a project or environment.
+`client connect` validates a new endpoint, asks for interactive confirmation,
+stops the current managed background server when present, deletes the previous
+encrypted CLI session, clears the saved default environment, and then saves the
+new endpoint. A foreground server must first be stopped with Ctrl+C. It does
+not select a project or environment, stop remote or unrelated local servers,
+or revoke browser sessions.
 
 ## Server lifecycle
 
@@ -60,15 +63,18 @@ The server resolution order is:
 4. `http://localhost:8840`
 
 Machine authentication uses `DOPBASE_TOKEN` in preference to a token saved by
-`login` in the operating system credential store. A saved credential is used
+`login` in the encrypted local session file. A saved credential is used
 only when it matches the resolved server. Dopbase will not accept a token as a
 CLI argument because command-line arguments can be exposed through shell
 history and process inspection.
 
-`dopbase config` displays the config path, resolved server and its source,
-authentication status and source, and the absence of a selected environment.
-It never displays token contents. See [client configuration](./configuration)
-for the TOML schema and override behavior.
+`dopbase status` displays the config path, resolved server and its source,
+authentication source, cached identity, login email, and the saved default
+environment. It performs a short health check and reports `connected (live)`
+or `offline (cache)` without failing when the server is unavailable. It never
+displays token contents. See
+[client configuration](./configuration) for the TOML schema and override
+behavior.
 
 ## Environment references
 
@@ -128,6 +134,8 @@ affected resource counts and requires confirmation; automation must pass
 | Command                                       | Purpose                   |
 | --------------------------------------------- | ------------------------- |
 | `dopbase env create <project> <name>`         | Create an environment     |
+| `dopbase env default <environment>`           | Set the run default       |
+| `dopbase env default --clear`                 | Clear the run default     |
 | `dopbase env list [<project>]`                | List environments         |
 | `dopbase env show <environment>`              | Show environment metadata |
 | `dopbase env rename <environment> <new-name>` | Rename an environment     |
@@ -154,9 +162,11 @@ printf '%s' "$NEW_DATABASE_URL" | \
   dopbase secret set payment-service/staging DATABASE_URL --stdin
 ```
 
-Dopbase does not provide a plaintext `--value` argument. Reveal and deletion
-operations are explicit, permission-controlled, and audited. Normal human and
-JSON output never contains a value.
+Dopbase does not provide a plaintext `--value` argument. `--reveal` requires
+interactive password confirmation on every invocation and cannot be bypassed
+with `--json`, stdin, or a confirmation flag. Reveal and deletion operations
+are explicit, permission-controlled, and audited. Normal human and JSON output
+never contains a value.
 
 ## Import and export
 
@@ -192,7 +202,8 @@ dopbase export payment-service/staging --stdout
 overwrite an existing path unless `--force` is passed and creates the file with
 restrictive permissions where the platform supports them. Export and stdout
 reveal plaintext values and therefore require reveal permission and create an
-audit event.
+audit event. The CLI also requires interactive password confirmation for every
+export. Non-interactive export is intentionally rejected.
 
 The same workflows exist in the Admin UI, with a visual review and dry-run
 summary before anything is stored; see [import and export](/ui/import-export).
@@ -232,9 +243,17 @@ Automation may set `DOPBASE_ENV` instead:
 DOPBASE_ENV=env_01ABCDEF dopbase run -- ./payment-service
 ```
 
-An explicit positional environment takes precedence over `DOPBASE_ENV`. If
-neither is present, `run` fails instead of guessing from the current directory
-or saved state.
+Interactive users may save a server-scoped default:
+
+```bash
+dopbase env default payment-service/development
+dopbase run -- npm run dev
+```
+
+An explicit positional environment takes precedence over `DOPBASE_ENV`, which
+takes precedence over the saved default. If none is available, `run` explains
+how to set the default. Use `dopbase env default --clear` to remove it. An empty
+`DOPBASE_ENV` is an error and does not fall back.
 
 Before starting the child, Dopbase writes the resolved project, environment,
 immutable ID, and loaded key count to standard error. It does not print values.

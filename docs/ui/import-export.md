@@ -57,6 +57,7 @@ dopbase export payment-service/staging --output .env.staging
 ```
 
 The command reference covers the CLI flags, including `--dry-run`,
-`--replace`, and `--stdout`. See [CLI commands](/cli/commands). Choose the
-interface that fits the workflow. Both write the same records and create audit
-events.
+`--replace`, and `--stdout`. CLI export also requires interactive password
+confirmation for each invocation. See [CLI commands](/cli/commands). Choose
+the interface that fits the workflow. Both write the same records and create
+audit events.

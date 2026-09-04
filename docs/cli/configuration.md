@@ -5,9 +5,9 @@ description: "How the Dopbase CLI stores machine-global connection state and res
 
 # Client configuration
 
-Dopbase keeps client connection state in a machine-global configuration. It
-does not create configuration inside an application repository and does not
-store an active project or environment.
+Dopbase keeps client connection state and an optional run default in a
+machine-global configuration. It does not create configuration inside an
+application repository.
 
 ## Default local server
 
@@ -41,14 +41,18 @@ The v0.0.12 schema contains only non-secret client state:
 ```toml
 version = 1
 server_url = "https://dopbase.example.com"
+
+[default_environment]
+server_url = "https://dopbase.example.com"
+environment_id = "env_01ABCDEF"
 ```
 
 `server_url` is omitted when the implicit local server is active. Dopbase
 writes configuration atomically and restricts file permissions to the current
 user where the platform supports them.
 
-The file never stores project selection, environment selection, secret values,
-or authentication tokens.
+The optional default contains only an immutable environment ID and the server
+URL that owns it. The file never stores secret values or authentication tokens.
 
 ## Select a server
 
@@ -64,8 +68,11 @@ the endpoint is a compatible Dopbase server. The new server is saved only after
 validation succeeds. A failed connection leaves the previous configuration and
 credential unchanged.
 
-After a successful switch, Dopbase removes the previous server's saved
-credential. Authenticate separately against the new endpoint:
+After validation, Dopbase asks for confirmation. A successful switch stops the
+current managed background server when present, removes the previous encrypted
+CLI session and key, and clears the previous default environment. A foreground
+server must be stopped with Ctrl+C first. Remote and unrelated local servers
+are not stopped. Authenticate separately against the new endpoint:
 
 ```bash
 dopbase login
@@ -82,47 +89,71 @@ The `local` alias resolves to `http://localhost:8840`. Dopbase validates the
 local server, removes the `server_url` override, and removes the previous
 server's credential.
 
+Persistent switching is rejected while `DOPBASE_URL` is set because that
+environment variable would override the newly saved endpoint.
+
 ## Credentials
 
-`dopbase login` stores the resulting token in the operating system credential
-store, keyed by the normalized server URL. It never writes the token to
-`config.toml` or a Dopbase server's SQLite database.
+`dopbase login` stores the resulting token in an encrypted extensionless
+`session` file beside `config.toml`, scoped to the normalized server URL. Its
+random 32-byte key is stored separately in `session-key`. The token is never
+written to `config.toml` or a Dopbase server's SQLite database.
+
+The encrypted payload also caches the normalized administrator email so
+`dopbase status` can identify the login without contacting the server. Older
+sessions remain valid but show an unknown email until the next login.
 
 Only one saved connection is active in v0.0.12. Logging in again replaces the
 credential for that server. `dopbase logout` removes the active credential but
 leaves the selected server unchanged.
 
-If the operating system credential store is unavailable, interactive login
-fails with instructions to use `DOPBASE_TOKEN`. Dopbase does not silently fall
-back to a plaintext credential file.
+On Unix, the data directory is mode `0700` and both session files are mode
+`0600`. On Windows, they inherit the user profile directory ACL. Separating the
+key protects a copied `session` file by itself, but an attacker that can read
+both files can decrypt the token. Use `DOPBASE_TOKEN` when the credential must
+be managed externally.
 
 ## Inspect effective configuration
 
-`dopbase config` displays safe connection status:
+`dopbase status` displays safe connection status:
 
 ```text
 Config file:     /home/alex/.dopbase/config.toml
 Server:          https://dopbase.example.com
+Server status:   connected (live)
 Server source:   config
-Authentication:  logged in (credential store)
-Environment:     none (pass one explicitly)
+Authentication:  encrypted_session
+Identity:        admin
+Email:           admin@example.com
+Environment:     env_01ABCDEF (default)
 ```
 
-It never displays a token or secret value. `dopbase config --json` returns the
+It never displays a token or secret value. `dopbase status --json` returns the
 same safe fields for diagnostics and automation:
 
 ```json
 {
   "config_file": "/home/alex/.dopbase/config.toml",
   "server_url": "http://localhost:8840",
+  "server_status": "offline",
+  "status_source": "cache",
   "server_source": "default",
   "authentication": "none",
+  "identity": "none",
+  "email": null,
   "environment": null
 }
 ```
 
+The server status is `connected` with a `live` source when the health check
+succeeds. It is `offline` with a `cache` source when Dopbase cannot be reached;
+the remaining fields still come from safe local configuration and session
+metadata. The health probe times out after three seconds.
+
 The stable server-source values are `argument`, `environment`, `config`, and
-`default`. Authentication is `environment`, `credential_store`, or `none`.
+`default`. Authentication is `environment`, `encrypted_session`, or `none`.
+Identity is `admin`, `runner`, or `none`. An environment credential is reported
+as a runner identity and has no email.
 
 ## Resolution order
 
@@ -136,7 +167,17 @@ The effective server is resolved in this order:
 Authentication is resolved in this order:
 
 1. `DOPBASE_TOKEN`
-2. The operating system credential matching the normalized active server
+2. The encrypted session matching the normalized active server
+
+The environment used by `dopbase run` is resolved in this order:
+
+1. Positional environment reference
+2. A non-empty `DOPBASE_ENV`
+3. The saved default when its server URL matches the effective server
+
+Set or clear the default with `dopbase env default <environment>` and
+`dopbase env default --clear`. A server override never reuses a default saved
+for another endpoint.
 
 A stored credential is used only when its server matches the effective server.
 Dopbase never sends a saved token to an endpoint selected by an unrelated

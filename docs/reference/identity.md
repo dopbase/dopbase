@@ -14,8 +14,8 @@ and human CLI operations.
 
 Passwords are hashed with Argon2id. Browser sessions have an eight-hour idle
 and 24-hour absolute lifetime. CLI sessions are opaque bearer tokens with a
-30-day idle and 90-day absolute lifetime and are stored in the operating-system
-credential store. Offline password recovery verifies the master key, requires
+30-day idle and 90-day absolute lifetime and are stored in an encrypted local
+session file. Offline password recovery verifies the master key, requires
 the server to be stopped, and revokes every human session.
 
 ## Machine identities
@@ -30,10 +30,19 @@ dopbase run env_01ABCDEF -- npm start
 
 `DOPBASE_TOKEN` is preferred over a saved human login when it is present.
 
-Interactive `dopbase login` stores its token in the operating system credential
-store under the normalized server URL. The global TOML config contains the
-selected server but never the token. A saved credential is used only for its
+Interactive `dopbase login` encrypts its token in the extensionless `session`
+file under the Dopbase data directory. The separate `session-key` file holds
+the random local encryption key. The global TOML config contains the selected
+server but never the token. A saved credential is used only for its
 matching server.
+
+The encrypted payload also caches the administrator email for offline
+`dopbase status` output. The password is never stored.
+
+Plaintext `secret get --reveal` and `export` operations in the official CLI
+require interactive password confirmation every time. This is a CLI safety
+gate; direct HTTP clients continue to follow the server's existing recent-
+authentication policy.
 
 For application servers, create a runner token scoped to one environment:
 
@@ -61,5 +70,6 @@ Tokens must be scoped, revocable, and hidden from logs. Operators should use the
 child process. Dopbase does not accept tokens as command-line arguments because
 they may be exposed through process inspection or shell history.
 
-If an operating system credential store is unavailable, use `DOPBASE_TOKEN`.
-Dopbase must not silently store an interactive login token in plaintext.
+The session and key files are restricted to the current user where the platform
+supports it. An attacker that can read both files can decrypt the token; use
+`DOPBASE_TOKEN` when an externally managed credential is required.

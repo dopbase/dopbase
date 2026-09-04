@@ -43,8 +43,16 @@ dopbase run -- ./payment-service
 ```
 
 An explicit positional environment takes precedence over `DOPBASE_ENV`. If
-neither is present, Dopbase fails rather than using the current directory or a
-remembered environment.
+neither is present, Dopbase uses the server-scoped default saved by:
+
+```bash
+dopbase env default payment-service/development
+dopbase run -- ./payment-service
+```
+
+If no matching default exists, Dopbase stops with instructions for setting
+one. Use `dopbase env default --clear` to remove it. An empty `DOPBASE_ENV` is
+treated as a configuration error rather than falling back.
 
 Use different environment IDs and runner tokens for production and staging.
 See [target projects and environments](/cli/environment-targeting) for a full

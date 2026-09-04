@@ -54,9 +54,15 @@ dopbase serve
 The default local server exposes:
 
 ```text
-Admin UI: http://localhost:8840
-API:      http://localhost:8840/api/v1
-Database: ~/.dopbase/dopbase.db
+╭──────────────────────────────────────────────────────────────────╮
+│  Dopbase                                                     │
+│  Secure, Simple and Private                                  │
+│  Version 0.0.12                                              │
+│                                                              │
+│  Admin UI:   http://localhost:8840                           │
+│  API:        http://localhost:8840/api/v1                    │
+│  Config:     /Users/venobi/.dopbase                          │
+╰──────────────────────────────────────────────────────────────────╯
 ```
 
 The same address serves the Admin UI in a browser. The first visit walks you
@@ -71,14 +77,17 @@ Open another terminal. With no configured server, Dopbase uses the local
 default automatically:
 
 ```bash
-dopbase config
+dopbase status
 ```
 
 ```text
 Server:          http://localhost:8840
+Server status:   connected (live)
 Server source:   default
-Authentication:  not logged in
-Environment:     none (pass one explicitly)
+Authentication:  none
+Identity:        none
+Email:           none
+Environment:     none (set with `dopbase env default <project/environment>`)
 ```
 
 No repository or global config file is required for the implicit local server.
@@ -92,7 +101,7 @@ dopbase login
 ```
 
 `login` authenticates with the resolved server and saves the token in the
-operating system credential store.
+encrypted local session file.
 
 ## 5. Bootstrap a project
 

@@ -56,8 +56,8 @@ dopbase login
 ```
 
 For another endpoint, `dopbase client connect` validates and saves the server in
-`~/.dopbase/config.toml`, then `login` stores its token in the operating system
-credential store. Client state does not become a second source of truth for
+`~/.dopbase/config.toml`, then `login` stores its token in the encrypted local
+session file. Client state does not become a second source of truth for
 project secrets.
 
 The saved client state contains no active project or environment. Commands

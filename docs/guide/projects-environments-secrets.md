@@ -87,7 +87,8 @@ dopbase secret get payment-service/staging DATABASE_URL --reveal
 ```
 
 Reading metadata does not reveal a value. Reveal operations are explicit,
-permission-controlled, and audited.
+permission-controlled, and audited. The official CLI requires interactive
+password confirmation every time `--reveal` is used.
 
 ## Deletion
 

@@ -14,7 +14,7 @@ dopbase login
 
 The first command validates Cloud and stores its URL in the machine-global
 configuration. The second authenticates your user and saves the token in the
-operating system credential store.
+encrypted local session file.
 
 ::: info Endpoint pending
 `<dopbase-cloud-url>` is a placeholder. Do not substitute an assumed hostname or send credentials to an unofficial endpoint.
@@ -36,6 +36,6 @@ the credential from the previous active server; run `dopbase login` against the
 new destination.
 
 The selected Cloud URL is stored in the user's machine-global config. The login
-token is stored in the operating system credential store, not in the TOML file
-or an application repository. `dopbase config` displays the effective endpoint
+token is stored in the encrypted extensionless `session` file, not in the TOML
+file or an application repository. `dopbase status` displays the effective endpoint
 and authentication status without revealing the token.

@@ -43,6 +43,7 @@ Read the [public documentation](./docs/) for the product model, CLI, self-hostin
 | `src/`   | Vue administration interface              | Initial scaffold              |
 | `docs/`  | VitePress product documentation           | Active public specification   |
 | `tests/` | Frontend tests and test setup             | Early test scaffold           |
+| `app/tests/` | Rust integration tests                  | Backend and CLI test suite   |
 
 ## Development
 
@@ -70,7 +71,7 @@ bun run dev
 The combined command serves the UI at `http://localhost:9000`, proxies `/api`
 requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
-`bun run build:binary` and then `./app/target/release/dopbase serve`.
+`bun run build:all` and then `./app/target/release/dopbase serve`.
 
 Start the documentation site:
 
@@ -82,11 +83,20 @@ The repository defines these production build commands:
 
 ```bash
 bun run build
-bun run build:binary
+bun run build:all
 bun run docs:build
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full setup, checks, and pull-request expectations.
+
+### Rust test placement
+
+Keep `app/src/` production-only. All Rust test cases belong under `app/tests/`
+as integration tests. Do not add `#[cfg(test)]` modules, `#[test]`,
+`#[tokio::test]`, or `*_test.rs` files anywhere under `app/src/`; add or update
+the corresponding test file in `app/tests/` instead. This keeps the production
+source tree clean and makes the test boundary clear for both humans and AI
+contributors.
 
 ## Security
 
