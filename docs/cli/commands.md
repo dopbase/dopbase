@@ -270,6 +270,82 @@ authorization, not-found, malformed-response, missing-cache, or cache-integrity
 failures stop before the child starts. Once started, signals are forwarded and
 the child's exit status is returned to the calling shell.
 
+## backup
+
+Create an encrypted system-level snapshot containing all projects, environments,
+secrets, runner tokens, and administrator credentials.
+
+```bash
+# Create a timestamped backup stored on the server
+dopbase backup
+
+# Create a named backup and save a copy locally
+dopbase backup pre-upgrade --output ./pre-upgrade.dop
+
+# Run with structured JSON output
+dopbase backup pre-upgrade --json
+```
+
+| Argument / Flag       | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| `[name]`              | Optional name prefix (default: `dopbase_backup_<timestamp>`)  |
+| `-o, --output <path>` | Download a copy of the encrypted archive to a local file path |
+| `--json`              | Format results as machine-readable JSON                       |
+
+### Operation flow
+
+1. Dopbase contacts the server and verifies that the instance is running and reachable (`server_status: connected (live)`).
+2. The server acquires an online SQLite snapshot lock, generates `dopbase.db` and `manifest.json`, and encrypts the ZIP container using **XChaCha20-Poly1305** with the server's master key (`~/.dopbase/master.key`).
+3. The encrypted `.dop` archive is stored on the server under `~/.dopbase/backups/`.
+4. If `--output` was specified, the CLI streams and downloads the archive to your local device.
+5. The CLI prints a confirmation and a security notice reminding you that the backup is encrypted with this instance's master key and that the master key will be required if restoring onto a new server.
+
+> [!IMPORTANT]
+> `dopbase backup` requires an active, reachable server (`server_status: connected (live)`).
+> If the server is offline or disconnected, the command halts immediately.
+
+## restore
+
+Restore all database tables and instance configuration from a `.dop` backup archive.
+
+```bash
+# Restore on the same server (uses server's existing master key)
+dopbase restore ./pre-upgrade.dop
+
+# Restore on a new or different server (Dual-input restore with master.key file)
+dopbase restore ./pre-upgrade.dop --key /path/to/source/master.key
+
+# Restore on a new server using a 64-character hex master key
+dopbase restore ./pre-upgrade.dop --key 4a2f8b9c01234567...
+
+# First-run restore requires the setup token printed by the target server
+dopbase restore ./pre-upgrade.dop --setup-token dbs_... --yes
+```
+
+| Argument / Flag         | Description                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `<path>`                | Path to the local `.dop` backup file to restore                                                     |
+| `-k, --key <KEY>`       | Path to source server's `master.key` file or a 64-character hex string                              |
+| `-y, --yes`             | Skip the destructive confirmation prompt (initialized restores still require password confirmation) |
+| `--setup-token <TOKEN>` | One-time token required for first-run restore                                                       |
+| `--json`                | Format results as machine-readable JSON                                                             |
+
+### Operation flow
+
+- **On a live, initialized server**:
+  1. Verifies server status is live (`connected (live)`).
+  2. Uploads the `.dop` archive to the server.
+  3. Prompts for interactive confirmation (requiring typing `RESTORE`) unless `--yes` is specified.
+  4. Decrypts and authenticates the archive using the provided `--key` (or the server's existing master key).
+  5. If `--key` was provided, re-keys restored secret metadata to the target server's existing `~/.dopbase/master.key`.
+  6. Replaces SQLite database tables, runs any pending migrations, and preserves the active administrator session.
+- **On a first-run uninitialized server**:
+  - Restoring requires the one-time first-run setup token.
+
+> [!IMPORTANT]
+> `dopbase restore` strictly requires the server to be live and connected (`server_status: connected (live)`).
+> Offline restores are rejected to prevent file system races and corruption.
+
 ## Structured output
 
 Resource and metadata commands support `--json` for automation. Secret

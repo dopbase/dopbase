@@ -17,12 +17,12 @@ control for the next page.
 
 Four filters narrow the list:
 
-| Filter      | Answers                                          |
-| ----------- | ------------------------------------------------ |
-| Action      | "Show me every reveal" or every delete           |
-| Project     | Everything that happened inside one project      |
-| Environment | One environment only                             |
-| Actor       | The administrator or runner token that acted     |
+| Filter      | Answers                                      |
+| ----------- | -------------------------------------------- |
+| Action      | "Show me every reveal" or every delete       |
+| Project     | Everything that happened inside one project  |
+| Environment | One environment only                         |
+| Actor       | The administrator or runner token that acted |
 
 Changing any filter reloads the list from the start.
 

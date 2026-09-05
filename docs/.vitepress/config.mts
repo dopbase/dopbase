@@ -2,10 +2,12 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineConfig, type HeadConfig } from "vitepress";
 import { assetFileNames } from "../../config/asset-file-names.ts";
+import pkg from "../../package.json" with { type: "json" };
 
 const siteUrl = "https://docs.dopbase.com";
 const siteName = "Dopbase";
 const projectUrl = "https://github.com/dopbase/dopbase";
+const currentVersion = `v${pkg.version}`;
 const siteDescription =
   "Dopbase is an open-source secrets manager for developers. Self-host one executable, organize secrets by environment, and inject them into applications.";
 const ogImage = `${siteUrl}/og-image.jpg`;
@@ -178,6 +180,13 @@ export default defineConfig({
         ],
       },
       { text: "About", link: "/about/" },
+      {
+        text: currentVersion,
+        items: [
+          { text: "Changelog & Roadmap", link: "/about/roadmap" },
+          { text: "GitHub Releases", link: `${projectUrl}/releases` },
+        ],
+      },
     ],
     sidebar: {
       "/guide/": [
@@ -199,22 +208,57 @@ export default defineConfig({
             { text: "Server and client", link: "/guide/server-client" },
             { text: "Import a .env file", link: "/guide/import-env" },
             { text: "Run an application", link: "/guide/run-an-application" },
+            {
+              text: "Backup and disaster recovery",
+              link: "/guide/backups-and-restore",
+            },
           ],
         },
       ],
       "/cli/": [
         {
-          text: "Command line",
+          text: "Getting Started",
           items: [
             { text: "CLI overview", link: "/cli/" },
             { text: "serve", link: "/cli/serve" },
-            { text: "client connect", link: "/cli/client-connect" },
+            { text: "Client connect", link: "/cli/client-connect" },
             { text: "Client configuration", link: "/cli/configuration" },
             {
-              text: "Projects and environments",
+              text: "Environment targeting",
               link: "/cli/environment-targeting",
             },
-            { text: "Command reference", link: "/cli/commands" },
+          ],
+        },
+        {
+          text: "Commands Reference",
+          items: [
+            { text: "All commands overview", link: "/cli/commands" },
+            { text: "serve & stop", link: "/cli/commands#server-lifecycle" },
+            {
+              text: "client connect",
+              link: "/cli/commands#connections-and-authentication",
+            },
+            {
+              text: "login & logout",
+              link: "/cli/commands#connections-and-authentication",
+            },
+            {
+              text: "status",
+              link: "/cli/commands#connections-and-authentication",
+            },
+            { text: "update", link: "/cli/commands#check-for-updates" },
+            { text: "init", link: "/cli/commands#bootstrap-a-project" },
+            { text: "project", link: "/cli/commands#project-commands" },
+            { text: "env", link: "/cli/commands#environment-commands" },
+            { text: "secret", link: "/cli/commands#secret-commands" },
+            {
+              text: "import & export",
+              link: "/cli/commands#import-and-export",
+            },
+            { text: "token", link: "/cli/commands#runner-tokens" },
+            { text: "run", link: "/cli/commands#run-a-process" },
+            { text: "backup", link: "/cli/commands#backup" },
+            { text: "restore", link: "/cli/commands#restore" },
           ],
         },
       ],
@@ -230,6 +274,7 @@ export default defineConfig({
             },
             { text: "Managing secrets", link: "/ui/managing-secrets" },
             { text: "Import and export", link: "/ui/import-export" },
+            { text: "Backups and restoration", link: "/ui/backups" },
             { text: "Audit and instance status", link: "/ui/audit-instance" },
           ],
         },

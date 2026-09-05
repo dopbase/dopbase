@@ -30,7 +30,9 @@ for (const file of collectHtmlFiles(dist)) {
   const targetDir = join(dist, rel.slice(0, -".html".length));
   mkdirSync(targetDir, { recursive: true });
   renameSync(file, join(targetDir, "index.html"));
-  console.log(`restructured: ${rel} -> ${rel.replace(/\.html$/, "")}/index.html`);
+  console.log(
+    `restructured: ${rel} -> ${rel.replace(/\.html$/, "")}/index.html`,
+  );
   moved++;
 }
 console.log(`docs post-build: moved ${moved} pages to directory-style paths`);

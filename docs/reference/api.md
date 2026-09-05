@@ -28,6 +28,7 @@ test.
 | Environments                                | `/api/v1/environments`                               |
 | Secrets, import, export, and runtime values | `/api/v1/environments/{id}/secrets`                  |
 | Runner tokens                               | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
+| System backups and restoration              | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit and instance status                   | `/api/v1/audit-events`, `/api/v1/instance`           |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and

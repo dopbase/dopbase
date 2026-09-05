@@ -16,15 +16,26 @@ When the server starts for the first time it prints a one-time setup token:
 Setup token: dbsetup_xxxxxxxxxxxxxxxx
 ```
 
-Open the Admin UI and you land on the setup page. Enter three things:
+Open the Admin UI and you land on the setup page (`/setup`). The page provides two setup options:
 
-1. The setup token from the server output. With `dopbase serve --background`,
-   the token is also written to `~/.dopbase/serve.log`.
-2. An email address for the administrator account.
-3. A password of at least 12 characters (128 at most).
+### Option 1: Claim a fresh instance
 
-The token works once. After setup completes, visiting `/setup` redirects to the
-workspace. If the server reports that setup is complete, sign in instead.
+1. Enter the one-time **setup token** from the server startup output. With
+   `dopbase serve --background`, the token is also written to `~/.dopbase/serve.log`.
+2. Provide an **email address** for the administrator account.
+3. Enter a secure **password** of at least 12 characters (128 at most).
+
+The setup token works once. Once claimed, the server is initialized and redirects to the workspace.
+
+### Option 2: Restore from an existing backup
+
+If you are restoring an existing installation or spinning up a replacement instance from a backup:
+
+1. Switch to the **Restore from Backup** tab.
+2. Select or drag-and-drop your encrypted `.dop` backup file.
+3. Click **Restore & initialize server**.
+
+The server validates the backup archive against its master encryption key, restores all projects, environments, secrets, runner tokens, and administrator credentials, and closes the setup window. You are then redirected to the sign-in page to log in using the administrator credentials restored from the backup.
 
 There is no second administrator, no invitation flow, and no password reset by
 email. Offline recovery with the master key is the fallback; see

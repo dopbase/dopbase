@@ -25,6 +25,7 @@ commands. CLI changes appear in the UI.
 | [Projects and environments](./projects-environments) | Create, rename, and delete projects and environments                             |
 | [Managing secrets](./managing-secrets)               | Set, reveal, and delete secrets, and edit a whole environment in a `.env` editor |
 | [Import and export](./import-export)                 | Move secrets between a `.env` file and an environment                            |
+| [Backups and restoration](./backups)                 | Create and restore full encrypted server snapshots (`.dop` archives)             |
 | [Audit and instance status](./audit-instance)        | Read the audit log and check server health                                       |
 
 ## Who can sign in

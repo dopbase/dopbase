@@ -9,14 +9,15 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 
 ## Audit events in 0.0.13
 
-| Area           | Events                                                                                                                                        |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Secrets        | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.imported`, `secret.exported`, `secret.runtime_accessed`    |
-| Projects       | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                 |
-| Environments   | `environment.created`, `environment.renamed`, `environment.deleted`                                                                            |
-| Tokens         | `token.created`, `token.revoked`                                                                                                                |
-| Authentication | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                           |
-| Administrator  | `admin.bootstrapped`, `admin.reauthenticated`, `admin.password_changed`                                                                          |
+| Area           | Events                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Secrets        | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.imported`, `secret.exported`, `secret.runtime_accessed` |
+| Projects       | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                           |
+| Environments   | `environment.created`, `environment.renamed`, `environment.deleted`                                                                      |
+| Tokens         | `token.created`, `token.revoked`                                                                                                         |
+| Authentication | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                    |
+| Administrator  | `admin.bootstrapped`, `admin.reauthenticated`, `admin.password_changed`                                                                  |
+| Backups        | `backup.created`, `backup.deleted`, `backup.restored`, `backup.restored_bootstrap`                                                       |
 
 The API schema defines the event names used by this release.
 
