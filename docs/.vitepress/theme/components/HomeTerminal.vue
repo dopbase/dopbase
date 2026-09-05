@@ -8,7 +8,7 @@
 ╭──────────────────────────────────────────────────────────────────╮
 │  <span class="success">Dopbase</span>                                                         │
 │  Secure, Simple and Private                                      │
-│  Version 0.0.13                                                  │
+│  Version 0.0.14                                                  │
 │                                                                  │
 │  <span class="quiet">Admin UI:</span>   http://localhost:8840                               │
 │  <span class="quiet">API:</span>        http://localhost:8840/api/v1                        │

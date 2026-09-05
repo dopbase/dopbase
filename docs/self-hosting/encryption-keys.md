@@ -17,7 +17,7 @@ This separation means that stealing the database alone should not reveal plainte
 
 ## Current key source
 
-Dopbase 0.0.13 uses a 256-bit master key in a local owner-only file. Set its
+Dopbase 0.0.14 uses a 256-bit master key in a local owner-only file. Set its
 location in `server.toml`, with `DOPBASE_MASTER_KEY_PATH`, or with the
 `--master-key-file` option. Dopbase creates the file when it initializes a new
 instance and verifies it before opening the HTTP listener.

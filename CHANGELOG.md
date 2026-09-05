@@ -4,6 +4,33 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+## 0.0.14 - 2026-09-05
+
+### Added
+
+- Encrypted backup creation, upload, download, deletion, and restoration through
+  the Admin UI, REST API, and CLI.
+- First-run disaster recovery from a backup archive using the one-time setup
+  token and the source server's master key.
+- An encrypted, server-scoped CLI run cache for explicitly requested offline
+  secret injection.
+
+### Changed
+
+- Rekey cross-server backup imports to the target server's master key while
+  preserving secret values and the active administrator session.
+- Expanded backup, restore, storage, audit, and CLI documentation, including a
+  dedicated disaster-recovery guide.
+- Simplified frontend and binary build command names and refreshed the repository
+  banner.
+
+### Security
+
+- Validate backup authentication, manifests, SQLite integrity, schema migrations,
+  archive sizes, and setup authorization before modifying live data.
+- Apply restores through disposable database connections so cancellation cannot
+  return unsafe connection state to the application pool.
+
 ## 0.0.13 - 2026-09-04
 
 ### Added

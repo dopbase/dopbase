@@ -81,5 +81,5 @@ security schemes.
 
 `GET /api/v1/health` identifies the product, binary version, and API version.
 `dopbase client connect` validates this response before changing local client
-configuration. v0.0.13 does not yet promise compatibility with future major API
+configuration. v0.0.14 does not yet promise compatibility with future major API
 versions or implement idempotency keys.

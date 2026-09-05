@@ -8,7 +8,7 @@ description: "The Dopbase security model: encryption of secret values, separatio
 Dopbase stores credentials that can grant access to databases, cloud accounts, payment providers, and internal services. Its security controls apply when those credentials are stored, served, revealed, and audited.
 
 ::: info Review the security model
-This page documents the 0.0.13 security model. Public source makes independent
+This page documents the 0.0.14 security model. Public source makes independent
 review possible, but it is not the same as an independent security audit.
 :::
 
@@ -24,7 +24,7 @@ review possible, but it is not the same as an independent security audit.
 
 ## Envelope encryption
 
-The v0.0.13 implementation uses envelope encryption:
+The v0.0.14 implementation uses envelope encryption:
 
 ```text
 Secret value

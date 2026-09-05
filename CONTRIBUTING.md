@@ -126,7 +126,7 @@ tag from the release commit:
 ```bash
 git switch main
 git pull --ff-only
-version=0.0.13
+version=0.0.14
 git tag -a "$version" -m "$version"
 git push origin "$version"
 ```

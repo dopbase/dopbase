@@ -156,7 +156,7 @@ function handleKeyFileInputChange(event: Event) {
         </form>
 
         <p class="mt-6 text-sm leading-relaxed text-ink-muted">
-          Only one administrator account exists in v0.0.13. Password recovery
+          Only one administrator account exists in v0.0.14. Password recovery
           later requires the master key on the server host via
           <DbCode>dopbase admin reset-password</DbCode>.
         </p>

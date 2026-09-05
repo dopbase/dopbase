@@ -7,7 +7,7 @@ description: "See which sensitive actions Dopbase records, who performed them, w
 
 Audit records answer who performed a sensitive action, where it happened, and when. They describe the action without storing the secret value involved.
 
-## Audit events in 0.0.13
+## Audit events in 0.0.14
 
 | Area           | Events                                                                                                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
