@@ -90,6 +90,8 @@ export interface ApiRequestOptions {
    * (login and first-admin bootstrap) which run before any CSRF token exists.
    */
   anonymous?: boolean;
+  /** Response payload format; defaults to "json". */
+  responseType?: "json" | "blob";
 }
 
 export interface ApiResult<T> {
@@ -125,7 +127,9 @@ export async function apiRequest<T>(
 ): Promise<ApiResult<T>> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) {
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) {
     headers["Content-Type"] = "application/json";
   }
   if (MUTATING_METHODS.has(method) && !options.anonymous) {
@@ -140,7 +144,11 @@ export async function apiRequest<T>(
       headers,
       credentials: "same-origin",
       body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
+        options.body === undefined
+          ? undefined
+          : isFormData
+            ? (options.body as BodyInit)
+            : JSON.stringify(options.body),
       signal: options.signal,
     });
   } catch (error) {
@@ -161,6 +169,11 @@ export async function apiRequest<T>(
       emit(reauthListeners);
     }
     throw apiError;
+  }
+
+  if (options.responseType === "blob") {
+    const blob = await response.blob();
+    return { message: "OK", data: blob as unknown as T };
   }
 
   const payload = (await response.json()) as ApiEnvelope<T>;

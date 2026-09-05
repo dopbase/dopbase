@@ -42,3 +42,41 @@ export async function bootstrapAdmin(
   });
   return data;
 }
+
+export interface BootstrapRestoreResponse {
+  message: string;
+  restored: boolean;
+  key: string;
+  size: number;
+}
+
+/** Restores an uninitialized server from an encrypted .dop backup file and optional master key. */
+export async function bootstrapRestore(
+  file: File,
+  setupToken: string,
+  masterKey?: File | string,
+): Promise<BootstrapRestoreResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("setup_token", setupToken.trim());
+  if (masterKey) {
+    if (typeof masterKey === "string") {
+      formData.append(
+        "master_key",
+        new Blob([masterKey.trim()], { type: "text/plain" }),
+        "master.key",
+      );
+    } else {
+      formData.append("master_key", masterKey);
+    }
+  }
+  const { data } = await apiRequest<BootstrapRestoreResponse>(
+    `${BASE}/restore`,
+    {
+      method: "POST",
+      body: formData,
+      anonymous: true,
+    },
+  );
+  return data;
+}

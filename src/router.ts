@@ -54,6 +54,11 @@ export const router = createRouter({
       component: () => import("~/pages/Workspace/ImportSecrets.page.vue"),
     },
     {
+      path: "/backups",
+      name: "backups",
+      component: () => import("~/pages/Backups/Backups.page.vue"),
+    },
+    {
       path: "/audit",
       name: "audit",
       component: () => import("~/pages/Audit/Audit.page.vue"),

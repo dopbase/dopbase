@@ -35,3 +35,17 @@ export function formatDateTime(iso: string): string {
 export function formatCountdown(seconds: number): string {
   return `${seconds}s`;
 }
+
+/** Formats byte counts into human-readable strings, e.g. `128 KB`, `1.4 MB`. */
+export function formatBytes(bytes: number): string {
+  if (bytes <= 0 || Number.isNaN(bytes)) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let unitIndex = -1;
+  let val = bytes;
+  do {
+    val /= 1024;
+    unitIndex++;
+  } while (val >= 1024 && unitIndex < units.length - 1);
+  return `${val >= 10 ? Math.round(val) : val.toFixed(1)} ${units[unitIndex]}`;
+}

@@ -1,4 +1,5 @@
 export { default as AlertTriangleIcon } from "./AlertTriangle.icon.vue";
+export { default as ArchiveIcon } from "./Archive.icon.vue";
 export { default as ArrowLeftIcon } from "./ArrowLeft.icon.vue";
 export { default as BathIcon } from "./Bath.icon.vue";
 export { default as BedIcon } from "./Bed.icon.vue";

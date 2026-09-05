@@ -98,4 +98,109 @@ describe("useSetupController", () => {
     await c.submit();
     expect(c.formError.value).toContain("already been set up");
   });
+
+  describe("restore mode", () => {
+    it("validates file extension on selection", () => {
+      const c = useSetupController();
+      const invalidFile = new File(["dummy"], "backup.zip", {
+        type: "application/zip",
+      });
+      c.onFileSelected(invalidFile);
+      expect(c.selectedFile.value).toBeNull();
+      expect(c.restoreError.value).toContain(".dop");
+
+      const validFile = new File(["dummy"], "backup.dop", {
+        type: "application/octet-stream",
+      });
+      c.onFileSelected(validFile);
+      expect(c.selectedFile.value?.name).toBe("backup.dop");
+      expect(c.restoreError.value).toBeNull();
+    });
+
+    it("requires a file before submitting restore", async () => {
+      const c = useSetupController();
+      await c.submitRestore();
+      expect(c.restoreError.value).toContain("select a .dop");
+      expect(bootstrapApi.bootstrapRestore).not.toHaveBeenCalled();
+    });
+
+    it("restores backup successfully and routes to login with notice", async () => {
+      vi.mocked(bootstrapApi.bootstrapRestore).mockResolvedValueOnce({
+        message: "Backup restored successfully.",
+        restored: true,
+        key: "backup.dop",
+        size: 1024,
+      });
+      vi.mocked(bootstrapApi.fetchBootstrapStatus).mockResolvedValueOnce({
+        state: "ready",
+      });
+
+      const c = useSetupController();
+      const file = new File(["dummy"], "backup.dop", {
+        type: "application/octet-stream",
+      });
+      c.onFileSelected(file);
+      c.setupToken.value = "dbs_test-token";
+      await c.submitRestore();
+
+      expect(bootstrapApi.bootstrapRestore).toHaveBeenCalledWith(
+        file,
+        "dbs_test-token",
+      );
+      expect(routerPush).toHaveBeenCalledWith({
+        name: "login",
+        query: { notice: "backup-restored" },
+      });
+    });
+
+    it("handles decryption failure with clear message", async () => {
+      vi.mocked(bootstrapApi.bootstrapRestore).mockRejectedValueOnce(
+        new ApiError(400, { BACKUP_DECRYPT_FAILED: "decryption failed" }),
+      );
+
+      const c = useSetupController();
+      const file = new File(["dummy"], "backup.dop", {
+        type: "application/octet-stream",
+      });
+      c.onFileSelected(file);
+      c.setupToken.value = "dbs_test-token";
+      await c.submitRestore();
+
+      expect(c.restoreError.value).toContain("master key");
+    });
+
+    it("restores backup with master key file", async () => {
+      vi.mocked(bootstrapApi.bootstrapRestore).mockResolvedValueOnce({
+        message: "Restored",
+        restored: true,
+        key: "backup.dop",
+        size: 1024,
+      });
+      vi.mocked(bootstrapApi.fetchBootstrapStatus).mockResolvedValueOnce({
+        state: "ready",
+      });
+
+      const c = useSetupController();
+      const file = new File(["dummy"], "backup.dop", {
+        type: "application/octet-stream",
+      });
+      const keyFile = new File(["keydata"], "master.key", {
+        type: "application/octet-stream",
+      });
+      c.onFileSelected(file);
+      c.setupToken.value = "dbs_test-token";
+      c.onMasterKeyFileSelected(keyFile);
+      await c.submitRestore();
+
+      expect(bootstrapApi.bootstrapRestore).toHaveBeenCalledWith(
+        file,
+        "dbs_test-token",
+        keyFile,
+      );
+      expect(routerPush).toHaveBeenCalledWith({
+        name: "login",
+        query: { notice: "backup-restored" },
+      });
+    });
+  });
 });

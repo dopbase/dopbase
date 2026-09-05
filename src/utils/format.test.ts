@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDateTime, formatRelativeTime } from "./format";
+import { formatBytes, formatDateTime, formatRelativeTime } from "./format";
 
 const NOW = new Date("2026-08-28T12:00:00Z");
 
@@ -31,5 +31,19 @@ describe("formatDateTime", () => {
 
   it("returns the raw input when unparseable", () => {
     expect(formatDateTime("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatBytes", () => {
+  it("formats zero and negative values", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(-10)).toBe("0 B");
+  });
+
+  it("formats bytes, kilobytes, and megabytes", () => {
+    expect(formatBytes(500)).toBe("500 B");
+    expect(formatBytes(1024)).toBe("1.0 KB");
+    expect(formatBytes(20480)).toBe("20 KB");
+    expect(formatBytes(1572864)).toBe("1.5 MB");
   });
 });

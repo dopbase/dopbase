@@ -9,17 +9,21 @@ import { TerminalIcon } from "~/assets/icons";
 const { email, password, fieldErrors, formError, submitting, submit } =
   useLoginController();
 const route = useRoute();
-const notice = computed(() =>
-  route.query.notice === "password-changed"
-    ? "Your password was changed. Sign in with the new password."
-    : null,
-);
+const notice = computed(() => {
+  if (route.query.notice === "password-changed") {
+    return "Your password was changed. Sign in with the new password.";
+  }
+  if (route.query.notice === "backup-restored") {
+    return "Backup restored successfully. Sign in with an administrator account from the backup.";
+  }
+  return null;
+});
 </script>
 
 <template>
   <AuthLayout>
     <div class="w-full max-w-sm">
-      <p class="mb-1 font-mono text-xs text-ink-faint">$ dopbase auth login</p>
+      <p class="mb-1 font-mono text-xs text-ink-faint">$ dopbase login</p>
       <h1 class="text-xl font-semibold">Sign in</h1>
       <p class="mt-1 text-sm text-ink-muted">
         Authenticate with the administrator account created during setup.

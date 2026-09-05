@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import {
+  ArchiveIcon,
   DopbaseIcon,
   FolderIcon,
   HistoryIcon,
@@ -28,6 +29,12 @@ const navItems = [
     label: "Projects",
     icon: FolderIcon,
     match: (r: string) => r.startsWith("/workspace"),
+  },
+  {
+    name: "backups",
+    label: "Backups",
+    icon: ArchiveIcon,
+    match: (r: string) => r.startsWith("/backups"),
   },
   {
     name: "audit",

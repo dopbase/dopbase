@@ -41,7 +41,10 @@ function createLocalStorageMock(): Storage {
 
 const localStorageMock = createLocalStorageMock();
 
-for (const target of [globalThis, (globalThis as unknown as { window?: unknown }).window]) {
+for (const target of [
+  globalThis,
+  (globalThis as unknown as { window?: unknown }).window,
+]) {
   if (target == null) continue;
   Object.defineProperty(target, "localStorage", {
     value: localStorageMock,
