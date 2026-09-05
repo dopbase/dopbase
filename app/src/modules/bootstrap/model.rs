@@ -19,3 +19,12 @@ pub struct BootstrapAdminResponse {
   pub email: String,
   pub csrf_token: String,
 }
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BootstrapRestoreResponse {
+  pub message: String,
+  pub restored: bool,
+  pub key: String,
+  pub size: u64,
+}

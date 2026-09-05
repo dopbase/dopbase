@@ -150,3 +150,45 @@ fn status_reports_no_identity_without_credentials() {
   assert_eq!(value["server_status"], "offline");
   assert_eq!(value["status_source"], "cache");
 }
+
+#[tokio::test]
+async fn backup_rejects_when_server_is_offline() {
+  use clap::Parser;
+
+  let cli =
+    app::cli::args::Cli::try_parse_from(["dopbase", "--server", "http://127.0.0.1:1", "backup"])
+      .unwrap();
+
+  let err = app::cli::commands::execute(cli).await.unwrap_err();
+  let msg = err.to_string();
+  assert!(
+    msg.contains("Cannot perform backup: Dopbase server at http://127.0.0.1:1 is not connected or offline (live status required)"),
+    "unexpected message: {msg}"
+  );
+}
+
+#[tokio::test]
+async fn restore_rejects_when_server_is_offline() {
+  use clap::Parser;
+
+  let dir = TempDir::new().unwrap();
+  let backup_file = dir.path().join("test_backup.dop");
+  std::fs::write(&backup_file, b"dummy content").unwrap();
+
+  let cli = app::cli::args::Cli::try_parse_from([
+    "dopbase",
+    "--server",
+    "http://127.0.0.1:1",
+    "restore",
+    backup_file.to_str().unwrap(),
+    "--yes",
+  ])
+  .unwrap();
+
+  let err = app::cli::commands::execute(cli).await.unwrap_err();
+  let msg = err.to_string();
+  assert!(
+    msg.contains("Cannot perform restore: Dopbase server at http://127.0.0.1:1 is not connected or offline (live status required)"),
+    "unexpected message: {msg}"
+  );
+}

@@ -5,6 +5,7 @@ use crate::state::AppState;
 
 pub mod audit;
 pub mod auth;
+pub mod backups;
 pub mod bootstrap;
 pub(crate) mod common;
 pub mod environments;
@@ -25,6 +26,7 @@ pub fn routes() -> Router<AppState> {
     .merge(tokens::routes())
     .merge(audit::routes())
     .merge(instance::routes())
+    .merge(backups::routes())
 }
 
 pub fn openapi() -> OpenApi {
@@ -37,5 +39,6 @@ pub fn openapi() -> OpenApi {
   doc.merge(tokens::doc::build());
   doc.merge(audit::doc::build());
   doc.merge(instance::doc::build());
+  doc.merge(backups::doc::build());
   doc
 }

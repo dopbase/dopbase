@@ -411,6 +411,20 @@ async fn server_is_connected(server: &local_config::ResolvedServer) -> bool {
   )
 }
 
+async fn ensure_server_is_connected(
+  server: &local_config::ResolvedServer,
+  operation: &str,
+) -> Result<()> {
+  if !server_is_connected(server).await {
+    bail!(
+      "Cannot perform {operation}: Dopbase server at {} is not connected or offline (live status required).\n\
+       Check that the server is running with `dopbase serve` and verify the endpoint with `dopbase status`.",
+      server.url
+    );
+  }
+  Ok(())
+}
+
 pub fn status_document(
   server: &local_config::ResolvedServer,
   credential: &Credential,
@@ -492,6 +506,13 @@ async fn execute_client(
       environment,
       command,
     } => run(server, environment, command).await,
+    Command::Backup { name, output } => backup(server, name, output, json_output).await,
+    Command::Restore {
+      path,
+      key,
+      setup_token,
+      yes,
+    } => restore(server, path, key, setup_token, yes, json_output).await,
     _ => bail!("unsupported command"),
   }
 }
@@ -1201,4 +1222,227 @@ fn write_private(
   force: bool,
 ) -> Result<()> {
   crate::utils::private_file::write(path, contents, force)
+}
+
+fn format_bytes(bytes: u64) -> String {
+  const KIB: u64 = 1024;
+  const MIB: u64 = KIB * 1024;
+  const GIB: u64 = MIB * 1024;
+
+  if bytes >= GIB {
+    format!("{:.2} GiB", bytes as f64 / GIB as f64)
+  } else if bytes >= MIB {
+    format!("{:.2} MiB", bytes as f64 / MIB as f64)
+  } else if bytes >= KIB {
+    format!("{:.2} KiB", bytes as f64 / KIB as f64)
+  } else {
+    format!("{} B", bytes)
+  }
+}
+
+async fn backup(
+  server: &local_config::ResolvedServer,
+  name: Option<String>,
+  output: Option<PathBuf>,
+  json_output: bool,
+) -> Result<i32> {
+  ensure_server_is_connected(server, "backup").await?;
+
+  let steps_total = if output.is_some() { 2 } else { 1 };
+  if !json_output {
+    eprintln!(
+      "==> [1/{steps_total}] Creating encrypted backup snapshot on server ({})...",
+      server.url
+    );
+  }
+  let api = client::human_client(server).await?;
+  let payload = match &name {
+    Some(n) => json!({ "name": n }),
+    None => json!({}),
+  };
+  let data = api
+    .request(Method::POST, "/api/v1/backups", Some(payload))
+    .await?;
+  let key = data
+    .get("key")
+    .and_then(Value::as_str)
+    .context("Backup response missing key")?;
+  let size = data.get("size").and_then(Value::as_u64).unwrap_or(0);
+
+  let local_path_saved = if let Some(out_path) = output {
+    if !json_output {
+      eprintln!(
+        "==> [2/{steps_total}] Downloading backup archive to {}...",
+        out_path.display()
+      );
+    }
+    let download_url = format!("/api/v1/backups/{key}");
+    let bytes = api.download_bytes(&download_url).await?;
+    write_private(&out_path, &bytes, false)?;
+    Some(out_path)
+  } else {
+    None
+  };
+
+  if json_output {
+    let mut out_json = data.clone();
+    if let Some(p) = &local_path_saved {
+      out_json["localPath"] = json!(p);
+    }
+    print_value(true, &out_json);
+  } else {
+    println!();
+    println!("Backup Completed Successfully");
+    println!("  Filename: {}", key);
+    println!("  Size:     {}", format_bytes(size));
+    println!("  Server:   {} (~/.dopbase/backups/{})", server.url, key);
+    if let Some(p) = &local_path_saved {
+      println!("  Saved To: {}", p.display());
+    }
+    println!("  Status:   Ready");
+    println!();
+    println!(
+      "  Notice: This backup is encrypted with this instance's master key (~/.dopbase/master.key)."
+    );
+    println!(
+      "          Restoring on a different server requires both this .dop file and the master key."
+    );
+  }
+
+  Ok(0)
+}
+
+async fn restore(
+  server: &local_config::ResolvedServer,
+  path: PathBuf,
+  key_input: Option<String>,
+  setup_token: Option<String>,
+  yes: bool,
+  json_output: bool,
+) -> Result<i32> {
+  if !path.exists() {
+    bail!("Backup file not found: {}", path.display());
+  }
+  let file_name = path
+    .file_name()
+    .and_then(|s| s.to_str())
+    .unwrap_or("backup.dop");
+
+  if !file_name.ends_with(".dop") {
+    bail!("Invalid backup file: must have a .dop extension");
+  }
+
+  ensure_server_is_connected(server, "restore").await?;
+
+  let master_key_bytes = if let Some(k) = key_input {
+    let p = Path::new(&k);
+    let raw = if p.exists() {
+      std::fs::read(p)
+        .with_context(|| format!("Failed to read master key file: {}", p.display()))?
+    } else {
+      k.into_bytes()
+    };
+    Some(crate::services::crypto::parse_master_key(&raw)?)
+  } else {
+    None
+  };
+
+  let bytes = std::fs::read(&path)
+    .with_context(|| format!("Failed to read backup file: {}", path.display()))?;
+
+  let anon_client = ApiClient::new(server, None)?;
+  let status_res = anon_client
+    .request(Method::GET, "/api/v1/bootstrap/status", None)
+    .await?;
+
+  let state = status_res
+    .get("state")
+    .and_then(Value::as_str)
+    .unwrap_or("ready");
+
+  if !yes {
+    eprintln!("WARNING: Restoring will overwrite existing projects, environments, and secrets.");
+    confirm(
+      &format!("Proceed with restoring from \"{}\"?", path.display()),
+      yes,
+    )?;
+  }
+
+  if state == "setupRequired" {
+    if !json_output {
+      eprintln!(
+        "==> [1/2] Connecting to uninitialized Dopbase server at {}...",
+        server.url
+      );
+      eprintln!("==> [2/2] Restoring system snapshot and initializing instance...");
+    }
+    let setup_token = setup_token
+      .as_deref()
+      .context("--setup-token is required when restoring an uninitialized server")?;
+    let res = anon_client
+      .upload_bootstrap_multipart(
+        "/api/v1/bootstrap/restore",
+        file_name,
+        bytes,
+        master_key_bytes,
+        setup_token,
+      )
+      .await?;
+
+    if json_output {
+      print_value(true, &res);
+    } else {
+      println!();
+      println!("Restore Completed Successfully");
+      println!("  Source:   {}", path.display());
+      println!("  Server:   {} (Initialized)", server.url);
+      println!("  Sign in:  {}/login", server.url);
+      println!("  Status:   Ready");
+    }
+  } else {
+    if !json_output {
+      eprintln!("==> [1/3] Authenticating administrator session...");
+    }
+    let auth_client = client::password_confirmed_human_client(server).await?;
+
+    if !json_output {
+      eprintln!("==> [2/3] Uploading backup snapshot to server...");
+    }
+    let upload_res = auth_client
+      .upload_backup_multipart(
+        "/api/v1/backups/upload",
+        file_name,
+        bytes,
+        master_key_bytes.clone(),
+      )
+      .await?;
+    let key = upload_res
+      .get("key")
+      .and_then(Value::as_str)
+      .context("Uploaded backup missing key")?;
+
+    if !json_output {
+      eprintln!("==> [3/3] Restoring database tables and running migrations...");
+    }
+    let restore_url = format!("/api/v1/backups/{key}/restore");
+    let restore_body = master_key_bytes
+      .as_ref()
+      .map(|k| serde_json::json!({ "master_key": hex::encode(k) }));
+    let restore_res = auth_client
+      .request(Method::POST, &restore_url, restore_body)
+      .await?;
+
+    if json_output {
+      print_value(true, &restore_res);
+    } else {
+      println!();
+      println!("Restore Completed Successfully");
+      println!("  Source:   {}", path.display());
+      println!("  Key:      {}", key);
+      println!("  Server:   {}", server.url);
+      println!("  Status:   Ready");
+    }
+  }
+
+  Ok(0)
 }

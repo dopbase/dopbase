@@ -177,6 +177,140 @@ impl ApiClient {
     self.request(Method::GET, "/api/v1/health", None).await
   }
 
+  pub async fn download_bytes(
+    &self,
+    path: &str,
+  ) -> Result<Vec<u8>> {
+    let mut request = self
+      .client
+      .request(Method::GET, format!("{}{}", self.base_url, path));
+    if let Some(token) = &self.token {
+      request = request.bearer_auth(token);
+    }
+    let response = request
+      .send()
+      .await
+      .map_err(|error| transport_error(error, &self.base_url, false))?;
+    let status = response.status();
+    if !status.is_success() {
+      let value: Value = response.json().await.unwrap_or(Value::Null);
+      let errors = value
+        .get("error")
+        .and_then(Value::as_object)
+        .map(|errors| {
+          errors
+            .iter()
+            .map(|(code, message)| {
+              format!("{code}: {}", message.as_str().unwrap_or("Download failed."))
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
+        })
+        .unwrap_or_else(|| format!("server returned {status}"));
+      bail!(errors);
+    }
+    let bytes = response.bytes().await?.to_vec();
+    Ok(bytes)
+  }
+
+  pub async fn upload_multipart(
+    &self,
+    path: &str,
+    file_name: &str,
+    bytes: Vec<u8>,
+  ) -> Result<Value> {
+    self
+      .upload_backup_multipart(path, file_name, bytes, None)
+      .await
+  }
+
+  pub async fn upload_backup_multipart(
+    &self,
+    path: &str,
+    file_name: &str,
+    bytes: Vec<u8>,
+    master_key: Option<Vec<u8>>,
+  ) -> Result<Value> {
+    self
+      .upload_backup_multipart_with_setup_token(path, file_name, bytes, master_key, None)
+      .await
+  }
+
+  pub async fn upload_bootstrap_multipart(
+    &self,
+    path: &str,
+    file_name: &str,
+    bytes: Vec<u8>,
+    master_key: Option<Vec<u8>>,
+    setup_token: &str,
+  ) -> Result<Value> {
+    self
+      .upload_backup_multipart_with_setup_token(
+        path,
+        file_name,
+        bytes,
+        master_key,
+        Some(setup_token),
+      )
+      .await
+  }
+
+  async fn upload_backup_multipart_with_setup_token(
+    &self,
+    path: &str,
+    file_name: &str,
+    bytes: Vec<u8>,
+    master_key: Option<Vec<u8>>,
+    setup_token: Option<&str>,
+  ) -> Result<Value> {
+    let part = reqwest::multipart::Part::bytes(bytes)
+      .file_name(file_name.to_string())
+      .mime_str("application/octet-stream")?;
+    let mut form = reqwest::multipart::Form::new().part("file", part);
+    if let Some(key_bytes) = master_key {
+      let key_part = reqwest::multipart::Part::bytes(key_bytes)
+        .file_name("master.key")
+        .mime_str("application/octet-stream")?;
+      form = form.part("master_key", key_part);
+    }
+    if let Some(setup_token) = setup_token {
+      form = form.text("setup_token", setup_token.to_owned());
+    }
+    let mut request = self
+      .client
+      .request(Method::POST, format!("{}{}", self.base_url, path))
+      .multipart(form);
+    if let Some(token) = &self.token {
+      request = request.bearer_auth(token);
+    }
+    let response = request
+      .send()
+      .await
+      .map_err(|error| transport_error(error, &self.base_url, false))?;
+    let status = response.status();
+    let value: Value = response
+      .json()
+      .await
+      .context("server returned an invalid JSON response")?;
+    if !status.is_success() {
+      let errors = value
+        .get("error")
+        .and_then(Value::as_object)
+        .map(|errors| {
+          errors
+            .iter()
+            .map(|(code, message)| {
+              format!("{code}: {}", message.as_str().unwrap_or("Upload failed."))
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
+        })
+        .unwrap_or_else(|| format!("server returned {status}"));
+      bail!(errors);
+    }
+    Ok(value.get("data").cloned().unwrap_or(Value::Null))
+  }
+
   pub(crate) fn credential_token(&self) -> Result<&str> {
     self
       .token

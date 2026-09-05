@@ -19,7 +19,8 @@ tokio = { version = "1", features = [
   "io-util",
 ] }
 # HTTP server / REST API
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 tower-http = { version = "0.7", features = [
   "cors",
   "limit",
@@ -51,6 +52,7 @@ directories = "6"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
+  "multipart",
 ] }
 rpassword = "7"
 # Envelope encryption (authenticated encryption)
@@ -61,6 +63,7 @@ argon2 = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
 base64 = "0.22"
+hex = "0.4"
 fs2 = "0.4"
 getrandom = "0.3"
 hkdf = "0.12"
@@ -73,6 +76,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 ulid = { version = "1", features = ["serde"] }
 zeroize = { version = "1", features = ["derive"] }
+tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30", features = ["signal", "process", "fs"] }

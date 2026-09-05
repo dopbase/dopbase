@@ -81,6 +81,18 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "run", "billing/production", "--", "printenv"],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "update"],
+    &["dopbase", "backup"],
+    &["dopbase", "backup", "my-backup"],
+    &["dopbase", "backup", "--output", "/tmp/backup.dop"],
+    &[
+      "dopbase",
+      "backup",
+      "my-backup",
+      "--output",
+      "/tmp/backup.dop",
+    ],
+    &["dopbase", "restore", "/tmp/backup.dop"],
+    &["dopbase", "restore", "/tmp/backup.dop", "--yes"],
     &["dopbase", "--json", "project", "list"],
     &["dopbase", "--data-dir", "/tmp/dopbase", "status"],
   ];

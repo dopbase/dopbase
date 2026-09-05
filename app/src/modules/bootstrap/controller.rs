@@ -70,3 +70,85 @@ pub async fn create_admin(
     ),
   )
 }
+
+/// Restore server from backup during first run
+///
+/// Restores an uninitialized instance from an encrypted backup archive (.dop).
+/// The archive must be encrypted with this server's master encryption key.
+#[utoipa::path(
+  post,
+  path = "/api/v1/bootstrap/restore",
+  tag = "bootstrap",
+  responses(
+    (status = 200, description = "Backup restored and server initialized", body = inline(HttpResponseFormat<BootstrapRestoreResponse>)),
+    (status = 400, description = "Failed to decrypt or corrupted backup", body = crate::http::ErrorBody),
+    (status = 409, description = "This instance has already been initialized", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many attempts; try again later", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn restore(
+  State(state): State<AppState>,
+  mut multipart: axum::extract::Multipart,
+) -> Result<HttpResponse<BootstrapRestoreResponse>, crate::http::HttpError> {
+  let mut file_name = None;
+  let mut file_bytes = None;
+  let mut master_key_bytes = None;
+  let mut setup_token = None;
+
+  while let Some(field) = multipart.next_field().await.map_err(|_| {
+    crate::http::HttpError::bad_request("MULTIPART_ERROR", "Failed to process multipart upload.")
+  })? {
+    match field.name() {
+      Some("file") | Some("backup") => {
+        file_name = field.file_name().map(|s| s.to_string());
+        let data = field.bytes().await.map_err(|_| {
+          crate::http::HttpError::bad_request(
+            "MULTIPART_ERROR",
+            "Failed to read uploaded file data.",
+          )
+        })?;
+        file_bytes = Some(data.to_vec());
+      }
+      Some("key") | Some("master_key") => {
+        let data = field.bytes().await.map_err(|_| {
+          crate::http::HttpError::bad_request(
+            "MULTIPART_ERROR",
+            "Failed to read uploaded master key.",
+          )
+        })?;
+        if !data.is_empty() {
+          let parsed = crate::services::crypto::parse_master_key(&data).map_err(|e| {
+            crate::http::HttpError::bad_request("INVALID_MASTER_KEY", &e.to_string())
+          })?;
+          master_key_bytes = Some(parsed);
+        }
+      }
+      Some("setup_token") | Some("setupToken") => {
+        let data = field.text().await.map_err(|_| {
+          crate::http::HttpError::bad_request("MULTIPART_ERROR", "Failed to read setup token.")
+        })?;
+        setup_token = Some(data);
+      }
+      _ => {}
+    }
+  }
+
+  let name = file_name.unwrap_or_else(|| "backup.dop".to_string());
+  let bytes = file_bytes.ok_or_else(|| {
+    crate::http::HttpError::bad_request(
+      "BACKUP_FILE_MISSING",
+      "No file provided in the restore request.",
+    )
+  })?;
+  let setup_token = setup_token.unwrap_or_default();
+
+  let response = service::restore_bootstrap(
+    &state,
+    &name,
+    &bytes,
+    &setup_token,
+    master_key_bytes.as_deref(),
+  )
+  .await?;
+  Ok(HttpResponse::ok(response, "BACKUP_RESTORED"))
+}

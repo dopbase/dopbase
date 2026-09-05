@@ -181,6 +181,44 @@ pub enum Command {
     #[arg(long, default_value_t = 10)]
     timeout: u64,
   },
+  /// Create an encrypted backup snapshot of the Dopbase instance.
+  ///
+  /// Backs up projects, environments, secrets, runner tokens, and admin
+  /// accounts into an XChaCha20-Poly1305 encrypted .dop archive. Without [name],
+  /// a timestamped name is generated automatically. Stored on the server by
+  /// default; specify -o/--output to also download and save locally.
+  ///
+  /// Example: dopbase backup
+  /// Example: dopbase backup pre-migration --output ./pre-migration.dop
+  Backup {
+    /// Optional backup name (default: dopbase_backup_<timestamp>.dop).
+    name: Option<String>,
+    /// Optional local file path to download and save the backup to.
+    #[arg(short, long, value_name = "FILE")]
+    output: Option<PathBuf>,
+  },
+  /// Restore the instance from an encrypted .dop backup file.
+  ///
+  /// Restores all projects, environments, secrets, runner tokens, and admin
+  /// accounts from the specified backup. If the server is uninitialized,
+  /// completes bootstrap restoration. If already initialized, requires
+  /// confirmation and administrator credentials.
+  ///
+  /// Example: dopbase restore ./backup.dop
+  /// Example: dopbase restore ./backup.dop --setup-token dbs_... --yes
+  Restore {
+    /// Path to the .dop backup file to restore.
+    path: PathBuf,
+    /// Master key file path or 64-character hex string (required when restoring onto a new server).
+    #[arg(short, long, value_name = "KEY")]
+    key: Option<String>,
+    /// Setup token printed by the target server when restoring an uninitialized instance.
+    #[arg(long, value_name = "TOKEN")]
+    setup_token: Option<String>,
+    /// Skip confirmation prompt.
+    #[arg(long)]
+    yes: bool,
+  },
 }
 
 #[derive(Args, Debug, Default)]
