@@ -27,13 +27,15 @@ commands. CLI changes appear in the UI.
 | [Import and export](./import-export)                 | Move secrets between a `.env` file and an environment                            |
 | [Backups and restoration](./backups)                 | Create and restore full encrypted server snapshots (`.dop` archives)             |
 | [Audit and instance status](./audit-instance)        | Read the audit log and check server health                                       |
+| [Users and AI agents](./users) | Manage human roles and create AI service accounts |
 
 ## Who can sign in
 
-v0.0.14 supports exactly one human administrator. The first person to reach an
-uninitialized server claims it with the setup token printed at startup. After
-that, only that administrator signs in. Machine work uses environment-scoped
-runner tokens instead; see [identity and tokens](/reference/identity).
+The unreleased role update supports root, admin, and member sign-in. Setup
+creates the protected root; root and admin create additional users from Users.
+AI agents authenticate through service-account tokens. Applications use
+environment-scoped runner tokens to retrieve values. See
+[identity and tokens](/reference/identity) for the permission matrix.
 
 ## Where the UI fits
 

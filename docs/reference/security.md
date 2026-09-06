@@ -14,6 +14,9 @@ review possible, but it is not the same as an independent security audit.
 
 ## Security goals
 
+See [identity and tokens](/reference/identity#permission-model) for the
+permissions available to each role.
+
 - Encrypt secret values before persistence.
 - Keep the master encryption key outside the secrets database.
 - Use authenticated encryption so modified ciphertext is detected.

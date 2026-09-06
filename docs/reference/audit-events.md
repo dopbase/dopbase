@@ -23,6 +23,10 @@ The API schema defines the event names used by this release.
 
 ## Record contents
 
+The upcoming account update also records user creation, updates and deletion,
+AI account creation and deletion, and AI token creation and revocation.
+Root and admin can review this history in the Audit page.
+
 An audit record may contain:
 
 ```text

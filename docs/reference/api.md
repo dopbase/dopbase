@@ -6,16 +6,16 @@ description: "Dopbase exposes a versioned REST API with a generated OpenAPI 3 sp
 # REST API
 
 Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.
-The generated OpenAPI 3 specification is available from a running server:
+Enable API documentation with `dopbase serve --docs`. The generated OpenAPI 3
+specification is then available from the running server:
 
 ```text
 OpenAPI JSON: http://localhost:8840/api/v1/openapi.json
 Swagger UI:   http://localhost:8840/api/docs
 ```
 
-The Rust request and response types are the source of truth. Every Axum route
-is registered in the generated specification and checked by an API contract
-test.
+Use the documentation on your running server to explore the API available
+in your installed version.
 
 ## Resource areas
 
@@ -30,6 +30,9 @@ test.
 | Runner tokens                               | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration              | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit and instance status                   | `/api/v1/audit-events`, `/api/v1/instance`           |
+| Human users | `/api/v1/users` |
+| AI service accounts | `/api/v1/service-accounts` |
+| Instance summary | `/api/v1/status` |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
 the responses supported by each operation.
@@ -70,12 +73,17 @@ details.
 
 - Browser sessions use an HttpOnly, SameSite Strict cookie and require the
   server-issued `X-Dopbase-CSRF` header for mutations.
-- CLI sessions and runner identities use `Authorization: Bearer <token>`.
+- CLI sessions, runner identities, and AI service accounts use `Authorization: Bearer <token>`.
 - A runner token can retrieve runtime secrets only from its assigned
   environment. It cannot list metadata, mutate secrets, reveal, or export.
 
 The OpenAPI document declares the `cookieAuth`, `bearerAuth`, and `csrfHeader`
 security schemes.
+
+Account and agent-token administration requires a root/admin browser session;
+CLI bearer sessions cannot administer accounts. AI bearer tokens may only read
+metadata and [instance status](/ui/audit-instance#instance-status). See
+[identity and tokens](/reference/identity) for the complete role matrix.
 
 ## Compatibility
 
