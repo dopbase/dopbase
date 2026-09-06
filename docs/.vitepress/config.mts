@@ -158,6 +158,7 @@ const config = defineConfig({
       include: ["mermaid", "fastdom"],
     },
     build: {
+      chunkSizeWarningLimit: 800,
       rolldownOptions: {
         output: {
           assetFileNames,
