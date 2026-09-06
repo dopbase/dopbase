@@ -12,6 +12,8 @@
     "typecheck:native": "tsc -b --incremental false",
     "typecheck:vue": "vue-tsc -b",
     "typecheck": "bun run typecheck:native && bun run typecheck:vue",
+    "lint": "bunx eslint src tests",
+    "test:run": "bunx vitest run --configLoader runner",
     "build": "bun run typecheck && vite build",
     "build:bin": "cargo build --manifest-path app/Cargo.toml --release",
     "build:all": "bun run build && bun run build:bin",
