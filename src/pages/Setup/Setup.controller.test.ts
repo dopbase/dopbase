@@ -5,10 +5,12 @@ import * as bootstrapApi from "~/services/bootstrap.api";
 import { ApiError } from "~/services/http.client";
 
 const routerPush = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
+const routeQuery = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: routerPush }),
-  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace }),
+  useRoute: () => ({ query: routeQuery }),
 }));
 
 vi.mock("~/services/bootstrap.api");
@@ -30,9 +32,26 @@ function fill(c: ReturnType<typeof useSetupController>): void {
 beforeEach(() => {
   setActivePinia(createPinia());
   routerPush.mockReset();
+  routerReplace.mockReset();
+  for (const key of Object.keys(routeQuery)) delete routeQuery[key];
 });
 
 describe("useSetupController", () => {
+  it("pre-fills the setup token from the ?token= query and strips it from the URL", () => {
+    routeQuery.token = "setup_first-run-token";
+    routeQuery.other = "kept";
+    const c = useSetupController();
+    expect(c.setupToken.value).toBe("setup_first-run-token");
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith({ query: { other: "kept" } });
+  });
+
+  it("ignores a missing or non-string token query param", () => {
+    routeQuery.token = ["setup_array"];
+    const c = useSetupController();
+    expect(c.setupToken.value).toBe("");
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
   it("blocks empty submissions with field errors", async () => {
     const c = useSetupController();
     await c.submit();

@@ -1,11 +1,16 @@
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "~/services/http.client";
 import { bootstrapRestore } from "~/services/bootstrap.api";
 import { useAuthStore } from "~/stores/auth.store";
+import {
+  isValidEmail,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  validatePasswordLength,
+} from "~/utils/validation";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const MIN_PASSWORD_LENGTH = 12;
+export { MIN_PASSWORD_LENGTH } from "~/utils/validation";
 
 export type SetupMode = "setup" | "restore";
 
@@ -16,6 +21,7 @@ export type SetupMode = "setup" | "restore";
  */
 export function useSetupController() {
   const router = useRouter();
+  const route = useRoute();
   const auth = useAuthStore();
 
   const mode = ref<SetupMode>("setup");
@@ -47,6 +53,16 @@ export function useSetupController() {
       confirmPassword.value === "" || password.value === confirmPassword.value,
   );
 
+  // Pre-fill the token from `?token=setup_...` (the server prints a one-click
+  // setup link on first run), then strip the secret from the address bar.
+  const tokenParam = route.query.token;
+  if (typeof tokenParam === "string" && tokenParam.trim() !== "") {
+    setupToken.value = tokenParam.trim();
+    const query = { ...route.query };
+    delete query.token;
+    void router.replace({ query });
+  }
+
   function validate(): boolean {
     const errors: typeof fieldErrors.value = {};
     if (setupToken.value.trim() === "") {
@@ -54,13 +70,14 @@ export function useSetupController() {
     }
     if (email.value.trim() === "") {
       errors.email = "Enter an email address.";
-    } else if (!EMAIL_PATTERN.test(email.value.trim())) {
+    } else if (!isValidEmail(email.value)) {
       errors.email = "Enter a valid email address.";
     }
-    if (password.value.length < MIN_PASSWORD_LENGTH) {
+    const passwordResult = validatePasswordLength(password.value);
+    if (passwordResult.code === "PASSWORD_TOO_SHORT") {
       errors.password = `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
-    } else if (password.value.length > 128) {
-      errors.password = "Use at most 128 characters.";
+    } else if (passwordResult.code === "PASSWORD_TOO_LONG") {
+      errors.password = `Use at most ${MAX_PASSWORD_LENGTH} characters.`;
     }
     if (confirmPassword.value !== password.value) {
       errors.confirmPassword = "Passwords do not match.";
