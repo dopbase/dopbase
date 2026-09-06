@@ -44,6 +44,18 @@ and [role permissions](./docs/reference/identity.md) for how access works.
 Version 0.1.0 starts with a fresh data directory; databases and backups from
 earlier releases are not supported.
 
+## How it works
+
+One executable carries the server and the client. The client authenticates,
+fetches one environment, and injects its secrets straight into your application
+process no shared `.env` file in the runtime.
+
+<p align="center">
+  <img src="./assets/how-it-works.svg" alt="How Dopbase works: the client authenticates with the server, fetches one environment, and injects its secrets into an isolated application process, while the server keeps encrypted secrets and an audit history" width="100%" />
+</p>
+
+See [server and client](./docs/guide/server-client.md) for the full walkthrough.
+
 ## Repository layout
 
 | Path         | Purpose                                   | Current state                 |

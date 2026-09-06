@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+      viewBox="0 0 1280 576"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-labelledby="dopbase-how-it-works-2d-title dopbase-how-it-works-2d-desc">
+      <title id="dopbase-how-it-works-2d-title">How Dopbase works</title>
+      <desc id="dopbase-how-it-works-2d-desc">
+        A developer runs the Dopbase client, which authenticates with the
+        Dopbase server, fetches one environment, and injects its secrets into an
+        isolated application process. The server keeps encrypted secrets and an
+        audit history, while shared environment files stay outside the runtime.
+      </desc>
+      <defs>
+        <linearGradient id="dopbase-heading-rule" x1="0" y1="0" x2="1" y2="0">
+          <stop stop-color="#a87cff" />
+          <stop offset="1" stop-color="#66d0ff" />
+        </linearGradient>
+        <marker
+          id="dopbase-arrow"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto">
+          <path d="M0 0L8 4L0 8Z" fill="#b8b1c2" />
+        </marker>
+        <marker
+          id="dopbase-arrow-accent"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto">
+          <path d="M0 0L8 4L0 8Z" fill="#a87cff" />
+        </marker>
+        <marker
+          id="dopbase-arrow-link"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto">
+          <path d="M0 0L8 4L0 8Z" fill="#66d0ff" />
+        </marker>
+        <style>
+          @font-face {
+            font-family: "IBM Plex Sans Variable";
+            font-style: normal;
+            font-weight: 100 700;
+            src: url("../fonts/ibm-plex-sans-latin-wght-normal.woff2")
+              format("woff2-variations");
+          }
+          @font-face {
+            font-family: "Fira Code Variable";
+            font-style: normal;
+            font-weight: 300 700;
+            src: url("../fonts/fira-code-latin-wght-normal.woff2")
+              format("woff2-variations");
+          }
+          .sans {
+            font-family: "IBM Plex Sans Variable", system-ui, sans-serif;
+          }
+          .mono {
+            font-family: "Fira Code Variable", ui-monospace, monospace;
+          }
+          .zone-label {
+            fill: #8f879a;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+          }
+          .node-title {
+            fill: #f5f2f8;
+            font-size: 20px;
+            font-weight: 600;
+          }
+          .node-copy {
+            fill: #b8b1c2;
+            font-size: 12px;
+          }
+          .tag {
+            fill: #c3a7ff;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+          }
+          .flow-label {
+            fill: #d8d2df;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+          }
+        </style>
+      </defs>
+
+      <rect width="1280" height="720" fill="#0b0910" />
+      <!-- The figure begins directly with the three trust zones. -->
+      <g transform="translate(0 -128)">
+        <!-- Trust zones -->
+        <rect
+          x="48"
+          y="192"
+          width="420"
+          height="344"
+          rx="8"
+          fill="#14111c"
+          stroke="#3b3448" />
+        <rect x="64" y="184" width="132" height="24" rx="4" fill="#0b0910" />
+        <text x="76" y="200" class="mono zone-label">WORKSTATION</text>
+
+        <rect
+          x="500"
+          y="192"
+          width="360"
+          height="344"
+          rx="8"
+          fill="#14111c"
+          stroke="#51475f"
+          stroke-dasharray="4 4" />
+        <rect x="516" y="184" width="148" height="24" rx="4" fill="#0b0910" />
+        <text x="528" y="200" class="mono zone-label">DOPBASE SERVER</text>
+
+        <rect
+          x="892"
+          y="192"
+          width="340"
+          height="344"
+          rx="8"
+          fill="#14111c"
+          stroke="#3b3448" />
+        <rect x="908" y="184" width="164" height="24" rx="4" fill="#0b0910" />
+        <text x="920" y="200" class="mono zone-label">APPLICATION RUNTIME</text>
+
+        <!-- Connectors are drawn before nodes -->
+        <line
+          x1="240"
+          y1="320"
+          x2="280"
+          y2="320"
+          stroke="#b8b1c2"
+          stroke-width="2"
+          marker-end="url(#dopbase-arrow)" />
+        <line
+          x1="448"
+          y1="280"
+          x2="468"
+          y2="280"
+          stroke="#66d0ff"
+          stroke-width="2" />
+        <line
+          x1="500"
+          y1="280"
+          x2="532"
+          y2="280"
+          stroke="#66d0ff"
+          stroke-width="2"
+          marker-end="url(#dopbase-arrow-link)" />
+        <line
+          x1="532"
+          y1="360"
+          x2="448"
+          y2="360"
+          stroke="#b8b1c2"
+          stroke-width="2"
+          stroke-dasharray="8 8"
+          marker-end="url(#dopbase-arrow)" />
+        <line
+          x1="600"
+          y1="384"
+          x2="600"
+          y2="420"
+          stroke="#b8b1c2"
+          stroke-width="2"
+          marker-end="url(#dopbase-arrow)" />
+        <line
+          x1="760"
+          y1="384"
+          x2="760"
+          y2="420"
+          stroke="#b8b1c2"
+          stroke-width="2"
+          stroke-dasharray="8 8"
+          marker-end="url(#dopbase-arrow)" />
+        <path
+          d="M360 384V528Q360 552 384 552H1036Q1060 552 1060 528V384"
+          fill="none"
+          stroke="#a87cff"
+          stroke-width="3"
+          marker-end="url(#dopbase-arrow-accent)" />
+        <line
+          x1="776"
+          y1="608"
+          x2="876"
+          y2="608"
+          stroke="#ff8496"
+          stroke-width="2"
+          stroke-dasharray="8 8" />
+        <line
+          x1="884"
+          y1="596"
+          x2="884"
+          y2="620"
+          stroke="#ff8496"
+          stroke-width="4" />
+
+        <!-- Connector labels -->
+        <rect x="460" y="244" width="48" height="16" rx="4" fill="#0b0910" />
+        <text x="484" y="256" class="mono flow-label" text-anchor="middle">
+          FETCH
+        </text>
+        <rect x="456" y="336" width="56" height="16" rx="4" fill="#0b0910" />
+        <text x="484" y="348" class="mono flow-label" text-anchor="middle">
+          SECRETS
+        </text>
+        <rect x="626" y="520" width="168" height="16" rx="4" fill="#0b0910" />
+        <text x="710" y="532" class="sans flow-label" text-anchor="middle">
+          INJECT SECRETS INTO APP
+        </text>
+        <rect x="792" y="576" width="76" height="16" rx="4" fill="#0b0910" />
+        <text
+          x="830"
+          y="588"
+          class="mono"
+          fill="#ff8496"
+          font-size="12"
+          font-weight="600"
+          text-anchor="middle">
+          NO BYPASS
+        </text>
+
+        <!-- Privileged gate -->
+        <circle
+          cx="484"
+          cy="280"
+          r="16"
+          fill="#241c33"
+          stroke="#66d0ff"
+          stroke-width="2" />
+        <path
+          d="M478 280V276A6 6 0 0 1 490 276V280M476 280H492V292H476Z"
+          fill="none"
+          stroke="#66d0ff"
+          stroke-width="2"
+          stroke-linejoin="round" />
+
+        <!-- Workstation nodes -->
+        <rect
+          x="80"
+          y="256"
+          width="160"
+          height="128"
+          rx="8"
+          fill="#181420"
+          stroke="#6b6078" />
+        <rect x="92" y="268" width="44" height="20" rx="4" fill="#241c33" />
+        <text x="114" y="282" class="mono tag" text-anchor="middle">YOU</text>
+        <text x="160" y="328" class="sans node-title" text-anchor="middle">
+          Developer
+        </text>
+        <text x="160" y="356" class="mono node-copy" text-anchor="middle">
+          terminal
+        </text>
+
+        <rect
+          x="280"
+          y="256"
+          width="160"
+          height="128"
+          rx="8"
+          fill="#241c33"
+          stroke="#a87cff"
+          stroke-width="2" />
+        <rect x="292" y="268" width="72" height="20" rx="4" fill="#34274a" />
+        <text x="328" y="282" class="mono tag" text-anchor="middle">
+          01 RUN
+        </text>
+        <text x="360" y="320" class="sans node-title" text-anchor="middle">
+          Dopbase CLI
+        </text>
+        <text x="360" y="348" class="mono node-copy" text-anchor="middle">
+          dopbase run
+        </text>
+
+        <!-- Server nodes -->
+        <rect
+          x="532"
+          y="256"
+          width="296"
+          height="128"
+          rx="8"
+          fill="#1b1725"
+          stroke="#6b6078" />
+        <rect x="544" y="268" width="88" height="20" rx="4" fill="#241c33" />
+        <text x="588" y="282" class="mono tag" text-anchor="middle">
+          02 FETCH
+        </text>
+        <text x="680" y="320" class="sans node-title" text-anchor="middle">
+          Dopbase server
+        </text>
+        <text x="680" y="348" class="mono node-copy" text-anchor="middle">
+          API + Admin UI
+        </text>
+
+        <rect
+          x="532"
+          y="420"
+          width="136"
+          height="88"
+          rx="8"
+          fill="#181420"
+          stroke="#6b6078" />
+        <text
+          x="600"
+          y="456"
+          class="sans"
+          fill="#f5f2f8"
+          font-size="16"
+          font-weight="600"
+          text-anchor="middle">
+          Encrypted store
+        </text>
+        <text x="600" y="480" class="mono node-copy" text-anchor="middle">
+          SQLite at rest
+        </text>
+
+        <rect
+          x="692"
+          y="420"
+          width="136"
+          height="88"
+          rx="8"
+          fill="#181420"
+          stroke="#6b6078" />
+        <text
+          x="760"
+          y="456"
+          class="sans"
+          fill="#f5f2f8"
+          font-size="16"
+          font-weight="600"
+          text-anchor="middle">
+          Audit history
+        </text>
+        <text x="760" y="480" class="mono node-copy" text-anchor="middle">
+          access + changes
+        </text>
+
+        <!-- Runtime node -->
+        <rect
+          x="924"
+          y="264"
+          width="276"
+          height="120"
+          rx="8"
+          fill="#1b1725"
+          stroke="#66d0ff"
+          stroke-width="2" />
+        <rect x="936" y="276" width="80" height="20" rx="4" fill="#142332" />
+        <text
+          x="976"
+          y="290"
+          class="mono"
+          fill="#66d0ff"
+          font-size="12"
+          font-weight="600"
+          letter-spacing="0.08em"
+          text-anchor="middle">
+          03 INJECT
+        </text>
+        <text x="1060" y="328" class="sans node-title" text-anchor="middle">
+          Your application
+        </text>
+        <text x="1060" y="356" class="mono node-copy" text-anchor="middle">
+          secrets in process memory
+        </text>
+
+        <rect
+          x="600"
+          y="580"
+          width="176"
+          height="56"
+          rx="8"
+          fill="#181420"
+          stroke="#ff8496"
+          stroke-dasharray="8 8" />
+        <text
+          x="688"
+          y="604"
+          class="sans"
+          fill="#f5f2f8"
+          font-size="16"
+          font-weight="600"
+          text-anchor="middle">
+          Shared .env file
+        </text>
+        <text
+          x="688"
+          y="624"
+          class="mono"
+          fill="#ff8496"
+          font-size="12"
+          text-anchor="middle">
+          kept out of runtime
+        </text>
+
+        <!-- Legend strip -->
+        <line x1="48" y1="660" x2="1232" y2="660" stroke="#3b3448" />
+        <text
+          x="48"
+          y="688"
+          class="mono"
+          fill="#8f879a"
+          font-size="12"
+          font-weight="600"
+          letter-spacing="0.12em">
+          FLOW
+        </text>
+        <line
+          x1="136"
+          y1="684"
+          x2="180"
+          y2="684"
+          stroke="#a87cff"
+          stroke-width="3"
+          marker-end="url(#dopbase-arrow-accent)" />
+        <text x="196" y="688" class="sans" fill="#b8b1c2" font-size="12">
+          process delivery
+        </text>
+        <line
+          x1="348"
+          y1="684"
+          x2="392"
+          y2="684"
+          stroke="#b8b1c2"
+          stroke-width="2"
+          stroke-dasharray="8 8"
+          marker-end="url(#dopbase-arrow)" />
+        <text x="408" y="688" class="sans" fill="#b8b1c2" font-size="12">
+          read or record
+        </text>
+        <line
+          x1="548"
+          y1="684"
+          x2="584"
+          y2="684"
+          stroke="#ff8496"
+          stroke-width="2"
+          stroke-dasharray="8 8" />
+        <line
+          x1="592"
+          y1="676"
+          x2="592"
+          y2="692"
+          stroke="#ff8496"
+          stroke-width="4" />
+        <text x="608" y="688" class="sans" fill="#b8b1c2" font-size="12">
+          blocked path
+        </text>
+        <text
+          x="1232"
+          y="688"
+          class="mono"
+          fill="#8f879a"
+          font-size="12"
+          text-anchor="end">
+          PROJECT / ENVIRONMENT / SECRETS
+        </text>
+      </g>
+    </svg>
