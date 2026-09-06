@@ -9,7 +9,7 @@ import DbSpinner from "./DbSpinner.vue";
 const props = withDefaults(
   defineProps<{
     variant?: "primary" | "secondary" | "ghost" | "danger";
-    size?: "sm" | "md";
+    size?: "sm" | "md" | "lg";
     type?: "button" | "submit";
     disabled?: boolean;
     loading?: boolean;
@@ -20,26 +20,37 @@ const props = withDefaults(
 const variantClasses = computed(() => {
   switch (props.variant) {
     case "primary":
-      return "bg-accent text-white hover:bg-accent-strong border border-transparent";
+      // Solid brand fill; hover/active lighten the base (PocketBase's
+      // alt-color convention) instead of swapping to a different hue.
+      return "bg-accent text-white hover:bg-accent-alt1 active:bg-accent-alt2";
     case "ghost":
-      return "bg-transparent text-ink hover:bg-raised hover:text-ink-strong border border-transparent";
+      return "bg-transparent text-ink hover:bg-raised hover:text-ink-strong active:bg-line-strong";
     case "danger":
-      return "bg-crit/10 text-crit border border-crit/40 hover:bg-crit/20";
+      // Solid destructive fill (PocketBase's danger button).
+      return "bg-crit text-white hover:bg-crit-alt1 active:bg-crit-alt2";
     default:
-      return "bg-raised text-ink-strong border border-line hover:border-ink-faint";
+      // Secondary: filled surface, no border (PocketBase's secondary).
+      return "bg-raised text-ink-strong hover:bg-line active:bg-line-strong";
   }
 });
 
-const sizeClasses = computed(() =>
-  props.size === "sm" ? "h-8 px-3 text-xs gap-1.5" : "h-9 px-4 text-sm gap-2",
-);
+const sizeClasses = computed(() => {
+  switch (props.size) {
+    case "sm":
+      return "h-8 gap-1.5 px-3 text-xs";
+    case "lg":
+      return "h-11 gap-2 px-6 text-sm";
+    default:
+      return "h-10 gap-2 px-5 text-sm";
+  }
+});
 </script>
 
 <template>
   <button
     :type="type"
     :disabled="disabled || loading"
-    class="inline-flex cursor-pointer items-center justify-center rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50"
+    class="inline-flex cursor-pointer select-none items-center justify-center rounded-control font-semibold transition-colors duration-150 active:duration-75 disabled:pointer-events-none disabled:opacity-50"
     :class="[variantClasses, sizeClasses]">
     <DbSpinner v-if="loading" class="h-3.5 w-3.5" />
     <slot />
