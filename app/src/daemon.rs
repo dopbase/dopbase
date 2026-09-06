@@ -254,7 +254,10 @@ pub(crate) async fn start(
     );
   }
   if let Some(token) = &started.setup_token {
-    eprintln!("\nDopbase setup token (shown once):\n{token}\n");
+    eprintln!(
+      "{}",
+      crate::server::setup_token_message(&config.public_url, token)
+    );
   }
   let stop_command = format!("dopbase --data-dir {} stop", data_dir.display());
   if json_output {
@@ -501,10 +504,16 @@ pub async fn stop(
   json_output: bool,
 ) -> Result<i32> {
   let stopped = stop_managed(data_dir, grace).await?;
-  print_value(
-    json_output,
-    &serde_json::json!({"stopped": true, "pid": stopped.pid, "forced": stopped.forced}),
-  );
+  if json_output {
+    print_value(
+      true,
+      &serde_json::json!({"stopped": true, "pid": stopped.pid, "forced": stopped.forced}),
+    );
+  } else if stopped.forced {
+    println!("Dopbase server stopped forcefully.");
+  } else {
+    println!("Dopbase server stopped successfully.");
+  }
   Ok(0)
 }
 

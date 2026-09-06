@@ -8,8 +8,9 @@ use anyhow::{Context, Result};
 use axum::{
   Router,
   extract::DefaultBodyLimit,
-  http::{HeaderName, StatusCode, Uri},
+  http::{HeaderName, Request, StatusCode, Uri},
   middleware,
+  middleware::Next,
   response::{IntoResponse, Response},
 };
 use fs2::FileExt;
@@ -41,6 +42,44 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
   let crypto = CryptoService::initialize(db.pool(), &config.master_key.path)
     .await
     .context("failed to initialize master key")?;
+  let reset_marker = config.data_dir.join(".factory-reset.pending");
+  if reset_marker.exists() {
+    // A reset marker is durable intent. Re-run the database phase on startup
+    // so a process crash cannot leave a partially reset instance usable.
+    let mut tx = db.pool().begin().await?;
+    for table in [
+      "audit_events",
+      "runner_tokens",
+      "agent_tokens",
+      "secrets",
+      "environment_env_layout",
+      "environments",
+      "projects",
+      "sessions",
+      "service_accounts",
+      "admins",
+    ] {
+      sqlx::query(&format!("DELETE FROM {table}"))
+        .execute(&mut *tx)
+        .await
+        .with_context(|| format!("failed to resume factory reset for {table}"))?;
+    }
+    tx.commit()
+      .await
+      .context("failed to commit resumed factory reset")?;
+    let backup_dir = config.data_dir.join("backups");
+    if let Ok(entries) = std::fs::read_dir(&backup_dir) {
+      for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "dop") {
+          std::fs::remove_file(&path)
+            .with_context(|| format!("failed to remove reset backup {}", path.display()))?;
+        }
+      }
+    }
+    std::fs::remove_file(&reset_marker)
+      .with_context(|| format!("failed to clear reset marker {}", reset_marker.display()))?;
+  }
   let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
     .fetch_one(db.pool())
     .await?;
@@ -55,6 +94,8 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
     crypto,
     setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
+    maintenance: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+    started_at: std::time::Instant::now(),
   })
 }
 
@@ -89,7 +130,33 @@ pub fn router(state: AppState) -> Router {
     .layer(PropagateRequestIdLayer::new(request_id.clone()))
     .layer(SetRequestIdLayer::new(request_id, MakeRequestUuid))
     .layer(middleware::map_response(normalize_error_response))
+    .layer(middleware::from_fn_with_state(
+      state.clone(),
+      maintenance_gate,
+    ))
     .with_state(state)
+}
+
+async fn maintenance_gate(
+  axum::extract::State(state): axum::extract::State<AppState>,
+  request: Request<axum::body::Body>,
+  next: Next,
+) -> Response {
+  if state.maintenance.load(std::sync::atomic::Ordering::SeqCst)
+    && request.uri().path().starts_with("/api/")
+    && !request
+      .uri()
+      .path()
+      .starts_with("/api/v1/instance/factory-reset")
+  {
+    return HttpError::new(
+      StatusCode::SERVICE_UNAVAILABLE,
+      "INSTANCE_RESETTING",
+      "The instance is being reset. Please try again shortly.",
+    )
+    .into_response();
+  }
+  next.run(request).await
 }
 
 async fn normalize_error_response(response: Response) -> Response {
@@ -144,20 +211,20 @@ pub fn startup_banner(
   if docs_enabled {
     rows.push(format!("Swagger:    {public_url}/api/docs"));
   }
-  let width = rows
-    .iter()
-    .map(|row| row.chars().count())
-    .max()
-    .unwrap_or(0)
-    .max(62);
-  let border = "─".repeat(width + 4);
-  let mut lines = Vec::with_capacity(rows.len() + 2);
-  lines.push(format!("╭{border}╮"));
-  for row in rows {
-    lines.push(format!("│  {row:<width$}  │"));
-  }
-  lines.push(format!("╰{border}╯"));
-  lines.join("\n")
+  rows.join("\n")
+}
+
+/// Formats the one-time setup token message shown on first run, including a
+/// one-click link that pre-fills the token input in the Admin UI. The token is
+/// appended to the URL fragment-free query so the browser can auto-fill it.
+pub fn setup_token_message(
+  public_url: &str,
+  token: &str,
+) -> String {
+  let base = public_url.trim_end_matches('/');
+  format!(
+    "\nDopbase setup token (shown once):\n{token}\n\nOr open this link to fill it in automatically:\n{base}/setup?token={token}\n"
+  )
 }
 
 /// Run the server, optionally reporting readiness (or the startup failure) to
@@ -199,7 +266,7 @@ pub async fn serve_with_ready(
     )
   );
   if let Some(setup) = setup_token.as_deref() {
-    eprintln!("\nDopbase setup token (shown once):\n{setup}\n");
+    eprintln!("{}", setup_token_message(public_url, setup));
   }
   tracing::info!(%address,"Dopbase server started");
   let serve_result = axum::serve(listener, router(state.clone()))
