@@ -2,7 +2,7 @@
 
 set -eu
 
-root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/dopbase-installer-test.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 real_curl=$(command -v curl)
@@ -14,9 +14,13 @@ legacy_release_dir="${repository_dir}/releases/download/v0.0.12"
 install_dir="${test_dir}/install"
 mkdir -p "$mock_bin" "$release_dir" "$legacy_release_dir" "$install_dir"
 
+# The variable references are intentionally literal: this writes a mock script.
+# shellcheck disable=SC2016
 printf '%s\n' '#!/bin/sh' 'case "$1" in' '  -s) printf "%s\\n" "${TEST_UNAME_S}" ;;' '  -m) printf "%s\\n" "${TEST_UNAME_M}" ;;' 'esac' >"${mock_bin}/uname"
 chmod 755 "${mock_bin}/uname"
 
+# The variable references are intentionally literal: this writes a mock script.
+# shellcheck disable=SC2016
 printf '%s\n' \
   '#!/bin/sh' \
   'case " $* " in' \

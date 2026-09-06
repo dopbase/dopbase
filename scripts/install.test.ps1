@@ -12,8 +12,8 @@ $legacyInstallDir = Join-Path $testDir "legacy-install"
 $version = "0.0.12"
 $archiveName = "dopbase_${version}_windows_amd64.zip"
 $archivePath = Join-Path $releaseDir $archiveName
-$releaseUrl = ([uri]$releaseDir).AbsoluteUri
-$legacyReleaseUrl = ([uri]$legacyReleaseDir).AbsoluteUri
+$releaseUrl = [uri]::new($releaseDir, [UriKind]::Absolute).AbsoluteUri
+$legacyReleaseUrl = [uri]::new($legacyReleaseDir, [UriKind]::Absolute).AbsoluteUri
 
 try {
   New-Item -ItemType Directory -Path $releaseDir, $legacyReleaseDir, $payloadDir, $installDir, $legacyInstallDir | Out-Null
