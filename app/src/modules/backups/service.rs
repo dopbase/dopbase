@@ -12,7 +12,7 @@ use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use super::model::*;
 use crate::{
-  extractors::{require_admin, require_recent_browser_auth},
+  extractors::{require_recent_browser_auth, require_root},
   http::HttpError,
   models::AuthIdentity,
   modules::common,
@@ -71,7 +71,7 @@ pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<Vec<BackupItem>, HttpError> {
-  require_admin(identity)?;
+  require_root(identity)?;
   let dir = backup_dir(state);
   let mut items = Vec::new();
 
@@ -115,7 +115,7 @@ pub async fn create(
   identity: &AuthIdentity,
   request: CreateBackupRequest,
 ) -> Result<BackupItem, HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_root(identity)?;
   let dir = backup_dir(state);
 
   let key = if let Some(raw_name) = request.name.filter(|n| !n.trim().is_empty()) {
@@ -223,7 +223,7 @@ pub async fn read_for_download(
   identity: &AuthIdentity,
   key: &str,
 ) -> Result<(PathBuf, u64), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_root(identity)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 
@@ -262,7 +262,7 @@ pub async fn upload(
   bytes: Vec<u8>,
   provided_master_key: Option<&[u8]>,
 ) -> Result<BackupItem, HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_root(identity)?;
 
   if bytes.len() > MAX_BACKUP_FILE_BYTES {
     return Err(HttpError::bad_request(
@@ -502,7 +502,7 @@ pub async fn restore(
   provided_master_key: Option<&[u8]>,
 ) -> Result<(), HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_root(identity)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 
@@ -715,7 +715,11 @@ pub async fn restore_database_from_archive(
 
     // Copy snapshot data from backup_db
     sqlx::query("INSERT INTO instance_metadata SELECT * FROM backup_db.instance_metadata").execute(&mut *tx).await?;
-    sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins").execute(&mut *tx).await?;
+    if preserve_admin.is_some() {
+      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins WHERE role = 'admin'").execute(&mut *tx).await?;
+    } else {
+      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins").execute(&mut *tx).await?;
+    }
     sqlx::query("INSERT OR IGNORE INTO sessions SELECT * FROM backup_db.sessions WHERE admin_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO projects SELECT * FROM backup_db.projects").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO environments SELECT * FROM backup_db.environments").execute(&mut *tx).await?;
@@ -796,6 +800,7 @@ fn session_id_from_identity(identity: &AuthIdentity) -> &str {
   match identity {
     AuthIdentity::Admin { session_id, .. } => session_id,
     AuthIdentity::Runner { .. } => "",
+    AuthIdentity::ServiceAccount { .. } => "",
   }
 }
 
@@ -804,7 +809,7 @@ pub async fn delete(
   identity: &AuthIdentity,
   key: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_root(identity)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 
