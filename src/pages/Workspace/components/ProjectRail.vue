@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import type { WorkspaceController } from "~/pages/Workspace/Workspace.controller";
 import NameDialog from "./NameDialog.vue";
-import { DbConfirmDialog, DbSpinner } from "~/components/ui";
+import { DbConfirmDialog, DbSkeleton } from "~/components/ui";
 import {
   BoxIcon,
   LayersIcon,
@@ -100,7 +100,7 @@ async function confirmEnvDelete(): Promise<void> {
       </h2>
       <button
         type="button"
-        class="cursor-pointer rounded-md border border-line bg-raised p-1 text-ink-muted transition-colors hover:border-accent/50 hover:text-ink-strong"
+        class="cursor-pointer rounded-control bg-raised p-1 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong"
         aria-label="New project"
         data-testid="new-project"
         @click="projectDialog = { mode: 'create' }">
@@ -109,7 +109,19 @@ async function confirmEnvDelete(): Promise<void> {
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-      <DbSpinner v-if="!projects" class="mx-auto mt-8 h-5 w-5 text-ink-muted" />
+      <!-- Skeleton loading projects -->
+      <div
+        v-if="!projects"
+        class="flex flex-col gap-1 px-1 py-1"
+        data-testid="projects-skeleton">
+        <div
+          v-for="i in 5"
+          :key="i"
+          class="flex items-center gap-2 rounded-control px-2 py-2">
+          <DbSkeleton class="h-3.5 w-3.5 shrink-0 rounded" />
+          <DbSkeleton class="h-3.5 w-32" />
+        </div>
+      </div>
       <p v-else-if="projectsError" class="px-2 py-4 text-xs text-crit">
         {{ projectsError }}
       </p>
@@ -117,7 +129,7 @@ async function confirmEnvDelete(): Promise<void> {
         <li v-for="project in projects" :key="project.id">
           <!-- Project row -->
           <div
-            class="group flex items-center gap-1 rounded-md px-2 py-1.5"
+            class="group flex items-center gap-1 rounded-control px-2 py-1.5"
             :class="
               isProjectActive(project) ? 'bg-raised' : 'hover:bg-raised/60'
             ">
@@ -165,7 +177,7 @@ async function confirmEnvDelete(): Promise<void> {
             class="mb-1 ml-4 flex flex-col gap-0.5 border-l border-line-soft pl-2 pt-0.5">
             <li v-for="environment in environments ?? []" :key="environment.id">
               <div
-                class="group flex items-center gap-1 rounded-md px-2 py-1.5"
+                class="group flex items-center gap-1 rounded-control px-2 py-1.5"
                 :class="
                   isEnvActive(environment)
                     ? 'bg-accent-soft'
@@ -212,8 +224,12 @@ async function confirmEnvDelete(): Promise<void> {
               </div>
             </li>
 
-            <li v-if="environmentsLoading" class="px-2 py-1.5">
-              <DbSpinner class="h-3.5 w-3.5 text-ink-faint" />
+            <li
+              v-if="environmentsLoading"
+              class="flex items-center gap-2 px-2 py-1.5"
+              data-testid="environments-skeleton">
+              <DbSkeleton class="h-3 w-3 shrink-0 rounded" />
+              <DbSkeleton class="h-3 w-20" />
             </li>
             <li
               v-else-if="environmentsError"
@@ -224,7 +240,7 @@ async function confirmEnvDelete(): Promise<void> {
             <li>
               <button
                 type="button"
-                class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 font-mono text-xs text-ink-faint transition-colors hover:bg-raised/60 hover:text-ink"
+                class="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 font-mono text-xs text-ink-faint transition-colors hover:bg-raised/60 hover:text-ink"
                 @click="envDialog = { mode: 'create' }">
                 <PlusIcon class="h-3 w-3" />
                 new environment

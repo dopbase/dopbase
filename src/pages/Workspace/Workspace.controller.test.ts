@@ -5,15 +5,21 @@ import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
 
-const { routerPush, routerReplace, routeParams } = vi.hoisted(() => ({
-  routerPush: vi.fn(),
-  routerReplace: vi.fn(),
-  routeParams: {} as Record<string, string | undefined>,
-}));
+const { routerPush, routerReplace, route } = await vi.hoisted(async () => {
+  const { reactive } = await import("vue");
+  return {
+    routerPush: vi.fn(),
+    routerReplace: vi.fn(),
+    route: reactive({
+      params: {} as Record<string, string | undefined>,
+      name: "environment",
+    }),
+  };
+});
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: routerPush, replace: routerReplace }),
-  useRoute: () => ({ params: routeParams, name: "environment" }),
+  useRoute: () => route,
 }));
 
 vi.mock("~/services/projects.api");
@@ -28,11 +34,26 @@ const project = {
   updatedAt: "2026-08-28T00:00:00Z",
 };
 
+const environment = (id: string, name: string, projectId = "prj_1") => ({
+  id,
+  projectId,
+  projectName: projectId === "prj_1" ? "app" : "other",
+  name,
+  createdAt: "",
+  updatedAt: "",
+});
+
 beforeEach(() => {
+  // Reset call history and queued one-off implementations: controllers
+  // from earlier tests leak their watchers on the shared reactive route,
+  // so stale queues would otherwise be consumed by the wrong caller.
+  vi.mocked(projectsApi.listProjects).mockReset();
+  vi.mocked(environmentsApi.listEnvironments).mockReset();
   vi.mocked(projectsApi.listProjects).mockResolvedValue([project]);
   vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([]);
-  routeParams.projectRef = undefined;
-  routeParams.environmentId = undefined;
+  route.params.projectRef = undefined;
+  route.params.environmentId = undefined;
+  route.name = "environment";
   routerPush.mockReset();
   routerReplace.mockReset();
 });
@@ -62,7 +83,7 @@ describe("useWorkspaceController", () => {
   });
 
   it("deleteProject navigates back to the workspace", async () => {
-    routeParams.projectRef = "app";
+    route.params.projectRef = "app";
     vi.mocked(projectsApi.deleteProject).mockResolvedValueOnce({
       projects: 1,
       environments: 2,
@@ -76,7 +97,7 @@ describe("useWorkspaceController", () => {
   });
 
   it("selectEnvironment puts the environment in the URL", () => {
-    routeParams.projectRef = "app";
+    route.params.projectRef = "app";
     const c = useWorkspaceController();
     c.selectEnvironment("env_1");
     expect(routerPush).toHaveBeenCalledWith({
@@ -86,7 +107,7 @@ describe("useWorkspaceController", () => {
   });
 
   it("createEnvironment navigates to the created environment", async () => {
-    routeParams.projectRef = "app";
+    route.params.projectRef = "app";
     vi.mocked(environmentsApi.createEnvironment).mockResolvedValueOnce({
       id: "env_9",
       projectId: "prj_1",
@@ -104,8 +125,8 @@ describe("useWorkspaceController", () => {
   });
 
   it("deleteEnvironment returns to the project route", async () => {
-    routeParams.projectRef = "app";
-    routeParams.environmentId = "env_1";
+    route.params.projectRef = "app";
+    route.params.environmentId = "env_1";
     vi.mocked(environmentsApi.deleteEnvironment).mockResolvedValueOnce({
       projects: 0,
       environments: 1,
@@ -140,5 +161,42 @@ describe("useWorkspaceController", () => {
       { label: "secrets", count: 2 },
       { label: "runner tokens", count: 1 },
     ]);
+  });
+
+  it("reselects the first environment when switching projects", async () => {
+    route.name = "project";
+    route.params.projectRef = "app";
+    route.params.environmentId = "env_1";
+    // Keyed by reference so leaked watchers from earlier tests (which
+    // share the reactive route mock) cannot consume the wrong response.
+    let resolveOther!: (value: ReturnType<typeof environment>[]) => void;
+    vi.mocked(environmentsApi.listEnvironments).mockImplementation(
+      (reference?: string) =>
+        reference === "app"
+          ? Promise.resolve([environment("env_1", "dev")])
+          : new Promise((resolve) => {
+              resolveOther = resolve;
+            }),
+    );
+    const c = useWorkspaceController();
+    await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
+
+    // Switch to another project whose environments load slowly: while the
+    // request is in flight the stale list must not trigger a selection.
+    route.params.projectRef = "other";
+    route.params.environmentId = undefined;
+    await vi.waitFor(() => expect(c.environments.value).toBeNull());
+    expect(routerReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "environment" }),
+    );
+
+    // Once the new list arrives, the first environment is opened.
+    resolveOther([environment("env_9", "prod", "prj_2")]);
+    await vi.waitFor(() =>
+      expect(routerReplace).toHaveBeenCalledWith({
+        name: "environment",
+        params: { projectRef: "other", environmentId: "env_9" },
+      }),
+    );
   });
 });

@@ -25,6 +25,7 @@ const props = withDefaults(
     initialName: "",
     submitLabel: "Save",
     placeholder: "e.g. payment-service",
+    hint: undefined,
   },
 );
 

@@ -6,7 +6,7 @@ import SecretsPanel from "./components/SecretsPanel.vue";
 import TokensPanel from "./components/TokensPanel.vue";
 import NameDialog from "./components/NameDialog.vue";
 import { DashboardLayout } from "~/layouts";
-import { DbButton, DbEmptyState, DbSpinner } from "~/components/ui";
+import { DbButton, DbEmptyState, DbSkeleton } from "~/components/ui";
 import { BoxIcon, FolderIcon, LayersIcon } from "~/assets/icons";
 
 /**
@@ -45,18 +45,68 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
           </DbEmptyState>
         </div>
 
-        <!-- Loading projects -->
+        <!-- Loading projects skeleton -->
         <div
           v-else-if="!projects"
-          class="flex h-full items-center justify-center p-10">
-          <DbSpinner class="h-6 w-6 text-ink-muted" />
+          class="flex flex-col"
+          data-testid="workspace-skeleton">
+          <!-- Header skeleton -->
+          <div
+            class="flex items-center justify-between border-b border-line px-6 py-4">
+            <DbSkeleton class="h-4 w-40" />
+            <DbSkeleton class="h-7 w-36 rounded-control" />
+          </div>
+          <!-- Body skeleton -->
+          <div class="p-6">
+            <div class="mb-4 flex items-center justify-between gap-4">
+              <DbSkeleton class="h-8 w-64 rounded-control" />
+              <div class="flex gap-2">
+                <DbSkeleton class="h-8 w-24 rounded-control" />
+                <DbSkeleton class="h-8 w-24 rounded-control" />
+              </div>
+            </div>
+            <div
+              class="overflow-x-auto rounded-card border border-line bg-panel">
+              <table class="min-w-full text-left text-sm">
+                <thead>
+                  <tr class="border-b border-line">
+                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-16" /></th>
+                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-16" /></th>
+                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-20" /></th>
+                    <th class="px-4 py-2.5 text-right">
+                      <DbSkeleton class="ml-auto h-3 w-16" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="i in 5"
+                    :key="i"
+                    class="border-b border-line-soft last:border-b-0">
+                    <td class="px-4 py-3"><DbSkeleton class="h-4 w-36" /></td>
+                    <td class="px-4 py-3">
+                      <DbSkeleton class="h-4 w-10 rounded-control" />
+                    </td>
+                    <td class="px-4 py-3"><DbSkeleton class="h-4 w-20" /></td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <DbSkeleton class="h-6 w-16 rounded-control" />
+                        <DbSkeleton class="h-6 w-6 rounded-control" />
+                        <DbSkeleton class="h-6 w-6 rounded-control" />
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- Project selected but has no environments -->
         <div v-else-if="project && !selectedEnvironment" class="p-10">
           <DbEmptyState
             title="No environments"
-            description="Environments hold the values a project needs in one context — development, staging, production. Create the first one to start storing secrets.">
+            description="Environments hold the values a project needs in one context development, staging, production. Create the first one to start storing secrets.">
             <template #icon>
               <LayersIcon class="h-5 w-5" />
             </template>
@@ -82,7 +132,7 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
             </nav>
 
             <div
-              class="ml-auto flex items-center gap-1 rounded-md border border-line bg-panel p-1">
+              class="ml-auto flex items-center gap-1 rounded-control border border-line bg-panel p-1">
               <button
                 type="button"
                 class="cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors"

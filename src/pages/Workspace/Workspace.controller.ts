@@ -83,6 +83,10 @@ export function useWorkspaceController() {
     environmentsRequest = request;
     environmentsLoading.value = true;
     environmentsError.value = null;
+    // Drop the previous project's list immediately: otherwise selection
+    // logic could act on a stale list while the new one is in flight and
+    // open an environment that belongs to the old project.
+    environments.value = null;
     try {
       const result = await environmentsApi.listEnvironments(
         reference,
