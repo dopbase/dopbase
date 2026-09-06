@@ -28,6 +28,10 @@ const props = withDefaults(
     confirmLabel: "Confirm",
     cancelLabel: "Cancel",
     tone: "danger",
+    description: undefined,
+    confirmWord: undefined,
+    affectedCounts: undefined,
+    error: undefined,
   },
 );
 
@@ -60,7 +64,7 @@ const confirmPrompt = computed(() =>
 
       <ul
         v-if="affectedCounts && affectedCounts.length > 0"
-        class="flex flex-col gap-1 rounded-md border border-line-soft bg-canvas px-3 py-2 font-mono text-xs text-ink-muted">
+        class="flex flex-col gap-1 rounded-control border border-line-soft bg-canvas px-3 py-2 font-mono text-xs text-ink-muted">
         <li
           v-for="item in affectedCounts"
           :key="item.label"

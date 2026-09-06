@@ -26,7 +26,7 @@ const toneClasses = computed(() => {
 
 <template>
   <div
-    class="rounded-md border px-3 py-2 text-xs leading-relaxed"
+    class="rounded-control border px-3.5 py-2.5 text-xs leading-relaxed"
     :class="toneClasses"
     role="alert">
     <slot />

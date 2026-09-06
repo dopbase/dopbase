@@ -4,7 +4,7 @@
 
 <template>
   <svg
-    class="animate-spin text-current"
+    class="h-5 w-5 animate-spin text-current"
     viewBox="0 0 24 24"
     fill="none"
     aria-hidden="true">

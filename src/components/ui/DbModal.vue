@@ -82,7 +82,7 @@ onBeforeUnmount(() => {
       <div
         ref="panel"
         :class="widthClass"
-        class="w-full rounded-[var(--radius-card)] border border-line bg-panel shadow-2xl focus:outline-none"
+        class="w-full rounded-card border border-line bg-panel shadow-2xl focus:outline-none"
         role="dialog"
         aria-modal="true"
         :aria-label="title"
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
           <button
             v-if="!persistent"
             type="button"
-            class="cursor-pointer rounded p-1 text-ink-muted transition-colors hover:bg-raised hover:text-ink-strong"
+            class="cursor-pointer rounded-control p-1 text-ink-muted transition-colors hover:bg-raised hover:text-ink-strong"
             aria-label="Close dialog"
             @click="emit('close')">
             <XIcon class="h-4 w-4" />

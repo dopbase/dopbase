@@ -11,10 +11,10 @@ defineProps<{
 
 <template>
   <div
-    class="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-dashed border-line bg-panel/50 px-8 py-14 text-center">
+    class="flex flex-col items-center justify-center gap-3 rounded-card border border-dashed border-line bg-panel/50 px-8 py-14 text-center">
     <div
       v-if="$slots.icon"
-      class="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-raised text-ink-muted">
+      class="flex h-11 w-11 items-center justify-center rounded-control border border-line bg-raised text-ink-muted">
       <slot name="icon" />
     </div>
     <h3 class="text-base font-semibold text-ink-strong">{{ title }}</h3>
