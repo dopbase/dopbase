@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { DbAlert, DbButton, DbModal } from "~/components/ui";
-import * as secretsApi from "~/services/secrets.api";
-import { serializeEnvFile } from "~/utils/env-file";
-import { useReauthentication } from "~/composable";
+import { errorMessage, isAbortError } from "~/services/api-errors";
 import { DownloadIcon } from "~/assets/icons";
 
 /**
@@ -13,16 +11,15 @@ import { DownloadIcon } from "~/assets/icons";
  */
 const props = defineProps<{
   open: boolean;
-  environmentId: string;
   environmentName: string;
   projectName: string;
+  action: (signal: AbortSignal) => Promise<string>;
 }>();
 
 const emit = defineEmits<{ close: []; exported: [] }>();
 
 const working = ref(false);
 const error = ref<string | null>(null);
-const { runWithReauth } = useReauthentication();
 let operation = new AbortController();
 
 watch(
@@ -51,7 +48,6 @@ function download(content: string, fileName: string): void {
 
 async function confirmExport(): Promise<void> {
   const target = {
-    environmentId: props.environmentId,
     environmentName: props.environmentName,
     projectName: props.projectName,
   };
@@ -59,20 +55,18 @@ async function confirmExport(): Promise<void> {
   working.value = true;
   error.value = null;
   try {
-    await runWithReauth(async () => {
-      const result = await secretsApi.exportSecrets(target.environmentId);
-      if (signal.aborted) return;
-      download(
-        serializeEnvFile(result.entries),
-        `${target.projectName}_${target.environmentName}.env`,
-      );
-    }, signal);
+    const content = await props.action(signal);
+    if (signal.aborted) return;
+    download(
+      content,
+      `${target.projectName}_${target.environmentName}.env`,
+    );
     if (signal.aborted) return;
     emit("exported");
     emit("close");
-  } catch {
-    if (signal.aborted) return;
-    error.value = "The export failed. Try again.";
+  } catch (cause) {
+    if (isAbortError(cause) || signal.aborted) return;
+    error.value = errorMessage(cause, "The export failed. Try again.");
   } finally {
     working.value = false;
   }
