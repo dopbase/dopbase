@@ -102,7 +102,7 @@ jobs:
         run: |
           set -euo pipefail
           awk -v version="${GITHUB_REF_NAME}" '
-            $0 == "## " version " -" { found=1; print; next }
+            index($0, "## " version " -") == 1 { found=1; print; next }
             found && /^## / { exit }
             found { print }
           ' CHANGELOG.md > release-notes.md
