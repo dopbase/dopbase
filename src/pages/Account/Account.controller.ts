@@ -2,8 +2,12 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
-
-export const MIN_PASSWORD_LENGTH = 12;
+import { formatDateTime, formatRelativeTime } from "~/utils/format";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  validatePasswordLength,
+} from "~/utils/validation";
 
 /**
  * Account screen controller: session display and password rotation.
@@ -28,6 +32,34 @@ export function useAccountController() {
   const submitting = ref(false);
 
   const email = computed(() => auth.session?.email ?? "");
+  const role = computed(() => auth.session?.role ?? "admin");
+  const lastLoginAt = computed(() => auth.session?.lastLoginAt ?? null);
+
+  const formattedRole = computed(() => {
+    switch (role.value) {
+      case "root":
+        return "Root Administrator";
+      case "admin":
+        return "Administrator";
+      case "member":
+        return "Member";
+      case "ai_agent":
+        return "AI Agent";
+      default:
+        return role.value;
+    }
+  });
+
+  const formattedLastLogin = computed(() => {
+    if (!lastLoginAt.value) return null;
+    return formatRelativeTime(lastLoginAt.value);
+  });
+
+  const fullLastLogin = computed(() => {
+    if (!lastLoginAt.value) return "";
+    return formatDateTime(lastLoginAt.value);
+  });
+
   const recentAuthentication = computed(
     () => auth.session?.recentAuthentication ?? false,
   );
@@ -37,10 +69,11 @@ export function useAccountController() {
     if (currentPassword.value === "") {
       errors.currentPassword = "Enter your current password.";
     }
-    if (newPassword.value.length < MIN_PASSWORD_LENGTH) {
+    const passwordResult = validatePasswordLength(newPassword.value);
+    if (passwordResult.code === "PASSWORD_TOO_SHORT") {
       errors.newPassword = `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
-    } else if (newPassword.value.length > 128) {
-      errors.newPassword = "Use at most 128 characters.";
+    } else if (passwordResult.code === "PASSWORD_TOO_LONG") {
+      errors.newPassword = `Use at most ${MAX_PASSWORD_LENGTH} characters.`;
     }
     if (confirmPassword.value !== newPassword.value) {
       errors.confirmPassword = "Passwords do not match.";
@@ -83,6 +116,11 @@ export function useAccountController() {
 
   return {
     email,
+    role,
+    formattedRole,
+    lastLoginAt,
+    formattedLastLogin,
+    fullLastLogin,
     recentAuthentication,
     currentPassword,
     newPassword,

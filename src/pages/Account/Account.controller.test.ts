@@ -78,9 +78,29 @@ describe("useAccountController", () => {
     );
   });
 
-  it("exposes the signed-in email", async () => {
+  it("exposes the signed-in email and role", async () => {
     await signIn(useAuthStore());
     const c = useAccountController();
     expect(c.email.value).toBe("a@b.c");
+    expect(c.role.value).toBe("admin");
+    expect(c.formattedRole.value).toBe("Administrator");
+  });
+
+  it("formats role and last login when present", async () => {
+    const store = useAuthStore();
+    vi.mocked(authApi.login).mockResolvedValueOnce({
+      adminId: "usr_root",
+      email: "root@example.com",
+      sessionKind: "browser",
+      token: null,
+      csrfToken: "csrf_root",
+      role: "root",
+      lastLoginAt: new Date(Date.now() - 60000).toISOString(),
+    });
+    await store.login("root@example.com", "oldpassword1");
+    const c = useAccountController();
+    expect(c.role.value).toBe("root");
+    expect(c.formattedRole.value).toBe("Root Administrator");
+    expect(c.formattedLastLogin.value).toBe("1m ago");
   });
 });
