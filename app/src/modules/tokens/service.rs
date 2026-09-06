@@ -5,7 +5,7 @@ use crate::{
     errors::TOKEN_SCOPE_INVALID,
     tokens::{RUNNER_TOKEN_ID_PREFIX, RUNNER_TOKEN_PREFIX},
   },
-  extractors::require_admin,
+  extractors::require_project_manager,
   http::HttpError,
   models::AuthIdentity,
   services::token,
@@ -17,7 +17,7 @@ pub async fn list(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<Vec<TokenMetadata>, HttpError> {
-  require_admin(identity)?;
+  require_project_manager(identity)?;
   crate::modules::environments::service::show(state, id).await?;
   Ok(repository::list(state.db.pool(), id).await?)
 }
@@ -27,7 +27,7 @@ pub async fn create(
   id: &str,
   request: CreateTokenRequest,
 ) -> Result<CreatedTokenResponse, HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   if request.role != "runner" {
     return Err(HttpError::validation(std::collections::BTreeMap::from([(
       TOKEN_SCOPE_INVALID.into(),
@@ -96,7 +96,7 @@ pub async fn revoke(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<TokenMetadata, HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let token = repository::find(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::not_found("TOKEN_NOT_FOUND", "The requested token was not found."))?;

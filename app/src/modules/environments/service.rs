@@ -26,7 +26,7 @@ pub async fn list(
   identity: &AuthIdentity,
   project: Option<&str>,
 ) -> Result<Vec<EnvironmentResponse>, HttpError> {
-  crate::extractors::require_admin(identity)?;
+  crate::extractors::require_metadata_access(identity)?;
   Ok(repository::list(state.db.pool(), project).await?)
 }
 pub async fn show(
@@ -72,7 +72,7 @@ pub async fn create(
   request: CreateEnvironmentRequest,
 ) -> Result<EnvironmentResponse, HttpError> {
   common::validate_slug(&request.name, ENVIRONMENT_NAME_INVALID, "Environment name")?;
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project = crate::modules::projects::service::show(state, project_ref).await?;
   let id = token::public_id(ENVIRONMENT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
@@ -111,7 +111,7 @@ pub async fn rename(
   request: RenameEnvironmentRequest,
 ) -> Result<EnvironmentResponse, HttpError> {
   common::validate_slug(&request.name, ENVIRONMENT_NAME_INVALID, "Environment name")?;
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let environment = show(state, id).await?;
   let mut tx = state.db.pool().begin().await?;
   let updated = sqlx::query("UPDATE environments SET name=?,updated_at=? WHERE id=?")
@@ -148,7 +148,7 @@ pub async fn delete(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<DeleteEnvironmentResponse, HttpError> {
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let environment = show(state, id).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let secrets: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id=?")

@@ -120,7 +120,7 @@ pub async fn show(
   identity: AuthIdentity,
   Path(id): Path<String>,
 ) -> Result<HttpResponse<EnvironmentResponse>, EnvironmentError> {
-  crate::extractors::require_admin(&identity)?;
+  crate::extractors::require_metadata_access(&identity)?;
   Ok(HttpResponse::ok(
     service::show(&state, &id).await?,
     "ENVIRONMENT_FETCHED",

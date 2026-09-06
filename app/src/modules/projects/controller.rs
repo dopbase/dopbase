@@ -28,7 +28,7 @@ pub async fn list(
   State(state): State<AppState>,
   identity: AuthIdentity,
 ) -> Result<HttpResponse<Vec<ProjectResponse>>, ProjectError> {
-  crate::extractors::require_admin(&identity)?;
+  crate::extractors::require_read_access(&identity)?;
   Ok(HttpResponse::ok(
     service::list(&state).await?,
     "PROJECTS_FETCHED",
@@ -120,7 +120,7 @@ pub async fn show(
   identity: AuthIdentity,
   Path(reference): Path<String>,
 ) -> Result<HttpResponse<ProjectResponse>, ProjectError> {
-  crate::extractors::require_admin(&identity)?;
+  crate::extractors::require_read_access(&identity)?;
   Ok(HttpResponse::ok(
     service::show(&state, &reference).await?,
     "PROJECT_FETCHED",

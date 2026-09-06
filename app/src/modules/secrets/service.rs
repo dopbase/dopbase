@@ -8,7 +8,7 @@ use crate::{
     },
     limits::{MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
   },
-  extractors::{require_admin, require_recent_browser_auth},
+  extractors::{require_metadata_access, require_project_manager, require_recent_browser_auth},
   http::HttpError,
   models::{AuthIdentity, SecretInput},
   state::AppState,
@@ -52,7 +52,7 @@ pub async fn list(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<Vec<SecretMetadata>, HttpError> {
-  require_admin(identity)?;
+  require_metadata_access(identity)?;
   environment(state, id).await?;
   Ok(repository::list(state.db.pool(), id).await?)
 }
@@ -62,7 +62,7 @@ pub async fn get(
   id: &str,
   key: &str,
 ) -> Result<SecretMetadata, HttpError> {
-  require_admin(identity)?;
+  require_metadata_access(identity)?;
   environment(state, id).await?;
   repository::find(state.db.pool(), id, key)
     .await?
@@ -81,7 +81,7 @@ pub async fn set(
     value: request.value,
   };
   validate_entry(&input)?;
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let env = environment(state, id).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let existing: Option<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key=?")
@@ -129,7 +129,7 @@ pub async fn delete(
   id: &str,
   key: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let env = environment(state, id).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let deleted = sqlx::query("DELETE FROM secrets WHERE environment_id=? AND key=?")
@@ -180,7 +180,7 @@ pub async fn reveal(
   key: &str,
 ) -> Result<RevealedSecret, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let env = environment(state, id).await?;
   let row = repository::find(state.db.pool(), id, key)
     .await?
@@ -257,7 +257,7 @@ pub async fn import(
   request: ImportSecretsRequest,
 ) -> Result<ImportSecretsResponse, HttpError> {
   validate_import(&request)?;
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let env = environment(state, id).await?;
   // Applying takes the SQLite write reservation before reading. This makes
   // the diff, version selection, replacement deletes, layout, and audit one
@@ -423,7 +423,7 @@ pub async fn layout(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<EnvLayoutResponse, HttpError> {
-  require_admin(identity)?;
+  require_metadata_access(identity)?;
   environment(state, id).await?;
   Ok(EnvLayoutResponse {
     layout: repository::layout(state.db.pool(), id).await?,
@@ -435,7 +435,7 @@ pub async fn export(
   id: &str,
 ) -> Result<ExportSecretsResponse, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let env = environment(state, id).await?;
   let entries = decrypt_all(state, id).await?;
   common::audit(
@@ -471,6 +471,12 @@ pub async fn runtime(
       return Err(HttpError::forbidden(
         TOKEN_SCOPE_INVALID,
         "The runner token cannot access this environment.",
+      ));
+    }
+    AuthIdentity::ServiceAccount { .. } => {
+      return Err(HttpError::forbidden(
+        crate::constants::errors::AUTHORIZATION_DENIED,
+        "AI agents may access secret metadata but never secret values.",
       ));
     }
   };

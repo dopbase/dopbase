@@ -45,7 +45,7 @@ pub async fn create(
   request: CreateProjectRequest,
 ) -> Result<ProjectResponse, HttpError> {
   common::validate_slug(&request.name, "PROJECT_NAME_INVALID", "Project name")?;
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let id = token::public_id(PROJECT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
@@ -75,7 +75,7 @@ pub async fn rename(
   request: RenameProjectRequest,
 ) -> Result<ProjectResponse, HttpError> {
   common::validate_slug(&request.name, "PROJECT_NAME_INVALID", "Project name")?;
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project = show(state, reference).await?;
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
@@ -113,7 +113,7 @@ pub async fn delete(
   identity: &AuthIdentity,
   reference: &str,
 ) -> Result<DeleteProjectResponse, HttpError> {
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project = show(state, reference).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let environments: i64 =
@@ -185,7 +185,7 @@ pub async fn init(
       ));
     }
   }
-  let (admin_id, email) = crate::extractors::require_admin(identity)?;
+  let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project_id = token::public_id(PROJECT_ID_PREFIX);
   let environment_id = token::public_id(ENVIRONMENT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
