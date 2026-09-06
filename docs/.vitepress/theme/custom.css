@@ -7,8 +7,7 @@
   --dopbase-paper: #ffffff;
   --vp-c-brand-1: var(--dopbase-violet);
   --vp-c-brand-2: #7429e8;
-  --vp-c-brand-3: #6420cc;
-  --vp-c-brand-soft: rgba(134, 59, 255, 0.14);
+  --dopbase-ink: #0d0a14;
   --vp-font-family-base:
     Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -16,21 +15,29 @@
     "Fira Code Variable", "SFMono-Regular", Consolas, monospace;
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(
-    115deg,
-    var(--dopbase-violet) 15%,
+    135deg,
+    #9f55ff 0%,
     var(--dopbase-cyan) 88%
   );
   --vp-home-hero-image-background-image: none;
+  --dopbase-grid-color: rgba(134, 59, 255, 0.08);
+  --dopbase-hero-glow: rgba(134, 59, 255, 0.12);
+  --dopbase-hero-glow-cyan: rgba(71, 191, 255, 0.05);
+  --dopbase-home-max-width: 1280px;
 }
 
 .dark {
-  --vp-c-brand-1: #b78aff;
+  --vp-c-brand-1: #aa3bff;
   --vp-c-brand-2: #9d66ff;
   --vp-c-brand-3: #8b4cff;
   --vp-c-brand-soft: rgba(170, 59, 255, 0.18);
+  --dopbase-grid-color: rgba(170, 59, 255, 0.12);
+  --dopbase-hero-glow: rgba(134, 59, 255, 0.2);
+  --dopbase-hero-glow-cyan: rgba(71, 191, 255, 0.08);
 }
 
 .VPNavBarTitle .logo {
+  border-radius: 8px;
   height: 28px;
   width: 28px;
 }
@@ -44,6 +51,217 @@
   max-width: 620px;
 }
 
+/* Hero background grid pattern and ambient glow */
+.VPHome .VPHero.VPHomeHero {
+  position: relative;
+  overflow-x: clip;
+}
+
+.VPHome .VPHero.VPHomeHero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, var(--dopbase-grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--dopbase-grid-color) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center top;
+  mask-image: radial-gradient(
+    ellipse 85% 70% at 50% 35%,
+    black 25%,
+    transparent 80%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 85% 70% at 50% 35%,
+    black 25%,
+    transparent 80%
+  );
+}
+
+.VPHome .VPHero.VPHomeHero::after {
+  content: "";
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  max-width: 100vw;
+  height: 600px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 35%,
+    var(--dopbase-hero-glow) 0%,
+    var(--dopbase-hero-glow-cyan) 45%,
+    transparent 72%
+  );
+  filter: blur(50px);
+}
+
+.VPHome .VPHero.VPHomeHero .container {
+  max-width: var(--dopbase-home-max-width, 1280px);
+  position: relative;
+  z-index: 1;
+}
+
+.VPHome .VPHero.VPHomeHero .image-bg {
+  display: none;
+}
+
+/* Let the mobile navigation use the full screen width. */
+@media (max-width: 767px) {
+  .VPNavScreen .container {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+/* Side-by-side hero layout */
+@media (min-width: 960px) {
+  .VPHome .VPHero.has-image.VPHomeHero .container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    max-width: var(--dopbase-home-max-width, 1280px);
+    text-align: left;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .main {
+    flex: 1 1 48%;
+    max-width: 580px;
+    width: auto;
+    order: 1;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .name,
+  .VPHome .VPHero.has-image.VPHomeHero .text {
+    max-width: 100%;
+    font-size: 44px;
+    line-height: 1.16;
+    margin: 0;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .tagline {
+    max-width: 520px;
+    font-size: 19px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .actions {
+    justify-content: flex-start;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .image {
+    flex: 1 1 52%;
+    max-width: 620px;
+    width: 100%;
+    order: 2;
+    margin: 0;
+    min-height: auto;
+    display: flex;
+    justify-content: center;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .image-container {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    transform: none;
+    display: block;
+    margin: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .VPHome .VPHero.has-image.VPHomeHero .container {
+    gap: 48px;
+    max-width: var(--dopbase-home-max-width, 1280px);
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .main {
+    max-width: 600px;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .name,
+  .VPHome .VPHero.has-image.VPHomeHero .text {
+    font-size: 48px;
+    line-height: 1.15;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .image {
+    max-width: 630px;
+  }
+}
+
+@media (max-width: 959px) {
+  .VPHome .VPHero.has-image.VPHomeHero .container {
+    text-align: center;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .main {
+    order: 1;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .tagline {
+    margin: 0 auto;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .actions {
+    justify-content: center;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .image {
+    order: 2;
+    margin: 40px auto 0;
+    width: 100%;
+    max-width: 640px;
+    min-height: auto;
+  }
+
+  .VPHome .VPHero.has-image.VPHomeHero .image-container {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    transform: none;
+    display: block;
+  }
+}
+
+/* Align VPFeatures / VPHomeFeatures with vp content */
+.VPHome .VPFeatures.VPHomeFeatures .container,
+.VPHomeFeatures .container,
+.VPFeatures .container {
+  max-width: var(--dopbase-home-max-width, 1280px);
+  width: 100%;
+}
+
+/* Align VPHomeContent container */
+.VPHome .vp-doc.container {
+  max-width: calc(var(--dopbase-home-max-width, 1280px) + 128px);
+}
+
+@media (max-width: 959px) {
+  .VPHome .vp-doc.container {
+    max-width: calc(var(--dopbase-home-max-width, 1280px) + 96px);
+  }
+}
+
+@media (max-width: 639px) {
+  .VPHome .vp-doc.container {
+    max-width: calc(var(--dopbase-home-max-width, 1280px) + 48px);
+  }
+}
+
 .VPFeature {
   border-color: color-mix(
     in srgb,
@@ -54,8 +272,9 @@
 
 .dopbase-home {
   margin: 0 auto;
-  max-width: 1152px;
-  padding: 20px 24px 80px;
+  max-width: var(--dopbase-home-max-width, 1280px);
+  padding: 0 0 80px;
+  width: 100%;
 }
 
 .dopbase-terminal {
@@ -68,6 +287,47 @@
   margin: 8px auto 56px;
   max-width: 850px;
   overflow: hidden;
+  text-align: left;
+}
+
+.dopbase-terminal pre {
+  text-align: left;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Home Terminal inside Hero */
+.VPHome .VPHero.has-image.VPHomeHero .dopbase-terminal {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  text-align: left;
+  box-shadow:
+    0 24px 60px -12px rgba(75, 25, 145, 0.35),
+    0 0 0 1px rgba(170, 59, 255, 0.32);
+}
+
+.VPHome .VPHero.has-image.VPHomeHero .dopbase-terminal pre {
+  font-size: 13px;
+  line-height: 1.62;
+  padding: 16px 20px 20px;
+  text-align: left;
+}
+
+@media (min-width: 1200px) {
+  .VPHome .VPHero.has-image.VPHomeHero .dopbase-terminal pre {
+    font-size: 13.5px;
+    line-height: 1.68;
+    padding: 18px 22px 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  .VPHome .VPHero.has-image.VPHomeHero .dopbase-terminal pre {
+    font-size: 12px;
+    line-height: 1.55;
+    padding: 14px 16px 16px;
+  }
 }
 
 .dopbase-terminal__bar {
@@ -117,8 +377,12 @@
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(4, 1fr);
-  margin: 0 auto;
-  max-width: 850px;
+
+  margin-top: 34px;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -149,11 +413,13 @@
   font-variant-ligatures: none;
 }
 
-@media (max-width: 700px) {
-  .dopbase-home {
-    padding-inline: 18px;
+@media (max-width: 639px) {
+  .dopbase-path {
+    grid-template-columns: 1fr;
   }
+}
 
+@media (min-width: 640px) and (max-width: 959px) {
   .dopbase-path {
     grid-template-columns: 1fr 1fr;
   }

@@ -28,8 +28,6 @@ features:
 ---
 
 <div class="dopbase-home">
-  <HomeTerminal />
-
   <div class="dopbase-path" aria-label="Dopbase workflow">
     <div><strong>01 / Serve</strong><span>Start Dopbase or use Cloud.</span></div>
     <div><strong>02 / Connect</strong><span>Choose the active server.</span></div>
