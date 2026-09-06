@@ -14,6 +14,8 @@ pub struct AppState {
   pub crypto: CryptoService,
   pub setup: Arc<RwLock<SetupState>>,
   pub rate_limiter: RateLimiter,
+  pub maintenance: Arc<std::sync::atomic::AtomicBool>,
+  pub started_at: std::time::Instant,
 }
 
 #[derive(Default)]
