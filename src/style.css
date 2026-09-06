@@ -4,9 +4,11 @@
 /**
  * Dopbase Admin UI — dark-first design tokens.
  *
- * A single dark palette tuned for a developer-facing secret manager:
- * near-black canvas, low-contrast panels with subtle keylines, and one
- * purple accent carried over from the Dopbase brand.
+ * A neutral dark palette modeled on the latest PocketBase admin UI:
+ * a #1c1c1c canvas, lighter surfaces stepped up with white via
+ * color-mix() (sidebar, panels, hovers, keylines), text derived from
+ * a single #ebebeb ramp, and one purple accent carried over from the
+ * Dopbase brand for interactive elements.
  */
 @theme {
   --font-sans:
@@ -14,29 +16,51 @@
   --font-mono:
     "Fira Code Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  --color-canvas: #0a0c10;
+  /* Main content area — PocketBase's dark `--surfaceColor`. */
+  --color-canvas: #1c1c1c;
+  /* Sidebar, cards, and modal surfaces — one white step above the
+     canvas (PocketBase's `--surfaceAlt1Color`). */
+  --color-panel: color-mix(in srgb, #1c1c1c, white 2%);
   /* Editor surfaces sit on the page canvas but must read as a distinct,
-     editable region — a blue-leaning step between canvas and panel. */
-  --color-editor: #0d1424;
-  --color-panel: #10131a;
-  --color-raised: #171b25;
-  --color-line: #232837;
-  --color-line-soft: #1a1e29;
+     editable region — a white step between panel and raised. */
+  --color-editor: color-mix(in srgb, #1c1c1c, white 4%);
+  /* Hover fills and quiet inputs (PocketBase's `--surfaceAlt2Color`). */
+  --color-raised: color-mix(in srgb, #1c1c1c, white 7%);
+  /* Keylines (PocketBase's `--surfaceAlt3Color` / `--surfaceAlt2Color`). */
+  --color-line: color-mix(in srgb, #1c1c1c, white 12%);
+  --color-line-soft: color-mix(in srgb, #1c1c1c, white 7%);
+  /* Pressed-state surface step (PocketBase's `--surfaceAlt4Color`). */
+  --color-line-strong: color-mix(in srgb, #1c1c1c, white 14%);
 
-  --color-ink: #b3bccd;
-  --color-ink-strong: #edf0f7;
-  --color-ink-muted: #8b95ab;
-  --color-ink-faint: #5d6880;
+  /* Text ramp derived from PocketBase's `--surfaceTxtColor` (#ebebeb):
+     strong is the base tone, then alpha steps for body, hints, and
+     disabled text. */
+  --color-ink-strong: #ebebeb;
+  --color-ink: color-mix(in srgb, #ebebeb, transparent 15%);
+  --color-ink-muted: color-mix(in srgb, #ebebeb, transparent 45%);
+  --color-ink-faint: color-mix(in srgb, #ebebeb, transparent 65%);
 
+  /* Dopbase brand purple — carried over unchanged. */
   --color-accent: #aa3bff;
   --color-accent-strong: #c084fc;
-  --color-accent-soft: rgba(170, 59, 255, 0.14);
+  --color-accent-soft: color-mix(in srgb, #aa3bff, transparent 86%);
+  /* Solid-fill interactive steps (PocketBase's alt-color convention):
+     hover and active lighten the base by mixing white in. */
+  --color-accent-alt1: color-mix(in srgb, #aa3bff, white 10%);
+  --color-accent-alt2: color-mix(in srgb, #aa3bff, white 15%);
+  --color-crit-alt1: color-mix(in srgb, #f26d6d, white 10%);
+  --color-crit-alt2: color-mix(in srgb, #f26d6d, white 15%);
 
   --color-ok: #3fd68f;
   --color-warn: #f5b74e;
   --color-crit: #f26d6d;
 
+  /* Text selection highlight (PocketBase's `--selectionColor`). */
+  --color-selection: rgba(255, 255, 255, 0.22);
+
   --radius-card: 10px;
+  /* Form controls — buttons, fields, chips (PocketBase's 5px radius). */
+  --radius-control: 5px;
 
   /**
    * Typography scale tuned for comfort on a dark, developer-facing UI.
@@ -86,7 +110,7 @@
   }
 
   ::selection {
-    background: rgba(170, 59, 255, 0.35);
+    background: var(--color-selection);
     color: var(--color-ink-strong);
   }
 
