@@ -4,6 +4,38 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Static root/admin/member permissions, browser-based user administration,
+  metadata-only AI service accounts with expiring bearer tokens, and the
+  authenticated `/api/v1/status` summary.
+- Console user-role selection, AI account creation/deletion, instance counts,
+  and root-only Danger Zone visibility.
+- User guides for account management, role permissions, instance status,
+  and factory-reset confirmations.
+
+### Changed
+
+- Replaced the boxed server startup banner with plain startup lines and
+  updated documentation examples to match.
+
+## 0.0.15 - 2026-09-06
+
+### Added
+
+- PocketBase-inspired component system for the Admin UI: solid borderless
+  buttons, filled fields with inline labels, borderless badges, and new
+  toggle and checkbox primitives, all carrying the Dopbase purple accent.
+- The "Edit as .env" view is now a full editor shell with a filename tab and
+  unsaved-changes dot, active-line gutter highlight, a status bar with cursor
+  position and problem counts, a problems strip, and Cmd/Ctrl+S to save.
+
+### Fixed
+
+- Equalized `DbInput` and `DbSelect` field heights.
+- Selecting a project now reliably opens its first environment instead of
+  getting stuck on a stale environment left over from the previous project.
+
 ## 0.0.14 - 2026-09-05
 
 ### Added
