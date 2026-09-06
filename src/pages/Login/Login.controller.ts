@@ -2,8 +2,7 @@ import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidEmail } from "~/utils/validation";
 
 /**
  * Login screen controller: form state, client-side validation, stable
@@ -25,7 +24,7 @@ export function useLoginController() {
     const errors: { email?: string; password?: string } = {};
     if (email.value.trim() === "") {
       errors.email = "Enter your email address.";
-    } else if (!EMAIL_PATTERN.test(email.value.trim())) {
+    } else if (!isValidEmail(email.value)) {
       errors.email = "Enter a valid email address.";
     }
     if (password.value === "") {

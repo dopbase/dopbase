@@ -4,7 +4,7 @@ import { useRoute } from "vue-router";
 import { useLoginController } from "./Login.controller";
 import { AuthLayout } from "~/layouts";
 import { DbAlert, DbButton, DbCode, DbInput } from "~/components/ui";
-import { TerminalIcon } from "~/assets/icons";
+import { TerminalIcon, InfoIcon } from "~/assets/icons";
 
 const { email, password, fieldErrors, formError, submitting, submit } =
   useLoginController();
@@ -59,9 +59,10 @@ const notice = computed(() => {
         </DbButton>
       </form>
 
-      <details class="group mt-6 rounded-md border border-line bg-panel">
+      <details class="group mt-6 rounded-control border border-line bg-panel">
         <summary
-          class="cursor-pointer list-none px-4 py-3 text-sm text-ink-muted transition-colors hover:text-ink">
+          class="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-ink-muted transition-colors hover:text-ink">
+          <InfoIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
           Lost access?
         </summary>
         <div

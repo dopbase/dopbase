@@ -23,8 +23,8 @@ const { health, reachable, endpoint } = useServerStatus();
           <DopbaseIcon class="h-6 w-6" />
         </div>
         <div>
-          <p class="font-mono text-sm font-semibold text-ink-strong">dopbase</p>
-          <p class="text-xs text-ink-muted">self-hosted secret manager</p>
+          <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
+          <p class="text-xs text-ink-muted">Secret manager in a single file</p>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ const { health, reachable, endpoint } = useServerStatus();
 
     <!-- Form side -->
     <main
-      class="auth-form-side relative flex flex-1 items-start justify-center px-6 py-10 md:items-center md:px-12">
+      class="auth-form-side relative flex flex-1 items-start justify-center overflow-y-auto px-6 py-8 md:items-center md:px-10 lg:px-12">
       <slot />
     </main>
   </div>
@@ -95,8 +95,8 @@ const { health, reachable, endpoint } = useServerStatus();
   inset: 0;
   z-index: -1;
   background-image:
-    linear-gradient(to right, rgb(35 40 55 / 0.55) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(35 40 55 / 0.55) 1px, transparent 1px);
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
   background-size: 32px 32px;
   mask-image: radial-gradient(
     ellipse 70% 60% at 50% 45%,
