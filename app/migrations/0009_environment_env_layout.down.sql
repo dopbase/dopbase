@@ -1,1 +1,1 @@
-DROP TABLE environment_env_layout;
+DROP TABLE IF EXISTS environment_env_layout;

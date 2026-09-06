@@ -1,1 +1,2 @@
+DROP INDEX IF EXISTS admins_root_idx;
 DROP TABLE IF EXISTS admins;
