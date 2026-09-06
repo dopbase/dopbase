@@ -1,4 +1,4 @@
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
 
@@ -13,8 +13,11 @@ export function useDashboardLayoutController() {
   const auth = useAuthStore();
 
   const email = computed(() => auth.session?.email ?? "");
+  const loggingOut = ref(false);
 
   async function logout(): Promise<void> {
+    if (loggingOut.value) return;
+    loggingOut.value = true;
     try {
       await auth.logout();
     } catch {
@@ -22,11 +25,13 @@ export function useDashboardLayoutController() {
       // session is revoked or unreachable — either way, leave the dashboard.
     } finally {
       await router.push({ name: "login" });
+      loggingOut.value = false;
     }
   }
 
   return {
     email,
+    loggingOut,
     logout,
   };
 }

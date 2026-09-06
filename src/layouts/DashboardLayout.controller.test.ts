@@ -39,11 +39,20 @@ describe("useDashboardLayoutController", () => {
     expect(c.email.value).toBe("a@b.c");
   });
 
-  it("logs out and routes to the login screen", async () => {
+  it("logs out and routes to the login screen with loggingOut state", async () => {
     await loginAdmin();
-    vi.mocked(authApi.logout).mockResolvedValueOnce();
+    let resolveLogout!: () => void;
+    const logoutPromise = new Promise<void>((resolve) => {
+      resolveLogout = resolve;
+    });
+    vi.mocked(authApi.logout).mockReturnValueOnce(logoutPromise);
     const c = useDashboardLayoutController();
-    await c.logout();
+    expect(c.loggingOut.value).toBe(false);
+    const callPromise = c.logout();
+    expect(c.loggingOut.value).toBe(true);
+    resolveLogout();
+    await callPromise;
+    expect(c.loggingOut.value).toBe(false);
     expect(authApi.logout).toHaveBeenCalledTimes(1);
     expect(routerPush).toHaveBeenCalledWith({ name: "login" });
     expect(useAuthStore().isAuthenticated).toBe(false);
