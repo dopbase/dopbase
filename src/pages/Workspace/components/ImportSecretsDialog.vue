@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { ref, toRef } from "vue";
 import { DbAlert, DbButton, DbModal } from "~/components/ui";
-import { parseEnvFile } from "~/utils/env-file";
-import { useImportStore } from "~/stores/import.store";
 import { UploadIcon } from "~/assets/icons";
+import { useImportSecretsDialogController } from "./ImportSecretsDialog.controller";
 
 /**
  * ImportSecretsDialog — picks and parses a `.env` file locally, then hands
@@ -19,58 +17,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-const route = useRoute();
-const router = useRouter();
-const importStore = useImportStore();
-
-const parseErrors = ref<string[]>([]);
-const fileError = ref<string | null>(null);
-const parsing = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
-
-watch(
-  () => props.open,
-  (open) => {
-    if (open) {
-      parseErrors.value = [];
-      fileError.value = null;
-    }
-  },
-);
+const { parseErrors, fileError, parsing, processFile } =
+  useImportSecretsDialogController(
+    toRef(props, "environmentId"),
+    toRef(props, "open"),
+  );
 
 async function onFileChange(event: Event): Promise<void> {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
-  fileError.value = null;
-  parseErrors.value = [];
-  parsing.value = true;
-  try {
-    const content = await file.text();
-    const parsed = parseEnvFile(content);
-    if (parsed.entries.length === 0 && parsed.errors.length > 0) {
-      parseErrors.value = parsed.errors;
-      return;
-    }
-    importStore.begin({
-      environmentId: props.environmentId,
-      fileName: file.name,
-      entries: parsed.entries,
-      errors: parsed.errors,
-    });
-    emit("close");
-    await router.push({
-      name: "environment-import",
-      params: {
-        projectRef: route.params.projectRef,
-        environmentId: props.environmentId,
-      },
-    });
-  } catch {
-    fileError.value = "The file could not be read.";
-  } finally {
-    parsing.value = false;
-    if (fileInput.value) fileInput.value.value = "";
-  }
+  if (await processFile(file)) emit("close");
+  if (fileInput.value) fileInput.value.value = "";
 }
 </script>
 
@@ -82,7 +40,7 @@ async function onFileChange(event: Event): Promise<void> {
     <div class="flex flex-col gap-4">
       <p class="text-sm text-ink">
         Select a <code class="font-mono text-xs">.env</code> file. It is parsed
-        locally; the review opens on a full page where values are validated and
+        locally, the review opens on a full page where values are validated and
         stored encrypted, never rendered in the browser.
       </p>
       <label
