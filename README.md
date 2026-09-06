@@ -4,9 +4,11 @@
 
 # Dopbase
 
-Dopbase is an open-source secrets manager in a single file. One executable contains the server, Admin UI, REST API, migrations, and command-line client. It keeps application secrets organized by project and environment and runs on your own infrastructure.
+[Dopbase](https://dopbase.com) is an open-source secrets manager in a single file. One executable contains the server, Admin UI, REST API, migrations, and command-line client. It keeps application secrets organized by project and environment and runs on your own infrastructure.
 
 The executable is a single download. Runtime data stays separate: Dopbase stores its SQLite database, configuration, and master key under `~/.dopbase` by default.
+
+Website: [http://dopbase.com](http://dopbase.com)
 
 ## Why Dopbase
 
@@ -35,6 +37,10 @@ SQLite database, lock files, configuration, and local master key live under
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
+The upcoming account update adds four roles, user management, read-only AI
+accounts, and an instance overview. See [users and AI agents](./docs/ui/users.md)
+and [role permissions](./docs/reference/identity.md) for how access works.
+
 ## Repository layout
 
 | Path         | Purpose                                   | Current state                  |
@@ -47,7 +53,7 @@ Read the [public documentation](./docs/) for the product model, CLI, self-hostin
 
 ## Development
 
-You need [Bun](https://bun.sh/) and a Rust toolchain with Rust 2024 edition support.
+You need **Bun** and a Rust toolchain with Rust 2024 edition support.
 
 Install the JavaScript dependencies and start the Vue development server:
 
