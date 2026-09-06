@@ -27,6 +27,7 @@ export { default as FolderIcon } from "./Folder.icon.vue";
 export { default as HeartIcon } from "./Heart.icon.vue";
 export { default as HistoryIcon } from "./History.icon.vue";
 export { default as HomeIcon } from "./Home.icon.vue";
+export { default as InfoIcon } from "./Info.icon.vue";
 export { default as KeyIcon } from "./Key.icon.vue";
 export { default as LayersIcon } from "./Layers.icon.vue";
 export { default as LockIcon } from "./Lock.icon.vue";
