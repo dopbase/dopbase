@@ -23,7 +23,7 @@ export interface EnvToken {
 }
 
 const KEY_START = /^[A-Za-z_]/;
-const KEY_CHARS = /^[A-Za-z0-9_.]*/;
+const KEY_CHARS = /^[A-Za-z0-9_]*/;
 
 function whitespace(line: string, start: number): EnvToken | null {
   const match = /^\s+/.exec(line.slice(start));

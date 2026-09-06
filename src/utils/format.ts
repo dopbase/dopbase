@@ -36,6 +36,19 @@ export function formatCountdown(seconds: number): string {
   return `${seconds}s`;
 }
 
+/** Formats seconds into a human-readable duration, e.g. `2h 15m`, `45s`, `3d 4h`. */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0 || Number.isNaN(seconds)) return "0s";
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  return `${s}s`;
+}
+
 /** Formats byte counts into human-readable strings, e.g. `128 KB`, `1.4 MB`. */
 export function formatBytes(bytes: number): string {
   if (bytes <= 0 || Number.isNaN(bytes)) return "0 B";

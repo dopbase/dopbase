@@ -20,7 +20,8 @@ export interface ParsedEnvLines {
   issues: EnvFileIssue[];
 }
 
-const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+// Keep the browser grammar identical to the secrets endpoint.
+const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function unquote(raw: string): { value: string; quoted: boolean } | null {
   if (raw.length < 2) return null;
