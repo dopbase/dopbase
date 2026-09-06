@@ -4,6 +4,7 @@ use axum::{
   body::{Body, to_bytes},
   http::{Request, header},
 };
+use chrono::Utc;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tower::ServiceExt;
@@ -838,4 +839,71 @@ async fn test_dashboard_upload_cross_key_rekeys_cleanly() {
   .await;
   assert_eq!(status, 200);
   assert_eq!(secret_res["data"]["value"], "super-secret-key-12345");
+}
+
+#[tokio::test]
+async fn restore_recovers_service_accounts_and_agent_tokens() {
+  let (_dir, state, router, token) = admin_setup().await;
+  let now = Utc::now().to_rfc3339();
+  sqlx::query("INSERT INTO service_accounts(id,name,role,created_at,updated_at) VALUES(?,?,?,?,?)")
+    .bind("aia_backup_test")
+    .bind("backup-agent")
+    .bind("ai_agent")
+    .bind(&now)
+    .bind(&now)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  sqlx::query(
+    "INSERT INTO agent_tokens(id,service_account_id,name,token_hash,created_at) VALUES(?,?,?,?,?)",
+  )
+  .bind("ait_backup_test")
+  .bind("aia_backup_test")
+  .bind("restore-token")
+  .bind(app::services::token::hash("dpa_restore_test"))
+  .bind(&now)
+  .execute(state.db.pool())
+  .await
+  .unwrap();
+
+  let (status, backup, _) = call(
+    &router,
+    "POST",
+    "/api/v1/backups",
+    Some(&token),
+    Some(json!({"name":"accounts_snapshot"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let key = backup["data"]["key"].as_str().unwrap();
+
+  sqlx::query("DELETE FROM agent_tokens")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  sqlx::query("DELETE FROM service_accounts")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    &format!("/api/v1/backups/{key}/restore"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+
+  let account_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM service_accounts")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  let token_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_tokens")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(account_count, 1);
+  assert_eq!(token_count, 1);
 }
