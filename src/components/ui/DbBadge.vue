@@ -15,22 +15,22 @@ const props = withDefaults(
 const toneClasses = computed(() => {
   switch (props.tone) {
     case "ok":
-      return "border-ok/30 bg-ok/10 text-ok";
+      return "bg-ok/20 text-ok";
     case "warn":
-      return "border-warn/30 bg-warn/10 text-warn";
+      return "bg-warn/20 text-warn";
     case "crit":
-      return "border-crit/30 bg-crit/10 text-crit";
+      return "bg-crit/20 text-crit";
     case "accent":
-      return "border-accent/30 bg-accent-soft text-accent-strong";
+      return "bg-accent/20 text-accent-strong";
     default:
-      return "border-line bg-raised text-ink";
+      return "bg-line text-ink";
   }
 });
 </script>
 
 <template>
   <span
-    class="inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-xs leading-none"
+    class="inline-flex min-h-6 items-center rounded-control px-2 py-0.5 font-mono text-xs font-medium leading-none"
     :class="toneClasses">
     <slot />
   </span>
