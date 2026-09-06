@@ -4,18 +4,12 @@ on:
   push:
     tags:
       - "*.*.*"
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Release tag to verify and publish
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.release_tag || github.ref_name }}
+  group: release-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 env:
@@ -23,7 +17,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: "1.98.0"
   SMOKE_PORT: "18376"
-  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
   prepare:
@@ -34,7 +27,6 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.release_tag || github.ref_name }}
           persist-credentials: false
 
       - name: Install Rust
@@ -50,12 +42,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! "${RELEASE_TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag must match MAJOR.MINOR.PATCH; got ${RELEASE_TAG}" >&2
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match MAJOR.MINOR.PATCH; got ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
 
-          release_version="${RELEASE_TAG}"
+          release_version="${GITHUB_REF_NAME}"
           package_version="$(cargo metadata \
             --manifest-path app/Cargo.toml \
             --locked \
@@ -109,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          awk -v version="${RELEASE_TAG}" '
+          awk -v version="${GITHUB_REF_NAME}" '
             index($0, "## " version " -") == 1 { found=1; print; next }
             found && /^## / { exit }
             found { print }
@@ -162,7 +154,6 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.release_tag || github.ref_name }}
           persist-credentials: false
 
       - name: Install Rust target
@@ -211,7 +202,7 @@ jobs:
         run: |
           set -euo pipefail
           binary="app/target/${{ matrix.target }}/release/dopbase"
-          version="${RELEASE_TAG}"
+          version="${GITHUB_REF_NAME}"
           bind_address="127.0.0.1:${SMOKE_PORT}"
           public_url="http://${bind_address}"
           test "$("${binary}" --version)" = "dopbase ${version}"
@@ -279,7 +270,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $binary = "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
-          $version = $env:RELEASE_TAG
+          $version = "${{ github.ref_name }}"
           $actualVersion = (& $binary --version).Trim()
           if ($actualVersion -ne "dopbase $version") {
             throw "unexpected Dopbase version: $actualVersion"
@@ -359,7 +350,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG}"
+          version="${GITHUB_REF_NAME}"
           archive="dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
           package_dir="$(mktemp -d)"
           cp "app/target/${{ matrix.target }}/release/dopbase" "${package_dir}/dopbase"
@@ -373,7 +364,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $version = $env:RELEASE_TAG
+          $version = "${{ github.ref_name }}"
           $archive = "dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
           $packageDir = Join-Path $env:RUNNER_TEMP ("dopbase-package-" + [guid]::NewGuid())
           New-Item -ItemType Directory -Path $packageDir | Out-Null
@@ -410,7 +401,7 @@ jobs:
         working-directory: release
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG}"
+          version="${GITHUB_REF_NAME}"
           expected=(
             "dopbase_${version}_darwin_amd64.zip"
             "dopbase_${version}_darwin_arm64.zip"
@@ -443,20 +434,20 @@ jobs:
 
           curl --fail --silent --show-error \
             "${api_headers[@]}" \
-            "${api_url}/git/ref/tags/${RELEASE_TAG}" >/dev/null
+            "${api_url}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
 
           release_json="$(curl --silent --show-error \
             "${api_headers[@]}" \
-            "${api_url}/releases/tags/${RELEASE_TAG}" || true)"
+            "${api_url}/releases/tags/${GITHUB_REF_NAME}" || true)"
           if ! jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
             release_json="$(curl --fail --silent --show-error \
               "${api_headers[@]}" \
               --request POST \
               --header 'Content-Type: application/json' \
               --data "$(jq -n \
-                --arg tag "${RELEASE_TAG}" \
+                --arg tag "${GITHUB_REF_NAME}" \
                 --arg target "${GITHUB_SHA}" \
-                --arg name "${RELEASE_TAG} Release" \
+                --arg name "${GITHUB_REF_NAME} Release" \
                 --arg body "${release_notes}" \
                 '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, generate_release_notes: false}')" \
               "${api_url}/releases")"
@@ -464,18 +455,18 @@ jobs:
 
           assets=(
             "release/checksums.txt"
-            "release/dopbase_${RELEASE_TAG}_darwin_amd64.zip"
-            "release/dopbase_${RELEASE_TAG}_darwin_arm64.zip"
-            "release/dopbase_${RELEASE_TAG}_linux_amd64.zip"
-            "release/dopbase_${RELEASE_TAG}_linux_arm64.zip"
-            "release/dopbase_${RELEASE_TAG}_windows_amd64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_darwin_amd64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_darwin_arm64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_linux_amd64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_linux_arm64.zip"
+            "release/dopbase_${GITHUB_REF_NAME}_windows_amd64.zip"
           )
           for asset in "${assets[@]}"; do
             test -f "${asset}"
             uploaded=false
             for attempt in 1 2 3; do
               if gh release upload \
-                "${RELEASE_TAG}" \
+                "${GITHUB_REF_NAME}" \
                 "${asset}" \
                 --repo "${GH_REPO}" \
                 --clobber; then
