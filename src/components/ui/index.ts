@@ -1,6 +1,7 @@
 export { default as DbAlert } from "./DbAlert.vue";
 export { default as DbBadge } from "./DbBadge.vue";
 export { default as DbButton } from "./DbButton.vue";
+export { default as DbCheckbox } from "./DbCheckbox.vue";
 export { default as DbCode } from "./DbCode.vue";
 export { default as DbConfirmDialog } from "./DbConfirmDialog.vue";
 export { default as DbCopyButton } from "./DbCopyButton.vue";
@@ -8,5 +9,7 @@ export { default as DbEmptyState } from "./DbEmptyState.vue";
 export { default as DbInput } from "./DbInput.vue";
 export { default as DbModal } from "./DbModal.vue";
 export { default as DbSelect } from "./DbSelect.vue";
+export { default as DbSkeleton } from "./DbSkeleton.vue";
 export { default as DbSpinner } from "./DbSpinner.vue";
+export { default as DbSwitch } from "./DbSwitch.vue";
 export { default as DbTextarea } from "./DbTextarea.vue";
