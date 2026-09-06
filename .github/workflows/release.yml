@@ -447,7 +447,7 @@ jobs:
               --data "$(jq -n \
                 --arg tag "${GITHUB_REF_NAME}" \
                 --arg target "${GITHUB_SHA}" \
-                --arg name "${GITHUB_REF_NAME} Release" \
+                --arg name "Dopbase ${GITHUB_REF_NAME}" \
                 --arg body "${release_notes}" \
                 '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, generate_release_notes: false}')" \
               "${api_url}/releases")"
