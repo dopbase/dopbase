@@ -1,9 +1,10 @@
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import * as auditApi from "~/services/audit.api";
 import type { AuditEvent } from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import type { Environment, Project } from "~/services";
+import { formatDateTime, formatRelativeTime } from "~/utils/format";
 
 export const AUDIT_PAGE_SIZE = 25;
 
@@ -29,6 +30,26 @@ export function useAuditController() {
 
   const projects = ref<Project[]>([]);
   const environments = ref<Environment[]>([]);
+  let requestVersion = 0;
+
+  const projectOptions = computed(() => [
+    { label: "All projects", value: "" },
+    ...projects.value.map((project) => ({ label: project.name, value: project.id })),
+  ]);
+  const environmentOptions = computed(() => [
+    { label: "All environments", value: "" },
+    ...environments.value.map((environment) => ({
+      label: `${environment.projectName}/${environment.name}`,
+      value: environment.id,
+    })),
+  ]);
+  const projectName = (id: string | null): string =>
+    projects.value.find((project) => project.id === id)?.name ?? id ?? "—";
+  const environmentName = (id: string | null): string => {
+    if (!id) return "—";
+    const match = environments.value.find((environment) => environment.id === id);
+    return match ? `${match.projectName}/${match.name}` : id;
+  };
 
   function currentQuery(): auditApi.AuditQuery {
     return {
@@ -41,10 +62,13 @@ export function useAuditController() {
   }
 
   async function load(): Promise<void> {
+    const version = ++requestVersion;
+    const query = currentQuery();
     loading.value = true;
     loadError.value = null;
     try {
-      const page = await auditApi.listAuditEvents(currentQuery());
+      const page = await auditApi.listAuditEvents(query);
+      if (version !== requestVersion) return;
       items.value = page.items;
       nextCursor.value = page.nextCursor;
       hasLoaded.value = true;
@@ -57,12 +81,16 @@ export function useAuditController() {
 
   async function loadMore(): Promise<void> {
     if (!nextCursor.value || loadingMore.value) return;
+    const version = requestVersion;
+    const cursor = nextCursor.value;
+    const query = currentQuery();
     loadingMore.value = true;
     try {
       const page = await auditApi.listAuditEvents({
-        ...currentQuery(),
-        cursor: nextCursor.value,
+        ...query,
+        cursor,
       });
+      if (version !== requestVersion || nextCursor.value !== cursor) return;
       items.value.push(...page.items);
       nextCursor.value = page.nextCursor;
     } catch {
@@ -100,6 +128,12 @@ export function useAuditController() {
     filters,
     projects,
     environments,
+    projectOptions,
+    environmentOptions,
+    projectName,
+    environmentName,
+    formatDateTime,
+    formatRelativeTime,
     load,
     loadMore,
   };

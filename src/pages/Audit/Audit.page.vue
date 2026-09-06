@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { useAuditController } from "./Audit.controller";
 import { DashboardLayout } from "~/layouts";
 import {
@@ -9,10 +9,9 @@ import {
   DbEmptyState,
   DbInput,
   DbSelect,
-  DbSpinner,
+  DbSkeleton,
 } from "~/components/ui";
 import { HistoryIcon, RefreshIcon } from "~/assets/icons";
-import { formatRelativeTime, formatDateTime } from "~/utils/format";
 import type { AuditEvent } from "~/services";
 
 /**
@@ -31,8 +30,12 @@ const {
   loadError,
   hasLoaded,
   filters,
-  projects,
-  environments,
+  projectOptions,
+  environmentOptions,
+  projectName,
+  environmentName,
+  formatDateTime,
+  formatRelativeTime,
   load,
   loadMore,
 } = controller;
@@ -43,29 +46,6 @@ function toggle(event: AuditEvent): void {
   expandedId.value = expandedId.value === event.id ? null : event.id;
 }
 
-const projectOptions = computed(() => [
-  { label: "All projects", value: "" },
-  ...projects.value.map((project) => ({
-    label: project.name,
-    value: project.id,
-  })),
-]);
-
-const environmentOptions = computed(() => [
-  { label: "All environments", value: "" },
-  ...environments.value.map((environment) => ({
-    label: `${environment.projectName}/${environment.name}`,
-    value: environment.id,
-  })),
-]);
-
-const projectName = (id: string | null): string =>
-  projects.value.find((project) => project.id === id)?.name ?? id ?? "—";
-const environmentName = (id: string | null): string => {
-  if (!id) return "—";
-  const match = environments.value.find((environment) => environment.id === id);
-  return match ? `${match.projectName}/${match.name}` : id;
-};
 </script>
 
 <template>
@@ -119,7 +99,53 @@ const environmentName = (id: string | null): string => {
         {{ loadError }}
       </DbAlert>
 
-      <DbSpinner v-if="loading" class="mx-auto mt-12 h-6 w-6 text-ink-muted" />
+      <!-- Loading skeleton placeholder state -->
+      <div
+        v-if="loading"
+        class="overflow-x-auto rounded-card border border-line bg-panel"
+        data-testid="audit-skeleton">
+        <table class="min-w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-line">
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Time
+              </th>
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Action
+              </th>
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Actor
+              </th>
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Context
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="i in 6"
+              :key="i"
+              class="border-b border-line-soft last:border-b-0">
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-28" />
+              </td>
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-5 w-32 rounded-control" />
+              </td>
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-24" />
+              </td>
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-44" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <DbEmptyState
         v-else-if="hasLoaded && items.length === 0"
@@ -132,7 +158,7 @@ const environmentName = (id: string | null): string => {
 
       <div
         v-else
-        class="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-panel">
+        class="overflow-x-auto rounded-card border border-line bg-panel">
         <table class="min-w-full text-left text-sm" data-testid="audit-table">
           <thead>
             <tr class="border-b border-line">
