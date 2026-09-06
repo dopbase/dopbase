@@ -12,7 +12,7 @@ use crate::{
     limits::{BROWSER_SESSION_IDLE_HOURS, CLI_SESSION_IDLE_DAYS, RECENT_AUTHENTICATION_MINUTES},
   },
   http::HttpError,
-  models::{AuthIdentity, SessionKind},
+  models::{AdminRole, AuthIdentity, SessionKind},
   services::token,
   state::AppState,
 };
@@ -22,10 +22,25 @@ struct SessionRow {
   session_id: String,
   admin_id: String,
   email: String,
+  role: String,
   kind: String,
   csrf_hash: Option<Vec<u8>>,
+  created_at: String,
   idle_expires_at: String,
   absolute_expires_at: String,
+}
+
+fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
+  match value {
+    "root" => Ok(AdminRole::Root),
+    "admin" => Ok(AdminRole::Admin),
+    "member" => Ok(AdminRole::Member),
+    "ai_agent" => Ok(AdminRole::AiAgent),
+    _ => Err(HttpError::unauthorized(
+      AUTHENTICATION_INVALID,
+      "The account role is invalid.",
+    )),
+  }
 }
 
 impl FromRequestParts<AppState> for AuthIdentity {
@@ -42,9 +57,12 @@ impl FromRequestParts<AppState> for AuthIdentity {
     let now = Utc::now();
 
     let session: Option<SessionRow> = sqlx::query_as(
-            "SELECT s.id AS session_id, a.id AS admin_id, a.email, s.kind, s.csrf_hash, s.idle_expires_at, s.absolute_expires_at FROM sessions s JOIN admins a ON a.id = s.admin_id WHERE s.token_hash = ? AND s.revoked_at IS NULL",
+            "SELECT s.id AS session_id, a.id AS admin_id, a.email, a.role, s.kind, s.csrf_hash, s.created_at, s.idle_expires_at, s.absolute_expires_at FROM sessions s JOIN admins a ON a.id = s.admin_id WHERE s.token_hash = ? AND s.revoked_at IS NULL",
         ).bind(&hash).fetch_optional(state.db.pool()).await.map_err(HttpError::from)?;
     if let Some(session) = session {
+      let created_at = chrono::DateTime::parse_from_rfc3339(&session.created_at)
+        .map_err(|_| HttpError::internal())?
+        .with_timezone(&Utc);
       let idle = chrono::DateTime::parse_from_rfc3339(&session.idle_expires_at)
         .map_err(|_| HttpError::internal())?
         .with_timezone(&Utc);
@@ -88,10 +106,34 @@ impl FromRequestParts<AppState> for AuthIdentity {
       return Ok(AuthIdentity::Admin {
         admin_id: session.admin_id,
         email: session.email,
+        role: parse_role(&session.role)?,
         session_id: session.session_id,
         kind: session_kind,
         recent_auth_at,
+        created_at,
         csrf_hash: session.csrf_hash,
+      });
+    }
+
+    let agent: Option<(String, String, String)> = sqlx::query_as(
+      "SELECT t.id, a.id, a.name FROM agent_tokens t JOIN service_accounts a ON a.id=t.service_account_id WHERE t.token_hash=? AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at>?)",
+    )
+    .bind(&hash)
+    .bind(now.to_rfc3339())
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(HttpError::from)?;
+    if let Some((token_id, service_account_id, name)) = agent {
+      sqlx::query("UPDATE agent_tokens SET last_used_at=? WHERE id=?")
+        .bind(now.to_rfc3339())
+        .bind(&token_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(HttpError::from)?;
+      return Ok(AuthIdentity::ServiceAccount {
+        service_account_id,
+        name,
+        token_id,
       });
     }
 
@@ -140,20 +182,107 @@ fn credential(headers: &HeaderMap) -> Option<(String, bool)> {
 pub fn require_admin(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
   match identity {
     AuthIdentity::Admin {
-      admin_id, email, ..
+      admin_id,
+      email,
+      role: AdminRole::Root | AdminRole::Admin,
+      ..
     } => Ok((admin_id, email)),
-    AuthIdentity::Runner { .. } => Err(HttpError::forbidden(
+    _ => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "This operation requires an administrator.",
     )),
   }
 }
 
+pub fn require_project_manager(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  match identity {
+    AuthIdentity::Admin {
+      admin_id,
+      email,
+      role: AdminRole::Root | AdminRole::Admin | AdminRole::Member,
+      ..
+    } => Ok((admin_id, email)),
+    _ => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation requires a human project account.",
+    )),
+  }
+}
+
+pub fn require_read_access(identity: &AuthIdentity) -> Result<(), HttpError> {
+  match identity {
+    AuthIdentity::Admin { .. } | AuthIdentity::ServiceAccount { .. } => Ok(()),
+    AuthIdentity::Runner { .. } => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation is not available to runner tokens.",
+    )),
+  }
+}
+
+pub fn require_metadata_access(identity: &AuthIdentity) -> Result<(), HttpError> {
+  match identity {
+    AuthIdentity::Admin { .. } | AuthIdentity::ServiceAccount { .. } => Ok(()),
+    _ => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation requires an authenticated account.",
+    )),
+  }
+}
+
+pub fn require_root(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  match identity {
+    AuthIdentity::Admin {
+      admin_id,
+      email,
+      role: AdminRole::Root,
+      ..
+    } => Ok((admin_id, email)),
+    _ => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation requires the root administrator.",
+    )),
+  }
+}
+
+pub fn require_root_browser(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  let result = require_root(identity)?;
+  if !matches!(
+    identity,
+    AuthIdentity::Admin {
+      kind: SessionKind::Browser,
+      ..
+    }
+  ) {
+    return Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation is available from the Admin UI only.",
+    ));
+  }
+  Ok(result)
+}
+
+pub fn require_admin_browser(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  let result = require_admin(identity)?;
+  if !matches!(
+    identity,
+    AuthIdentity::Admin {
+      kind: SessionKind::Browser,
+      ..
+    }
+  ) {
+    return Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation is available from the Admin UI only.",
+    ));
+  }
+  Ok(result)
+}
+
 pub fn require_mutation(
   identity: &AuthIdentity,
   headers: &HeaderMap,
 ) -> Result<(), HttpError> {
-  require_admin(identity)?;
+  require_project_manager(identity)?;
   if let AuthIdentity::Admin {
     kind: SessionKind::Browser,
     csrf_hash,
@@ -190,7 +319,7 @@ pub fn require_recent_browser_auth(identity: &AuthIdentity) -> Result<(), HttpEr
       "Please confirm your password before continuing.",
     ));
   }
-  require_admin(identity).map(|_| ())
+  require_project_manager(identity).map(|_| ())
 }
 
 pub struct OptionalIdentity(pub Option<AuthIdentity>);
