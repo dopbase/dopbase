@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineConfig, type HeadConfig } from "vitepress";
+import { withMermaid } from "vitepress-mermaid-viewer";
 import { assetFileNames } from "../../config/asset-file-names.ts";
 import pkg from "../../package.json" with { type: "json" };
 
@@ -69,7 +70,7 @@ function buildJsonLd(pageData: {
   });
 }
 
-export default defineConfig({
+const config = defineConfig({
   title: "Dopbase",
   titleTemplate: ":title · Dopbase",
   description: siteDescription,
@@ -77,6 +78,12 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   sitemap: { hostname: siteUrl },
+  mermaid: {
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "neutral",
+    flowchart: { htmlLabels: false },
+  },
   async buildEnd({ outDir }) {
     await writeFile(
       join(outDir, "robots.txt"),
@@ -147,6 +154,9 @@ export default defineConfig({
   },
   vite: {
     publicDir: "../public",
+    optimizeDeps: {
+      include: ["mermaid", "fastdom"],
+    },
     build: {
       rolldownOptions: {
         output: {
@@ -165,51 +175,55 @@ export default defineConfig({
       text: "Edit this page on GitHub",
     },
     nav: [
-      { text: "Guide", link: "/guide/" },
-      { text: "CLI", link: "/cli/" },
-      { text: "Admin UI", link: "/ui/" },
-      { text: "Self-hosting", link: "/self-hosting/" },
-      { text: "Cloud", link: "/cloud/" },
+      { text: "Guide", link: "/guide/", activeMatch: "^/guide/" },
+      { text: "CLI", link: "/cli/", activeMatch: "^/cli/" },
+      { text: "Admin UI", link: "/ui/", activeMatch: "^/ui/" },
       {
-        text: "Reference",
-        items: [
-          { text: "Security", link: "/reference/security" },
-          { text: "Audit events", link: "/reference/audit-events" },
-          { text: "REST API", link: "/reference/api" },
-          { text: "Glossary", link: "/reference/glossary" },
-        ],
+        text: "Self-hosting",
+        link: "/self-hosting/",
+        activeMatch: "^/self-hosting/",
       },
-      { text: "About", link: "/about/" },
+      { text: "Cloud", link: "/cloud/", activeMatch: "^/cloud/" },
+      { text: "Reference", link: "/reference/", activeMatch: "^/reference/" },
+      { text: "About", link: "/about/", activeMatch: "^/about/" },
       {
         text: currentVersion,
         items: [
-          { text: "Changelog & Roadmap", link: "/about/roadmap" },
-          { text: "GitHub Releases", link: `${projectUrl}/releases` },
+          { text: "Roadmap", link: "/about/roadmap" },
+          { text: "Releases", link: `${projectUrl}/releases` },
         ],
       },
     ],
     sidebar: {
       "/guide/": [
         {
-          text: "Start here",
+          text: "Getting Started",
           items: [
             { text: "Introduction", link: "/guide/" },
-            { text: "Product status", link: "/guide/product-status" },
             { text: "Quick start", link: "/guide/quick-start" },
+            { text: "Product status", link: "/guide/product-status" },
           ],
         },
         {
-          text: "Learn Dopbase",
+          text: "Core Concepts",
           items: [
             {
-              text: "Projects and environments",
+              text: "Projects, environments, and secrets",
               link: "/guide/projects-environments-secrets",
             },
-            { text: "Server and client", link: "/guide/server-client" },
+            {
+              text: "Server and client",
+              link: "/guide/server-client",
+            },
+          ],
+        },
+        {
+          text: "Workflows",
+          items: [
             { text: "Import a .env file", link: "/guide/import-env" },
             { text: "Run an application", link: "/guide/run-an-application" },
             {
-              text: "Backup and disaster recovery",
+              text: "Backup and restore",
               link: "/guide/backups-and-restore",
             },
           ],
@@ -220,78 +234,68 @@ export default defineConfig({
           text: "Getting Started",
           items: [
             { text: "CLI overview", link: "/cli/" },
-            { text: "serve", link: "/cli/serve" },
-            { text: "Client connect", link: "/cli/client-connect" },
-            { text: "Client configuration", link: "/cli/configuration" },
             {
               text: "Environment targeting",
               link: "/cli/environment-targeting",
             },
+            { text: "Client configuration", link: "/cli/configuration" },
+            { text: "Command", link: "/cli/commands" },
           ],
         },
         {
-          text: "Commands Reference",
+          text: "Server & Connections",
           items: [
-            { text: "All commands overview", link: "/cli/commands" },
-            { text: "serve & stop", link: "/cli/commands#server-lifecycle" },
-            {
-              text: "client connect",
-              link: "/cli/commands#connections-and-authentication",
-            },
-            {
-              text: "login & logout",
-              link: "/cli/commands#connections-and-authentication",
-            },
-            {
-              text: "status",
-              link: "/cli/commands#connections-and-authentication",
-            },
-            { text: "update", link: "/cli/commands#check-for-updates" },
-            { text: "init", link: "/cli/commands#bootstrap-a-project" },
-            { text: "project", link: "/cli/commands#project-commands" },
-            { text: "env", link: "/cli/commands#environment-commands" },
-            { text: "secret", link: "/cli/commands#secret-commands" },
-            {
-              text: "import & export",
-              link: "/cli/commands#import-and-export",
-            },
-            { text: "token", link: "/cli/commands#runner-tokens" },
-            { text: "run", link: "/cli/commands#run-a-process" },
-            { text: "backup", link: "/cli/commands#backup" },
-            { text: "restore", link: "/cli/commands#restore" },
+            { text: "Server lifecycle", link: "/cli/serve" },
+            { text: "Client connect", link: "/cli/client-connect" },
           ],
         },
       ],
       "/ui/": [
         {
-          text: "Admin UI",
+          text: "Getting Started",
           items: [
-            { text: "Overview", link: "/ui/" },
+            { text: "Admin UI overview", link: "/ui/" },
             { text: "Setup and sign in", link: "/ui/setup-and-sign-in" },
+            { text: "Account settings", link: "/ui/account" },
+          ],
+        },
+        {
+          text: "Secrets Management",
+          items: [
             {
               text: "Projects and environments",
               link: "/ui/projects-environments",
             },
             { text: "Managing secrets", link: "/ui/managing-secrets" },
             { text: "Import and export", link: "/ui/import-export" },
+          ],
+        },
+        {
+          text: "Administration",
+          items: [
+            { text: "Users and AI agents", link: "/ui/users" },
             { text: "Backups and restoration", link: "/ui/backups" },
             { text: "Audit and instance status", link: "/ui/audit-instance" },
-            { text: "Users and AI agents", link: "/ui/users" },
           ],
         },
       ],
       "/self-hosting/": [
         {
-          text: "Self-hosting",
+          text: "Deployment & Storage",
           items: [
             { text: "Overview", link: "/self-hosting/" },
             {
               text: "Storage and backups",
               link: "/self-hosting/storage-backups",
             },
-            { text: "Factory reset", link: "/self-hosting/factory-reset" },
             { text: "Encryption keys", link: "/self-hosting/encryption-keys" },
+          ],
+        },
+        {
+          text: "Operations & Maintenance",
+          items: [
             { text: "Operations", link: "/self-hosting/operations" },
+            { text: "Factory reset", link: "/self-hosting/factory-reset" },
           ],
         },
       ],
@@ -300,22 +304,40 @@ export default defineConfig({
           text: "Dopbase Cloud",
           items: [
             { text: "Overview", link: "/cloud/" },
-            { text: "Connect to Cloud", link: "/cloud/connect" },
             {
-              text: "Choose a deployment",
+              text: "Self-hosted vs Cloud",
               link: "/cloud/self-hosted-vs-cloud",
             },
+            { text: "Connect to Cloud", link: "/cloud/connect" },
           ],
         },
       ],
       "/reference/": [
         {
-          text: "Reference",
+          text: "Overview",
+          items: [{ text: "Reference overview", link: "/reference/" }],
+        },
+        {
+          text: "Security & Permissions",
           items: [
-            { text: "Security", link: "/reference/security" },
+            { text: "Security model", link: "/reference/security" },
             { text: "Identity and tokens", link: "/reference/identity" },
             { text: "Audit events", link: "/reference/audit-events" },
+          ],
+        },
+        {
+          text: "API & Architecture",
+          items: [
             { text: "REST API", link: "/reference/api" },
+            {
+              text: "Frontend architecture",
+              link: "/reference/frontend-architecture",
+            },
+          ],
+        },
+        {
+          text: "Support & Terms",
+          items: [
             { text: "Troubleshooting", link: "/reference/troubleshooting" },
             { text: "Glossary", link: "/reference/glossary" },
           ],
@@ -326,6 +348,7 @@ export default defineConfig({
           text: "About Dopbase",
           items: [
             { text: "Project principles", link: "/about/" },
+            { text: "Background", link: "/about/background" },
             { text: "Open source", link: "/about/open-source" },
             { text: "Roadmap", link: "/about/roadmap" },
             { text: "Product boundaries", link: "/about/product-boundaries" },
@@ -344,3 +367,5 @@ export default defineConfig({
     },
   },
 });
+
+export default withMermaid(config);

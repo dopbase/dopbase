@@ -60,7 +60,7 @@ Version 0.1.0
 
 Admin UI:   http://localhost:8840
 API:        http://localhost:8840/api/v1
-Config:     /Users/venobi/.dopbase
+Config:     ~/.dopbase
 ```
 
 The same address serves the Admin UI in a browser. The first visit walks you

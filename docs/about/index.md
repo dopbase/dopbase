@@ -30,3 +30,10 @@ The same client should work with a local server, a production self-hosted deploy
 The guiding question is:
 
 > Does this make secrets simpler to manage without weakening security?
+
+## Further reading
+
+- [Background: Why Dopbase exists](./background): Why `.env` files are broken under AI-assisted development, and the real-world constraints of regulated financial systems.
+- [Open source](./open-source): Licensing, distribution, and freedom from artificial paywalls.
+- [Roadmap](./roadmap): Upcoming releases and operational milestones.
+- [Product boundaries](./product-boundaries): Explicit capabilities and non-goals.

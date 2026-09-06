@@ -14,12 +14,11 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 | Secrets        | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.imported`, `secret.exported`, `secret.runtime_accessed` |
 | Projects       | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                           |
 | Environments   | `environment.created`, `environment.renamed`, `environment.deleted`                                                                      |
-| Tokens         | `token.created`, `token.revoked`                                                                                                         |
+| Runner tokens  | `token.created`, `token.revoked`                                                                                                         |
 | Authentication | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                    |
-| Administrator  | `admin.bootstrapped`, `admin.reauthenticated`, `admin.password_changed`                                                                  |
-| Users          | `user.created`, `user.updated`, `user.deleted`                                                                                           |
-| AI accounts    | `agent.created`, `agent.deleted`, `agent_token.created`, `agent_token.revoked`                                                           |
-| Backups        | `backup.created`, `backup.deleted`, `backup.restored`, `backup.restored_bootstrap`                                                       |
+| Administrator & users | `admin.bootstrapped`, `admin.created`, `admin.updated`, `admin.deleted`, `admin.reauthenticated`, `admin.password_changed`          |
+| AI service accounts | `service_account.created`, `service_account.deleted`, `service_account.token_created`, `service_account.token_revoked`              |
+| Backups        | `backup.created`, `backup.downloaded`, `backup.uploaded`, `backup.restored`, `backup.deleted`, `master_key.downloaded`, `backup.restored_bootstrap` |
 
 The API schema defines the event names used by this release.
 

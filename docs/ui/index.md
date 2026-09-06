@@ -27,7 +27,8 @@ commands. CLI changes appear in the UI.
 | [Import and export](./import-export)                 | Move secrets between a `.env` file and an environment                            |
 | [Backups and restoration](./backups)                 | Create and restore full encrypted server snapshots (`.dop` archives)             |
 | [Audit and instance status](./audit-instance)        | Read the audit log and check server health                                       |
-| [Users and AI agents](./users) | Manage human roles and create AI service accounts |
+| [Users and AI agents](./users)                       | Manage human roles and create AI service accounts                                |
+| [Account settings](./account)                        | Manage profile details, update passwords, and view session status                |
 
 ## Who can sign in
 

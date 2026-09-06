@@ -8,7 +8,8 @@
 
 The executable is a single download. Runtime data stays separate: Dopbase stores its SQLite database, configuration, and master key under `~/.dopbase` by default.
 
-Website: [http://dopbase.com](http://dopbase.com)
+- Website: [http://dopbase.com](http://dopbase.com)
+- Documentation: [http://docs.dopbase.com](http://docs.dopbase.com)
 
 ## Why Dopbase
 
@@ -45,13 +46,13 @@ earlier releases are not supported.
 
 ## Repository layout
 
-| Path         | Purpose                                   | Current state                  |
-| ------------ | ----------------------------------------- | ------------------------------ |
+| Path         | Purpose                                   | Current state                 |
+| ------------ | ----------------------------------------- | ----------------------------- |
 | `app/`       | Rust service and command-line application | v0.1.0 backend implementation |
-| `src/`       | Vue administration interface              | Initial scaffold               |
-| `docs/`      | VitePress product documentation           | Active public specification    |
-| `tests/`     | Frontend tests and test setup             | Early test scaffold            |
-| `app/tests/` | Rust integration tests                    | Backend and CLI test suite     |
+| `src/`       | Vue administration interface              | Initial scaffold              |
+| `docs/`      | VitePress product documentation           | Active public specification   |
+| `tests/`     | Frontend tests and test setup             | Early test scaffold           |
+| `app/tests/` | Rust integration tests                    | Backend and CLI test suite    |
 
 ## Development
 

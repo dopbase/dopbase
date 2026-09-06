@@ -7,6 +7,25 @@ description: "Learn how Dopbase gives developers an open-source way to store app
 
 Dopbase is an open-source secrets manager for developers. It stores application configuration such as database URLs, API keys, and service credentials across development, staging, and production.
 
+## How Dopbase works
+
+```mermaid
+flowchart LR
+    accTitle: How Dopbase manages secrets
+    accDescr: You add or update secrets for your projects and environments. Dopbase keeps them organized and protected. Your application receives the right values when it starts.
+
+    ADD["1. Add or update secrets"] -->|"For each project and environment"| PROTECT["2. Dopbase organizes and protects them"]
+    PROTECT -->|"When your app starts"| USE["3. Your app receives the right values"]
+
+    classDef person fill:#0d0b14,color:#ffffff,stroke:#863bff,stroke-width:2px;
+    classDef dopbase fill:#ede6ff,color:#0d0b14,stroke:#863bff,stroke-width:2px;
+    classDef app fill:#e6f8ed,color:#0d0b14,stroke:#219653,stroke-width:2px;
+
+    class ADD person;
+    class PROTECT dopbase;
+    class USE app;
+```
+
 The product has three parts:
 
 - A server that stores encrypted secrets and exposes an API and admin interface.

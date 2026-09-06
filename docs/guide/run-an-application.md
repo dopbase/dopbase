@@ -60,13 +60,56 @@ two-server example.
 
 ## Data flow
 
-```text
-Dopbase server
-      ↓ authenticated encrypted connection
-Dopbase client
-      ↕ credential-bound encrypted cache in ~/.dopbase
-      ↓ selected environment values
-Application process
+Select the diagram to open the viewer. You can zoom, drag the diagram in any
+direction, or use the keyboard controls.
+
+```mermaid
+flowchart TB
+    accTitle: How Dopbase injects runtime secrets
+    accDescr: Dopbase resolves the requested environment and fetches its secrets from the configured server. A successful response refreshes an encrypted local cache. If the server is unavailable, Dopbase can use a matching cache. It then injects the values into the child process without creating a .env file.
+
+    START["dopbase run starts"] --> RESOLVE["Resolve the server, credential, and environment"]
+    RESOLVE --> FETCH["Fetch the environment and runtime secrets"]
+
+    subgraph SERVER["Dopbase server"]
+        AUTH["Authenticate and authorize the credential"]
+        DATABASE[("Encrypted secrets at rest")]
+        MASTER["Master key outside the database"]
+        DECRYPT["Decrypt the allowed environment values"]
+        AUDIT["Record runtime access"]
+
+        DATABASE --> DECRYPT
+        MASTER --> DECRYPT
+        AUTH -->|Allowed| DECRYPT
+        DECRYPT --> AUDIT
+    end
+
+    FETCH -->|"Authenticated API request"| AUTH
+    AUTH -->|"Authentication or access error"| STOP["Stop without starting the application"]
+    AUDIT -->|"Encrypted in transit when using HTTPS"| VALIDATE{"Valid live response?"}
+    VALIDATE -->|Yes| CACHE_WRITE["Refresh the credential-bound encrypted cache"]
+    VALIDATE -->|No| STOP
+    FETCH -. "Unavailable or timed out" .-> CACHE_READ{"Usable matching cache?"}
+    CACHE_READ -->|Yes| CACHED["Load the cached environment values"]
+    CACHE_READ -->|No| STOP
+    CACHE_WRITE --> INJECT["Override matching variables and remove DOPBASE_TOKEN"]
+    CACHED --> INJECT
+    INJECT --> CHILD["Start the application without writing a .env file"]
+    CHILD --> RUNTIME["The application reads secrets from its environment"]
+
+    classDef command fill:#0d0b14,color:#ffffff,stroke:#863bff,stroke-width:2px;
+    classDef client fill:#ede6ff,color:#0d0b14,stroke:#863bff;
+    classDef server fill:#e8f7ff,color:#0d0b14,stroke:#47bfff;
+    classDef cache fill:#fff7df,color:#0d0b14,stroke:#c98900;
+    classDef runtime fill:#e6f8ed,color:#0d0b14,stroke:#219653;
+    classDef failure fill:#fff0f0,color:#6e1010,stroke:#cc4141;
+
+    class START command;
+    class RESOLVE,FETCH,VALIDATE,INJECT client;
+    class AUTH,DATABASE,MASTER,DECRYPT,AUDIT server;
+    class CACHE_WRITE,CACHE_READ,CACHED cache;
+    class CHILD,RUNTIME runtime;
+    class STOP failure;
 ```
 
 The client retrieves the allowed values and injects them into the child process.

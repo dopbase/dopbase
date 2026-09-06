@@ -71,4 +71,4 @@ Treat the value as exposed. Remove or restrict the log, rotate the credential at
 
 ## A database or key is missing
 
-Do not overwrite the remaining material. Recovery requires both a usable database backup and the correct separately stored master key. Follow the supported restore procedure when it becomes available.
+Do not overwrite the remaining material. Recovery requires both a usable database backup and the correct separately stored master key. Restore the database using [`dopbase restore`](/cli/commands#restore) or follow the [backup restoration guide](/self-hosting/storage-backups#restoring-backups).

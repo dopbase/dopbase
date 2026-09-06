@@ -12,17 +12,18 @@ the user configuration.
 
 ## Connections and authentication
 
-| Command                               | Purpose                             |
-| ------------------------------------- | ----------------------------------- |
-| `dopbase serve`                       | Start a self-hosted server          |
-| `dopbase serve --background`          | Start the server as a daemon        |
-| `dopbase stop`                        | Stop the background server          |
-| `dopbase client connect <server-url>` | Validate and save another server    |
-| `dopbase client connect local`        | Return to the implicit local server |
-| `dopbase login`                       | Authenticate with the active server |
-| `dopbase logout`                      | Remove the active saved credential  |
-| `dopbase status`                      | Show safe effective client settings |
-| `dopbase update`                      | Check GitHub for a newer release    |
+| Command                                | Purpose                             |
+| -------------------------------------- | ----------------------------------- |
+| `dopbase serve`                        | Start a self-hosted server          |
+| `dopbase serve --background`           | Start the server as a daemon        |
+| `dopbase stop`                         | Stop the background server          |
+| `dopbase client connect <server-url>`  | Validate and save another server    |
+| `dopbase client connect local`         | Return to the implicit local server |
+| `dopbase login`                        | Authenticate with the active server |
+| `dopbase logout`                       | Remove the active saved credential  |
+| `dopbase status`                       | Show safe effective client settings |
+| `dopbase update`                       | Check GitHub for a newer release    |
+| `dopbase admin reset-password <email>` | Reset a user password offline       |
 
 When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint, asks for interactive confirmation,
@@ -258,14 +259,16 @@ how to set the default. Use `dopbase env default --clear` to remove it. An empty
 Before starting the child, Dopbase writes the resolved project, environment,
 immutable ID, loaded key count, and whether values came from the live server or
 encrypted cache to standard error. It does not print values.
+
 Managed values override same-named variables inherited from the parent process.
 Dopbase authentication variables are removed from the child environment so the
 child application does not receive the credential used to contact Dopbase.
 
 Every successful live retrieval refreshes the credential-bound encrypted cache.
 Connection failures, timeouts, and 5xx responses fall back to the latest
-matching cache after a five-second live-fetch deadline. Cached entries do not
-expire, so the warning includes their fetch time and age. Authentication,
+matching cache after a five-second live-fetch deadline.
+
+Cached entries do not expire, so the warning includes their fetch time and age. Authentication,
 authorization, not-found, malformed-response, missing-cache, or cache-integrity
 failures stop before the child starts. Once started, signals are forwarded and
 the child's exit status is returned to the calling shell.
@@ -345,6 +348,24 @@ dopbase restore ./pre-upgrade.dop --setup-token dbs_... --yes
 > [!IMPORTANT]
 > `dopbase restore` strictly requires the server to be live and connected (`server_status: connected (live)`).
 > Offline restores are rejected to prevent file system races and corruption.
+
+## Server administration
+
+Offline maintenance commands operate directly on the server database:
+
+```bash
+dopbase admin reset-password admin@example.com
+```
+
+`admin reset-password` performs offline recovery on the host machine. Because it accesses SQLite files directly, the background or foreground server process must be stopped first to avoid database locks.
+
+| Option                     | Description                                       |
+| -------------------------- | ------------------------------------------------- |
+| `--config <FILE>`          | Server configuration file to load (`server.toml`) |
+| `--database-url <URL>`     | SQLite database connection string override        |
+| `--master-key-file <FILE>` | Path to the server master key file                |
+
+The command requires an interactive terminal, prompts for a new password (12–128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
 
 ## Structured output
 

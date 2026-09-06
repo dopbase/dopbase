@@ -22,6 +22,7 @@
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs && bun ./scripts/docs-postbuild.mjs",
+    "docs:test:mermaid": "bun scripts/check-mermaid-viewer.mjs",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
@@ -44,13 +45,16 @@
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.10.0",
+    "fastdom": "^1.0.12",
     "globals": "^17.11.0",
     "happy-dom": "^20.11.10",
+    "mermaid": "^11",
     "prettier": "^3.9.6",
     "typescript": "npm:@typescript/typescript6@~6.0.2",
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.2",
     "vitepress": "^2.0.0-alpha.19",
+    "vitepress-mermaid-viewer": "^0.4.0",
     "vitest": "^4.1.11",
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.11"
