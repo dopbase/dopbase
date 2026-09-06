@@ -5,9 +5,10 @@ description: "Complete guide to Dopbase full-system encrypted snapshots (.dop), 
 
 # Backup and disaster recovery
 
-::: warning Upcoming account update
-Backup recovery for additional user and AI accounts is still in development.
-Do not rely on it for production data. See [product status](/guide/product-status).
+::: warning Fresh install and matching key
+Dopbase 0.1.0 accepts backups created by 0.1.0 only. A restore also needs the
+matching source `master.key` when moving between servers. Test recovery before
+relying on it for production data.
 :::
 
 Dopbase includes a native, full-system backup and disaster recovery engine. Unlike
@@ -28,7 +29,7 @@ A `.dop` backup file is a cryptographically protected container structured as fo
 
 1. **Inner Archive**: A standard ZIP archive containing:
    - `dopbase.db`: A consistent SQLite snapshot produced using SQLite's online vacuum/backup API.
-   - `manifest.json`: Metadata including schema version, creation timestamp, Dopbase server version, and record counts.
+    - `manifest.json`: Metadata including schema version, creation timestamp, Dopbase server version, and record counts.
 2. **Authenticated Encryption (AEAD)**: The entire archive is encrypted using **XChaCha20-Poly1305** with a fresh, cryptographically secure 24-byte nonce and a 16-byte authentication tag.
 3. **Envelope Header**: The file starts with magic bytes `DOPBASE_BK1\0`, followed by the 24-byte nonce and the authenticated ciphertext.
 

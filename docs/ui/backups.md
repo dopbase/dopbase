@@ -5,11 +5,8 @@ description: "Manage system-wide encrypted backups, download and upload .dop arc
 
 # Backups and restoration
 
-In the upcoming account update, only root can use this page.
-
-::: warning Upcoming account update
-Backup recovery for additional user and AI accounts is still in development.
-Do not rely on it for production data. See [product status](/guide/product-status).
+Only root can use this page. Version 0.1.0 backups include human users,
+service accounts, and tokens. Backups from earlier releases are not supported.
 :::
 
 The **Backups** page in the Admin UI lets you create, inspect, download, delete,

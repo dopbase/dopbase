@@ -31,8 +31,8 @@ commands. CLI changes appear in the UI.
 
 ## Who can sign in
 
-The unreleased role update supports root, admin, and member sign-in. Setup
-creates the protected root; root and admin create additional users from Users.
+Version 0.1.0 supports root, admin, and member sign-in. Setup creates the
+protected root; root and admin create additional users from Users.
 AI agents authenticate through service-account tokens. Applications use
 environment-scoped runner tokens to retrieve values. See
 [identity and tokens](/reference/identity) for the permission matrix.

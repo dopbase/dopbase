@@ -39,12 +39,9 @@ back up the key through a separately protected process.
 
 ## Built-in backup and restore system
 
-::: warning Upcoming account update
-Backup recovery for additional user and AI accounts is still in development.
-Do not rely on it for production data. See [product status](/guide/product-status).
-:::
-
-Full-instance backups are available only to root in the account update.
+Full-instance backups are available only to root in version 0.1.0. They include
+human users, service accounts, and tokens. Backups from earlier releases are
+not supported.
 
 Dopbase includes a comprehensive system snapshot and restoration engine. Unlike
 per-environment export and import (which only touch secret values in dotenv format),

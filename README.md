@@ -37,15 +37,17 @@ SQLite database, lock files, configuration, and local master key live under
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
-The upcoming account update adds four roles, user management, read-only AI
-accounts, and an instance overview. See [users and AI agents](./docs/ui/users.md)
+Dopbase 0.1.0 adds four roles, user management, read-only AI accounts, an
+instance overview, and crash-safe factory reset. See [users and AI agents](./docs/ui/users.md)
 and [role permissions](./docs/reference/identity.md) for how access works.
+Version 0.1.0 starts with a fresh data directory; databases and backups from
+earlier releases are not supported.
 
 ## Repository layout
 
 | Path         | Purpose                                   | Current state                  |
 | ------------ | ----------------------------------------- | ------------------------------ |
-| `app/`       | Rust service and command-line application | v0.0.14 backend implementation |
+| `app/`       | Rust service and command-line application | v0.1.0 backend implementation |
 | `src/`       | Vue administration interface              | Initial scaffold               |
 | `docs/`      | VitePress product documentation           | Active public specification    |
 | `tests/`     | Frontend tests and test setup             | Early test scaffold            |

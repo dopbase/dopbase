@@ -10,18 +10,25 @@ through claiming it.
 
 ## First-run setup
 
-When the server starts for the first time it prints a one-time setup token:
+When the server starts for the first time it prints a one-time setup token
+together with a link that pre-fills the token input:
 
 ```text
-Setup token: dbsetup_xxxxxxxxxxxxxxxx
+Dopbase setup token (shown once):
+dbsetup_xxxxxxxxxxxxxxxx
+
+Or open this link to fill it in automatically:
+http://localhost:8840/setup?token=dbsetup_xxxxxxxxxxxxxxxx
 ```
 
 Open the Admin UI and you land on the setup page (`/setup`). The page provides two setup options:
 
 ### Option 1: Claim a fresh instance
 
-1. Enter the one-time **setup token** from the server startup output. With
-   `dopbase serve --background`, the token is also written to `~/.dopbase/serve.log`.
+1. Enter the one-time **setup token** from the server startup output, or open
+   the **setup link** printed alongside it, which fills in the token field
+   automatically. With `dopbase serve --background`, the token and link are also
+   written to `~/.dopbase/serve.log`.
 2. Provide an **email address** for the administrator account.
 3. Enter a secure **password** of at least 12 characters (128 at most).
 
@@ -37,9 +44,10 @@ If you are restoring an existing installation or spinning up a replacement insta
 
 The server validates the backup archive against its master encryption key, restores all projects, environments, secrets, runner tokens, and administrator credentials, and closes the setup window. You are then redirected to the sign-in page to log in using the administrator credentials restored from the backup.
 
-There is no second administrator, no invitation flow, and no password reset by
-email. Offline recovery with the master key is the fallback; see
-[identity and tokens](/reference/identity).
+Setup creates the protected root account. Root and admin can create additional
+admin and member users through [Users](./users). Invitations and password reset
+by email are not available. Offline recovery with the master key is the
+fallback; see [identity and tokens](/reference/identity).
 
 ## Signing in
 
@@ -66,7 +74,7 @@ Logging out revokes the server session and clears it from the browser.
 ## Your account
 
 The Account page shows the signed-in email and lets you change the password.
-Changing the password signs out every human session everywhere, including the
-one that changed it. You sign back in with the new password.
+Changing the password signs out every session belonging to that account,
+including the one that changed it. You sign back in with the new password.
 
-Any other signed-in browser is also signed out.
+Other users' sessions are unaffected by this password change.

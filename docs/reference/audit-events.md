@@ -7,7 +7,7 @@ description: "See which sensitive actions Dopbase records, who performed them, w
 
 Audit records answer who performed a sensitive action, where it happened, and when. They describe the action without storing the secret value involved.
 
-## Audit events in 0.0.14
+## Audit events in 0.1.0
 
 | Area           | Events                                                                                                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,15 +17,15 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 | Tokens         | `token.created`, `token.revoked`                                                                                                         |
 | Authentication | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                    |
 | Administrator  | `admin.bootstrapped`, `admin.reauthenticated`, `admin.password_changed`                                                                  |
+| Users          | `user.created`, `user.updated`, `user.deleted`                                                                                           |
+| AI accounts    | `agent.created`, `agent.deleted`, `agent_token.created`, `agent_token.revoked`                                                           |
 | Backups        | `backup.created`, `backup.deleted`, `backup.restored`, `backup.restored_bootstrap`                                                       |
 
 The API schema defines the event names used by this release.
 
 ## Record contents
 
-The upcoming account update also records user creation, updates and deletion,
-AI account creation and deletion, and AI token creation and revocation.
-Root and admin can review this history in the Audit page.
+Root and admin can review user, AI account, and backup history in the Audit page.
 
 An audit record may contain:
 

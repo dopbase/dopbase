@@ -1,13 +1,13 @@
 ---
 title: "Roadmap"
-description: "The Dopbase roadmap: what ships in the 0.0.14 testing release and what is planned toward the first public release."
+description: "The Dopbase roadmap: what ships in 0.1.0 and what is planned next."
 ---
 
 # Roadmap
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## Current testing release: v0.0.14
+## Current release: v0.1.0
 
 - Authentication
 - Projects and environments
@@ -16,17 +16,15 @@ The roadmap describes intent, not a release commitment. Work may move as impleme
 - Admin interface and REST API
 - CLI, `.env` import and export, and `dopbase run`
 - Service tokens and audit records
-
-## v0.1.0: first public release
-
-- Stabilize and validate the current server, CLI, Admin UI, and self-hosting
-  workflows for the first public release
+- Root, admin, member, and AI agent roles
+- User and AI account management
+- Instance status, factory reset, and encrypted full-instance backups
 
 ## v0.2.0
 
 - Secret version history and rollback
 - User invitations
-- Service accounts
+- Broader service-account automation
 - Improved role-based access control
 
 ## v0.3.0

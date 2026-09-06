@@ -92,8 +92,8 @@ No human can delete their own account or change their own role. An admin can
 manage another admin, but cannot modify root. Root is created only during first-run setup. Root changes its password through Account settings.
 After an account is updated, that user needs to sign in again.
 
-These roles are part of an upcoming update. See
-[product status](/guide/product-status) for release availability.
+These roles are available in version 0.1.0. See [product status](/guide/product-status)
+for the current operational boundaries.
 
 Full-instance backup listing, creation, upload, download, restore, and deletion
 are root-only because snapshots contain every project and human account.

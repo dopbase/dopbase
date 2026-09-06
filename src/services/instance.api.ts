@@ -7,7 +7,7 @@ export interface InstanceStatus {
   initializationState: string;
   databaseHealth: string;
   keyAvailability: string;
-  /** Always `"restart-required"` in v0.0.14: config changes need a restart. */
+  /** Configuration changes still require a restart in v0.1.0. */
   configurationReload: string;
 }
 export interface StatusResponse {

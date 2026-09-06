@@ -221,7 +221,7 @@ function clearKeyFile() {
             <div
               class="border-t border-line-soft px-3.5 py-2.5 text-xs leading-relaxed text-ink-muted">
               <p>
-                Only one root account exists in v0.0.14. Password recovery later
+                The root account cannot be recovered by email. Password recovery
                 requires the master key on the server host via:
               </p>
               <DbCode class="mt-2">dopbase admin reset-password</DbCode>
