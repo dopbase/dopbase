@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useId } from "vue";
+import { ChevronDownIcon } from "~/assets/icons";
 
 /**
- * DbSelect — labeled native select styled for the dark palette.
+ * DbSelect — labeled native select styled as a PocketBase field: the
+ * label sits inside the filled control and a chevron hints at the menu.
  * Presentation-only.
  */
 defineProps<{
@@ -23,21 +25,34 @@ function onChange(event: Event): void {
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="label" :for="id" class="text-xs font-medium text-ink-muted">
-      {{ label }}
-    </label>
-    <select
-      :id="id"
-      :value="modelValue"
-      :disabled="disabled"
-      class="w-full cursor-pointer rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink-strong outline-none transition-colors focus:border-accent disabled:opacity-50"
-      @change="onChange">
-      <option
-        v-for="option in options"
-        :key="option.value"
-        :value="option.value">
-        {{ option.label }}
-      </option>
-    </select>
+    <!-- PocketBase-style field: label inside the filled select, custom
+         chevron, fill lightens on focus. -->
+    <div
+      class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
+      :class="disabled ? 'opacity-50' : ''">
+      <label
+        v-if="label"
+        :for="id"
+        class="block px-3.5 pb-0.5 pt-2 text-xs font-semibold text-ink-muted">
+        {{ label }}
+      </label>
+      <div class="relative flex items-center" :class="label ? 'h-9' : 'h-10'">
+        <select
+          :id="id"
+          :value="modelValue"
+          :disabled="disabled"
+          class="h-full w-full cursor-pointer appearance-none bg-transparent pl-3.5 pr-9 text-sm text-ink-strong outline-none disabled:cursor-default"
+          @change="onChange">
+          <option
+            v-for="option in options"
+            :key="option.value"
+            :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+        <ChevronDownIcon
+          class="pointer-events-none absolute right-3.5 h-4 w-4 shrink-0 text-ink-faint" />
+      </div>
+    </div>
   </div>
 </template>
