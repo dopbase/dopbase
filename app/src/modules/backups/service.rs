@@ -22,7 +22,7 @@ use crate::{
 
 const BACKUP_DIR_NAME: &str = "backups";
 const BACKUP_EXTENSION: &str = ".dop";
-const MANIFEST_MAGIC: &str = "DOPBASE_BACKUP_V1";
+const MANIFEST_MAGIC: &str = "DOPBASE_BACKUP_V2";
 const MAX_BACKUP_FILE_BYTES: usize = 250 * 1024 * 1024; // 250 MB
 const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 
@@ -338,8 +338,8 @@ pub async fn upload(
     .map_err(|_| HttpError::bad_request("BACKUP_INVALID", "Backup manifest is invalid."))?;
   if manifest.magic != MANIFEST_MAGIC {
     return Err(HttpError::bad_request(
-      "BACKUP_INVALID",
-      "Backup manifest version is unsupported.",
+      "BACKUP_VERSION_UNSUPPORTED",
+      "This backup was created by an older Dopbase format and cannot be restored by this release.",
     ));
   }
 
@@ -590,8 +590,8 @@ pub async fn restore_database_from_archive(
     .map_err(|_| HttpError::bad_request("BACKUP_CORRUPT", "Backup manifest is invalid."))?;
   if manifest.magic != MANIFEST_MAGIC {
     return Err(HttpError::bad_request(
-      "BACKUP_CORRUPT",
-      "Backup manifest version is unsupported.",
+      "BACKUP_VERSION_UNSUPPORTED",
+      "This backup was created by an older Dopbase format and cannot be restored by this release.",
     ));
   }
 
@@ -668,7 +668,7 @@ pub async fn restore_database_from_archive(
     let mut tx = conn.begin().await?;
 
     // Capture current active admin and session to preserve login if requested
-    type AdminRowTuple = (String, String, String, String, String);
+    type AdminRowTuple = (String, String, String, String, String, String);
     type SessionRowTuple = (
       String,
       String,
@@ -687,7 +687,7 @@ pub async fn restore_database_from_archive(
 
     if let Some((admin_id, _, session_id)) = preserve_admin {
       current_admin = sqlx::query_as(
-        "SELECT id, email, password_hash, created_at, updated_at FROM admins WHERE id = ?",
+        "SELECT id, email, password_hash, role, created_at, updated_at FROM admins WHERE id = ?",
       )
       .bind(admin_id)
       .fetch_optional(&mut *tx)
@@ -705,6 +705,8 @@ pub async fn restore_database_from_archive(
     // Wipe existing data
     sqlx::query("DELETE FROM audit_events").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM runner_tokens").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM agent_tokens").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM service_accounts").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM secrets").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM environment_env_layout").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM environments").execute(&mut *tx).await?;
@@ -716,11 +718,12 @@ pub async fn restore_database_from_archive(
     // Copy snapshot data from backup_db
     sqlx::query("INSERT INTO instance_metadata SELECT * FROM backup_db.instance_metadata").execute(&mut *tx).await?;
     if preserve_admin.is_some() {
-      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins WHERE role = 'admin'").execute(&mut *tx).await?;
+      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins WHERE role <> 'root'").execute(&mut *tx).await?;
     } else {
       sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins").execute(&mut *tx).await?;
     }
-    sqlx::query("INSERT OR IGNORE INTO sessions SELECT * FROM backup_db.sessions WHERE admin_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO service_accounts SELECT * FROM backup_db.service_accounts").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO agent_tokens SELECT * FROM backup_db.agent_tokens").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO projects SELECT * FROM backup_db.projects").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO environments SELECT * FROM backup_db.environments").execute(&mut *tx).await?;
     sqlx::query("INSERT OR REPLACE INTO environment_env_layout SELECT * FROM backup_db.environment_env_layout").execute(&mut *tx).await?;
@@ -741,18 +744,17 @@ pub async fn restore_database_from_archive(
       .await?;
 
       if let Some((target_admin_id,)) = restored_admin_with_same_email {
-        sess.1 = target_admin_id.clone();
-        effective_admin_id = Some(target_admin_id);
-      } else {
-        sqlx::query("INSERT OR IGNORE INTO admins(id, email, password_hash, created_at, updated_at) VALUES(?, ?, ?, ?, ?)")
-          .bind(&admin.0).bind(&admin.1).bind(&admin.2).bind(&admin.3).bind(&admin.4)
-          .execute(&mut *tx).await?;
-        let actual_admin: (String,) = sqlx::query_as("SELECT id FROM admins LIMIT 1")
-          .fetch_one(&mut *tx)
+        sqlx::query("DELETE FROM admins WHERE id = ?")
+          .bind(target_admin_id)
+          .execute(&mut *tx)
           .await?;
-        sess.1 = actual_admin.0.clone();
-        effective_admin_id = Some(actual_admin.0);
       }
+
+      sqlx::query("INSERT OR REPLACE INTO admins(id, email, password_hash, role, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?)")
+        .bind(&admin.0).bind(&admin.1).bind(&admin.2).bind(&admin.3).bind(&admin.4).bind(&admin.5)
+        .execute(&mut *tx).await?;
+      sess.1 = admin.0.clone();
+      effective_admin_id = Some(admin.0.clone());
 
       sqlx::query("INSERT OR REPLACE INTO sessions(id, admin_id, kind, token_hash, csrf_hash, created_at, last_used_at, recent_auth_at, idle_expires_at, absolute_expires_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(sess.0).bind(sess.1).bind(sess.2).bind(sess.3).bind(sess.4).bind(sess.5).bind(sess.6).bind(sess.7).bind(sess.8).bind(sess.9)
