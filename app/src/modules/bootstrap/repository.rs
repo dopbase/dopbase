@@ -11,7 +11,7 @@ pub async fn insert_admin(
   password_hash: &str,
   now: &str,
 ) -> Result<(), sqlx::Error> {
-  sqlx::query("INSERT INTO admins(id,email,password_hash,created_at,updated_at) VALUES(?,?,?,?,?)")
+  sqlx::query("INSERT INTO admins(id,email,password_hash,created_at,updated_at,role) VALUES(?,?,?,?,?,'root')")
     .bind(id)
     .bind(email)
     .bind(password_hash)

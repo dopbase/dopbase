@@ -1,3 +1,4 @@
+use crate::models::AdminRole;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 #[derive(Serialize, ToSchema)]
@@ -17,7 +18,9 @@ pub struct BootstrapAdminRequest {
 pub struct BootstrapAdminResponse {
   pub admin_id: String,
   pub email: String,
+  pub role: AdminRole,
   pub csrf_token: String,
+  pub last_login_at: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]

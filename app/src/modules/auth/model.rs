@@ -1,4 +1,4 @@
-use crate::models::SessionKind;
+use crate::models::{AdminRole, SessionKind};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 #[derive(Deserialize, ToSchema)]
@@ -13,17 +13,21 @@ pub struct LoginRequest {
 pub struct LoginResponse {
   pub admin_id: String,
   pub email: String,
+  pub role: AdminRole,
   pub session_kind: SessionKind,
   pub token: Option<String>,
   pub csrf_token: Option<String>,
+  pub last_login_at: Option<String>,
 }
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponse {
   pub admin_id: String,
   pub email: String,
+  pub role: AdminRole,
   pub session_kind: SessionKind,
   pub recent_authentication: bool,
+  pub last_login_at: Option<String>,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct ReauthenticateRequest {

@@ -9,9 +9,9 @@ use crate::{
     },
     tokens::{ADMIN_SESSION_PREFIX, CSRF_TOKEN_PREFIX, SESSION_ID_PREFIX},
   },
-  extractors::require_admin,
+  extractors::require_project_manager,
   http::HttpError,
-  models::{AuthIdentity, SessionKind},
+  models::{AdminRole, AuthIdentity, SessionKind},
   services::token,
   state::AppState,
 };
@@ -34,7 +34,7 @@ pub async fn login(
     ));
   }
   let admin = repository::admin_by_email(state.db.pool(), &email).await?;
-  let valid = if let Some((_, _, hash)) = &admin {
+  let valid = if let Some((_, _, hash, _)) = &admin {
     common::verify_password_async(request.password.clone(), hash.clone()).await?
   } else {
     false
@@ -60,7 +60,13 @@ pub async fn login(
     ));
   }
   state.rate_limiter.clear(&limit_key).await;
-  let (admin_id, email, _) = admin.expect("validated");
+  let (admin_id, email, _, role_value) = admin.expect("validated");
+  let role = match role_value.as_str() {
+    "root" => AdminRole::Root,
+    "admin" => AdminRole::Admin,
+    "member" => AdminRole::Member,
+    _ => return Err(HttpError::internal()),
+  };
   let raw = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;
   let csrf = if request.session_kind == SessionKind::Browser {
     Some(token::generate(CSRF_TOKEN_PREFIX).map_err(|_| HttpError::internal())?)
@@ -108,9 +114,11 @@ pub async fn login(
   let response = LoginResponse {
     admin_id,
     email,
+    role,
     session_kind: request.session_kind,
     token: (request.session_kind == SessionKind::Cli).then(|| raw.clone()),
     csrf_token: csrf,
+    last_login_at: Some(now.to_rfc3339()),
   };
   Ok(LoginResult {
     response,
@@ -123,18 +131,26 @@ pub fn session(identity: &AuthIdentity) -> Result<SessionResponse, HttpError> {
       admin_id,
       email,
       kind,
+      role,
       recent_auth_at,
+      created_at,
       ..
     } => Ok(SessionResponse {
       admin_id: admin_id.clone(),
       email: email.clone(),
+      role: *role,
       session_kind: *kind,
       recent_authentication: Utc::now() - *recent_auth_at
         <= Duration::minutes(RECENT_AUTHENTICATION_MINUTES),
+      last_login_at: Some(created_at.to_rfc3339()),
     }),
     AuthIdentity::Runner { .. } => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "A runner token has no human session.",
+    )),
+    AuthIdentity::ServiceAccount { .. } => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "An AI service account has no human session.",
     )),
   }
 }
@@ -142,7 +158,7 @@ pub async fn logout(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let session_id = match identity {
     AuthIdentity::Admin { session_id, .. } => session_id,
     _ => unreachable!(),
@@ -175,7 +191,7 @@ pub async fn reauthenticate(
   identity: &AuthIdentity,
   password: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   let hash = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
@@ -216,7 +232,7 @@ pub async fn change_password(
   identity: &AuthIdentity,
   request: ChangePasswordRequest,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_admin(identity)?;
+  let (admin_id, email) = require_project_manager(identity)?;
   common::validate_password(&request.new_password)?;
   let old = repository::password_hash(state.db.pool(), admin_id)
     .await?

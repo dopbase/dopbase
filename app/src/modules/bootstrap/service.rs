@@ -15,6 +15,7 @@ use crate::{
     tokens::{ADMIN_ID_PREFIX, ADMIN_SESSION_PREFIX, CSRF_TOKEN_PREFIX, SESSION_ID_PREFIX},
   },
   http::HttpError,
+  models::AdminRole,
   services::token,
   state::AppState,
 };
@@ -106,7 +107,9 @@ pub async fn create(
     response: BootstrapAdminResponse {
       admin_id,
       email,
+      role: AdminRole::Root,
       csrf_token: csrf,
+      last_login_at: Some(now.to_rfc3339()),
     },
     session_token,
   })
