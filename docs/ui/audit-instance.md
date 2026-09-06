@@ -1,14 +1,16 @@
 ---
 title: "Audit and instance status"
-description: "Review what happened on your Dopbase server with the audit log and monitor instance status in two read-only Admin UI screens."
+description: "Review what happened on your Dopbase server with the audit log and monitor instance status in the Admin UI."
 ---
 
 # Audit and instance status
 
-Two read-only screens answer the questions "what happened?" and "how is the
-server doing?".
+Audit shows recorded activity; Instance shows server health and an overview
+of what is stored on your instance.
 
 ## The audit log
+
+The Audit page is available to root and admin.
 
 Dopbase records sensitive actions such as secret changes, imports, exports,
 reveals, token creation and revocation, deletions, and sign-ins. The Audit page
@@ -32,21 +34,26 @@ one specific value, filter by environment and action rather than scrolling.
 
 ## Instance status
 
-The read-only Instance page reports:
+The Instance page reports:
 
 - The running Dopbase version
-- The server's public endpoint
-- Whether the SQLite storage is healthy
+- How long the server has been running and when the summary was updated
+- Whether storage is healthy
 - Whether the master key is available. If this shows a
   problem, nothing that needs encryption or decryption will work, and the
   fix lives on the host, not in the browser.
 
-The page also shows that configuration changes require a restart. Dopbase reads
-settings from `~/.dopbase/server.toml` and the process environment at startup.
-The Admin UI does not edit these settings. See
-[self-hosting operations](/self-hosting/operations) for the host configuration.
+The page reports project, environment, secret, human-user, AI-agent, active
+runner-token, active agent-token, and backup counts. All human roles can view
+it. AI accounts also have read-only access to the summary.
 
-## What these pages do not do
+Configuration still loads at startup and requires a restart to change. See
+[self-hosting operations](/self-hosting/operations).
 
-Neither page changes server state. The audit log is append-only, and the
-instance page exposes no file paths, keys, or private configuration.
+## Danger Zone
+
+Root also sees **Danger Zone** on the Instance page. Its factory-reset action
+permanently removes accounts, project data, audit history, and server backups.
+Reading the status summary does not reset anything.
+
+Read [factory reset](/self-hosting/factory-reset) before using this action.

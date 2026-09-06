@@ -26,6 +26,11 @@ and evaluation before the first public release, 0.1.0.
 
 ## Current boundaries
 
+User management, four built-in roles, read-only AI accounts, and an expanded
+instance overview are part of an upcoming update, not the 0.0.14 release.
+Backup recovery for additional accounts and factory reset are still in
+development. Do not use these features with production data.
+
 Dopbase Cloud is not available yet. The current release does not include
 Windows ARM64, automatic upgrades, or managed backups. Self-hosted operators
 remain responsible for TLS, network access, database backups, master-key
