@@ -2,6 +2,7 @@ import { apiRequest } from "./http.client";
 
 /** Session kinds supported by the server. Browser UI always sends `"browser"`. */
 export type SessionKind = "browser" | "cli";
+export type AccountRole = "root" | "admin" | "member" | "ai_agent";
 
 export interface LoginRequest {
   email: string;
@@ -17,6 +18,8 @@ export interface LoginResponse {
   token: string | null;
   /** CSRF token, only present for browser sessions. */
   csrfToken: string | null;
+  role?: AccountRole;
+  lastLoginAt?: string | null;
 }
 
 export interface SessionResponse {
@@ -25,6 +28,8 @@ export interface SessionResponse {
   sessionKind: SessionKind;
   /** True when the password was confirmed within the last ten minutes. */
   recentAuthentication: boolean;
+  role?: AccountRole;
+  lastLoginAt?: string | null;
 }
 
 const BASE = "/api/v1/auth";
@@ -55,6 +60,7 @@ export async function reauthenticate(password: string): Promise<void> {
   await apiRequest(`${BASE}/reauthenticate`, {
     method: "POST",
     body: { password },
+    notifyAuthEvents: false,
   });
 }
 
@@ -65,5 +71,6 @@ export async function changePassword(
   await apiRequest(`${BASE}/change-password`, {
     method: "POST",
     body: { currentPassword, newPassword },
+    notifyAuthEvents: false,
   });
 }

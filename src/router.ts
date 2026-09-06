@@ -57,11 +57,13 @@ export const router = createRouter({
       path: "/backups",
       name: "backups",
       component: () => import("~/pages/Backups/Backups.page.vue"),
+      meta: { rootOnly: true },
     },
     {
       path: "/audit",
       name: "audit",
       component: () => import("~/pages/Audit/Audit.page.vue"),
+      meta: { adminOnly: true },
     },
     {
       path: "/instance",
@@ -72,6 +74,12 @@ export const router = createRouter({
       path: "/account",
       name: "account",
       component: () => import("~/pages/Account/Account.page.vue"),
+    },
+    {
+      path: "/users",
+      name: "users",
+      component: () => import("~/pages/Users/Users.page.vue"),
+      meta: { adminOnly: true },
     },
     {
       path: "/:pathMatch(.*)*",

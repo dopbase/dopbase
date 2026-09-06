@@ -18,6 +18,8 @@ export interface BootstrapAdminResponse {
   adminId: string;
   email: string;
   csrfToken: string;
+  role?: "root" | "admin";
+  lastLoginAt?: string | null;
 }
 
 const BASE = "/api/v1/bootstrap";

@@ -38,6 +38,8 @@ export function installRouterGuards(router: Router): void {
           };
         }
       }
+      if (to.meta.rootOnly && !auth.isRoot) return { name: "workspace" };
+      if (to.meta.adminOnly && !auth.isAdmin) return { name: "workspace" };
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {

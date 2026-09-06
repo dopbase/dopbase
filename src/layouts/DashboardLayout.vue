@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useRoute } from "vue-router";
+import { useAuthStore } from "~/stores/auth.store";
 import {
   ArchiveIcon,
   DopbaseIcon,
@@ -7,8 +9,10 @@ import {
   HistoryIcon,
   ServerIcon,
   UserIcon,
+  UsersIcon,
   LogOutIcon,
 } from "~/assets/icons";
+import { DbSpinner } from "~/components/ui";
 import ReauthModal from "~/components/app/ReauthModal.vue";
 import { useDashboardLayoutController } from "./DashboardLayout.controller";
 
@@ -21,9 +25,16 @@ import { useDashboardLayoutController } from "./DashboardLayout.controller";
  * it.
  */
 const route = useRoute();
-const { email, logout } = useDashboardLayoutController();
+const auth = useAuthStore();
+const { email, loggingOut, logout } = useDashboardLayoutController();
 
 const navItems = [
+  {
+    name: "users",
+    label: "Users",
+    icon: UsersIcon,
+    match: (r: string) => r.startsWith("/users"),
+  },
   {
     name: "workspace",
     label: "Projects",
@@ -58,6 +69,15 @@ const navItems = [
 
 const isActive = (item: (typeof navItems)[number]): boolean =>
   item.match(route.path);
+const visibleNavItems = computed(() => navItems.filter(
+  (item) =>
+    item.name === "backups" || item.name === "users" || item.name === "audit"
+      ? auth.isAdmin
+      : true,
+));
+const consoleLabel = computed(() =>
+  auth.session?.role === "member" ? "member console" : "admin console",
+);
 </script>
 
 <template>
@@ -68,22 +88,22 @@ const isActive = (item: (typeof navItems)[number]): boolean =>
       <div
         class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4">
         <div
-          class="flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 bg-accent-soft text-accent-strong">
+          class="flex h-8 w-8 items-center justify-center rounded-control border border-accent/40 bg-accent-soft text-accent-strong">
           <DopbaseIcon class="h-5 w-5" />
         </div>
         <div class="leading-tight">
-          <p class="font-mono text-sm font-semibold text-ink-strong">dopbase</p>
-          <p class="text-xs text-ink-muted">admin console</p>
+          <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
+          <p class="text-xs text-ink-muted">{{ consoleLabel }}</p>
         </div>
       </div>
 
       <!-- Primary navigation -->
       <nav class="flex flex-col gap-1 px-3 py-4">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.name"
           :to="{ name: item.name }"
-          class="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors"
+          class="flex items-center gap-2.5 rounded-control px-3 py-2 text-sm transition-colors"
           :class="
             isActive(item)
               ? 'bg-accent-soft text-ink-strong'
@@ -108,10 +128,14 @@ const isActive = (item: (typeof navItems)[number]): boolean =>
           </div>
           <button
             type="button"
-            class="cursor-pointer rounded-md border border-line bg-raised p-1.5 text-ink-muted transition-colors hover:border-crit/40 hover:text-crit"
-            aria-label="Log out"
+            class="cursor-pointer rounded-control bg-raised p-1.5 text-ink-muted transition-colors hover:bg-crit/15 hover:text-crit disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="loggingOut"
+            :aria-label="loggingOut ? 'Logging out...' : 'Log out'"
+            :title="loggingOut ? 'Logging out...' : 'Log out'"
+            data-testid="logout-button"
             @click="logout">
-            <LogOutIcon class="h-4 w-4" />
+            <DbSpinner v-if="loggingOut" class="h-4 w-4 text-ink-muted" />
+            <LogOutIcon v-else class="h-4 w-4" />
           </button>
         </div>
       </div>

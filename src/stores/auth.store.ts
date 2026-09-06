@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { bootstrapAdmin, fetchBootstrapStatus } from "~/services/bootstrap.api";
 import * as authApi from "~/services/auth.api";
-import type { SessionKind } from "~/services/auth.api";
+import type { AccountRole, SessionKind } from "~/services/auth.api";
 import { onUnauthorized, registerCsrfProvider } from "~/services/http.client";
 
 export interface AdminSession {
@@ -11,6 +11,8 @@ export interface AdminSession {
   sessionKind: SessionKind;
   /** True when the password was confirmed within the last ten minutes. */
   recentAuthentication: boolean;
+  role: AccountRole;
+  lastLoginAt?: string | null;
 }
 
 export type BootstrapState = "unknown" | "setupRequired" | "ready";
@@ -60,6 +62,8 @@ export const useAuthStore = defineStore("auth", () => {
   });
 
   const isAuthenticated = computed(() => session.value !== null);
+  const isRoot = computed(() => session.value?.role === "root");
+  const isAdmin = computed(() => session.value?.role === "root" || session.value?.role === "admin");
 
   function setCsrf(token: string | null): void {
     csrfToken.value = token;
@@ -93,6 +97,8 @@ export const useAuthStore = defineStore("auth", () => {
       email: response.email,
       sessionKind: "browser",
       recentAuthentication: true,
+      role: response.role ?? "root",
+      lastLoginAt: response.lastLoginAt ?? null,
     };
     setCsrf(response.csrfToken);
     bootstrapState.value = "ready";
@@ -110,6 +116,8 @@ export const useAuthStore = defineStore("auth", () => {
       email: response.email,
       sessionKind: response.sessionKind,
       recentAuthentication: true,
+      role: response.role ?? "admin",
+      lastLoginAt: response.lastLoginAt ?? null,
     };
     if (response.csrfToken) setCsrf(response.csrfToken);
   }
@@ -122,6 +130,8 @@ export const useAuthStore = defineStore("auth", () => {
       email: response.email,
       sessionKind: response.sessionKind,
       recentAuthentication: response.recentAuthentication,
+      role: response.role ?? "admin",
+      lastLoginAt: response.lastLoginAt ?? null,
     };
   }
 
@@ -133,6 +143,12 @@ export const useAuthStore = defineStore("auth", () => {
       session.value = null;
       setCsrf(null);
     }
+  }
+
+  function clearLocalSession(): void {
+    session.value = null;
+    setCsrf(null);
+    bootstrapState.value = "unknown";
   }
 
   /** Confirms the password, enabling reveal/export for ten minutes. */
@@ -162,12 +178,15 @@ export const useAuthStore = defineStore("auth", () => {
     bootstrapState,
     csrfToken,
     isAuthenticated,
+    isRoot,
+    isAdmin,
     setCsrf,
     loadBootstrapStatus,
     bootstrap,
     login,
     fetchSession,
     logout,
+    clearLocalSession,
     reauthenticate,
     changePassword,
   };

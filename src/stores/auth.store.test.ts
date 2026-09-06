@@ -46,6 +46,8 @@ describe("auth store", () => {
       email: "a@b.c",
       sessionKind: "browser",
       recentAuthentication: true,
+      role: "admin",
+      lastLoginAt: null,
     });
     expect(store.csrfToken).toBe("csrf_1");
     expect(sessionStorage.getItem("dopbase.csrf")).toBe("csrf_1");
@@ -122,6 +124,8 @@ describe("auth store", () => {
       email: "a@b.c",
       sessionKind: "browser",
       recentAuthentication: false,
+      role: "admin",
+      lastLoginAt: null,
     });
   });
 

@@ -1,4 +1,5 @@
 export * from "./http.client";
+export * from "./api-errors";
 export * from "./auth.api";
 export * from "./bootstrap.api";
 export * from "./projects.api";
@@ -7,4 +8,5 @@ export * from "./secrets.api";
 export * from "./tokens.api";
 export * from "./audit.api";
 export * from "./instance.api";
+export * from "./service-accounts.api";
 export * from "./health.api";
