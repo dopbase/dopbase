@@ -14,7 +14,7 @@ import {
   DbEmptyState,
   DbInput,
   DbModal,
-  DbSpinner,
+  DbSkeleton,
   DbTextarea,
 } from "~/components/ui";
 import {
@@ -26,6 +26,7 @@ import {
 } from "~/assets/icons";
 import { formatRelativeTime } from "~/utils/format";
 import { ApiError } from "~/services/http.client";
+import { isValidSecretKey } from "~/utils/validation";
 import type { SecretMetadata } from "~/services";
 
 /**
@@ -75,7 +76,6 @@ const {
   editorError,
   editorDiff,
   editorIssues,
-  editorEntries,
   editorDirty,
   editorCanSave,
   openEditor,
@@ -134,6 +134,20 @@ const diffGroups = computed(() => {
   ].filter((group) => group.keys.length > 0);
 });
 
+/* Editor-diff styling: each group reads like a diff hunk. */
+const diffGroupClasses: Record<string, string> = {
+  Added: "border-ok/30 bg-ok/10",
+  Updated: "border-warn/30 bg-warn/10",
+  Deleted: "border-crit/30 bg-crit/10",
+  Unchanged: "border-line-soft bg-canvas",
+};
+const diffGroupLabelClasses: Record<string, string> = {
+  Added: "text-ok",
+  Updated: "text-warn",
+  Deleted: "text-crit",
+  Unchanged: "text-ink-faint",
+};
+
 const form = ref<FormState>(null);
 const saving = ref(false);
 const deleteTarget = ref<SecretMetadata | null>(null);
@@ -156,8 +170,8 @@ function closeForm(): void {
 
 async function submitForm(): Promise<void> {
   if (!form.value) return;
-  if (form.value.mode === "create" && form.value.key.trim() === "") {
-    form.value.error = "Enter a key name.";
+  if (form.value.mode === "create" && !isValidSecretKey(form.value.key.trim())) {
+    form.value.error = "Use 1–128 characters: letters, numbers, and '_'; start with a letter or '_'.";
     return;
   }
   saving.value = true;
@@ -172,7 +186,7 @@ async function submitForm(): Promise<void> {
     if (form.value) {
       form.value.error =
         cause instanceof ApiError && cause.hasCode("REQUEST_INVALID")
-          ? "Keys may use letters, numbers, '_', '-', or '.', and cannot start with a number."
+          ? "Keys may use letters, numbers, and '_', and cannot start with a number."
           : "The secret could not be saved.";
     }
   } finally {
@@ -206,7 +220,7 @@ async function confirmDelete(): Promise<void> {
       </h3>
       <div class="ml-auto flex items-center gap-2">
         <div
-          class="flex rounded-md border border-line bg-canvas p-0.5"
+          class="flex rounded-control border border-line bg-canvas p-0.5"
           role="tablist"
           aria-label="Secrets view">
           <button
@@ -258,7 +272,57 @@ async function confirmDelete(): Promise<void> {
         {{ actionError }}
       </DbAlert>
 
-      <DbSpinner v-if="loading" class="mx-auto mt-8 h-5 w-5 text-ink-muted" />
+      <!-- Loading skeleton secrets table -->
+      <div
+        v-if="loading"
+        class="overflow-x-auto rounded-card border border-line bg-panel"
+        data-testid="secrets-skeleton">
+        <table class="min-w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-line">
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Key
+              </th>
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Version
+              </th>
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Updated
+              </th>
+              <th
+                class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="i in 5"
+              :key="i"
+              class="border-b border-line-soft last:border-b-0">
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-36" />
+              </td>
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-10 rounded-control" />
+              </td>
+              <td class="px-4 py-3">
+                <DbSkeleton class="h-4 w-20" />
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <DbSkeleton class="h-6 w-16 rounded-control" />
+                  <DbSkeleton class="h-6 w-6 rounded-control" />
+                  <DbSkeleton class="h-6 w-6 rounded-control" />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <DbAlert v-else-if="loadError">
         {{ loadError }}
@@ -283,7 +347,7 @@ async function confirmDelete(): Promise<void> {
 
       <div
         v-else-if="secrets"
-        class="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-panel">
+        class="overflow-x-auto rounded-card border border-line bg-panel">
         <table class="min-w-full text-left text-sm" data-testid="secrets-table">
           <thead>
             <tr class="border-b border-line">
@@ -384,21 +448,11 @@ async function confirmDelete(): Promise<void> {
 
     <!-- Editor view -->
     <template v-else>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs text-ink-muted">
-          <span class="font-mono text-ink-strong">{{
-            editorEntries.length
-          }}</span>
-          keys ·
-          <span
-            class="font-mono"
-            :class="editorIssues.length > 0 ? 'text-crit' : 'text-ink-strong'">
-            {{ editorIssues.length }}
-          </span>
-          issues
-        </span>
+      <!-- Slim toolbar: state badge + actions. Key/issue counts live in
+           the editor's own status bar now. -->
+      <div class="flex items-center gap-2">
         <DbBadge v-if="editorDirty" tone="warn">unsaved changes</DbBadge>
-        <DbBadge v-else-if="editorContent !== null" tone="ok">saved</DbBadge>
+        <DbBadge v-else-if="editorContent !== null" tone="ok"> saved </DbBadge>
         <div class="ml-auto flex items-center gap-2">
           <DbButton
             size="sm"
@@ -420,9 +474,12 @@ async function confirmDelete(): Promise<void> {
         </div>
       </div>
 
-      <DbSpinner
+      <div
         v-if="editorLoading"
-        class="mx-auto mt-8 h-5 w-5 text-ink-muted" />
+        class="space-y-3"
+        data-testid="env-editor-skeleton">
+        <DbSkeleton class="h-64 w-full rounded-card" />
+      </div>
 
       <div v-else-if="editorLoadError" class="flex flex-col items-start gap-3">
         <DbAlert>{{ editorLoadError }}</DbAlert>
@@ -447,7 +504,10 @@ async function confirmDelete(): Promise<void> {
         <EnvFileEditor
           v-model="editorContent"
           :issues="editorIssues"
-          :disabled="editorSaving" />
+          :disabled="editorSaving"
+          :dirty="editorDirty"
+          :subtitle="environmentName"
+          @save="saveDraft" />
 
         <DbAlert v-if="editorError">
           {{ editorError }}
@@ -457,19 +517,21 @@ async function confirmDelete(): Promise<void> {
         <div
           v-if="editorDiff"
           data-testid="env-editor-diff"
-          class="flex flex-col gap-3 rounded-[var(--radius-card)] border border-line bg-panel p-4">
+          class="flex flex-col gap-3 rounded-card border border-line bg-panel p-4">
           <div class="flex items-center gap-2">
-            <DbBadge tone="accent">dry-run ok</DbBadge>
+            <DbBadge tone="accent">Validate changes is ok</DbBadge>
             <span class="text-xs text-ink-muted">
-              nothing stored yet — review the effect
+              nothing stored yet, review the effect
             </span>
           </div>
           <div
             v-for="group in diffGroups"
             :key="group.label"
-            class="rounded-md border border-line-soft bg-canvas px-3 py-2">
+            class="rounded-control border px-3 py-2"
+            :class="diffGroupClasses[group.label]">
             <p
-              class="mb-1 font-mono text-xs uppercase tracking-wide text-ink-faint">
+              class="mb-1 font-mono text-xs font-semibold uppercase tracking-wide"
+              :class="diffGroupLabelClasses[group.label]">
               {{ group.label }} ({{ group.keys.length }})
             </p>
             <p class="font-mono text-xs text-ink">
@@ -571,9 +633,9 @@ async function confirmDelete(): Promise<void> {
       @close="showImport = false" />
     <ExportSecretsDialog
       :open="showExport"
-      :environment-id="environmentId"
       :environment-name="environmentName"
       :project-name="projectName"
+      :action="controller.exportSecretsFile"
       @close="showExport = false" />
   </div>
 </template>

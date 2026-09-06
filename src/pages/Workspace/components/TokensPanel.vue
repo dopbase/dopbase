@@ -11,7 +11,7 @@ import {
   DbEmptyState,
   DbInput,
   DbModal,
-  DbSpinner,
+  DbSkeleton,
 } from "~/components/ui";
 import { KeyIcon } from "~/assets/icons";
 import { formatRelativeTime, formatDateTime } from "~/utils/format";
@@ -110,7 +110,62 @@ function tokenStatus(token: RunnerToken): {
 
     <DbAlert v-if="actionError">{{ actionError }}</DbAlert>
 
-    <DbSpinner v-if="loading" class="mx-auto mt-8 h-5 w-5 text-ink-muted" />
+    <!-- Loading skeleton tokens table -->
+    <div
+      v-if="loading"
+      class="overflow-x-auto rounded-card border border-line bg-panel"
+      data-testid="tokens-skeleton">
+      <table class="min-w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-line">
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Name
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Created
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Expires
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Last used
+            </th>
+            <th
+              class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="i in 3"
+            :key="i"
+            class="border-b border-line-soft last:border-b-0">
+            <td class="px-4 py-3">
+              <DbSkeleton class="h-4 w-32" />
+            </td>
+            <td class="px-4 py-3">
+              <DbSkeleton class="h-4 w-20" />
+            </td>
+            <td class="px-4 py-3">
+              <DbSkeleton class="h-4 w-24" />
+            </td>
+            <td class="px-4 py-3">
+              <DbSkeleton class="h-4 w-20" />
+            </td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex items-center justify-end">
+                <DbSkeleton class="h-6 w-14 rounded-control" />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <DbAlert v-else-if="loadError">{{ loadError }}</DbAlert>
 
@@ -130,7 +185,7 @@ function tokenStatus(token: RunnerToken): {
 
     <div
       v-else-if="tokens"
-      class="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-panel">
+      class="overflow-x-auto rounded-card border border-line bg-panel">
       <table class="min-w-full text-left text-sm" data-testid="tokens-table">
         <thead>
           <tr class="border-b border-line">
@@ -214,7 +269,7 @@ function tokenStatus(token: RunnerToken): {
           hint="A readable label, e.g. the deployment target's name." />
         <p class="text-sm text-ink-muted">
           Role: <DbBadge tone="accent">runner</DbBadge>
-          — the token can read this environment's runtime values but cannot list
+          - the token can read this environment's runtime values but cannot list
           metadata, mutate secrets, reveal, or export.
         </p>
         <p v-if="createError" class="text-xs text-crit">
@@ -245,7 +300,7 @@ function tokenStatus(token: RunnerToken): {
       persistent>
       <div v-if="created" class="flex flex-col gap-4">
         <p class="text-sm text-ink">
-          Copy the token now. It is stored only as a hash — this plaintext is
+          Copy the token now. It is stored only as a hash, this plaintext is
           shown <span class="font-semibold text-ink-strong">once</span> and
           cannot be recovered.
         </p>
@@ -254,7 +309,7 @@ function tokenStatus(token: RunnerToken): {
             class="min-w-0 flex-1 break-all rounded border border-accent/30 bg-canvas px-3 py-2 font-mono text-xs text-accent-strong">
             {{ created.plaintextToken }}
           </code>
-          <DbCopyButton :value="created.plaintextToken" label="Copy token" />
+          <DbCopyButton :value="created.plaintextToken" label="Copy" />
         </div>
         <DbCode>{{ created.token.name }} · {{ created.token.id }}</DbCode>
         <div class="flex items-center justify-end">

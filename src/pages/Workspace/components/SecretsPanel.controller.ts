@@ -2,6 +2,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import type { Ref } from "vue";
 import * as secretsApi from "~/services/secrets.api";
 import type {
+  ExportSecretsResponse,
   ImportSecretsResponse,
   SecretMetadata,
 } from "~/services/secrets.api";
@@ -10,9 +11,11 @@ import { useReauthentication } from "~/composable";
 import {
   mergeLayoutValues,
   parseEnvFileLines,
+  serializeEnvFile,
   stripLayoutValues,
   type EnvFileIssue,
 } from "~/utils/env-file";
+import { formatCountdown } from "~/utils/format";
 
 /** How long a revealed plaintext stays visible in component memory. */
 export const REVEAL_SECONDS = 30;
@@ -113,11 +116,11 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     wipeEditor();
   });
 
-  const revealCountdown = computed(() => `${revealSecondsLeft.value}s`);
+  const revealCountdown = computed(() => formatCountdown(revealSecondsLeft.value));
 
   function describeError(cause: unknown, fallback: string): string {
     if (cause instanceof ApiError && cause.firstCode === "REQUEST_INVALID") {
-      return "Keys may use letters, numbers, '_', '-', or '.', and cannot start with a number.";
+      return "Keys may use letters, numbers, and '_', and cannot start with a number.";
     }
     if (cause instanceof ApiError && cause.status === 0) {
       return "Cannot reach the Dopbase server.";
@@ -174,6 +177,17 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     }
   }
 
+  /** Reauthenticates and returns a serialized export for the owning dialog. */
+  async function exportSecretsFile(signal?: AbortSignal): Promise<string> {
+    const target = environmentId.value;
+    let response: ExportSecretsResponse | undefined;
+    await runWithReauth(async () => {
+      response = await secretsApi.exportSecrets(target);
+    }, signal);
+    if (response === undefined) throw new Error("The export returned no data.");
+    return serializeEnvFile(response.entries);
+  }
+
   // -------------------------------------------------------------------------
   // .env editor
   // -------------------------------------------------------------------------
@@ -190,16 +204,13 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     editorAwaitingReauth.value = false;
   }
 
-  const editorIssues = computed<EnvFileIssue[]>(() =>
+  const parsedEditor = computed(() =>
     editorContent.value === null
-      ? []
-      : parseEnvFileLines(editorContent.value).issues,
+      ? { entries: [], issues: [] as EnvFileIssue[] }
+      : parseEnvFileLines(editorContent.value),
   );
-  const editorEntries = computed(() =>
-    editorContent.value === null
-      ? []
-      : parseEnvFileLines(editorContent.value).entries,
-  );
+  const editorIssues = computed<EnvFileIssue[]>(() => parsedEditor.value.issues);
+  const editorEntries = computed(() => parsedEditor.value.entries);
   const editorDirty = computed(
     () =>
       editorContent.value !== null &&
@@ -371,6 +382,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     reveal,
     setSecret,
     deleteSecret,
+    exportSecretsFile,
     editorOpen,
     editorContent,
     editorLoading,
