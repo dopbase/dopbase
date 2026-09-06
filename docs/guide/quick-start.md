@@ -54,15 +54,13 @@ dopbase serve
 The default local server exposes:
 
 ```text
-╭──────────────────────────────────────────────────────────────────╮
-│  Dopbase                                                     │
-│  Secure, Simple and Private                                  │
-│  Version 0.0.14                                              │
-│                                                              │
-│  Admin UI:   http://localhost:8840                           │
-│  API:        http://localhost:8840/api/v1                    │
-│  Config:     /Users/venobi/.dopbase                          │
-╰──────────────────────────────────────────────────────────────────╯
+Dopbase
+Secure, Simple and Private
+Version 0.0.14
+
+Admin UI:   http://localhost:8840
+API:        http://localhost:8840/api/v1
+Config:     /Users/venobi/.dopbase
 ```
 
 The same address serves the Admin UI in a browser. The first visit walks you

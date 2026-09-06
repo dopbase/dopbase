@@ -11,13 +11,14 @@ import {
 } from "~/assets/icons";
 import {
   DbAlert,
+  DbBadge,
   DbButton,
   DbCode,
   DbConfirmDialog,
   DbEmptyState,
   DbInput,
   DbModal,
-  DbSpinner,
+  DbSkeleton,
 } from "~/components/ui";
 import { DashboardLayout } from "~/layouts";
 import { formatBytes, formatDateTime, formatRelativeTime } from "~/utils";
@@ -30,6 +31,7 @@ import { useBackupsController } from "./Backups.controller";
 const {
   backups,
   loading,
+  hasLoaded,
   loadError,
   actionMessage,
   downloadingMasterKey,
@@ -105,7 +107,13 @@ function chooseKeyFile(): void {
       <!-- Header -->
       <header class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 class="text-lg font-semibold text-ink-strong">Backups</h1>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-lg font-semibold text-ink-strong">Backups</h1>
+            <DbBadge v-if="hasLoaded" tone="neutral">
+              {{ backups.length }}
+              {{ backups.length === 1 ? "snapshot" : "snapshots" }}
+            </DbBadge>
+          </div>
           <p class="mt-0.5 text-sm text-ink-muted">
             Full system encrypted snapshots for disaster recovery.
           </p>
@@ -119,15 +127,6 @@ function chooseKeyFile(): void {
             <RefreshIcon class="h-3.5 w-3.5" />
             Refresh
           </DbButton>
-          <DbButton
-            size="sm"
-            variant="secondary"
-            :loading="downloadingMasterKey"
-            title="Download this server's master encryption key (master.key)"
-            @click="triggerDownloadMasterKey">
-            <KeyIcon class="h-3.5 w-3.5" />
-            Download Master Key
-          </DbButton>
           <DbButton size="sm" variant="secondary" @click="openUploadModal">
             <UploadIcon class="h-3.5 w-3.5" />
             Upload backup
@@ -139,18 +138,33 @@ function chooseKeyFile(): void {
         </div>
       </header>
 
-      <!-- Master Key Notice Banner -->
+      <!-- Master Key Notice Card -->
       <div
-        class="mb-6 flex items-start gap-3 rounded-lg border border-accent/20 bg-accent/5 p-4 text-xs">
-        <KeyIcon class="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-        <div class="flex-1 text-ink leading-relaxed">
-          <p class="font-medium text-ink-strong">Encryption Key Notice</p>
-          <p class="mt-0.5 text-ink-muted">
-            All backups are encrypted with this server's master key
-            (<DbCode>~/.dopbase/master.key</DbCode>). If you ever migrate or
-            restore backups onto a fresh server, you will need this master key
-            to decrypt your project secrets.
-          </p>
+        class="mb-6 flex flex-col gap-3 rounded-card border border-accent/25 bg-accent/5 p-4.5">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-accent/30 bg-accent-soft text-accent-strong">
+            <KeyIcon class="h-4 w-4" />
+          </div>
+          <div class="text-xs leading-relaxed">
+            <p class="font-semibold text-ink-strong">Encryption Key Notice</p>
+            <p class="mt-0.5 text-ink-muted">
+              All snapshots are encrypted with this server's master key
+              (<DbCode>~/.dopbase/master.key</DbCode>). Download and safeguard
+              this key to decrypt and restore backups on a fresh server.
+            </p>
+          </div>
+        </div>
+        <div class="shrink-0 self-end">
+          <DbButton
+            size="sm"
+            variant="secondary"
+            :loading="downloadingMasterKey"
+            title="Download this server's master encryption key (master.key)"
+            @click="triggerDownloadMasterKey">
+            <KeyIcon class="h-3.5 w-3.5" />
+            Download Master Key
+          </DbButton>
         </div>
       </div>
 
@@ -166,14 +180,52 @@ function chooseKeyFile(): void {
         {{ loadError }}
       </DbAlert>
 
-      <!-- Loading initial state -->
-      <DbSpinner
-        v-if="loading && backups.length === 0"
-        class="mx-auto mt-16 h-8 w-8 text-ink-muted" />
+      <!-- Loading skeleton placeholder state -->
+      <div
+        v-if="loading && !hasLoaded"
+        class="overflow-hidden rounded-card border border-line bg-panel shadow-sm"
+        data-testid="backups-skeleton">
+        <div class="overflow-x-auto">
+          <table class="w-full table-fixed text-left text-sm">
+            <thead>
+              <tr
+                class="border-b border-line bg-panel/50 text-xs font-medium text-ink-muted">
+                <th class="px-5 py-3.5">Backup</th>
+                <th class="w-28 px-5 py-3.5">Size</th>
+                <th class="w-40 px-5 py-3.5">Created</th>
+                <th class="w-56 px-5 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line-soft">
+              <tr v-for="i in 4" :key="i">
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-2.5">
+                    <DbSkeleton class="h-4 w-4 shrink-0 rounded" />
+                    <DbSkeleton class="h-4 w-48" />
+                  </div>
+                </td>
+                <td class="w-28 px-5 py-3.5">
+                  <DbSkeleton class="h-4 w-16" />
+                </td>
+                <td class="w-40 px-5 py-3.5">
+                  <DbSkeleton class="h-4 w-24" />
+                </td>
+                <td class="w-56 px-5 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <DbSkeleton class="h-8 w-24 rounded-control" />
+                    <DbSkeleton class="h-8 w-20 rounded-control" />
+                    <DbSkeleton class="h-8 w-8 rounded-control" />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <!-- Empty state -->
       <DbEmptyState
-        v-else-if="backups.length === 0"
+        v-else-if="hasLoaded && backups.length === 0"
         title="No backups found"
         description="Create your first encrypted snapshot to safeguard projects, environments, and secrets.">
         <template #icon>
@@ -194,17 +246,17 @@ function chooseKeyFile(): void {
       <!-- Backups Table -->
       <div
         v-else
-        class="overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel shadow-sm"
+        class="overflow-hidden rounded-card border border-line bg-panel shadow-sm"
         data-testid="backups-table">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
+          <table class="w-full table-fixed text-left text-sm">
             <thead>
               <tr
-                class="border-b border-line bg-surface/50 text-xs font-medium text-ink-muted">
+                class="border-b border-line bg-panel/50 text-xs font-medium text-ink-muted">
                 <th class="px-5 py-3.5">Backup</th>
-                <th class="px-5 py-3.5">Size</th>
-                <th class="px-5 py-3.5">Created</th>
-                <th class="px-5 py-3.5 text-right">Actions</th>
+                <th class="w-28 px-5 py-3.5">Size</th>
+                <th class="w-40 px-5 py-3.5">Created</th>
+                <th class="w-56 px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line-soft">
@@ -216,20 +268,21 @@ function chooseKeyFile(): void {
                   <div class="flex items-center gap-2.5">
                     <ArchiveIcon class="h-4 w-4 shrink-0 text-ink-muted" />
                     <span
-                      class="font-mono text-xs font-semibold text-ink-strong">
+                      class="truncate font-mono text-xs font-semibold text-ink-strong"
+                      :title="backup.key">
                       {{ backup.key }}
                     </span>
                   </div>
                 </td>
-                <td class="px-5 py-3.5 font-mono text-xs text-ink-muted">
+                <td class="w-28 px-5 py-3.5 font-mono text-xs text-ink-muted">
                   {{ formatBytes(backup.size) }}
                 </td>
-                <td class="px-5 py-3.5 text-xs text-ink-muted">
+                <td class="w-40 px-5 py-3.5 text-xs text-ink-muted">
                   <span :title="formatDateTime(backup.createdAt)">
                     {{ formatRelativeTime(backup.createdAt) }}
                   </span>
                 </td>
-                <td class="px-5 py-3.5 text-right">
+                <td class="w-56 px-5 py-3.5 text-right">
                   <div class="flex items-center justify-end gap-1">
                     <DbButton
                       size="sm"
@@ -343,7 +396,7 @@ function chooseKeyFile(): void {
         </div>
 
         <!-- Cross-Server Master Key option -->
-        <div class="rounded-lg border border-line bg-surface/50 p-3">
+        <div class="rounded-lg border border-line bg-panel/50 p-3">
           <p class="text-xs font-medium text-ink-strong">
             Cross-Server Master Key (optional)
           </p>

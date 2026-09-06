@@ -16,15 +16,13 @@ dopbase serve
 The local defaults are:
 
 ```text
-╭──────────────────────────────────────────────────────────────────╮
-│  Dopbase                                                     │
-│  Secure, Simple and Private                                  │
-│  Version 0.0.14                                              │
-│                                                              │
-│  Admin UI:   http://localhost:8840                           │
-│  API:        http://localhost:8840/api/v1                    │
-│  Config:     /Users/venobi/.dopbase                          │
-╰──────────────────────────────────────────────────────────────────╯
+Dopbase
+Secure, Simple and Private
+Version 0.0.14
+
+Admin UI:   http://localhost:8840
+API:        http://localhost:8840/api/v1
+Config:     /Users/venobi/.dopbase
 ```
 
 The banner always shows the version of the running Dopbase binary.
@@ -121,7 +119,8 @@ The daemon writes two files into the data directory:
 ```
 
 The one-time setup token of an uninitialized daemon is printed by the starting
-command and is also written to `serve.log`.
+command together with a one-click setup link (`/setup?token=...`) that pre-fills
+the token input in the browser; both are also written to `serve.log`.
 
 Stop the daemon with `dopbase stop`:
 
@@ -144,7 +143,9 @@ master key with owner-only permissions. An existing database fails closed if
 its configured key is missing, malformed, or incorrect.
 
 An uninitialized server prints its one-time setup token to dedicated startup
-stderr output. The token is never sent through structured request logging.
+stderr output, followed by a `/setup?token=...` link that pre-fills the token
+input in the Admin UI. The token is never sent through structured request
+logging.
 
 SQLite uses WAL mode so reads can continue while writes are committed. SIGINT
 and SIGTERM stop new requests, drain active requests, checkpoint the WAL, and

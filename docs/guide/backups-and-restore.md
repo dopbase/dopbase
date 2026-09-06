@@ -5,6 +5,11 @@ description: "Complete guide to Dopbase full-system encrypted snapshots (.dop), 
 
 # Backup and disaster recovery
 
+::: warning Upcoming account update
+Backup recovery for additional user and AI accounts is still in development.
+Do not rely on it for production data. See [product status](/guide/product-status).
+:::
+
 Dopbase includes a native, full-system backup and disaster recovery engine. Unlike
 per-environment `.env` export and import, a backup captures the complete server
 state in an encrypted archive: all projects, environments, secret keys and

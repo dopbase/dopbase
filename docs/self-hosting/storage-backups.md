@@ -39,6 +39,13 @@ back up the key through a separately protected process.
 
 ## Built-in backup and restore system
 
+::: warning Upcoming account update
+Backup recovery for additional user and AI accounts is still in development.
+Do not rely on it for production data. See [product status](/guide/product-status).
+:::
+
+Full-instance backups are available only to root in the account update.
+
 Dopbase includes a comprehensive system snapshot and restoration engine. Unlike
 per-environment export and import (which only touch secret values in dotenv format),
 the backup system snapshots the entire database: projects, environments, secret
@@ -69,7 +76,7 @@ Backups are packaged as `.dop` files. Every `.dop` archive is:
 Restoring replaces current database tables with the snapshot contents, verifies
 database integrity, and runs any outstanding schema migrations.
 
-- **On a running server (Admin UI)**: On the **Backups** page, click the restore icon next to any listed backup or upload a `.dop` file with **Upload Backup**. You will be prompted to confirm the restoration. Your current administrator session is preserved during the restore.
+- **On a running server (Admin UI)**: On the **Backups** page, click the restore icon next to any listed backup or upload a `.dop` file with **Upload Backup**. You will be prompted to confirm the restoration.
 - **During first-run setup (Admin UI)**: If you are setting up a new Dopbase server or disaster recovery host, visit `/setup`. Switch to the **Restore from Backup** tab, choose your `.dop` file, and click **Restore & initialize server**. The server decrypts and verifies the archive using its master key, populates the database, closes the initial setup window, and redirects you to sign in with the administrator credentials restored from the backup.
 - **Via CLI**:
   ```bash

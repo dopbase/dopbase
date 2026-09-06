@@ -5,6 +5,13 @@ description: "Manage system-wide encrypted backups, download and upload .dop arc
 
 # Backups and restoration
 
+In the upcoming account update, only root can use this page.
+
+::: warning Upcoming account update
+Backup recovery for additional user and AI accounts is still in development.
+Do not rely on it for production data. See [product status](/guide/product-status).
+:::
+
 The **Backups** page in the Admin UI lets you create, inspect, download, delete,
 and restore point-in-time system snapshots. Unlike per-environment `.env` export
 and import, a backup captures the complete server state: all projects,
@@ -92,8 +99,6 @@ During restoration:
 - Any outstanding schema migrations are executed automatically.
 - If a cross-server master key was supplied, Dopbase re-keys the restored secret
   metadata to the target server's existing `master.key` without replacing it.
-- Your current administrator session is preserved, allowing you to continue
-  working without needing to log in again.
 - An audit record (`backup.restored`) is written to the audit log.
 
 > [!WARNING]

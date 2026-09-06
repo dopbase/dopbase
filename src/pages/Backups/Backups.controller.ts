@@ -10,6 +10,7 @@ import {
   type BackupItem,
 } from "~/services/backups.api";
 import { useReauthentication } from "~/composable/reauthentication";
+import { errorMessage, isAbortError } from "~/services/api-errors";
 
 /**
  * Backups page controller: manages snapshot creation, listing, file upload,
@@ -18,7 +19,8 @@ import { useReauthentication } from "~/composable/reauthentication";
 export function useBackupsController() {
   const { runWithReauth } = useReauthentication();
   const backups = ref<BackupItem[]>([]);
-  const loading = ref(false);
+  const loading = ref(true);
+  const hasLoaded = ref(false);
   const loadError = ref<string | null>(null);
   const actionMessage = ref<{ text: string; tone: "ok" | "crit" } | null>(null);
   const downloadingMasterKey = ref(false);
@@ -53,8 +55,10 @@ export function useBackupsController() {
     loadError.value = null;
     try {
       backups.value = await fetchBackups();
+      hasLoaded.value = true;
     } catch {
       loadError.value = "Could not load the list of backups.";
+      hasLoaded.value = true;
     } finally {
       loading.value = false;
     }
@@ -82,14 +86,17 @@ export function useBackupsController() {
         created,
         ...backups.value.filter((b) => b.key !== created.key),
       ];
+      hasLoaded.value = true;
       createModalOpen.value = false;
       actionMessage.value = {
         text: `Backup "${created.key}" was created successfully.`,
         tone: "ok",
       };
-    } catch (err: any) {
-      createError.value =
-        err?.message || "Failed to create backup. Please try again.";
+    } catch (cause: unknown) {
+      createError.value = errorMessage(
+        cause,
+        "Failed to create backup. Please try again.",
+      );
     } finally {
       creating.value = false;
     }
@@ -137,15 +144,17 @@ export function useBackupsController() {
         uploaded,
         ...backups.value.filter((b) => b.key !== uploaded.key),
       ];
+      hasLoaded.value = true;
       uploadModalOpen.value = false;
       actionMessage.value = {
         text: `Backup "${uploaded.key}" was uploaded and verified.`,
         tone: "ok",
       };
-    } catch (err: any) {
-      uploadError.value =
-        err?.message ||
-        "Failed to upload backup. When uploading from another server, provide its master key.";
+    } catch (cause: unknown) {
+      uploadError.value = errorMessage(
+        cause,
+        "Failed to upload backup. When uploading from another server, provide its master key.",
+      );
     } finally {
       uploading.value = false;
     }
@@ -179,10 +188,10 @@ export function useBackupsController() {
           tone: "ok",
         };
       });
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
+    } catch (cause: unknown) {
+      if (isAbortError(cause)) return;
       actionMessage.value = {
-        text: err?.message || "Failed to download master key.",
+        text: errorMessage(cause, "Failed to download master key."),
         tone: "crit",
       };
     } finally {
@@ -223,10 +232,11 @@ export function useBackupsController() {
         tone: "ok",
       };
       await load();
-    } catch (err: any) {
-      restoreError.value =
-        err?.message ||
-        "Failed to restore backup. Please verify credentials or master key.";
+    } catch (cause: unknown) {
+      restoreError.value = errorMessage(
+        cause,
+        "Failed to restore backup. Please verify credentials or master key.",
+      );
     } finally {
       restoring.value = false;
     }
@@ -255,9 +265,11 @@ export function useBackupsController() {
         text: `Backup "${targetKey}" was deleted.`,
         tone: "ok",
       };
-    } catch (err: any) {
-      deleteError.value =
-        err?.message || "Failed to delete backup. Please try again.";
+    } catch (cause: unknown) {
+      deleteError.value = errorMessage(
+        cause,
+        "Failed to delete backup. Please try again.",
+      );
     } finally {
       deleting.value = false;
     }
@@ -266,6 +278,7 @@ export function useBackupsController() {
   return {
     backups,
     loading,
+    hasLoaded,
     loadError,
     actionMessage,
     downloadingMasterKey,
