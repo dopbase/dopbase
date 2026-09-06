@@ -19,16 +19,29 @@ const props = withDefaults(
     disabled?: boolean;
     ariaLabel?: string;
     placeholder?: string;
+    /** Filename shown in the editor tab. */
+    filename?: string;
+    /** Contextual subtitle (e.g. the environment name) in the tab. */
+    subtitle?: string;
+    /** Marks the buffer as modified — drives the tab's dirty dot. */
+    dirty?: boolean;
   }>(),
   {
     issues: () => [],
     disabled: false,
     ariaLabel: "Edit .env content",
     placeholder: "",
+    filename: ".env",
+    subtitle: "",
+    dirty: false,
   },
 );
 
-const emit = defineEmits<{ "update:modelValue": [value: string] }>();
+const emit = defineEmits<{
+  "update:modelValue": [value: string];
+  /** Cmd/Ctrl+S pressed — the parent owns the save flow. */
+  save: [];
+}>();
 
 /** Gutter width in `ch` units; the textarea's left padding must match. */
 const GUTTER_CH = 6;
@@ -39,6 +52,14 @@ const errorLines = computed(() => new Set(props.issues.map((i) => i.line)));
 const visibleIssues = computed(() => props.issues.slice(0, MAX_SHOWN_ISSUES));
 const hiddenIssueCount = computed(() =>
   Math.max(0, props.issues.length - MAX_SHOWN_ISSUES),
+);
+
+/** Lines that declare a key — the status bar's key count. */
+const keyCount = computed(
+  () =>
+    lineTokens.value.filter((tokens) =>
+      tokens.some((token) => token.type === "key"),
+    ).length,
 );
 
 const tokenClass: Record<EnvTokenType, string> = {
@@ -52,13 +73,36 @@ const tokenClass: Record<EnvTokenType, string> = {
   error: "text-crit underline decoration-crit/60 underline-offset-2",
 };
 
+/* Caret tracking: mirrors the cursor into the status bar (Ln/Col) and
+   drives the active-line highlight, like a real editor. */
+const caretLine = ref(1);
+const caretCol = ref(1);
+
+function syncCaret(el: HTMLTextAreaElement): void {
+  const lines = el.value.slice(0, el.selectionStart).split("\n");
+  caretLine.value = lines.length;
+  caretCol.value = (lines[lines.length - 1]?.length ?? 0) + 1;
+}
+
+function onCaretMove(event: Event): void {
+  syncCaret(event.target as HTMLTextAreaElement);
+}
+
 const textarea = ref<HTMLTextAreaElement | null>(null);
 
 function onInput(event: Event): void {
-  emit("update:modelValue", (event.target as HTMLTextAreaElement).value);
+  const el = event.target as HTMLTextAreaElement;
+  emit("update:modelValue", el.value);
+  syncCaret(el);
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  // Save shortcut — the universal editor reflex.
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    emit("save");
+    return;
+  }
   if (event.key !== "Tab" || props.disabled) return;
   event.preventDefault();
   const el = event.target as HTMLTextAreaElement;
@@ -83,9 +127,27 @@ defineExpose({ focus });
 <template>
   <div
     data-testid="env-editor"
-    class="flex flex-col overflow-hidden rounded-[var(--radius-card)] border bg-editor transition-colors focus-within:border-accent"
+    class="flex flex-col overflow-hidden rounded-card border bg-panel transition-colors focus-within:border-accent"
     :class="issues.length > 0 ? 'border-crit/60' : 'border-line'">
-    <div class="max-h-[26rem] min-h-[12rem] overflow-y-auto">
+    <!-- Editor tab bar: filename + dirty dot + context, editor chrome. -->
+    <div
+      class="flex items-center gap-2 border-b border-line-soft bg-panel px-3 py-2">
+      <span class="flex items-center gap-1.5 font-mono text-xs text-ink-strong">
+        <span
+          v-if="dirty"
+          class="h-2 w-2 rounded-full bg-accent"
+          aria-hidden="true" />
+        {{ filename }}
+      </span>
+      <span v-if="subtitle" class="truncate text-xs text-ink-faint">
+        {{ subtitle }}
+      </span>
+      <span class="ml-auto font-mono text-xs text-ink-faint">dotenv</span>
+    </div>
+
+    <!-- Code area: gutter column + tokenized highlight overlay, on the
+         darker canvas so the editor reads as a distinct surface. -->
+    <div class="max-h-[26rem] min-h-[12rem] overflow-y-auto bg-canvas">
       <div class="relative">
         <!-- Highlight overlay: gutter number + tokens per logical line. -->
         <div
@@ -94,15 +156,18 @@ defineExpose({ focus });
           <div v-for="(tokens, line) in lineTokens" :key="line" class="flex">
             <span
               aria-hidden="true"
-              class="w-[6ch] shrink-0 select-none pr-[1ch] text-right"
+              class="w-[6ch] shrink-0 select-none border-r border-line-soft bg-panel pr-[1ch] text-right"
               :class="
                 errorLines.has(line + 1)
                   ? 'font-semibold text-crit'
-                  : 'text-ink-faint'
+                  : line + 1 === caretLine
+                    ? 'text-ink-strong'
+                    : 'text-ink-faint'
               "
               >{{ line + 1 }}</span
             ><span
               class="min-w-0 flex-1 whitespace-pre-wrap break-words pr-[1ch]"
+              :class="line + 1 === caretLine ? 'bg-raised' : ''"
               ><template v-if="tokens.length === 0">&#8203;</template
               ><span
                 v-for="(token, tokenIndex) in tokens"
@@ -128,11 +193,26 @@ defineExpose({ focus });
           class="absolute inset-0 w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent py-3 pr-[1ch] font-mono text-xs leading-relaxed text-transparent caret-accent-strong outline-none selection:bg-accent-soft placeholder:text-ink-faint disabled:opacity-50"
           :style="{ paddingLeft: `${GUTTER_CH}ch` }"
           @input="onInput"
-          @keydown="onKeydown" />
+          @keydown="onKeydown"
+          @keyup="onCaretMove"
+          @click="onCaretMove"
+          @select="onCaretMove"
+          @focus="onCaretMove" />
       </div>
     </div>
 
-    <!-- Validation issues -->
+    <!-- Status bar: cursor position and counts — the editor's heartbeat. -->
+    <div
+      class="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line-soft bg-panel px-3 py-1.5 font-mono text-xs text-ink-faint">
+      <span>Ln {{ caretLine }}, Col {{ caretCol }}</span>
+      <span>{{ keyCount }} keys</span>
+      <span :class="issues.length > 0 ? 'text-crit' : ''">
+        {{ issues.length }} problems
+      </span>
+      <span class="ml-auto">ENV · UTF-8</span>
+    </div>
+
+    <!-- Problems strip -->
     <div
       v-if="issues.length > 0"
       data-testid="env-editor-issues"
