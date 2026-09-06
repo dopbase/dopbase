@@ -37,6 +37,14 @@ describe("apiRequest", () => {
     expect(result.data).toEqual([{ id: "prj_1" }]);
   });
 
+  it("rejects a successful response with no typed envelope", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+    await expect(apiRequest("/x")).rejects.toMatchObject({
+      status: 200,
+      codes: { INVALID_RESPONSE: expect.any(String) },
+    });
+  });
+
   it("sends a JSON body with the right content type", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ success: true, message: "OK", data: null }),
@@ -102,6 +110,30 @@ describe("apiRequest", () => {
     );
     await expect(apiRequest("/x")).rejects.toBeInstanceOf(ApiError);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("can suppress auth notifications for credential checks", async () => {
+    const unauthorized = vi.fn();
+    const reauth = vi.fn();
+    const offUnauthorized = onUnauthorized(unauthorized);
+    const offReauth = onReauthenticationRequired(reauth);
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ success: false, error: { AUTHENTICATION_INVALID: "no" } }, 401),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { success: false, error: { RECENT_AUTHENTICATION_REQUIRED: "no" } },
+          403,
+        ),
+      );
+
+    await expect(apiRequest("/reauth", { notifyAuthEvents: false })).rejects.toBeInstanceOf(ApiError);
+    await expect(apiRequest("/reveal", { notifyAuthEvents: false })).rejects.toBeInstanceOf(ApiError);
+    expect(unauthorized).not.toHaveBeenCalled();
+    expect(reauth).not.toHaveBeenCalled();
+    offUnauthorized();
+    offReauth();
   });
 
   it("notifies reauthentication listeners on the 403 challenge", async () => {

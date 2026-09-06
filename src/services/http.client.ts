@@ -26,8 +26,13 @@ export class ApiError extends Error {
   readonly status: number;
   readonly codes: ApiErrorCodeMap;
 
-  constructor(status: number, codes: ApiErrorCodeMap, message?: string) {
-    super(message ?? Object.values(codes)[0] ?? "The request failed.");
+  constructor(
+    status: number,
+    codes: ApiErrorCodeMap,
+    message?: string,
+    options?: ErrorOptions,
+  ) {
+    super(message ?? Object.values(codes)[0] ?? "The request failed.", options);
     this.name = "ApiError";
     this.status = status;
     this.codes = codes;
@@ -92,6 +97,8 @@ export interface ApiRequestOptions {
   anonymous?: boolean;
   /** Response payload format; defaults to "json". */
   responseType?: "json" | "blob";
+  /** Suppresses global 401/reauthentication notifications for form checks. */
+  notifyAuthEvents?: boolean;
 }
 
 export interface ApiResult<T> {
@@ -104,10 +111,15 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
     const payload = (await response.json()) as {
       error?: ApiErrorCodeMap;
     };
+    const codes = payload.error;
+    if (!codes || typeof codes !== "object" || Object.keys(codes).length === 0) {
+      return new ApiError(response.status, {
+        INTERNAL_ERROR: "The server reported an error.",
+      });
+    }
     return new ApiError(
       response.status,
-      payload.error ??
-        ({ INTERNAL_ERROR: "The server reported an error." } as const),
+      codes,
     );
   } catch {
     return new ApiError(response.status, {
@@ -121,10 +133,18 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
  * envelope. Throws {@link ApiError} for every non-2xx response and for
  * network failures (status `0`).
  */
+export function apiRequest(
+  path: string,
+  options: ApiRequestOptions & { responseType: "blob" },
+): Promise<ApiResult<Blob>>;
+export function apiRequest<T>(
+  path: string,
+  options?: ApiRequestOptions,
+): Promise<ApiResult<T>>;
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
-): Promise<ApiResult<T>> {
+): Promise<ApiResult<T | Blob>> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
   const isFormData =
@@ -154,28 +174,53 @@ export async function apiRequest<T>(
   } catch (error) {
     // AbortSignal cancellations are rethrown so callers can ignore them.
     if (options.signal?.aborted) throw error;
-    throw new ApiError(0, {
-      NETWORK_ERROR: "Cannot reach the Dopbase server.",
-    });
+    throw new ApiError(
+      0,
+      { NETWORK_ERROR: "Cannot reach the Dopbase server." },
+      "Cannot reach the Dopbase server.",
+      { cause: error },
+    );
   }
 
   if (!response.ok) {
     const apiError = await parseErrorResponse(response);
-    if (response.status === 401) emit(unauthorizedListeners);
+    if (options.notifyAuthEvents !== false && response.status === 401)
+      emit(unauthorizedListeners);
     if (
       response.status === 403 &&
       apiError.hasCode("RECENT_AUTHENTICATION_REQUIRED")
     ) {
-      emit(reauthListeners);
+      if (options.notifyAuthEvents !== false) emit(reauthListeners);
     }
     throw apiError;
   }
 
   if (options.responseType === "blob") {
     const blob = await response.blob();
-    return { message: "OK", data: blob as unknown as T };
+    return { message: "OK", data: blob };
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
-  return { message: payload.message, data: payload.data };
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (cause) {
+    throw new ApiError(
+      response.status,
+      { INVALID_RESPONSE: "The server returned an unreadable response." },
+      "The server returned an unreadable response.",
+      { cause },
+    );
+  }
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    (payload as Partial<ApiEnvelope<T>>).success !== true ||
+    !("data" in payload)
+  ) {
+    throw new ApiError(response.status, {
+      INVALID_RESPONSE: "The server returned an invalid response.",
+    });
+  }
+  const envelope = payload as ApiEnvelope<T>;
+  return { message: envelope.message, data: envelope.data };
 }

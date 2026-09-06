@@ -10,7 +10,7 @@ export interface HealthResponse {
 const BASE = "/api/v1/health";
 
 /** Public health check; identifies the product, binary, and API version. */
-export async function fetchHealth(): Promise<HealthResponse> {
-  const { data } = await apiRequest<HealthResponse>(BASE);
+export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
+  const { data } = await apiRequest<HealthResponse>(BASE, { signal });
   return data;
 }
