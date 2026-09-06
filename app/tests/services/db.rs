@@ -58,7 +58,7 @@ async fn creates_owner_only_database_file() {
 
 #[tokio::test]
 async fn migrations_apply_rollback_and_reapply() {
-  const TABLES: [&str; 8] = [
+  const TABLES: [&str; 11] = [
     "instance_metadata",
     "admins",
     "sessions",
@@ -67,12 +67,21 @@ async fn migrations_apply_rollback_and_reapply() {
     "secrets",
     "runner_tokens",
     "audit_events",
+    "environment_env_layout",
+    "service_accounts",
+    "agent_tokens",
   ];
-  const INDEXES: [&str; 4] = [
+  const INDEXES: [&str; 10] = [
     "sessions_token_hash_idx",
     "runner_tokens_token_hash_idx",
     "audit_events_created_idx",
     "audit_events_action_idx",
+    "sessions_revoked_retention_idx",
+    "sessions_idle_retention_idx",
+    "sessions_absolute_retention_idx",
+    "agent_tokens_hash_idx",
+    "agent_tokens_account_idx",
+    "admins_root_idx",
   ];
 
   let directory = tempfile::TempDir::new().unwrap();

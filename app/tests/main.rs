@@ -283,13 +283,102 @@ async fn health_and_openapi_are_available() {
     "/api/v1/tokens/{token_id}/revoke",
     "/api/v1/audit-events",
     "/api/v1/instance",
+    "/api/v1/status",
+    "/api/v1/instance/factory-reset",
+    "/api/v1/users",
+    "/api/v1/users/{id}",
+    "/api/v1/service-accounts",
+    "/api/v1/service-accounts/{id}",
+    "/api/v1/service-accounts/{id}/tokens",
+    "/api/v1/service-accounts/{id}/tokens/{token_id}/revoke",
   ] {
     assert!(
       spec["paths"][path].is_object(),
       "missing OpenAPI path {path}"
     );
   }
-  assert!(spec["components"]["schemas"]["ErrorBody"].is_object());
+  for schema in [
+    "ErrorBody",
+    "UserResponse",
+    "CreateUserRequest",
+    "UpdateUserRequest",
+    "AdminRole",
+    "InstanceStatus",
+    "StatusResponse",
+    "FactoryResetPreview",
+    "FactoryResetRequest",
+    "ServiceAccountResponse",
+    "CreateServiceAccountRequest",
+    "AgentTokenResponse",
+    "CreateAgentTokenRequest",
+    "CreatedAgentTokenResponse",
+  ] {
+    assert!(
+      spec["components"]["schemas"][schema].is_object(),
+      "missing OpenAPI schema {schema}"
+    );
+  }
+
+  assert_eq!(
+    spec["paths"]["/api/v1/users"]["get"]["summary"],
+    "List users"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/users/{id}"]["get"]["summary"],
+    "Show a user"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/users"]["post"]["summary"],
+    "Create a user"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/users/{id}"]["patch"]["summary"],
+    "Update a user"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/users/{id}"]["delete"]["summary"],
+    "Delete a user"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/status"]["get"]["summary"],
+    "Show public instance status"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/instance/factory-reset"]["get"]["summary"],
+    "Preview factory reset"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/instance/factory-reset"]["post"]["summary"],
+    "Perform a factory reset"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts"]["get"]["summary"],
+    "List service accounts"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts"]["post"]["summary"],
+    "Create a service account"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts/{id}"]["get"]["summary"],
+    "Show a service account"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts/{id}"]["delete"]["summary"],
+    "Delete a service account"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts/{id}/tokens"]["get"]["summary"],
+    "List service account tokens"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts/{id}/tokens"]["post"]["summary"],
+    "Create a service account token"
+  );
+  assert_eq!(
+    spec["paths"]["/api/v1/service-accounts/{id}/tokens/{token_id}/revoke"]["post"]["summary"],
+    "Revoke a service account token"
+  );
   state.db.close().await;
 }
 
