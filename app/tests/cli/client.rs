@@ -1,10 +1,15 @@
 use app::cli::{
-  client::{ApiClient, CliCancelled, normalize_login_email, password_confirmed_human_client},
+  client::{ApiClient, CliCancelled, normalize_login_email, recently_authenticated_client},
   local_config::{ClientConfig, ResolvedServer, ServerSource},
 };
 use reqwest::Method;
 use std::io::IsTerminal;
 use tempfile::TempDir;
+use tokio::{
+  io::{AsyncReadExt, AsyncWriteExt},
+  net::TcpListener,
+  time::{Duration, timeout},
+};
 
 #[test]
 fn login_email_is_trimmed_lowercased_and_validated() {
@@ -50,7 +55,7 @@ async fn plaintext_access_rejects_non_interactive_execution_before_connecting() 
     },
   };
 
-  let message = password_confirmed_human_client(&server)
+  let message = recently_authenticated_client(&server)
     .await
     .err()
     .unwrap()
@@ -93,4 +98,59 @@ Check that the server is running and verify the active endpoint with `dopbase st
   assert!(!message.contains("error sending request"));
   assert!(!message.contains("tcp connect error"));
   assert!(!message.contains("os error"));
+}
+
+#[test]
+fn api_client_rejects_an_unvalidated_remote_http_server() {
+  let directory = TempDir::new().unwrap();
+  let server = ResolvedServer {
+    url: "http://dopbase.example.com".into(),
+    source: ServerSource::Argument,
+    config_path: directory.path().join("config.toml"),
+    config: ClientConfig::default(),
+  };
+
+  let error = ApiClient::new(&server, Some("secret-token".into()))
+    .err()
+    .unwrap()
+    .to_string();
+  assert!(error.contains("remote URLs must use HTTPS"), "{error}");
+}
+
+#[tokio::test]
+async fn api_client_does_not_follow_redirects() {
+  let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+  let address = listener.local_addr().unwrap();
+  let server_task = tokio::spawn(async move {
+    let (mut stream, _) = listener.accept().await.unwrap();
+    let mut request = [0_u8; 2048];
+    let _ = stream.read(&mut request).await.unwrap();
+    stream
+      .write_all(
+        b"HTTP/1.1 302 Found\r\nLocation: /redirected\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+      )
+      .await
+      .unwrap();
+    stream.shutdown().await.unwrap();
+    timeout(Duration::from_millis(250), listener.accept())
+      .await
+      .is_err()
+  });
+  let directory = TempDir::new().unwrap();
+  let server = ResolvedServer {
+    url: format!("http://{address}"),
+    source: ServerSource::Argument,
+    config_path: directory.path().join("config.toml"),
+    config: ClientConfig::default(),
+  };
+
+  let error = ApiClient::new(&server, Some("secret-token".into()))
+    .unwrap()
+    .request(Method::GET, "/start", None)
+    .await
+    .unwrap_err()
+    .to_string();
+
+  assert!(error.contains("server returned 302 Found"), "{error}");
+  assert!(server_task.await.unwrap(), "client followed the redirect");
 }

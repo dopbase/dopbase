@@ -1,4 +1,7 @@
-use super::{local_config::ResolvedServer, session};
+use super::{
+  local_config::{ResolvedServer, normalize},
+  session,
+};
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -94,10 +97,14 @@ impl ApiClient {
     server: &ResolvedServer,
     token: Option<String>,
   ) -> Result<Self> {
+    let base_url = normalize(&server.url)?;
+    let https_only = base_url.starts_with("https://");
     Ok(Self {
-      base_url: server.url.clone(),
+      base_url,
       client: reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .https_only(https_only)
         .build()?,
       token,
     })
@@ -504,7 +511,7 @@ pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   })
 }
 
-pub async fn password_confirmed_human_client(server: &ResolvedServer) -> Result<ApiClient> {
+pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
   if !io::stdin().is_terminal() {
     bail!("interactive password confirmation is required for plaintext secret access");
   }

@@ -3,6 +3,21 @@ use std::fs;
 use app::services::crypto::{CryptoService, EncryptedValue, parse_master_key, rekey_database};
 use app::services::db::DbClient;
 
+fn random_key() -> Vec<u8> {
+  let mut key = vec![0_u8; 32];
+  getrandom::fill(&mut key).unwrap();
+  key
+}
+
+fn distinct_keys() -> (Vec<u8>, Vec<u8>) {
+  let first = random_key();
+  let mut second = random_key();
+  while first == second {
+    second = random_key();
+  }
+  (first, second)
+}
+
 #[tokio::test]
 async fn round_trip_detects_tampering_and_wrong_master_key() {
   let directory = tempfile::TempDir::new().unwrap();
@@ -30,7 +45,7 @@ async fn round_trip_detects_tampering_and_wrong_master_key() {
       .is_err()
   );
 
-  fs::write(&key, [7_u8; 32]).unwrap();
+  fs::write(&key, random_key()).unwrap();
   assert!(CryptoService::initialize(db.pool(), &key).await.is_err());
   db.close().await;
 }
@@ -56,7 +71,7 @@ async fn generated_key_is_owner_only() {
 
 #[test]
 fn parses_raw_and_hex_master_keys() {
-  let raw = vec![0x42_u8; 32];
+  let raw = random_key();
   assert_eq!(parse_master_key(&raw).unwrap(), raw);
 
   let hex = hex::encode(&raw);
@@ -74,8 +89,8 @@ fn parses_raw_and_hex_master_keys() {
 
 #[test]
 fn cross_key_backup_decryption_requires_the_source_key() {
-  let source_key = vec![0x11_u8; 32];
-  let target_crypto = CryptoService::from_key(vec![0x22_u8; 32]);
+  let (source_key, target_key) = distinct_keys();
+  let target_crypto = CryptoService::from_key(target_key);
   let source_crypto = CryptoService::from_key(source_key.clone());
   let payload = b"secret-dopbase-backup-payload-content";
   let encrypted = source_crypto.encrypt_backup(payload).unwrap();
@@ -121,8 +136,7 @@ async fn rekey_database_preserves_values_and_swaps_keys() {
   .await
   .unwrap();
 
-  let old_key = vec![0x11_u8; 32];
-  let new_key = vec![0x22_u8; 32];
+  let (old_key, new_key) = distinct_keys();
   let old_crypto = CryptoService::from_key(old_key.clone());
   let new_crypto = CryptoService::from_key(new_key.clone());
   let (verification_ciphertext, verification_nonce) = old_crypto

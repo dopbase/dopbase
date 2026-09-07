@@ -33,6 +33,10 @@ The command normalizes the URL and verifies that it is a compatible Dopbase
 server before changing machine-global state. If validation fails, the previous
 server and credential remain active.
 
+Remote servers must use HTTPS. Plain HTTP is accepted only for `localhost` and
+loopback IP addresses such as `127.0.0.1` and `::1`. The client does not follow
+redirects, so the configured endpoint must be the final Dopbase URL.
+
 An actual server change requires a yes/no confirmation. The warning identifies
 the current and destination endpoints and explains that Dopbase will stop the
 current managed background server when present, delete the encrypted local CLI

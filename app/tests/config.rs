@@ -200,6 +200,49 @@ fn remote_host_without_public_url_fails_with_guidance() {
 }
 
 #[test]
+fn explicit_public_urls_require_https_except_on_loopback() {
+  for public_url in [
+    "https://dopbase.example.com",
+    "http://localhost:8840",
+    "http://127.0.0.9:8840",
+    "http://[::1]:8840",
+  ] {
+    let directory = tempfile::TempDir::new().unwrap();
+    let config = ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(directory.path().join("data")),
+        public_url: Some(public_url.into()),
+        ..Default::default()
+      },
+      EnvironmentOverrides::default(),
+    );
+    assert!(config.is_ok(), "expected {public_url} to be accepted");
+  }
+
+  for public_url in [
+    "http://dopbase.example.com",
+    "http://10.0.0.8:8840",
+    "http://localhost.example.com:8840",
+  ] {
+    let directory = tempfile::TempDir::new().unwrap();
+    let error = ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(directory.path().join("data")),
+        public_url: Some(public_url.into()),
+        ..Default::default()
+      },
+      EnvironmentOverrides::default(),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+      error.contains("remote URLs must use HTTPS"),
+      "{public_url}: {error}"
+    );
+  }
+}
+
+#[test]
 fn localhost_host_maps_to_loopback() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");

@@ -21,7 +21,7 @@
     "test:installer:windows": "pwsh -NoProfile -File scripts/install.test.ps1",
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs && bun ./scripts/docs-postbuild.mjs",
+    "docs:build": "rm -rf build && vitepress build docs && bun ./scripts/docs-postbuild.mjs",
     "docs:test:mermaid": "bun scripts/check-mermaid-viewer.mjs",
     "docs:preview": "vitepress preview docs"
   },

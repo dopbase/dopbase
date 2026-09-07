@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
-use url::Url;
+use url::{Host, Url};
 
 use crate::constants::config::{
   CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_BIND_ADDRESS,
@@ -16,6 +16,28 @@ use crate::constants::config::{
   ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
+
+pub fn validate_endpoint_transport(url: &Url) -> Result<()> {
+  if url.scheme() == "https" {
+    return Ok(());
+  }
+  if url.scheme() != "http" {
+    bail!("URL must use HTTP or HTTPS");
+  }
+
+  let is_loopback = match url.host() {
+    Some(Host::Domain(host)) => host == "localhost",
+    Some(Host::Ipv4(host)) => host.is_loopback(),
+    Some(Host::Ipv6(host)) => host.is_loopback(),
+    None => false,
+  };
+  if !is_loopback {
+    bail!(
+      "remote URLs must use HTTPS; HTTP is only allowed for localhost or a loopback IP address"
+    );
+  }
+  Ok(())
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct MasterKeyConfig {
@@ -368,6 +390,7 @@ impl ServerConfig {
       if !matches!(public.scheme(), "http" | "https") || public.host_str().is_none() {
         bail!("public_url must be an absolute HTTP or HTTPS URL");
       }
+      validate_endpoint_transport(&public)?;
     } else if !bind.ip().is_loopback() {
       // load() derives public_url for loopback binds before validating, so a
       // non-loopback bind reaching here means the value was never configured.
