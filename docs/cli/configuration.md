@@ -62,7 +62,7 @@ Select a self-hosted or Cloud endpoint with:
 dopbase client connect https://dopbase.example.com
 ```
 
-`connect` accepts an absolute URL. Remote endpoints must use HTTPS; HTTP is
+`connect` accepts an absolute URL. Remote endpoints must use HTTPS, HTTP is
 limited to `localhost` and loopback IP addresses. Dopbase normalizes the URL,
 rejects embedded credentials, query strings, and fragments, then verifies that
 the endpoint is a compatible server. The new server is saved only after
