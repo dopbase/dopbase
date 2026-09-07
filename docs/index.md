@@ -1,6 +1,6 @@
 ---
 layout: home
-title: "Dopbase: open-source secrets manager for developers"
+title: "Dopbase - open-source secrets manager for developers"
 titleTemplate: false
 description: Dopbase is an open-source secrets manager for developers. Self-host one executable, organize secrets by environment, and inject them into applications.
 
