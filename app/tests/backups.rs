@@ -1,3 +1,4 @@
+use app::modules::backups::service::{sanitize_key, sanitize_name};
 use app::{config::ServerConfig, server};
 use axum::{
   Router,
@@ -906,4 +907,59 @@ async fn restore_recovers_service_accounts_and_agent_tokens() {
     .unwrap();
   assert_eq!(account_count, 1);
   assert_eq!(token_count, 1);
+}
+
+#[test]
+fn backup_keys_are_single_safe_path_components() {
+  let directory = TempDir::new().unwrap();
+  let backup_directory = directory.path().join("backups");
+
+  for key in ["snapshot.dop", "release_2026-09-07.dop"] {
+    let safe_key = sanitize_key(key).unwrap();
+    let path = backup_directory.join(&safe_key);
+    assert!(path.starts_with(&backup_directory));
+    assert_eq!(path.parent(), Some(backup_directory.as_path()));
+  }
+
+  for key in [
+    "../snapshot.dop",
+    "/tmp/snapshot.dop",
+    r"C:\temp\snapshot.dop",
+    "nested/snapshot.dop",
+    "snapshot..dop",
+    ".dop",
+    "snapshot.dop.exe",
+    "snapshot%2fdanger.dop",
+    "snapshot․report.dop",
+  ] {
+    assert!(
+      sanitize_key(key).is_err(),
+      "expected {key:?} to be rejected"
+    );
+  }
+}
+
+#[test]
+fn backup_names_reject_path_syntax_and_deceptive_extensions() {
+  for name in ["snapshot", "release_2026-09-07", "snapshot.dop"] {
+    assert!(
+      sanitize_name(name).is_ok(),
+      "expected {name:?} to be accepted"
+    );
+  }
+
+  for name in [
+    "../snapshot",
+    "/tmp/snapshot",
+    r"C:\temp\snapshot",
+    "nested/snapshot",
+    "snapshot..dop",
+    "snapshot.dop.exe",
+    "snapshot․report",
+  ] {
+    assert!(
+      sanitize_name(name).is_err(),
+      "expected {name:?} to be rejected"
+    );
+  }
 }

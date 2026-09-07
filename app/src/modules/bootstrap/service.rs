@@ -182,16 +182,8 @@ pub async fn restore_bootstrap(
     }
   };
 
-  // Generate safe filename for storage
-  let target_key = if filename.ends_with(".dop")
-    && filename
-      .chars()
-      .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
-  {
-    filename.to_string()
-  } else {
-    format!("restore_{}.dop", chrono::Utc::now().format("%Y%m%d_%H%M%S"))
-  };
+  let target_key = crate::modules::backups::service::sanitize_key(filename)
+    .unwrap_or_else(|_| format!("restore_{}.dop", chrono::Utc::now().format("%Y%m%d_%H%M%S")));
 
   // 2. If needs_rekey, re-key the database to the server's master key and re-encrypt the stored backup!
   let (final_bytes, restore_decrypted) = if needs_rekey {
