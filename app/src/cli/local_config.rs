@@ -1,5 +1,5 @@
 use crate::{
-  config::{client_config_path, ensure_data_dir},
+  config::{client_config_path, ensure_data_dir, validate_endpoint_transport},
   constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
 };
 use anyhow::{Context, Result, bail};
@@ -137,6 +137,7 @@ pub fn normalize(value: &str) -> Result<String> {
   if !matches!(url.scheme(), "http" | "https") {
     bail!("server URL must use HTTP or HTTPS");
   }
+  validate_endpoint_transport(&url)?;
   if !url.username().is_empty() || url.password().is_some() {
     bail!("server URL must not contain credentials");
   }

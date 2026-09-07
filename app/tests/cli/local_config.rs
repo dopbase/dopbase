@@ -1,6 +1,6 @@
 use app::cli::local_config::{
-  ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource, clear_default_environment, read,
-  save_default_environment,
+  ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource, clear_default_environment,
+  normalize, read, save_default_environment,
 };
 use tempfile::TempDir;
 
@@ -89,4 +89,29 @@ fn old_configuration_without_a_default_still_loads() {
   let config: ClientConfig =
     toml::from_str("version = 1\nserver_url = 'http://localhost:8840'\n").unwrap();
   assert!(config.default_environment.is_none());
+}
+
+#[test]
+fn server_urls_require_https_except_on_loopback() {
+  for url in [
+    "https://dopbase.example.com",
+    "http://localhost:8840",
+    "http://127.0.0.42:8840",
+    "http://[::1]:8840",
+  ] {
+    assert!(normalize(url).is_ok(), "expected {url} to be accepted");
+  }
+
+  for url in [
+    "http://dopbase.example.com",
+    "http://192.168.1.10:8840",
+    "http://localhost.example.com:8840",
+    "http://[2001:db8::1]:8840",
+  ] {
+    let error = normalize(url).unwrap_err().to_string();
+    assert!(
+      error.contains("remote URLs must use HTTPS"),
+      "{url}: {error}"
+    );
+  }
 }

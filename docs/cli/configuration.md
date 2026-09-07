@@ -62,9 +62,10 @@ Select a self-hosted or Cloud endpoint with:
 dopbase client connect https://dopbase.example.com
 ```
 
-`connect` accepts an absolute HTTP or HTTPS URL. It normalizes the endpoint,
+`connect` accepts an absolute URL. Remote endpoints must use HTTPS; HTTP is
+limited to `localhost` and loopback IP addresses. Dopbase normalizes the URL,
 rejects embedded credentials, query strings, and fragments, then verifies that
-the endpoint is a compatible Dopbase server. The new server is saved only after
+the endpoint is a compatible server. The new server is saved only after
 validation succeeds. A failed connection leaves the previous configuration and
 credential unchanged.
 
@@ -102,6 +103,9 @@ written to `config.toml` or a Dopbase server's SQLite database.
 The encrypted payload also caches the normalized administrator email so
 `dopbase status` can identify the login without contacting the server. Older
 sessions remain valid but show an unknown email until the next login.
+
+Remote server URLs must use HTTPS. HTTP is limited to `localhost` and loopback
+IP addresses, and the client does not follow redirects.
 
 Only one saved connection is active in v0.1.0. Logging in again replaces the
 credential for that server. `dopbase logout` removes the active credential but

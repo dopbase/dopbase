@@ -282,8 +282,8 @@ impl ServeArgs {
 pub enum ClientCommand {
   /// Validate a server URL and save it as the active server.
   ///
-  /// Accepts a full URL or the `local` alias to return to the implicit
-  /// local default (http://localhost:8840). Changing servers requires
+  /// Remote servers must use HTTPS. Accepts the `local` alias to return to
+  /// the implicit local default (http://localhost:8840). Changing servers requires
   /// interactive confirmation, stops the current managed background server,
   /// clears the saved CLI session and default, and then requires a new login.
   ///

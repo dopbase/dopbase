@@ -80,8 +80,9 @@ By default, all runtime files live in `~/.dopbase`. Select another directory
 with the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR`. Data-directory
 selection resolves in this order: CLI option, environment variable, default.
 
-`public_url` is required when binding beyond loopback. Dopbase does not trust
-forwarded headers, and TLS termination remains an operator concern.
+`public_url` is required when binding beyond loopback and must use HTTPS.
+HTTP is accepted only for `localhost` and loopback IP addresses. Dopbase does
+not trust forwarded headers, and TLS termination remains an operator concern.
 
 ## API documentation
 

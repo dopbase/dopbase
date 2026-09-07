@@ -704,7 +704,7 @@ async fn secret(
   json_output: bool,
 ) -> Result<i32> {
   let api = if matches!(&command, SecretCommand::Get { reveal: true, .. }) {
-    client::password_confirmed_human_client(server).await?
+    client::recently_authenticated_client(server).await?
   } else {
     client::human_client(server).await?
   };
@@ -854,7 +854,7 @@ async fn export(
   if stdout && json_output {
     bail!("--stdout and --json cannot be combined");
   }
-  let api = client::password_confirmed_human_client(server).await?;
+  let api = client::recently_authenticated_client(server).await?;
   let env = resolve_environment(&api, reference).await?;
   let data = api
     .request(
@@ -1403,7 +1403,7 @@ async fn restore(
     if !json_output {
       eprintln!("==> [1/3] Authenticating administrator session...");
     }
-    let auth_client = client::password_confirmed_human_client(server).await?;
+    let auth_client = client::recently_authenticated_client(server).await?;
 
     if !json_output {
       eprintln!("==> [2/3] Uploading backup snapshot to server...");
