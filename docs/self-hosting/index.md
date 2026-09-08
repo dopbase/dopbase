@@ -8,7 +8,7 @@ description: "Run Dopbase as a self-hosted secrets manager with one executable, 
 Dopbase runs as one self-hosted executable with SQLite storage and an embedded Admin UI.
 
 ```bash
-dopbase serve
+dopbase server start
 ```
 
 The command starts the service with local defaults. Operators still need to configure networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.

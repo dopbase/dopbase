@@ -413,6 +413,26 @@
   font-variant-ligatures: none;
 }
 
+.vp-doc table {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  width: max-content;
+}
+
+.vp-doc th,
+.vp-doc td {
+  max-width: 32rem;
+  min-width: 9rem;
+  vertical-align: top;
+}
+
+.vp-doc th,
+.vp-doc td code {
+  white-space: nowrap;
+}
+
 @media (max-width: 639px) {
   .dopbase-path {
     grid-template-columns: 1fr;

@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "app": "cargo run --manifest-path app/Cargo.toml -- serve",
+    "app": "cargo run --manifest-path app/Cargo.toml -- server start",
     "dev": "bun ./scripts/dev.ts",
     "dev:app": "bun run app",
     "dev:ui": "vite",

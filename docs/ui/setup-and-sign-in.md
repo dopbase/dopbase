@@ -27,7 +27,7 @@ Open the Admin UI and you land on the setup page (`/setup`). The page provides t
 
 1. Enter the one-time **setup token** from the server startup output, or open
    the **setup link** printed alongside it, which fills in the token field
-   automatically. With `dopbase serve --background`, the token and link are also
+   automatically. With `dopbase server up`, the token and link are also
    written to `~/.dopbase/serve.log`.
 2. Provide an **email address** for the administrator account.
 3. Enter a secure **password** of at least 12 characters (128 at most).

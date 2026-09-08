@@ -235,12 +235,13 @@ const config = defineConfig({
           text: "Getting Started",
           items: [
             { text: "CLI overview", link: "/cli/" },
+            { text: "CLI cheat sheet", link: "/cli/cheat-sheet" },
             {
               text: "Environment targeting",
               link: "/cli/environment-targeting",
             },
             { text: "Client configuration", link: "/cli/configuration" },
-            { text: "Command", link: "/cli/commands" },
+            { text: "Command reference", link: "/cli/commands" },
           ],
         },
         {
@@ -322,6 +323,7 @@ const config = defineConfig({
           text: "Security & Permissions",
           items: [
             { text: "Security model", link: "/reference/security" },
+            { text: "Public security updates", link: "/security/" },
             { text: "Identity and tokens", link: "/reference/identity" },
             { text: "Audit events", link: "/reference/audit-events" },
           ],

@@ -1,154 +1,151 @@
 ---
-title: "dopbase serve"
-description: "dopbase serve starts the self-hosted HTTP server, REST API, SQLite storage, and embedded Admin UI in a single command."
+title: "Server lifecycle"
+description: "Start, stop, inspect, and read logs from a local Dopbase server."
 ---
 
-# `dopbase serve`
+# Server lifecycle
 
-`dopbase serve` starts the self-hosted HTTP server, REST API, SQLite storage,
-and embedded Admin UI. The Swagger UI is disabled by default and enabled with
-`--docs` (see [API documentation](#api-documentation)).
+The `dopbase server` commands manage the self-hosted HTTP server, REST API,
+SQLite storage, and Admin UI.
 
-```bash
-dopbase serve
-```
+## Run in the foreground
 
-The local defaults are:
-
-```text
-Dopbase
-Secure, Simple and Private
-Version 0.1.0
-
-Admin UI:   http://localhost:8840
-API:        http://localhost:8840/api/v1
-Config:     ~/.dopbase
-```
-
-The banner always shows the version of the running Dopbase binary.
-
-The `Swagger: http://localhost:8840/api/docs` line is printed only when the
-API documentation is enabled (with `--docs` or `docs = true` in server.toml).
-
-## Server configuration
-
-A basic configuration only needs a port. Dopbase derives the remaining local settings:
-
-```toml
-version = 1
-port = 8840
-```
-
-With no `public_url` configured, a loopback server derives it from the port
-(`http://localhost:8840`). The same applies on the command line:
+Use `start` while developing or when another process manager handles Dopbase:
 
 ```bash
-dopbase serve --port 8840
+dopbase server start
 ```
 
-To expose the server beyond localhost, set a host and provide its public
-address. Dopbase does not derive the public URL from the `Host` header:
+The command stays attached to the terminal. Press Ctrl+C to stop it.
+
+The default listener is `127.0.0.1:8840`. Change the host or port separately:
 
 ```bash
-dopbase serve --host 0.0.0.0 --public-url https://dopbase.example.com
+dopbase server start --port 9000
+dopbase server start \
+  --host 0.0.0.0 \
+  --public-url https://dopbase.example.com
 ```
 
-```toml
-version = 1
-host = "0.0.0.0"
-port = 8840
-public_url = "https://dopbase.example.com"
-```
-
-Advanced deployments (reverse proxies, Docker port mappings, path prefixes)
-that need the raw socket can use `bind_address` instead of `port`/`host`.
-The two styles cannot be mixed:
-
-```toml
-version = 1
-bind_address = "127.0.0.1:8840"
-public_url = "https://dopbase.example.com"
-```
-
-Individual settings resolve from command option, matching environment variable,
-`server.toml`, then the default derived from the selected data directory.
-Supported overrides are `--config`, `--port`, `--host`, `--public-url`,
-`--bind-address`, `--database-url`, `--shutdown-grace-seconds`, `--docs`/`--no-docs`,
-and `--master-key-file`, with corresponding `DOPBASE_*` environment variables.
-
-By default, all runtime files live in `~/.dopbase`. Select another directory
-with the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR`. Data-directory
-selection resolves in this order: CLI option, environment variable, default.
-
-`public_url` is required when binding beyond loopback and must use HTTPS.
-HTTP is accepted only for `localhost` and loopback IP addresses. Dopbase does
-not trust forwarded headers, and TLS termination remains an operator concern.
-
-## API documentation
-
-The Swagger UI at `/api/docs` and the OpenAPI document at
-`/api/v1/openapi.json` are disabled by default. Enable them for one run with
-`dopbase serve --docs`, disable them again with `--no-docs`, or enable them
-persistently with `docs = true` in `server.toml` or `DOPBASE_DOCS=true`. The
-command-line flags override the environment variable, which overrides the
-configuration file.
+A non-loopback host requires an HTTPS public URL. Dopbase does not infer the
+public URL from request headers.
 
 ## Run in the background
 
-`--background` starts the server as a detached daemon (macOS and Linux). The
-command returns as soon as the server is ready; the real startup error, such as
-a bind failure, is reported to the terminal:
+On macOS and Linux, `up` starts a managed background process and returns after
+the listener is ready:
 
 ```bash
-dopbase serve --background
+dopbase server up
+dopbase server up --port 9000
 ```
 
-Only one server can use a data directory at a time. If Dopbase is already
-running, a second `serve` command exits with a clear message instead of
-starting another application instance. Stop the existing server first with
-`dopbase stop` when it is running in the background.
+`start` and `up` accept the same server options:
 
-Human-readable output includes the same branded version banner followed by the
-daemon PID, log path, and stop command. With `--json`, those details remain
-machine-readable and include a `version` field.
+| Option                               | Purpose                                      |
+| ------------------------------------ | -------------------------------------------- |
+| `--config <FILE>`                    | Read a different `server.toml` file          |
+| `--host <HOST>`                      | Bind to an IP address, default `127.0.0.1`   |
+| `--port <PORT>`                      | Listen on a port, default `8840`             |
+| `--public-url <URL>`                 | Set the URL clients use to reach the server  |
+| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout                |
+| `--docs`                             | Enable Swagger UI and the OpenAPI document   |
+| `--no-docs`                          | Disable API documentation for this run       |
+| `--master-key-file <FILE>`           | Read the server master key from another file |
 
-The daemon writes two files into the data directory:
+Only one server can use a data directory at a time.
+
+## Check status
+
+`server status` inspects the local server selected by `--data-dir`:
+
+```bash
+dopbase server status
+dopbase --data-dir /srv/dopbase server status
+```
+
+It reports whether the server is stopped or running in the foreground or
+background. The command exits with status 0 when the server is running and 1
+when it is stopped.
+
+Use `dopbase client status` to inspect the active client endpoint, login, and
+default environment. `dopbase status` is an alias for that client command.
+
+## Read background logs
+
+Print the last 100 lines:
+
+```bash
+dopbase server logs
+```
+
+Choose a line count or follow new output:
+
+```bash
+dopbase server logs --lines 50
+dopbase server logs --follow
+```
+
+Clear existing output and leave the log ready for new entries:
+
+```bash
+dopbase server logs --clean
+dopbase server logs --clean --follow
+```
+
+When combined with `--follow`, `--clean` waits for output written after the
+log was cleared.
+
+The log remains available after the background server stops. A foreground
+server writes to its attached terminal instead.
+
+## Stop the background server
+
+```bash
+dopbase server down
+dopbase server down --timeout 30
+```
+
+`down` sends SIGTERM and waits up to 10 seconds by default. It uses SIGKILL if
+the process does not finish before the timeout. Stop a foreground server with
+Ctrl+C.
+
+## Storage and configuration
+
+Runtime files live in `~/.dopbase` by default. Select another directory with
+the global `--data-dir <DIR>` option or `DOPBASE_DATA_DIR`.
+
+The database location is fixed:
 
 ```text
-~/.dopbase/dopbase.pid   PID file (process ID, version, bind address, public URL)
-~/.dopbase/serve.log     stdout and stderr of the server
+<data-dir>/dopbase.db
 ```
 
-The one-time setup token of an uninitialized daemon is printed by the starting
-command together with a one-click setup link (`/setup?token=...`) that pre-fills
-the token input in the browser; both are also written to `serve.log`.
+`database_url`, `DOPBASE_DATABASE_URL`, and `--database-url` are ignored.
+If an older installation points to another SQLite file, stop the server and
+move that file to `<data-dir>/dopbase.db` before upgrading.
 
-Stop the daemon with `dopbase stop`:
+Configure the listener with `host` and `port`. The old `bind_address`,
+`DOPBASE_BIND_ADDRESS`, and `--bind-address` settings are ignored.
+
+```toml
+version = 1
+host = "127.0.0.1"
+port = 8840
+docs = false
+```
+
+## API documentation
+
+Swagger UI and the OpenAPI document are disabled by default. Enable them for
+one run with:
 
 ```bash
-dopbase stop                    # graceful shutdown, then force after 10s
-dopbase stop --timeout 30       # extend the grace period
-dopbase --data-dir /tmp/x stop  # target a non-default data directory
+dopbase server start --docs
 ```
 
-`stop` sends SIGTERM, waits for the graceful shutdown described below, and
-escalates to SIGKILL after the timeout. It removes stale PID files and fails
-with a clear error when no daemon is running. A second `serve --background`
-refuses to start while a daemon is active for the same data directory, and a
-foreground `serve` fails on the database lock while any instance owns it.
+You can also set `docs = true` in `server.toml` or `DOPBASE_DOCS=true`.
 
-## Startup and shutdown
-
-Migrations run before the listener opens. A new database receives a random
-master key with owner-only permissions. An existing database fails closed if
-its configured key is missing, malformed, or incorrect.
-
-An uninitialized server prints its one-time setup token to dedicated startup
-stderr output, followed by a `/setup?token=...` link that pre-fills the token
-input in the Admin UI. The token is never sent through structured request
-logging.
-
-SQLite uses WAL mode so reads can continue while writes are committed. SIGINT
-and SIGTERM stop new requests, drain active requests, checkpoint the WAL, and
-close SQLite. Offline recovery refuses to run while the server owns the
-database lock.
+Migrations run before the listener opens. New installations create a random
+master key with owner-only permissions. During shutdown, Dopbase stops new
+requests, drains active requests, checkpoints SQLite, and closes the database.

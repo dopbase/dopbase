@@ -4,7 +4,7 @@
       <span class="dopbase-terminal__light"></span>
       local secrets workflow
     </div>
-    <pre><span class="prompt">$</span> dopbase serve
+    <pre><span class="prompt">$</span> dopbase server start
 <span class="success">Dopbase</span>
 Secure, Simple and Private
 Version 0.0.14
@@ -13,7 +13,7 @@ Version 0.0.14
 <span class="quiet">API:</span>        http://localhost:8840/api/v1
 <span class="quiet">Config:</span>     /Users/venobi/.dopbase
 
-<span class="prompt">$</span> dopbase status
+<span class="prompt">$</span> dopbase client status
 <span class="success">Server: http://localhost:8840 (default)</span>
 
 <span class="prompt">$</span> dopbase init storefront development --from .env

@@ -26,7 +26,7 @@ use crate::{
   config::{ServerConfig, database_path, ensure_data_dir},
   constants::errors::{INTERNAL_ERROR, REQUEST_INVALID},
   http::HttpError,
-  modules,
+  middlewares, modules,
   services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
   state::{AppState, SetupState},
 };
@@ -134,6 +134,7 @@ pub fn router(state: AppState) -> Router {
       state.clone(),
       maintenance_gate,
     ))
+    .layer(axum::middleware::from_fn(middlewares::security::headers))
     .with_state(state)
 }
 
@@ -323,7 +324,11 @@ impl InstanceLock {
     if database_url.contains(":memory:") {
       return Ok(false);
     }
-    let file = Self::open(database_url)?;
+    let path = Self::lock_path(database_url)?;
+    if !path.exists() {
+      return Ok(false);
+    }
+    let file = OpenOptions::new().read(true).write(true).open(path)?;
     match file.try_lock_exclusive() {
       Ok(()) => {
         file.unlock()?;
@@ -335,8 +340,7 @@ impl InstanceLock {
   }
 
   fn open(database_url: &str) -> Result<File> {
-    let database = database_path(database_url)?;
-    let lock = std::path::PathBuf::from(format!("{}.lock", database.display()));
+    let lock = Self::lock_path(database_url)?;
     if let Some(parent) = lock.parent() {
       std::fs::create_dir_all(parent)?;
     }
@@ -347,6 +351,14 @@ impl InstanceLock {
       .write(true)
       .open(&lock)?;
     Ok(file)
+  }
+
+  fn lock_path(database_url: &str) -> Result<std::path::PathBuf> {
+    let database = database_path(database_url)?;
+    Ok(std::path::PathBuf::from(format!(
+      "{}.lock",
+      database.display()
+    )))
   }
 }
 impl Drop for InstanceLock {

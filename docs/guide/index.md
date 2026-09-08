@@ -32,7 +32,7 @@ The product has three parts:
 - A command-line client that connects to a Dopbase server.
 - The planned Dopbase Cloud service, which will provide a managed server.
 
-Both the server and client ship in the same `dopbase` executable. You choose the role through commands such as `dopbase serve` and `dopbase client connect`.
+Both the server and client ship in the same `dopbase` executable. Use `dopbase server start` to run the server and `dopbase client connect` to select an endpoint.
 
 ## Why Dopbase exists
 

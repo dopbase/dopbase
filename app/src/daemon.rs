@@ -207,7 +207,7 @@ pub struct Started {
   pub setup_token: Option<String>,
 }
 
-/// Start `dopbase serve` as a detached background server.
+/// Start `dopbase server start` as a detached background server.
 ///
 /// The foreground command validates the configuration, refuses to run when a
 /// daemon is already active for this data directory, spawns the binary again
@@ -259,7 +259,7 @@ pub(crate) async fn start(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let stop_command = format!("dopbase --data-dir {} stop", data_dir.display());
+  let stop_command = format!("dopbase --data-dir {} server down", data_dir.display());
   if json_output {
     print_value(
       true,
@@ -515,6 +515,97 @@ pub async fn stop(
     println!("Dopbase server stopped successfully.");
   }
   Ok(0)
+}
+
+pub async fn logs(
+  data_dir: Option<&Path>,
+  line_count: usize,
+  clean: bool,
+  follow: bool,
+  json_output: bool,
+) -> Result<i32> {
+  let data_dir = resolve_data_dir(data_dir)?;
+  let path = log_file_path(&data_dir);
+  if clean {
+    OpenOptions::new()
+      .create(true)
+      .write(true)
+      .truncate(true)
+      .open(&path)
+      .with_context(|| {
+        format!(
+          "failed to clear background server log at {}",
+          path.display()
+        )
+      })?;
+    #[cfg(unix)]
+    {
+      use std::os::unix::fs::PermissionsExt;
+      fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).with_context(|| {
+        format!(
+          "failed to secure background server log at {}",
+          path.display()
+        )
+      })?;
+    }
+    if json_output {
+      print_value(
+        true,
+        &serde_json::json!({"log_file": path, "cleaned": true}),
+      );
+      return Ok(0);
+    }
+    if !follow {
+      println!("Background server log cleared.");
+      return Ok(0);
+    }
+    println!("Background server log cleared. Waiting for new output.");
+  }
+
+  let mut contents = if clean {
+    String::new()
+  } else {
+    fs::read_to_string(&path)
+      .with_context(|| format!("no background server log found at {}", path.display()))?
+  };
+  let lines = tail_lines(&contents, line_count);
+  if json_output {
+    print_value(true, &serde_json::json!({"log_file": path, "lines": lines}));
+    return Ok(0);
+  }
+  for line in &lines {
+    println!("{line}");
+  }
+  if !follow {
+    return Ok(0);
+  }
+
+  let mut offset = contents.len();
+  loop {
+    tokio::select! {
+      _ = tokio::signal::ctrl_c() => return Ok(0),
+      _ = tokio::time::sleep(Duration::from_millis(250)) => {}
+    }
+    contents =
+      fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    if contents.len() < offset {
+      offset = 0;
+    }
+    if contents.len() > offset {
+      print!("{}", &contents[offset..]);
+      std::io::stdout().flush()?;
+      offset = contents.len();
+    }
+  }
+}
+
+pub fn tail_lines(
+  contents: &str,
+  line_count: usize,
+) -> Vec<&str> {
+  let lines = contents.lines().collect::<Vec<_>>();
+  let start = lines.len().saturating_sub(line_count);
+  lines[start..].to_vec()
 }
 
 #[cfg(unix)]

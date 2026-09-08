@@ -1,5 +1,5 @@
 use std::{
-  fs,
+  fs::{self, OpenOptions},
   io::Write,
   path::Path,
   sync::{Arc, Mutex},
@@ -8,8 +8,8 @@ use std::{
 
 use app::constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME};
 use app::daemon::{
-  ManagedDaemonState, Ready, inspect, log_file_path, pid_file_path, read_pid_file, remove_pid_file,
-  stop, write_pid_file,
+  ManagedDaemonState, Ready, inspect, log_file_path, logs, pid_file_path, read_pid_file,
+  remove_pid_file, stop, tail_lines, write_pid_file,
 };
 
 #[derive(Clone, Default)]
@@ -94,6 +94,49 @@ fn corrupt_pid_file_is_rejected() {
   let path = directory.path().join("dopbase.pid");
   fs::write(&path, "not json").unwrap();
   assert!(read_pid_file(&path).is_err());
+}
+
+#[test]
+fn log_tail_returns_the_requested_recent_lines() {
+  let contents = "one\ntwo\nthree\nfour\n";
+  assert_eq!(tail_lines(contents, 2), vec!["three", "four"]);
+  assert_eq!(
+    tail_lines(contents, 10),
+    vec!["one", "two", "three", "four"]
+  );
+  assert!(tail_lines(contents, 0).is_empty());
+}
+
+#[tokio::test]
+async fn clean_logs_truncates_without_replacing_the_open_file() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let path = log_file_path(directory.path());
+  let mut daemon_log = OpenOptions::new()
+    .create(true)
+    .append(true)
+    .open(&path)
+    .unwrap();
+  writeln!(daemon_log, "old output").unwrap();
+
+  logs(Some(directory.path()), 100, true, false, true)
+    .await
+    .unwrap();
+  assert_eq!(fs::read_to_string(&path).unwrap(), "");
+
+  writeln!(daemon_log, "fresh output").unwrap();
+  assert_eq!(fs::read_to_string(&path).unwrap(), "fresh output\n");
+}
+
+#[tokio::test]
+async fn clean_logs_creates_a_missing_log_file() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let path = log_file_path(directory.path());
+
+  logs(Some(directory.path()), 100, true, false, true)
+    .await
+    .unwrap();
+
+  assert_eq!(fs::read_to_string(path).unwrap(), "");
 }
 
 #[test]

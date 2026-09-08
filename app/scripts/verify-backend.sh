@@ -16,6 +16,7 @@ cargo build --release
 runtime_root="$(mktemp -d)"
 data_dir="${runtime_root}/data"
 server_log="${runtime_root}/server.log"
+background_data_dir="${runtime_root}/background-data"
 binary="${runtime_root}/dopbase"
 server_pid=""
 
@@ -24,15 +25,19 @@ cleanup() {
     kill -TERM "${server_pid}" 2>/dev/null || true
     wait "${server_pid}" 2>/dev/null || true
   fi
+  if [[ -x "${binary}" ]] && [[ -f "${background_data_dir}/dopbase.pid" ]]; then
+    "${binary}" --data-dir "${background_data_dir}" server down --timeout 2 >/dev/null 2>&1 || true
+  fi
   rm -rf "${runtime_root}"
 }
 trap cleanup EXIT
 
 cp ./target/release/dopbase "${binary}"
 cd "${runtime_root}"
-"${binary}" --data-dir "${data_dir}" serve \
+"${binary}" --data-dir "${data_dir}" server start \
   --docs \
-  --bind-address 127.0.0.1:18376 \
+  --host 127.0.0.1 \
+  --port 18376 \
   --public-url http://127.0.0.1:18376 \
   >"${server_log}" 2>&1 &
 server_pid=$!
@@ -62,3 +67,18 @@ grep --quiet "Config:     ${data_dir}" "${server_log}"
 kill -TERM "${server_pid}"
 wait "${server_pid}"
 server_pid=""
+
+"${binary}" --data-dir "${background_data_dir}" --json server up \
+  --docs \
+  --host 127.0.0.1 \
+  --port 18377 \
+  >"${runtime_root}/background-start.json"
+curl --fail --silent http://127.0.0.1:18377/api/v1/health | grep --quiet '"success":true'
+"${binary}" --data-dir "${background_data_dir}" --json server status \
+  | grep --quiet '"status": "running"'
+"${binary}" --data-dir "${background_data_dir}" server logs --lines 5 >/dev/null
+"${binary}" --data-dir "${background_data_dir}" server down
+if "${binary}" --data-dir "${background_data_dir}" server status >/dev/null; then
+  echo "error: background server still reports as running" >&2
+  exit 1
+fi

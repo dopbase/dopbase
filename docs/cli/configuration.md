@@ -18,7 +18,7 @@ http://localhost:8840
 ```
 
 This default is implicit. Dopbase does not need to create a configuration file
-just to connect to a server started with the default `dopbase serve` settings.
+just to connect to a server started with the default `dopbase server start` settings.
 
 If a configured remote server is unavailable, Dopbase fails clearly. It never
 falls back to localhost, Cloud, or another endpoint.
@@ -101,7 +101,7 @@ random 32-byte key is stored separately in `session-key`. The token is never
 written to `config.toml` or a Dopbase server's SQLite database.
 
 The encrypted payload also caches the normalized administrator email so
-`dopbase status` can identify the login without contacting the server. Older
+`dopbase client status` can identify the login without contacting the server. Older
 sessions remain valid but show an unknown email until the next login.
 
 Remote server URLs must use HTTPS. HTTP is limited to `localhost` and loopback
@@ -139,7 +139,7 @@ cached runtime values; the next successful live run creates fresh material.
 
 ## Inspect effective configuration
 
-`dopbase status` displays safe connection status:
+`dopbase client status` displays safe connection status:
 
 ```text
 Config file:     /home/alex/.dopbase/config.toml
@@ -152,7 +152,7 @@ Email:           admin@example.com
 Environment:     env_01ABCDEF (default)
 ```
 
-It never displays a token or secret value. `dopbase status --json` returns the
+It never displays a token or secret value. `dopbase --json client status` returns the
 same safe fields for diagnostics and automation:
 
 ```json

@@ -35,19 +35,17 @@ fn cli_overrides_environment_and_config_file() {
   let config_path = data_dir.join(SERVER_CONFIG_FILENAME);
   fs::write(
     &config_path,
-    "bind_address = '127.0.0.1:1001'\ndatabase_url = 'sqlite://file.db'\n[master_key]\npath = 'file.key'\n",
+    "host = '127.0.0.1'\nport = 1001\n[master_key]\npath = 'file.key'\n",
   )
   .unwrap();
   let overrides = ServerOverrides {
     data_dir: Some(data_dir.clone()),
-    bind_address: Some("127.0.0.1:3003".into()),
-    database_url: Some("sqlite://cli.db".into()),
+    port: Some(3003),
     master_key_path: Some(directory.path().join("cli.key")),
     ..Default::default()
   };
   let environment = EnvironmentOverrides {
-    bind_address: Some("127.0.0.1:2002".into()),
-    database_url: Some("sqlite://environment.db".into()),
+    port: Some("2002".into()),
     master_key_path: Some(directory.path().join("environment.key")),
     ..Default::default()
   };
@@ -55,7 +53,10 @@ fn cli_overrides_environment_and_config_file() {
   let config = ServerConfig::load_with_environment(&overrides, environment).unwrap();
   assert_eq!(config.data_dir, data_dir);
   assert_eq!(config.bind_address, "127.0.0.1:3003");
-  assert_eq!(config.database_url, "sqlite://cli.db");
+  assert_eq!(
+    config.database_url,
+    sqlite_url(&data_dir.join(DATABASE_FILENAME))
+  );
   assert_eq!(config.master_key.path, directory.path().join("cli.key"));
 }
 
@@ -261,24 +262,28 @@ fn localhost_host_maps_to_loopback() {
 }
 
 #[test]
-fn port_conflicts_with_explicit_bind_address() {
+fn legacy_config_keys_are_ignored() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");
   fs::create_dir_all(&data_dir).unwrap();
   let config_path = data_dir.join(SERVER_CONFIG_FILENAME);
-  fs::write(&config_path, "bind_address = '127.0.0.1:1001'\n").unwrap();
-  let result = ServerConfig::load_with_environment(
+  fs::write(
+    &config_path,
+    "bind_address = '0.0.0.0:1001'\ndatabase_url = 'sqlite://elsewhere.db'\n",
+  )
+  .unwrap();
+  let config = ServerConfig::load_with_environment(
     &ServerOverrides {
-      data_dir: Some(data_dir),
-      port: Some(9000),
+      data_dir: Some(data_dir.clone()),
       ..Default::default()
     },
     EnvironmentOverrides::default(),
-  );
-  let error = result.unwrap_err().to_string();
-  assert!(
-    error.contains("either port/host or bind_address"),
-    "{error}"
+  )
+  .unwrap();
+  assert_eq!(config.bind_address, DEFAULT_BIND_ADDRESS);
+  assert_eq!(
+    config.database_url,
+    sqlite_url(&data_dir.join(DATABASE_FILENAME))
   );
 }
 

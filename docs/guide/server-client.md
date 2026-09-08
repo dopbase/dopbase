@@ -34,7 +34,7 @@ flowchart LR
 
 ## The server
 
-`dopbase serve` starts a self-hosted Dopbase instance. The server owns:
+`dopbase server start` runs a self-hosted Dopbase instance. The server owns:
 
 - Encrypted secret records and their metadata
 - Projects and environments

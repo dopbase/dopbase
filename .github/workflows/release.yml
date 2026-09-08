@@ -220,9 +220,10 @@ jobs:
           }
           trap cleanup EXIT
 
-          "${binary}" --data-dir "${data_dir}" serve \
+          "${binary}" --data-dir "${data_dir}" server start \
             --docs \
-            --bind-address "${bind_address}" \
+            --host 127.0.0.1 \
+            --port "${SMOKE_PORT}" \
             --public-url "${public_url}" \
             >"${server_log}" 2>&1 &
           server_pid=$!
@@ -286,7 +287,7 @@ jobs:
           try {
             $process = Start-Process -FilePath $binary -ArgumentList @(
               "--data-dir", $dataDir,
-              "serve", "--docs", "--bind-address", "127.0.0.1:$env:SMOKE_PORT",
+              "server", "start", "--docs", "--host", "127.0.0.1", "--port", "$env:SMOKE_PORT",
               "--public-url", $publicUrl
             ) -RedirectStandardOutput $serverLog -RedirectStandardError $serverError -PassThru
 

@@ -339,7 +339,7 @@ Check the server health and network connection, then try again."
   } else if error.is_connect() {
     format!(
       "Could not connect to Dopbase at {base_url}.\n\
-Check that the server is running and verify the active endpoint with `dopbase status`. For local development, start it with `dopbase serve`."
+Check that the server is running and verify the active endpoint with `dopbase client status`. For local development, start it with `dopbase server start`."
     )
   } else {
     format!(
