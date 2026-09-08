@@ -41,7 +41,7 @@ different from `DATABASE_URL` in `production`.
 Selection lives in the URL, not in some hidden app state:
 
 ```text
-/workspace/p/payment-service/e/env_01ABCDEF...
+/workspace/p/payment-service/e/env_1000
 ```
 
 The project part uses the name; the environment part uses its immutable ID.
