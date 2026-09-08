@@ -1,16 +1,15 @@
 use super::{model::*, repository};
 use crate::modules::common;
 use crate::{
-  constants::{
-    errors::{ENVIRONMENT_NAME_INVALID, TOKEN_SCOPE_INVALID},
-    tokens::ENVIRONMENT_ID_PREFIX,
-  },
+  constants::errors::{ENVIRONMENT_NAME_INVALID, TOKEN_SCOPE_INVALID},
   http::HttpError,
   models::{AffectedCounts, AuthIdentity},
-  services::token,
+  services::environment_id::{self, LAST_ENVIRONMENT_NUMBER},
   state::AppState,
 };
 use chrono::Utc;
+use sqlx::{Sqlite, Transaction};
+
 fn unique(error: sqlx::Error) -> HttpError {
   if error.to_string().contains("UNIQUE") {
     HttpError::conflict(
@@ -21,6 +20,29 @@ fn unique(error: sqlx::Error) -> HttpError {
     HttpError::from(error)
   }
 }
+
+pub(crate) async fn insert_generated(
+  tx: &mut Transaction<'_, Sqlite>,
+  project_id: &str,
+  name: &str,
+  now: &str,
+) -> Result<String, HttpError> {
+  let mut number = repository::next_id_number(tx).await?;
+  while number <= LAST_ENVIRONMENT_NUMBER {
+    let id = environment_id::from_number(number);
+    if repository::reserve_id(tx, &id).await? {
+      repository::advance_id_number(tx, number + 1).await?;
+      repository::insert(tx, &id, project_id, name, now)
+        .await
+        .map_err(unique)?;
+      return Ok(id);
+    }
+    number += 1;
+  }
+  tracing::error!("environment id number space is exhausted");
+  Err(HttpError::internal())
+}
+
 pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
@@ -74,20 +96,9 @@ pub async fn create(
   common::validate_slug(&request.name, ENVIRONMENT_NAME_INVALID, "Environment name")?;
   let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project = crate::modules::projects::service::show(state, project_ref).await?;
-  let id = token::public_id(ENVIRONMENT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
-  let mut tx = state.db.pool().begin().await?;
-  sqlx::query(
-    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?)",
-  )
-  .bind(&id)
-  .bind(&project.id)
-  .bind(&request.name)
-  .bind(&now)
-  .bind(&now)
-  .execute(&mut *tx)
-  .await
-  .map_err(unique)?;
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let id = insert_generated(&mut tx, &project.id, &request.name, &now).await?;
   common::audit(
     &mut *tx,
     "admin",
