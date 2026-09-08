@@ -4,7 +4,6 @@ pub mod client;
 #[doc(hidden)]
 pub mod commands;
 pub mod dotenv;
-mod help;
 #[doc(hidden)]
 pub mod local_config;
 #[doc(hidden)]

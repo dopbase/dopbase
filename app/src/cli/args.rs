@@ -4,7 +4,7 @@ use std::{
   path::PathBuf,
 };
 
-use super::help::*;
+use crate::constants::help::*;
 
 #[derive(Parser, Debug)]
 #[command(
