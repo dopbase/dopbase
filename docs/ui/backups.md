@@ -5,7 +5,7 @@ description: "Manage system-wide encrypted backups, download and upload .dop arc
 
 # Backups and restoration
 
-Only root can use this page. Version 0.1.0 backups include human users,
+Only root can use this page. Version 0.1.1 backups include human users,
 service accounts, and tokens. Backups from earlier releases are not supported.
 :::
 

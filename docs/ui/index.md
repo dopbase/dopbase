@@ -32,7 +32,7 @@ commands. CLI changes appear in the UI.
 
 ## Who can sign in
 
-Version 0.1.0 supports root, admin, and member sign-in. Setup creates the
+Version 0.1.1 supports root, admin, and member sign-in. Setup creates the
 protected root; root and admin create additional users from Users.
 AI agents authenticate through service-account tokens. Applications use
 environment-scoped runner tokens to retrieve values. See

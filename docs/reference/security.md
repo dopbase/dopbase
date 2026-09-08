@@ -27,7 +27,7 @@ permissions available to each role.
 
 ## Envelope encryption
 
-The v0.1.0 implementation uses envelope encryption:
+The v0.1.1 implementation uses envelope encryption:
 
 ```text
 Secret value

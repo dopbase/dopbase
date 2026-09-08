@@ -5,7 +5,7 @@ description: "Install Dopbase, start a local secrets server, import an existing 
 
 # Quick start
 
-This walkthrough installs Dopbase 0.1.0, starts a local server, imports an
+This walkthrough installs Dopbase 0.1.1, starts a local server, imports an
 existing `.env` file, and runs an application with its secrets.
 
 ::: warning Fresh install required
@@ -27,7 +27,7 @@ curl -fsSL https://dopbase.com/install.sh | sh
 On Windows x64, run PowerShell and install to `%LOCALAPPDATA%\Dopbase\bin`:
 
 ```powershell
-irm https://raw.githubusercontent.com/dopbase/dopbase/0.1.0/scripts/install.ps1 -OutFile install.ps1
+irm https://raw.githubusercontent.com/dopbase/dopbase/0.1.1/scripts/install.ps1 -OutFile install.ps1
 .\install.ps1
 Remove-Item install.ps1
 ```
@@ -56,7 +56,7 @@ The default local server exposes:
 ```text
 Dopbase
 Secure, Simple and Private
-Version 0.1.0
+Version 0.1.1
 
 Admin UI:   http://localhost:8840
 API:        http://localhost:8840/api/v1

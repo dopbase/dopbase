@@ -2,6 +2,44 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## 0.1.1 - 2026-09-08
+
+### Added
+
+- Added `dopbase server logs` for reading, following, and clearing background
+  server output.
+- Added command-specific help and examples when required CLI arguments or
+  subcommands are missing.
+- Published a CLI cheat sheet, architecture documentation, and monthly public
+  security summaries.
+
+### Changed
+
+- Moved local server commands under `dopbase server`: `start` runs in the
+  foreground, while `up`, `down`, `status`, and `logs` manage a background
+  server. The old `serve`, `serve --background`, and `stop` commands are no
+  longer supported.
+- Fixed the SQLite database location at `<data-dir>/dopbase.db` and replaced
+  `--bind-address` and `--database-url` with separate host and port settings.
+  The matching legacy configuration keys and environment variables are no
+  longer supported.
+- Updated the command reference and examples for the new server commands and
+  made wide documentation tables scroll on smaller screens.
+
+### Fixed
+
+- Prevented server status checks from creating missing database or lock files.
+
+### Security
+
+- Required HTTPS for remote client and public server URLs while keeping HTTP
+  available for loopback addresses. Client requests no longer follow redirects.
+- Rate-limited password re-verification, restricted post-login redirects to
+  same-origin paths, and removed deleted secret data from SQLite files after
+  restores and factory resets.
+- Added content security, frame, content-type, referrer, and API cache-control
+  response headers.
+
 ## 0.1.0 - 2026-09-06
 
 ### Added
@@ -18,12 +56,6 @@ All notable changes to Dopbase are documented in this file.
 
 - Replaced the boxed server startup banner with plain startup lines and
   updated documentation examples to match.
-- Moved local server commands under `dopbase server`: `start` runs in the
-  foreground, `up` and `down` manage a background process, and `status` and
-  `logs` provide local diagnostics.
-- Fixed the SQLite database location at `<data-dir>/dopbase.db` and replaced
-  raw bind-address configuration with separate host and port settings.
-- Added examples throughout CLI help and a command cheat sheet to the docs.
 
 ## 0.0.15 - 2026-09-06
 
