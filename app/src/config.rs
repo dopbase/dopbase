@@ -63,11 +63,6 @@ pub struct ServerConfig {
   #[serde(skip)]
   pub daemonized: bool,
   pub master_key: MasterKeyConfig,
-  /// True when bind_address came from an explicit source (file, environment,
-  /// or `--bind-address`). The ergonomic `port`/`host` selectors refuse to
-  /// mix with it so there is exactly one source of truth for the socket.
-  #[serde(skip)]
-  pub bind_address_explicit: bool,
   /// True when public_url came from an explicit source. Otherwise it is
   /// derived from the bind address (`http://localhost:{port}` for loopback;
   /// remote binds fail closed and require an explicit value).
@@ -79,11 +74,9 @@ pub struct ServerConfig {
 pub struct ServerOverrides {
   pub data_dir: Option<PathBuf>,
   pub config_path: Option<PathBuf>,
-  pub bind_address: Option<String>,
   pub public_url: Option<String>,
   pub port: Option<u16>,
   pub host: Option<String>,
-  pub database_url: Option<String>,
   pub shutdown_grace_seconds: Option<u64>,
   pub docs: Option<bool>,
   pub background: bool,
@@ -172,7 +165,6 @@ impl ServerConfig {
       shutdown_grace_seconds: 10,
       docs_enabled: false,
       daemonized: false,
-      bind_address_explicit: false,
       public_url_explicit: false,
     }
   }
@@ -210,7 +202,7 @@ impl ServerConfig {
         .with_context(|| format!("failed to parse {}", config_path.display()))?;
       file_port = file.port;
       file_host = file.host.clone();
-      config.apply_file(file);
+      config.apply_file(file)?;
     } else {
       file_port = None;
       file_host = None;
@@ -225,9 +217,8 @@ impl ServerConfig {
     config.apply_environment(environment)?;
     config.apply_overrides(overrides);
 
-    // The ergonomic `port`/`host` selectors (CLI > environment > file) compose
-    // the bind address; an explicit `bind_address` from any source excludes
-    // them so there is exactly one source of truth for the socket.
+    // The `port` and `host` selectors (CLI > environment > file) compose the
+    // listener address.
     config.select_bind_address(
       overrides.port.or(environment_port).or(file_port),
       overrides.host.clone().or(environment_host).or(file_host),
@@ -241,20 +232,22 @@ impl ServerConfig {
   fn apply_file(
     &mut self,
     file: ServerConfigFile,
-  ) {
+  ) -> Result<()> {
+    if file.bind_address.is_some() {
+      bail!("bind_address is no longer supported; use separate host and port settings");
+    }
+    if file.database_url.is_some() {
+      bail!(
+        "database_url is no longer supported; move the SQLite database to {}",
+        self.data_dir.join(DATABASE_FILENAME).display()
+      );
+    }
     if let Some(value) = file.version {
       self.version = value;
-    }
-    if let Some(value) = file.bind_address {
-      self.bind_address = value;
-      self.bind_address_explicit = true;
     }
     if let Some(value) = file.public_url {
       self.public_url = value;
       self.public_url_explicit = true;
-    }
-    if let Some(value) = file.database_url {
-      self.database_url = value;
     }
     if let Some(value) = file.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
@@ -270,22 +263,25 @@ impl ServerConfig {
         self.master_key.path = value;
       }
     }
+    Ok(())
   }
 
   fn apply_environment(
     &mut self,
     environment: EnvironmentOverrides,
   ) -> Result<()> {
-    if let Some(value) = environment.bind_address {
-      self.bind_address = value;
-      self.bind_address_explicit = true;
+    if environment.bind_address.is_some() {
+      bail!("DOPBASE_BIND_ADDRESS is no longer supported; use DOPBASE_HOST and DOPBASE_PORT");
+    }
+    if environment.database_url.is_some() {
+      bail!(
+        "DOPBASE_DATABASE_URL is no longer supported; move the SQLite database to {}",
+        self.data_dir.join(DATABASE_FILENAME).display()
+      );
     }
     if let Some(value) = environment.public_url {
       self.public_url = value;
       self.public_url_explicit = true;
-    }
-    if let Some(value) = environment.database_url {
-      self.database_url = value;
     }
     if let Some(value) = environment.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value
@@ -305,16 +301,9 @@ impl ServerConfig {
     &mut self,
     overrides: &ServerOverrides,
   ) {
-    if let Some(value) = &overrides.bind_address {
-      self.bind_address.clone_from(value);
-      self.bind_address_explicit = true;
-    }
     if let Some(value) = &overrides.public_url {
       self.public_url.clone_from(value);
       self.public_url_explicit = true;
-    }
-    if let Some(value) = &overrides.database_url {
-      self.database_url.clone_from(value);
     }
     if let Some(value) = overrides.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
@@ -332,10 +321,7 @@ impl ServerConfig {
     self.bind_address.parse().context("invalid bind address")
   }
 
-  /// Compose the bind address from the ergonomic `port`/`host` selectors.
-  /// Either may be omitted and falls back to the default. An explicit
-  /// `bind_address` (file, environment, or `--bind-address`) excludes these
-  /// selectors entirely so the socket has exactly one source of truth.
+  /// Compose the bind address from the `port` and `host` selectors.
   fn select_bind_address(
     &mut self,
     port: Option<u16>,
@@ -343,9 +329,6 @@ impl ServerConfig {
   ) -> Result<()> {
     if port.is_none() && host.is_none() {
       return Ok(());
-    }
-    if self.bind_address_explicit {
-      bail!("configure either port/host or bind_address, not both");
     }
     let host = host.as_deref().unwrap_or("127.0.0.1");
     let ip = match host {
