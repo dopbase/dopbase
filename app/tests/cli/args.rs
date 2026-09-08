@@ -42,6 +42,8 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "--json", "server", "status"],
     &["dopbase", "server", "logs", "--lines", "50"],
     &["dopbase", "server", "logs", "--follow"],
+    &["dopbase", "server", "logs", "--clean"],
+    &["dopbase", "server", "logs", "--clean", "--follow"],
     &["dopbase", "client", "connect", "http://localhost:8840"],
     &["dopbase", "login"],
     &["dopbase", "logout"],
@@ -126,6 +128,24 @@ fn parses_every_v0_1_command_shape() {
     Cli::try_parse_from(*command)
       .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
   }
+}
+
+#[test]
+fn server_logs_clean_flag_parses() {
+  let cli = Cli::try_parse_from(["dopbase", "server", "logs", "--clean"]).unwrap();
+  let Command::Server {
+    command: ServerCommand::Logs {
+      lines,
+      clean,
+      follow,
+    },
+  } = cli.command
+  else {
+    panic!("expected server logs");
+  };
+  assert_eq!(lines, 100);
+  assert!(clean);
+  assert!(!follow);
 }
 
 #[test]

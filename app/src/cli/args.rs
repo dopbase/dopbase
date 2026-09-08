@@ -269,6 +269,9 @@ pub enum ServerCommand {
     /// Number of recent lines to print.
     #[arg(long, default_value_t = 100, value_name = "COUNT")]
     lines: usize,
+    /// Clear the background server log before reading or following it.
+    #[arg(long)]
+    clean: bool,
     /// Continue printing new lines until Ctrl+C.
     #[arg(short, long)]
     follow: bool,

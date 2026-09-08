@@ -59,7 +59,8 @@ See [server lifecycle](./serve) for options and examples.
 | `--master-key-file <FILE>`           | Read the master key from another file       |
 
 `server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
-accepts `--lines <COUNT>` (default 100) and `--follow` or `-f`.
+accepts `--lines <COUNT>` (default 100), `--follow` or `-f`, and `--clean`.
+`--clean --follow` clears the existing log before waiting for new output.
 
 The old `serve`, `serve --background`, and `stop` commands are not supported.
 Use `server start`, `server up`, and `server down` respectively.

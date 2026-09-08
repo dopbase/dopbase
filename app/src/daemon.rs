@@ -520,13 +520,54 @@ pub async fn stop(
 pub async fn logs(
   data_dir: Option<&Path>,
   line_count: usize,
+  clean: bool,
   follow: bool,
   json_output: bool,
 ) -> Result<i32> {
   let data_dir = resolve_data_dir(data_dir)?;
   let path = log_file_path(&data_dir);
-  let mut contents = fs::read_to_string(&path)
-    .with_context(|| format!("no background server log found at {}", path.display()))?;
+  if clean {
+    OpenOptions::new()
+      .create(true)
+      .write(true)
+      .truncate(true)
+      .open(&path)
+      .with_context(|| {
+        format!(
+          "failed to clear background server log at {}",
+          path.display()
+        )
+      })?;
+    #[cfg(unix)]
+    {
+      use std::os::unix::fs::PermissionsExt;
+      fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).with_context(|| {
+        format!(
+          "failed to secure background server log at {}",
+          path.display()
+        )
+      })?;
+    }
+    if json_output {
+      print_value(
+        true,
+        &serde_json::json!({"log_file": path, "cleaned": true}),
+      );
+      return Ok(0);
+    }
+    if !follow {
+      println!("Background server log cleared.");
+      return Ok(0);
+    }
+    println!("Background server log cleared. Waiting for new output.");
+  }
+
+  let mut contents = if clean {
+    String::new()
+  } else {
+    fs::read_to_string(&path)
+      .with_context(|| format!("no background server log found at {}", path.display()))?
+  };
   let lines = tail_lines(&contents, line_count);
   if json_output {
     print_value(true, &serde_json::json!({"log_file": path, "lines": lines}));

@@ -86,6 +86,16 @@ dopbase server logs --lines 50
 dopbase server logs --follow
 ```
 
+Clear existing output and leave the log ready for new entries:
+
+```bash
+dopbase server logs --clean
+dopbase server logs --clean --follow
+```
+
+When combined with `--follow`, `--clean` waits for output written after the
+log was cleared.
+
 The log remains available after the background server stops. A foreground
 server writes to its attached terminal instead.
 
