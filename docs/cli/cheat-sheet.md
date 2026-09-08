@@ -6,7 +6,7 @@ description: "Every Dopbase CLI command and option, with short examples."
 # CLI cheat sheet
 
 Use `payment-service/production` anywhere a command asks for an environment.
-An immutable ID such as `env_01ABCDEF` works too.
+An immutable ID such as `env_1000` works too.
 
 ## Global options
 
