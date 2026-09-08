@@ -134,9 +134,7 @@ pub fn router(state: AppState) -> Router {
       state.clone(),
       maintenance_gate,
     ))
-    .layer(axum::middleware::from_fn(
-      middlewares::security::security_headers,
-    ))
+    .layer(axum::middleware::from_fn(middlewares::security::headers))
     .with_state(state)
 }
 

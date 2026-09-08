@@ -6,7 +6,7 @@ use axum::{
 
 /// Add browser hardening headers to every response and prevent API responses
 /// from being stored by caches.
-pub async fn security_headers(
+pub async fn headers(
   request: axum::extract::Request,
   next: Next,
 ) -> Response {
