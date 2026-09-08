@@ -9,7 +9,7 @@ use std::{
 use app::constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME};
 use app::daemon::{
   ManagedDaemonState, Ready, inspect, log_file_path, pid_file_path, read_pid_file, remove_pid_file,
-  stop, write_pid_file,
+  stop, tail_lines, write_pid_file,
 };
 
 #[derive(Clone, Default)]
@@ -94,6 +94,17 @@ fn corrupt_pid_file_is_rejected() {
   let path = directory.path().join("dopbase.pid");
   fs::write(&path, "not json").unwrap();
   assert!(read_pid_file(&path).is_err());
+}
+
+#[test]
+fn log_tail_returns_the_requested_recent_lines() {
+  let contents = "one\ntwo\nthree\nfour\n";
+  assert_eq!(tail_lines(contents, 2), vec!["three", "four"]);
+  assert_eq!(
+    tail_lines(contents, 10),
+    vec!["one", "two", "three", "four"]
+  );
+  assert!(tail_lines(contents, 0).is_empty());
 }
 
 #[test]
