@@ -17,7 +17,7 @@ You can therefore start a default local server and sign in without running
 `connect` first:
 
 ```bash
-dopbase serve
+dopbase server start
 dopbase login
 ```
 
@@ -43,8 +43,8 @@ current managed background server when present, delete the encrypted local CLI
 session, and clear the saved default environment. There is no non-interactive
 bypass.
 
-If a foreground `dopbase serve` process is using the same data directory, stop
-it with Ctrl+C before switching. A `serve --background` process representing
+If a foreground `dopbase server start` process is using the same data directory, stop
+it with Ctrl+C before switching. A `dopbase server up` process representing
 the current endpoint is stopped automatically after confirmation. Remote
 servers, unrelated local servers, and browser sessions are never stopped or
 revoked.
@@ -87,7 +87,7 @@ not in an application repository. Login credentials are stored separately in
 the encrypted local session file. An optional `dopbase run` default is saved as
 an immutable environment ID scoped to this server.
 
-Use `dopbase status` to inspect the effective endpoint and authentication
+Use `dopbase client status` to inspect the effective endpoint and authentication
 status without displaying token contents. Read [client configuration](./configuration)
 for the file format, precedence rules, and multi-instance behavior.
 

@@ -12,10 +12,10 @@ Both server and client commands ship in the same `dopbase` executable:
 
 ```bash
 # Server role
-dopbase serve
+dopbase server start
 
 # Client role
-dopbase status
+dopbase client status
 dopbase login
 dopbase init payment-service development --from .env
 dopbase env create payment-service staging
