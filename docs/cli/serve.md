@@ -111,12 +111,12 @@ The database location is fixed:
 <data-dir>/dopbase.db
 ```
 
-`database_url`, `DOPBASE_DATABASE_URL`, and `--database-url` are not supported.
+`database_url`, `DOPBASE_DATABASE_URL`, and `--database-url` are ignored.
 If an older installation points to another SQLite file, stop the server and
 move that file to `<data-dir>/dopbase.db` before upgrading.
 
 Configure the listener with `host` and `port`. The old `bind_address`,
-`DOPBASE_BIND_ADDRESS`, and `--bind-address` settings are not supported.
+`DOPBASE_BIND_ADDRESS`, and `--bind-address` settings are ignored.
 
 ```toml
 version = 1

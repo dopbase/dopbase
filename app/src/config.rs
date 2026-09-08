@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::constants::config::{
-  CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_BIND_ADDRESS,
-  ENV_DATA_DIR, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT,
-  ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
+  CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_DATA_DIR,
+  ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT, ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS,
+  MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -87,11 +87,9 @@ pub struct ServerOverrides {
 #[derive(Debug, Default, Deserialize)]
 struct ServerConfigFile {
   version: Option<u32>,
-  bind_address: Option<String>,
   public_url: Option<String>,
   port: Option<u16>,
   host: Option<String>,
-  database_url: Option<String>,
   shutdown_grace_seconds: Option<u64>,
   docs: Option<bool>,
   master_key: Option<MasterKeyConfigFile>,
@@ -108,11 +106,9 @@ struct MasterKeyConfigFile {
 #[derive(Debug, Default)]
 pub struct EnvironmentOverrides {
   pub data_dir: Option<PathBuf>,
-  pub bind_address: Option<String>,
   pub public_url: Option<String>,
   pub port: Option<String>,
   pub host: Option<String>,
-  pub database_url: Option<String>,
   pub shutdown_grace_seconds: Option<String>,
   pub docs: Option<String>,
   pub master_key_path: Option<PathBuf>,
@@ -122,11 +118,9 @@ impl EnvironmentOverrides {
   fn read() -> Self {
     Self {
       data_dir: env::var_os(ENV_DATA_DIR).map(PathBuf::from),
-      bind_address: env::var(ENV_BIND_ADDRESS).ok(),
       public_url: env::var(ENV_PUBLIC_URL).ok(),
       port: env::var(ENV_PORT).ok(),
       host: env::var(ENV_HOST).ok(),
-      database_url: env::var(ENV_DATABASE_URL).ok(),
       shutdown_grace_seconds: env::var(ENV_SHUTDOWN_GRACE_SECONDS).ok(),
       docs: env::var(ENV_DOCS).ok(),
       master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
@@ -233,15 +227,6 @@ impl ServerConfig {
     &mut self,
     file: ServerConfigFile,
   ) -> Result<()> {
-    if file.bind_address.is_some() {
-      bail!("bind_address is no longer supported; use separate host and port settings");
-    }
-    if file.database_url.is_some() {
-      bail!(
-        "database_url is no longer supported; move the SQLite database to {}",
-        self.data_dir.join(DATABASE_FILENAME).display()
-      );
-    }
     if let Some(value) = file.version {
       self.version = value;
     }
@@ -270,15 +255,6 @@ impl ServerConfig {
     &mut self,
     environment: EnvironmentOverrides,
   ) -> Result<()> {
-    if environment.bind_address.is_some() {
-      bail!("DOPBASE_BIND_ADDRESS is no longer supported; use DOPBASE_HOST and DOPBASE_PORT");
-    }
-    if environment.database_url.is_some() {
-      bail!(
-        "DOPBASE_DATABASE_URL is no longer supported; move the SQLite database to {}",
-        self.data_dir.join(DATABASE_FILENAME).display()
-      );
-    }
     if let Some(value) = environment.public_url {
       self.public_url = value;
       self.public_url_explicit = true;

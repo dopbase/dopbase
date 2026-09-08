@@ -262,58 +262,29 @@ fn localhost_host_maps_to_loopback() {
 }
 
 #[test]
-fn legacy_bind_address_is_rejected() {
+fn legacy_config_keys_are_ignored() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");
   fs::create_dir_all(&data_dir).unwrap();
   let config_path = data_dir.join(SERVER_CONFIG_FILENAME);
-  fs::write(&config_path, "bind_address = '127.0.0.1:1001'\n").unwrap();
-  let result = ServerConfig::load_with_environment(
-    &ServerOverrides {
-      data_dir: Some(data_dir),
-      ..Default::default()
-    },
-    EnvironmentOverrides::default(),
-  );
-  let error = result.unwrap_err().to_string();
-  assert!(error.contains("use separate host and port"), "{error}");
-}
-
-#[test]
-fn legacy_database_overrides_are_rejected() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let data_dir = directory.path().join("data");
-  fs::create_dir_all(&data_dir).unwrap();
   fs::write(
-    data_dir.join(SERVER_CONFIG_FILENAME),
-    "database_url = 'sqlite://elsewhere.db'\n",
+    &config_path,
+    "bind_address = '0.0.0.0:1001'\ndatabase_url = 'sqlite://elsewhere.db'\n",
   )
   .unwrap();
-  let file_error = ServerConfig::load_with_environment(
+  let config = ServerConfig::load_with_environment(
     &ServerOverrides {
       data_dir: Some(data_dir.clone()),
       ..Default::default()
     },
     EnvironmentOverrides::default(),
   )
-  .unwrap_err()
-  .to_string();
-  assert!(file_error.contains("database_url is no longer supported"));
-
-  fs::remove_file(data_dir.join(SERVER_CONFIG_FILENAME)).unwrap();
-  let environment_error = ServerConfig::load_with_environment(
-    &ServerOverrides {
-      data_dir: Some(data_dir),
-      ..Default::default()
-    },
-    EnvironmentOverrides {
-      database_url: Some("sqlite://elsewhere.db".into()),
-      ..Default::default()
-    },
-  )
-  .unwrap_err()
-  .to_string();
-  assert!(environment_error.contains("DOPBASE_DATABASE_URL is no longer supported"));
+  .unwrap();
+  assert_eq!(config.bind_address, DEFAULT_BIND_ADDRESS);
+  assert_eq!(
+    config.database_url,
+    sqlite_url(&data_dir.join(DATABASE_FILENAME))
+  );
 }
 
 #[test]
