@@ -6,7 +6,7 @@ description: "Dopbase exposes a versioned REST API with a generated OpenAPI 3 sp
 # REST API
 
 Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.
-Enable API documentation with `dopbase serve --docs`. The generated OpenAPI 3
+Enable API documentation with `dopbase server start --docs`. The generated OpenAPI 3
 specification is then available from the running server:
 
 ```text

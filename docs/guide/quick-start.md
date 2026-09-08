@@ -48,7 +48,7 @@ accepts `-InstallDir` and `-Version` parameters. Mirrors can set
 ## 2. Start the server
 
 ```bash
-dopbase serve
+dopbase server start
 ```
 
 The default local server exposes:
@@ -75,7 +75,7 @@ Open another terminal. With no configured server, Dopbase uses the local
 default automatically:
 
 ```bash
-dopbase status
+dopbase client status
 ```
 
 ```text

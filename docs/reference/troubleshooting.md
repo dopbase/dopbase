@@ -7,7 +7,7 @@ description: "Fix common Dopbase problems: client connection failures, authentic
 
 ## The client cannot connect
 
-1. Run `dopbase status` and confirm the effective server and its source.
+1. Run `dopbase client status` and confirm the effective server and its source.
 2. Confirm the server process is running.
 3. Check the scheme, hostname, port, firewall, and TLS configuration.
 4. Do not assume the client will fall back to another endpoint.
@@ -18,7 +18,7 @@ Dopbase does not fall back to that local default.
 
 ## Authentication fails
 
-Connecting and logging in are separate. Run `dopbase status` to verify the
+Connecting and logging in are separate. Run `dopbase client status` to verify the
 resolved endpoint and authentication source. A saved token is used only for the
 normalized server that issued it; a token issued by one server is not reused on
 another.

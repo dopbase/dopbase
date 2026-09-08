@@ -37,5 +37,5 @@ new destination.
 
 The selected Cloud URL is stored in the user's machine-global config. The login
 token is stored in the encrypted extensionless `session` file, not in the TOML
-file or an application repository. `dopbase status` displays the effective endpoint
+file or an application repository. `dopbase client status` displays the effective endpoint
 and authentication status without revealing the token.

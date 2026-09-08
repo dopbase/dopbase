@@ -84,7 +84,7 @@ server that is still using its original `master.key`:
 You are spinning up a new server, rebuilding after total hardware loss, or
 migrating to a new machine:
 
-When you start a fresh Dopbase instance (`dopbase serve`), it generates a _new, unique_
+When you start a fresh Dopbase instance (`dopbase server start`), it generates a _new, unique_
 master key and an empty database. If you attempt to restore your `.dop` backup using the
 new server's temporary master key, decryption fails because the cryptographic keys do not match.
 
@@ -114,7 +114,7 @@ operational state. If the server is stopped or disconnected, the CLI halts and g
 to start the server:
 
 ```bash
-dopbase serve --background
+dopbase server up
 ```
 
 ---

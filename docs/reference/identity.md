@@ -40,7 +40,7 @@ server but never the token. A saved credential is used only for its
 matching server.
 
 The encrypted payload also caches the administrator email for offline
-`dopbase status` output. The password is never stored.
+`dopbase client status` output. The password is never stored.
 
 Plaintext `secret get --reveal` and `export` operations in the official CLI
 require interactive password confirmation every time. This is a CLI safety

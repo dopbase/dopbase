@@ -86,7 +86,7 @@ database integrity, and runs any outstanding schema migrations.
 
 ### Server status requirement
 
-Backups and restorations require a live, connected server. Before initiating `dopbase backup` or `dopbase restore`, the CLI verifies that the server endpoint is reachable and responsive (`server_status: connected (live)`). If the server is offline or stopped, the operation aborts immediately with an error instructing you to start the server (`dopbase serve`) before proceeding.
+Backups and restorations require a live, connected server. Before initiating `dopbase backup` or `dopbase restore`, the CLI verifies that the server endpoint is reachable and responsive (`server_status: connected (live)`). If the server is offline or stopped, the operation aborts immediately with an error instructing you to start the server (`dopbase server start`) before proceeding.
 
 ## Backup principles
 
