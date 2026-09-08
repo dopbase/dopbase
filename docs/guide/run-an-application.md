@@ -17,7 +17,7 @@ The same pattern works with other commands:
 
 ```bash
 dopbase run payment-service/development -- cargo run
-dopbase run env_01ABCDEF -- python app.py
+dopbase run env_1000 -- python app.py
 ```
 
 The environment may be an immutable `env_...` ID or a readable
@@ -32,13 +32,13 @@ scoped to that environment:
 ```bash
 export DOPBASE_URL=https://dopbase.example.com
 export DOPBASE_TOKEN=<environment-runner-token>
-dopbase run env_01ABCDEF -- ./payment-service
+dopbase run env_1000 -- ./payment-service
 ```
 
 The environment can instead come from deployment-time configuration:
 
 ```bash
-export DOPBASE_ENV=env_01ABCDEF
+export DOPBASE_ENV=env_1000
 dopbase run -- ./payment-service
 ```
 
