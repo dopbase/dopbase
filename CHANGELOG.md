@@ -4,12 +4,18 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
-### Changed
+This release uses shorter environment IDs, removes native Windows packages,
+and standardizes pull request and release descriptions.
+
+### Improvement
 
 - New environments receive short sequential IDs starting at `env_1000`.
   Existing IDs continue to work, and deleted IDs are not reused.
+- Pull request descriptions now follow a checked repository template. Release
+  notes use the matching changelog section and link to the complete comparison
+  between versions.
 
-### Removed
+### Note
 
 - Removed native Windows release archives and the PowerShell installer. Windows
   users must run Dopbase in a Linux container with Docker.

@@ -27,6 +27,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Rust
@@ -78,6 +79,7 @@ jobs:
 
       - name: Test and build frontend
         run: |
+          bun run test:github
           bunx vitest run --passWithNoTests
           bun run test:installer
           bun run build
@@ -101,11 +103,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          awk -v version="${GITHUB_REF_NAME}" '
-            index($0, "## " version " -") == 1 { found=1; print; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md > release-notes.md
+          previous_version="$(node scripts/github-templates.mjs previous-version \
+            --version "${GITHUB_REF_NAME}" \
+            --commit "${GITHUB_SHA}")"
+          node scripts/github-templates.mjs render-release \
+            --version "${GITHUB_REF_NAME}" \
+            --previous-version "${previous_version}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --output release-notes.md
           test -s release-notes.md
 
       - name: Upload release notes
@@ -328,7 +333,18 @@ jobs:
           release_json="$(curl --silent --show-error \
             "${api_headers[@]}" \
             "${api_url}/releases/tags/${GITHUB_REF_NAME}" || true)"
-          if ! jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
+          if jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
+            release_id="$(jq -r '.id' <<<"${release_json}")"
+            release_json="$(curl --fail --silent --show-error \
+              "${api_headers[@]}" \
+              --request PATCH \
+              --header 'Content-Type: application/json' \
+              --data "$(jq -n \
+                --arg name "Dopbase ${GITHUB_REF_NAME}" \
+                --arg body "${release_notes}" \
+                '{name: $name, body: $body}')" \
+              "${api_url}/releases/${release_id}")"
+          else
             release_json="$(curl --fail --silent --show-error \
               "${api_headers[@]}" \
               --request POST \
@@ -341,6 +357,7 @@ jobs:
                 '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, generate_release_notes: false}')" \
               "${api_url}/releases")"
           fi
+          jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"
 
           assets=(
             "release/checksums.txt"

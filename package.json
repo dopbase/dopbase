@@ -14,6 +14,7 @@
     "typecheck": "bun run typecheck:native && bun run typecheck:vue",
     "lint": "bunx eslint src tests",
     "test:run": "bunx vitest run --configLoader runner",
+    "test:github": "node --test scripts/github-templates.test.mjs",
     "build": "bun run typecheck && vite build",
     "build:bin": "cargo build --manifest-path app/Cargo.toml --release",
     "build:all": "bun run build && bun run build:bin",
