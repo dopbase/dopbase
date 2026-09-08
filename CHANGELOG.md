@@ -9,6 +9,11 @@ All notable changes to Dopbase are documented in this file.
 - New environments receive short sequential IDs starting at `env_1000`.
   Existing IDs continue to work, and deleted IDs are not reused.
 
+### Removed
+
+- Removed native Windows release archives and the PowerShell installer. Windows
+  users must run Dopbase in a Linux container with Docker.
+
 ## 0.1.1 - 2026-09-08
 
 ### Added
