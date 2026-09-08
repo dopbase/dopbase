@@ -99,6 +99,262 @@ async fn admin_environment() -> (TempDir, app::state::AppState, Router, String, 
   (directory, state, router, token, environment_id)
 }
 
+async fn bootstrap_admin(
+  state: &app::state::AppState,
+  router: &Router,
+) -> String {
+  let setup = state.setup.read().await.token.clone().unwrap();
+  let (status, _, _) = call(
+    router,
+    "POST",
+    "/api/v1/bootstrap/admin",
+    None,
+    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (status, login, _) = call(
+    router,
+    "POST",
+    "/api/v1/auth/login",
+    None,
+    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  login["data"]["token"].as_str().unwrap().to_owned()
+}
+
+#[tokio::test]
+async fn environment_ids_are_short_and_never_reused() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"api"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+
+  let (status, first, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/api/environments",
+    Some(&token),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert_eq!(first["data"]["id"], "env_1000");
+
+  let (status, _, _) = call(
+    &router,
+    "DELETE",
+    "/api/v1/environments/env_1000",
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+
+  let (status, second, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/api/environments",
+    Some(&token),
+    Some(json!({"name":"staging"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert_eq!(second["data"]["id"], "env_1001");
+
+  let (status, initialized, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/init",
+    Some(&token),
+    Some(json!({
+      "projectName":"worker",
+      "environmentName":"production",
+      "entries":[{"key":"API_KEY","value":"private"}]
+    })),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert_eq!(initialized["data"]["environmentId"], "env_1002");
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    "/api/v1/environments/env_1002/secrets/API_KEY/reveal",
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(revealed["data"]["value"], "private");
+
+  let reserved: Vec<String> =
+    sqlx::query_scalar("SELECT id FROM environment_id_reservations ORDER BY id")
+      .fetch_all(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(reserved, ["env_1000", "env_1001", "env_1002"]);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn environment_ids_grow_from_four_to_five_and_six_digits() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"boundaries"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+
+  for (number, name, expected) in [
+    (9_999, "last-four-digit", "env_9999"),
+    (10_000, "first-five-digit", "env_10000"),
+    (99_999, "last-five-digit", "env_99999"),
+    (100_000, "first-six-digit", "env_100000"),
+  ] {
+    sqlx::query("UPDATE environment_id_sequence SET next_number=? WHERE id=1")
+      .bind(number)
+      .execute(state.db.pool())
+      .await
+      .unwrap();
+    let (status, environment, _) = call(
+      &router,
+      "POST",
+      "/api/v1/projects/boundaries/environments",
+      Some(&token),
+      Some(json!({"name":name})),
+    )
+    .await;
+    assert_eq!(status, 201);
+    assert_eq!(environment["data"]["id"], expected);
+  }
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn environment_id_sequence_skips_an_existing_reservation() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  sqlx::query("INSERT INTO environment_id_reservations(id) VALUES('env_1000')")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"collision"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (status, environment, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/collision/environments",
+    Some(&token),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert_eq!(environment["data"]["id"], "env_1001");
+  state.db.close().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_environment_creation_allocates_unique_sequential_ids() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"parallel"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+
+  let barrier = std::sync::Arc::new(Barrier::new(10));
+  let mut tasks = Vec::new();
+  for number in 0..10 {
+    let router = router.clone();
+    let token = token.clone();
+    let barrier = barrier.clone();
+    tasks.push(tokio::spawn(async move {
+      barrier.wait().await;
+      call(
+        &router,
+        "POST",
+        "/api/v1/projects/parallel/environments",
+        Some(&token),
+        Some(json!({"name":format!("environment-{number}")})),
+      )
+      .await
+    }));
+  }
+
+  let mut ids = Vec::new();
+  for task in tasks {
+    let (status, body, _) = task.await.unwrap();
+    assert_eq!(status, 201, "environment create body: {body:?}");
+    ids.push(body["data"]["id"].as_str().unwrap().to_owned());
+  }
+  ids.sort();
+  assert_eq!(
+    ids,
+    (1_000..1_010)
+      .map(|number| format!("env_{number}"))
+      .collect::<Vec<_>>()
+  );
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn exhausted_environment_ids_return_internal_error_and_roll_back_init() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  sqlx::query("UPDATE environment_id_sequence SET next_number=1000000 WHERE id=1")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/init",
+    Some(&token),
+    Some(json!({
+      "projectName":"rolled-back",
+      "environmentName":"production",
+      "entries":[]
+    })),
+  )
+  .await;
+  assert_eq!(status, 500);
+  assert!(body["error"]["INTERNAL_ERROR"].is_string());
+  let project_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM projects WHERE name='rolled-back'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(project_count, 0);
+  state.db.close().await;
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_secret_sets_increment_every_version() {
   let (_directory, state, router, token, environment_id) = admin_environment().await;
