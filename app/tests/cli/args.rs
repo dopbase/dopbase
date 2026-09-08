@@ -106,6 +106,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "token", "list", "billing/production"],
     &["dopbase", "token", "revoke", "tok_01"],
     &["dopbase", "run", "billing/production", "--", "printenv"],
+    &["dopbase", "run", "env_1000", "--", "printenv"],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "update"],
     &["dopbase", "backup"],
@@ -359,7 +360,7 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
       &[
         "Usage: dopbase secret list",
         "payment-service/production",
-        "env_01ABCDEF",
+        "env_1000",
         "dopbase env list",
       ],
     ),
