@@ -12,9 +12,9 @@ explicit override, the machine-global config, or the implicit local default.
 
 ## Client configuration
 
-Per-user machine-global state stored in `~/.dopbase/config.toml` or its Windows
-equivalent. It contains the selected server but no token, project, environment,
-or secret value.
+Per-user machine-global state stored in `~/.dopbase/config.toml` on macOS and
+Linux. It contains the selected server but no token, project, environment, or
+secret value.
 
 ## Audit event
 
