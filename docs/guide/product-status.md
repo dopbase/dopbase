@@ -33,9 +33,9 @@ created by earlier releases are not supported. Keep the matching master key
 with every backup, and test restores before relying on them for recovery.
 
 Dopbase Cloud is not available yet. The current release does not include
-native Windows binaries, automatic upgrades, or managed backups. Windows users
-must run Dopbase in a Linux container with Docker. Self-hosted operators remain
-responsible for TLS, network access, database backups, master-key storage,
+native Windows binaries, automatic upgrades, or managed backups.
+
+Windows users must run Dopbase in a Linux container with Docker. Self-hosted operators remain responsible for TLS, network access, database backups, master-key storage,
 monitoring, upgrades, and incident response.
 
 The source is public so anyone can inspect the implementation and report
