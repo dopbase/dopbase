@@ -10,18 +10,24 @@ project or environment from the current directory. Management commands receive
 an environment reference directly; `run` may use a server-scoped default from
 the user configuration.
 
+For a compact table of every command, command-specific option, and example, see
+the [CLI cheat sheet](./cheat-sheet).
+
 ## Connections and authentication
 
 | Command                                | Purpose                             |
 | -------------------------------------- | ----------------------------------- |
-| `dopbase serve`                        | Start a self-hosted server          |
-| `dopbase serve --background`           | Start the server as a daemon        |
-| `dopbase stop`                         | Stop the background server          |
+| `dopbase server start`                 | Run the server in the foreground    |
+| `dopbase server up`                    | Start the server in the background  |
+| `dopbase server down`                  | Stop the background server          |
+| `dopbase server status`                | Check the local server process      |
+| `dopbase server logs`                  | Read background server logs         |
 | `dopbase client connect <server-url>`  | Validate and save another server    |
 | `dopbase client connect local`         | Return to the implicit local server |
 | `dopbase login`                        | Authenticate with the active server |
 | `dopbase logout`                       | Remove the active saved credential  |
-| `dopbase status`                       | Show safe effective client settings |
+| `dopbase client status`                | Show safe effective client settings |
+| `dopbase status`                       | Alias for `dopbase client status`   |
 | `dopbase update`                       | Check GitHub for a newer release    |
 | `dopbase admin reset-password <email>` | Reset a user password offline       |
 
@@ -35,10 +41,28 @@ or revoke browser sessions.
 
 ## Server lifecycle
 
-`serve --background` and `stop` manage a detached server; see
-[serve](./serve#run-in-the-background) for PID and log file locations.
-`stop --timeout <seconds>` extends the grace period before the daemon is
-force-stopped (default 10).
+`server start` stays attached to the terminal and stops with Ctrl+C. On macOS
+and Linux, `server up` starts a managed background process. Use `server down`
+to stop it, `server status` to inspect it, and `server logs` to read its output.
+See [server lifecycle](./serve) for options and examples.
+
+`server start` and `server up` accept the same launch options:
+
+| Option | Purpose |
+| --- | --- |
+| `--config <FILE>` | Read a different server configuration file |
+| `--host <HOST>` | Bind to an IP address, default `127.0.0.1` |
+| `--port <PORT>` | Listen on a port, default `8840` |
+| `--public-url <URL>` | Set the URL clients use to reach the server |
+| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout |
+| `--docs` / `--no-docs` | Enable or disable API documentation |
+| `--master-key-file <FILE>` | Read the master key from another file |
+
+`server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
+accepts `--lines <COUNT>` (default 100) and `--follow` or `-f`.
+
+The old `serve`, `serve --background`, and `stop` commands are not supported.
+Use `server start`, `server up`, and `server down` respectively.
 
 ## Check for updates
 
@@ -69,7 +93,7 @@ only when it matches the resolved server. Dopbase will not accept a token as a
 CLI argument because command-line arguments can be exposed through shell
 history and process inspection.
 
-`dopbase status` displays the config path, resolved server and its source,
+`dopbase client status` displays the config path, resolved server and its source,
 authentication source, cached identity, login email, and the saved default
 environment. It performs a short health check and reports `connected (live)`
 or `offline (cache)` without failing when the server is unavailable. It never
@@ -329,7 +353,7 @@ dopbase restore ./pre-upgrade.dop --setup-token dbs_... --yes
 | ----------------------- | --------------------------------------------------------------------------------------------------- |
 | `<path>`                | Path to the local `.dop` backup file to restore                                                     |
 | `-k, --key <KEY>`       | Path to source server's `master.key` file or a 64-character hex string                              |
-| `-y, --yes`             | Skip the destructive confirmation prompt (initialized restores still require password confirmation) |
+| `--yes`                 | Skip the destructive confirmation prompt (initialized restores still require password confirmation) |
 | `--setup-token <TOKEN>` | One-time token required for first-run restore                                                       |
 | `--json`                | Format results as machine-readable JSON                                                             |
 
@@ -362,10 +386,9 @@ dopbase admin reset-password admin@example.com
 | Option                     | Description                                       |
 | -------------------------- | ------------------------------------------------- |
 | `--config <FILE>`          | Server configuration file to load (`server.toml`) |
-| `--database-url <URL>`     | SQLite database connection string override        |
 | `--master-key-file <FILE>` | Path to the server master key file                |
 
-The command requires an interactive terminal, prompts for a new password (12–128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
+The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
 
 ## Structured output
 
