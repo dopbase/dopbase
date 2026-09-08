@@ -8,6 +8,10 @@
 
 The executable is a single download. Runtime data stays separate: Dopbase stores its SQLite database, configuration, and master key under `~/.dopbase` by default.
 
+Native release archives are available for macOS and Linux on AMD64 and ARM64.
+On Windows, run Dopbase in a Linux container with Docker; native Windows
+binaries are not provided.
+
 - Website: [http://dopbase.com](http://dopbase.com)
 - Documentation: [http://docs.dopbase.com](http://docs.dopbase.com)
 
