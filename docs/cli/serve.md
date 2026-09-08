@@ -42,16 +42,16 @@ dopbase server up --port 9000
 
 `start` and `up` accept the same server options:
 
-| Option | Purpose |
-| --- | --- |
-| `--config <FILE>` | Read a different `server.toml` file |
-| `--host <HOST>` | Bind to an IP address, default `127.0.0.1` |
-| `--port <PORT>` | Listen on a port, default `8840` |
-| `--public-url <URL>` | Set the URL clients use to reach the server |
-| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout |
-| `--docs` | Enable Swagger UI and the OpenAPI document |
-| `--no-docs` | Disable API documentation for this run |
-| `--master-key-file <FILE>` | Read the server master key from another file |
+| Option                               | Purpose                                      |
+| ------------------------------------ | -------------------------------------------- |
+| `--config <FILE>`                    | Read a different `server.toml` file          |
+| `--host <HOST>`                      | Bind to an IP address, default `127.0.0.1`   |
+| `--port <PORT>`                      | Listen on a port, default `8840`             |
+| `--public-url <URL>`                 | Set the URL clients use to reach the server  |
+| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout                |
+| `--docs`                             | Enable Swagger UI and the OpenAPI document   |
+| `--no-docs`                          | Disable API documentation for this run       |
+| `--master-key-file <FILE>`           | Read the server master key from another file |
 
 Only one server can use a data directory at a time.
 

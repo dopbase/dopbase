@@ -30,9 +30,9 @@ in your installed version.
 | Runner tokens                               | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration              | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit and instance status                   | `/api/v1/audit-events`, `/api/v1/instance`           |
-| Human users | `/api/v1/users` |
-| AI service accounts | `/api/v1/service-accounts` |
-| Instance summary | `/api/v1/status` |
+| Human users                                 | `/api/v1/users`                                      |
+| AI service accounts                         | `/api/v1/service-accounts`                           |
+| Instance summary                            | `/api/v1/status`                                     |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
 the responses supported by each operation.

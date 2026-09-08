@@ -48,15 +48,15 @@ See [server lifecycle](./serve) for options and examples.
 
 `server start` and `server up` accept the same launch options:
 
-| Option | Purpose |
-| --- | --- |
-| `--config <FILE>` | Read a different server configuration file |
-| `--host <HOST>` | Bind to an IP address, default `127.0.0.1` |
-| `--port <PORT>` | Listen on a port, default `8840` |
-| `--public-url <URL>` | Set the URL clients use to reach the server |
-| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout |
-| `--docs` / `--no-docs` | Enable or disable API documentation |
-| `--master-key-file <FILE>` | Read the master key from another file |
+| Option                               | Purpose                                     |
+| ------------------------------------ | ------------------------------------------- |
+| `--config <FILE>`                    | Read a different server configuration file  |
+| `--host <HOST>`                      | Bind to an IP address, default `127.0.0.1`  |
+| `--port <PORT>`                      | Listen on a port, default `8840`            |
+| `--public-url <URL>`                 | Set the URL clients use to reach the server |
+| `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout               |
+| `--docs` / `--no-docs`               | Enable or disable API documentation         |
+| `--master-key-file <FILE>`           | Read the master key from another file       |
 
 `server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
 accepts `--lines <COUNT>` (default 100) and `--follow` or `-f`.
