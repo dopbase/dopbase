@@ -6,8 +6,8 @@ use super::{
   runtime_cache::{self, RuntimeSource},
 };
 use crate::{
-  config::{ServerConfig, ServerOverrides, ensure_data_dir},
-  constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
+  config::{ServerConfig, ServerOverrides, ensure_data_dir, resolve_data_dir, sqlite_url},
+  constants::config::{DATABASE_FILENAME, DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
   daemon::ManagedDaemonState,
   models::SecretInput,
 };
@@ -26,49 +26,11 @@ pub async fn execute(cli: Cli) -> Result<i32> {
   let data_dir = cli.data_dir.clone();
   let json_output = cli.json;
   match cli.command {
-    Command::Serve(args) => {
-      let docs = args.docs();
-      let background = args.background;
-      let supervised = args.supervised;
-      if background {
-        let config = ServerConfig::load(&ServerOverrides {
-          data_dir: data_dir.clone(),
-          docs,
-          background,
-          supervised,
-          config_path: args.config.clone(),
-          bind_address: args.bind_address.clone(),
-          public_url: args.public_url.clone(),
-          port: args.port,
-          host: args.host.clone(),
-          database_url: args.database_url.clone(),
-          shutdown_grace_seconds: args.shutdown_grace_seconds,
-          master_key_path: args.master_key_file.clone(),
-        })?;
-        let flags = serve_flags(&args, &config.data_dir);
-        return crate::daemon::start(config, &flags, json_output).await;
+    Command::Server { command } => {
+      if server_argument.is_some() {
+        bail!("--server cannot be used with local `dopbase server` commands");
       }
-      let config = ServerConfig::load(&ServerOverrides {
-        data_dir,
-        docs,
-        background,
-        supervised,
-        config_path: args.config,
-        bind_address: args.bind_address,
-        public_url: args.public_url,
-        port: args.port,
-        host: args.host,
-        database_url: args.database_url,
-        shutdown_grace_seconds: args.shutdown_grace_seconds,
-        master_key_path: args.master_key_file,
-      })?;
-      let ready = supervised.then(crate::daemon::Ready::attached).flatten();
-      let result = crate::server::serve_with_ready(config, ready.as_ref()).await;
-      if let (Some(ready), Err(error)) = (&ready, &result) {
-        ready.fail(&format!("{error:#}"));
-      }
-      result?;
-      Ok(0)
+      execute_server(command, data_dir, json_output).await
     }
     Command::Client {
       command: ClientCommand::Connect { server_url },
@@ -79,6 +41,13 @@ pub async fn execute(cli: Cli) -> Result<i32> {
         );
       }
       connect(&server_url, data_dir.as_deref(), json_output).await?;
+      Ok(0)
+    }
+    Command::Client {
+      command: ClientCommand::Status,
+    }
+    | Command::Status => {
+      show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
     Command::Login => {
@@ -100,20 +69,8 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       );
       Ok(0)
     }
-    Command::Status => {
-      show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
-      Ok(0)
-    }
     Command::Admin { command } => admin(command, data_dir).await,
     Command::Update => super::update::run(json_output).await,
-    Command::Stop { timeout } => {
-      crate::daemon::stop(
-        data_dir.as_deref(),
-        Duration::from_secs(timeout),
-        json_output,
-      )
-      .await
-    }
     command => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
       execute_client(command, &server, json_output).await
@@ -121,21 +78,172 @@ pub async fn execute(cli: Cli) -> Result<i32> {
   }
 }
 
-/// Build the argv for the detached background server: the same user flags
-/// plus the resolved data directory and the internal `--supervised` marker
-/// (`--background` itself must not reappear, or the child would daemonize again).
-fn serve_flags(
-  args: &ServeArgs,
+async fn execute_server(
+  command: ServerCommand,
+  data_dir: Option<PathBuf>,
+  json_output: bool,
+) -> Result<i32> {
+  match command {
+    ServerCommand::Start(args) => {
+      if json_output {
+        bail!("--json cannot be used with `dopbase server start`");
+      }
+      let supervised = args.supervised;
+      let config = load_server_config(args.launch, data_dir, false, supervised)?;
+      let ready = supervised.then(crate::daemon::Ready::attached).flatten();
+      let result = crate::server::serve_with_ready(config, ready.as_ref()).await;
+      if let (Some(ready), Err(error)) = (&ready, &result) {
+        ready.fail(&format!("{error:#}"));
+      }
+      result?;
+      Ok(0)
+    }
+    ServerCommand::Up(args) => {
+      let config = load_server_config(args.clone(), data_dir, true, false)?;
+      let flags = server_start_flags(&args, &config.data_dir);
+      crate::daemon::start(config, &flags, json_output).await
+    }
+    ServerCommand::Down { timeout } => {
+      let resolved_data_dir = resolve_data_dir(data_dir.as_deref())?;
+      let check_foreground = matches!(
+        crate::daemon::inspect(&resolved_data_dir),
+        Ok(ManagedDaemonState::Absent | ManagedDaemonState::Stale)
+      );
+      if check_foreground
+        && crate::server::InstanceLock::is_held(&sqlite_url(
+          &resolved_data_dir.join(DATABASE_FILENAME),
+        ))?
+      {
+        bail!("the server is running in the foreground; stop it with Ctrl+C");
+      }
+      crate::daemon::stop(
+        data_dir.as_deref(),
+        Duration::from_secs(timeout),
+        json_output,
+      )
+      .await
+    }
+    ServerCommand::Status => server_status(data_dir.as_deref(), json_output),
+    ServerCommand::Logs { lines, follow } => {
+      if json_output && follow {
+        bail!("--json cannot be used with `dopbase server logs --follow`");
+      }
+      crate::daemon::logs(data_dir.as_deref(), lines, follow, json_output).await
+    }
+  }
+}
+
+fn load_server_config(
+  args: ServerLaunchArgs,
+  data_dir: Option<PathBuf>,
+  background: bool,
+  supervised: bool,
+) -> Result<ServerConfig> {
+  ServerConfig::load(&ServerOverrides {
+    data_dir,
+    docs: args.docs(),
+    background,
+    supervised,
+    config_path: args.config,
+    public_url: args.public_url,
+    port: args.port,
+    host: args.host,
+    shutdown_grace_seconds: args.shutdown_grace_seconds,
+    master_key_path: args.master_key_file,
+  })
+}
+
+fn server_status(
+  data_dir: Option<&Path>,
+  json_output: bool,
+) -> Result<i32> {
+  let config = ServerConfig::load(&ServerOverrides {
+    data_dir: data_dir.map(Path::to_path_buf),
+    ..Default::default()
+  })?;
+  let log_file = crate::daemon::log_file_path(&config.data_dir);
+  match crate::daemon::inspect(&config.data_dir)? {
+    ManagedDaemonState::Running(pid) => {
+      if json_output {
+        print_value(
+          true,
+          &json!({
+            "status": "running",
+            "mode": "background",
+            "pid": pid.pid,
+            "started_at": pid.started_at,
+            "version": pid.version,
+            "bind_address": pid.bind_address,
+            "public_url": pid.resolved_public_url(),
+            "data_dir": config.data_dir,
+            "log_file": log_file,
+          }),
+        );
+      } else {
+        println!(
+          "Server:     running (background)\nPID:        {}\nStarted:    {}\nURL:        {}\nData:       {}\nLog:        {}",
+          pid.pid,
+          pid.started_at,
+          pid.resolved_public_url().as_deref().unwrap_or("unknown"),
+          config.data_dir.display(),
+          log_file.display(),
+        );
+      }
+      Ok(0)
+    }
+    state @ (ManagedDaemonState::Absent | ManagedDaemonState::Stale) => {
+      let foreground = crate::server::InstanceLock::is_held(&config.database_url)?;
+      if foreground {
+        if json_output {
+          print_value(
+            true,
+            &json!({"status":"running","mode":"foreground","data_dir":config.data_dir}),
+          );
+        } else {
+          println!(
+            "Server:     running (foreground)\nData:       {}",
+            config.data_dir.display()
+          );
+        }
+        Ok(0)
+      } else {
+        let stale_pid_file = matches!(state, ManagedDaemonState::Stale);
+        if json_output {
+          print_value(
+            true,
+            &json!({
+              "status":"stopped",
+              "mode":Value::Null,
+              "data_dir":config.data_dir,
+              "stale_pid_file":stale_pid_file,
+            }),
+          );
+        } else if stale_pid_file {
+          println!(
+            "Server:     stopped\nData:       {}\nNote:       stale PID file found",
+            config.data_dir.display()
+          );
+        } else {
+          println!(
+            "Server:     stopped\nData:       {}",
+            config.data_dir.display()
+          );
+        }
+        Ok(1)
+      }
+    }
+  }
+}
+
+/// Build the argv for the detached server from the public launch options.
+fn server_start_flags(
+  args: &ServerLaunchArgs,
   data_dir: &Path,
 ) -> Vec<String> {
-  let mut flags = vec!["serve".to_string()];
+  let mut flags = vec!["server".to_string(), "start".to_string()];
   if let Some(value) = &args.config {
     flags.push("--config".into());
     flags.push(value.to_string_lossy().into_owned());
-  }
-  if let Some(value) = &args.bind_address {
-    flags.push("--bind-address".into());
-    flags.push(value.clone());
   }
   if let Some(value) = args.port {
     flags.push("--port".into());
@@ -147,10 +255,6 @@ fn serve_flags(
   }
   if let Some(value) = &args.public_url {
     flags.push("--public-url".into());
-    flags.push(value.clone());
-  }
-  if let Some(value) = &args.database_url {
-    flags.push("--database-url".into());
     flags.push(value.clone());
   }
   if let Some(value) = args.shutdown_grace_seconds {
@@ -418,7 +522,7 @@ async fn ensure_server_is_connected(
   if !server_is_connected(server).await {
     bail!(
       "Cannot perform {operation}: Dopbase server at {} is not connected or offline (live status required).\n\
-       Check that the server is running with `dopbase serve` and verify the endpoint with `dopbase status`.",
+       Check that the server is running with `dopbase server start` and verify the endpoint with `dopbase client status`.",
       server.url
     );
   }
@@ -1068,9 +1172,8 @@ async fn admin(
     AdminCommand::ResetPassword {
       email,
       config,
-      database_url,
       master_key_file,
-    } => reset_password(email, data_dir, config, database_url, master_key_file).await?,
+    } => reset_password(email, data_dir, config, master_key_file).await?,
   }
   Ok(0)
 }
@@ -1078,7 +1181,6 @@ async fn reset_password(
   email: String,
   data_dir: Option<PathBuf>,
   config: Option<PathBuf>,
-  database_url: Option<String>,
   master_key_file: Option<PathBuf>,
 ) -> Result<()> {
   if !io::stdin().is_terminal() {
@@ -1087,7 +1189,6 @@ async fn reset_password(
   let config = ServerConfig::load(&ServerOverrides {
     data_dir,
     config_path: config,
-    database_url,
     master_key_path: master_key_file,
     ..Default::default()
   })?;
