@@ -18,7 +18,6 @@
     "build:bin": "cargo build --manifest-path app/Cargo.toml --release",
     "build:all": "bun run build && bun run build:bin",
     "test:installer": "sh scripts/install.test.sh",
-    "test:installer:windows": "pwsh -NoProfile -File scripts/install.test.ps1",
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs",
     "docs:build": "rm -rf build && vitepress build docs && bun ./scripts/docs-postbuild.mjs",
