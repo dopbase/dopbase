@@ -26,7 +26,7 @@ Project
 The server and client are built into the same `dopbase` executable:
 
 ```bash
-dopbase serve
+dopbase server start
 dopbase login
 dopbase init payment-service development --from .env
 dopbase run payment-service/development -- npm start
@@ -92,7 +92,7 @@ bun run dev
 The combined command serves the UI at `http://localhost:9000`, proxies `/api`
 requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
-`bun run build:all` and then `./app/target/release/dopbase serve`.
+`bun run build:all` and then `./app/target/release/dopbase server start`.
 
 Start the documentation site:
 

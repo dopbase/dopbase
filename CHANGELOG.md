@@ -18,6 +18,12 @@ All notable changes to Dopbase are documented in this file.
 
 - Replaced the boxed server startup banner with plain startup lines and
   updated documentation examples to match.
+- Moved local server commands under `dopbase server`: `start` runs in the
+  foreground, `up` and `down` manage a background process, and `status` and
+  `logs` provide local diagnostics.
+- Fixed the SQLite database location at `<data-dir>/dopbase.db` and replaced
+  raw bind-address configuration with separate host and port settings.
+- Added examples throughout CLI help and a command cheat sheet to the docs.
 
 ## 0.0.15 - 2026-09-06
 
