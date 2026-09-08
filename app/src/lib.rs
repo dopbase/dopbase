@@ -4,6 +4,7 @@ pub mod constants;
 pub mod daemon;
 pub mod extractors;
 pub mod http;
+pub mod middlewares;
 pub mod models;
 pub mod modules;
 pub mod server;

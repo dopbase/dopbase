@@ -691,3 +691,68 @@ async fn env_layout_persists_with_import_and_omits_values() {
   assert_eq!(status, 422);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn password_reverification_is_rate_limited() {
+  let (_directory, state, router, token, _environment_id) = admin_environment().await;
+  // Five wrong attempts exhaust the account budget shared by reauthenticate,
+  // change-password, and factory-reset; the sixth is throttled.
+  for _ in 0..5 {
+    let (status, _, _) = call(
+      &router,
+      "POST",
+      "/api/v1/auth/reauthenticate",
+      Some(&token),
+      Some(json!({"password":"wrong-password"})),
+    )
+    .await;
+    assert_eq!(status, 401);
+  }
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    "/api/v1/auth/reauthenticate",
+    Some(&token),
+    Some(json!({"password":"wrong-password"})),
+  )
+  .await;
+  assert_eq!(status, 429);
+  assert!(body["error"].get("RATE_LIMITED").is_some());
+  // Even the correct password is refused while locked out.
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/auth/reauthenticate",
+    Some(&token),
+    Some(json!({"password":"correct-horse-123"})),
+  )
+  .await;
+  assert_eq!(status, 429);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn security_headers_are_applied_to_every_response() {
+  let (_directory, state, router, _token, _environment_id) = admin_environment().await;
+  let (status, _, headers) = call(&router, "GET", "/api/v1/health", None, None).await;
+  assert_eq!(status, 200);
+  assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+  assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+  assert_eq!(headers.get("referrer-policy").unwrap(), "no-referrer");
+  assert!(
+    headers
+      .get("content-security-policy")
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .contains("frame-ancestors 'none'")
+  );
+  // API responses must never be cacheable.
+  assert_eq!(headers.get("cache-control").unwrap(), "no-store");
+  // Non-API responses keep the hardening headers but their own caching.
+  let (status, _, headers) = call(&router, "GET", "/", None, None).await;
+  assert_eq!(status, 200);
+  assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+  assert_eq!(headers.get("cache-control").unwrap(), "no-cache");
+  state.db.close().await;
+}

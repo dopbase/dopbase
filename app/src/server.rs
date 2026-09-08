@@ -26,7 +26,7 @@ use crate::{
   config::{ServerConfig, database_path, ensure_data_dir},
   constants::errors::{INTERNAL_ERROR, REQUEST_INVALID},
   http::HttpError,
-  modules,
+  middlewares, modules,
   services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
   state::{AppState, SetupState},
 };
@@ -134,6 +134,7 @@ pub fn router(state: AppState) -> Router {
       state.clone(),
       maintenance_gate,
     ))
+    .layer(axum::middleware::from_fn(middlewares::security_headers))
     .with_state(state)
 }
 
