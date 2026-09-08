@@ -4,111 +4,7 @@ use std::{
   path::PathBuf,
 };
 
-const AFTER_HELP: &str = "\
-Quickstart:
-  dopbase server start                     # run a server on http://localhost:8840
-  dopbase server up                        # run the server in the background
-  dopbase login                            # authenticate with the active server
-  dopbase init myapp dev --from .env       # create a project + environment from a dotenv file
-  dopbase secret set myapp/dev API_KEY --stdin
-  dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
-
-Common server options:
-  --host <HOST>    Bind host (default: 127.0.0.1)
-  --port <PORT>    Listen port (default: 8840)
-
-Run 'dopbase help <command>' for details on any command.
-";
-
-const SERVER_HELP: &str = "\
-Examples:
-  dopbase server start
-  dopbase server up --port 9000
-  dopbase server status
-  dopbase server logs --follow
-  dopbase server down
-";
-
-const CLIENT_HELP: &str = "\
-Examples:
-  dopbase client connect https://dopbase.example.com
-  dopbase client connect local
-  dopbase client status
-";
-
-const PROJECT_HELP: &str = "\
-Examples:
-  dopbase project create payment-service
-  dopbase project list
-  dopbase project show payment-service
-  dopbase project rename payment-service payments
-  dopbase project delete payment-service
-";
-
-const ENV_HELP: &str = "\
-Examples:
-  dopbase env create payment-service production
-  dopbase env list payment-service
-  dopbase env show payment-service/production
-  dopbase env default payment-service/development
-  dopbase env rename payment-service/production prod
-  dopbase env delete payment-service/staging
-";
-
-const SECRET_HELP: &str = "\
-Examples:
-  dopbase secret list payment-service/production
-  dopbase secret set payment-service/production API_KEY
-  dopbase secret get payment-service/production API_KEY
-  dopbase secret get payment-service/production API_KEY --reveal
-  dopbase secret delete payment-service/production API_KEY
-
-Use project/environment for readable references. Run `dopbase env list` to find
-an environment. Immutable IDs such as env_01ABCDEF are also accepted.
-";
-
-const SECRET_LIST_HELP: &str = "\
-Examples:
-  dopbase secret list payment-service/production
-  dopbase secret list env_01ABCDEF
-
-Run `dopbase env list` to find an environment.
-";
-
-const SECRET_SET_HELP: &str = "\
-Examples:
-  dopbase secret set payment-service/production API_KEY
-  printf '%s' \"$API_KEY\" | dopbase secret set payment-service/production API_KEY --stdin
-
-Without --stdin, Dopbase prompts for the value without showing it on screen.
-";
-
-const SECRET_GET_HELP: &str = "\
-Examples:
-  dopbase secret get payment-service/production API_KEY
-  dopbase secret get payment-service/production API_KEY --reveal
-";
-
-const SECRET_DELETE_HELP: &str = "\
-Examples:
-  dopbase secret delete payment-service/production API_KEY
-  dopbase secret delete payment-service/production API_KEY --yes
-";
-
-const TOKEN_HELP: &str = "\
-Examples:
-  dopbase token create payment-service/production --name deploy
-  dopbase token list payment-service/production
-  dopbase token revoke tok_01ABCDEF
-";
-
-const ADMIN_HELP: &str = "\
-Examples:
-  dopbase admin reset-password admin@example.com
-";
-
-const ENVIRONMENT_ARG_HELP: &str = "Environment ID or project/environment reference, for example \
-payment-service/production. Run `dopbase env list` to see available environments.";
+use super::help::*;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -200,18 +96,18 @@ pub enum Command {
     command: ClientCommand,
   },
   /// Authenticate with the active server.
-  #[command(after_help = "Examples:\n  dopbase login\n")]
+  #[command(after_help = LOGIN_HELP)]
   Login,
   /// Remove the saved credential for the active server.
-  #[command(after_help = "Examples:\n  dopbase logout\n")]
+  #[command(after_help = LOGOUT_HELP)]
   Logout,
   /// Alias for `dopbase client status`.
-  #[command(after_help = "Examples:\n  dopbase status\n")]
+  #[command(after_help = STATUS_HELP)]
   Status,
   /// Create a project, its first environment, and import secrets.
   ///
   /// Bootstraps a new project on the server from an existing dotenv file.
-  #[command(after_help = "Examples:\n  dopbase init payment-service development --from .env\n")]
+  #[command(after_help = INIT_HELP)]
   Init {
     /// Name of the project to create (unique on the server).
     project: String,
@@ -243,9 +139,7 @@ pub enum Command {
   ///
   /// Existing keys are kept unless --replace is passed. Use --dry-run to
   /// preview the result without changing anything.
-  #[command(
-    after_help = "Examples:\n  dopbase import payment-service/production .env.production\n  dopbase import payment-service/production .env.production --dry-run\n"
-  )]
+  #[command(after_help = IMPORT_HELP)]
   Import {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
@@ -265,9 +159,7 @@ pub enum Command {
   ///
   /// Requires --output <FILE> or --stdout; --force overwrites an existing
   /// file. Every export requires interactive password confirmation.
-  #[command(
-    after_help = "Examples:\n  dopbase export payment-service/production --output .env.production\n  dopbase export payment-service/production --stdout\n"
-  )]
+  #[command(after_help = EXPORT_HELP)]
   Export {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
@@ -300,9 +192,7 @@ pub enum Command {
   /// encrypted local cache; if the server is unavailable, the last cache for
   /// the same server, environment, and credential is used. Everything after
   /// `--` is the command to run.
-  #[command(
-    after_help = "Examples:\n  dopbase run payment-service/development -- npm run dev\n  dopbase run -- npm run dev\n"
-  )]
+  #[command(after_help = RUN_HELP)]
   Run {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: Option<String>,
@@ -317,7 +207,7 @@ pub enum Command {
     command: AdminCommand,
   },
   /// Check GitHub for a newer Dopbase release (informational only).
-  #[command(after_help = "Examples:\n  dopbase update\n")]
+  #[command(after_help = UPDATE_HELP)]
   Update,
   /// Create an encrypted backup snapshot of the Dopbase instance.
   ///
@@ -325,9 +215,7 @@ pub enum Command {
   /// accounts into an XChaCha20-Poly1305 encrypted .dop archive. Without [name],
   /// a timestamped name is generated automatically. Stored on the server by
   /// default; specify -o/--output to also download and save locally.
-  #[command(
-    after_help = "Examples:\n  dopbase backup\n  dopbase backup pre-migration --output ./pre-migration.dop\n"
-  )]
+  #[command(after_help = BACKUP_HELP)]
   Backup {
     /// Optional backup name (default: dopbase_backup_<timestamp>.dop).
     name: Option<String>,
@@ -341,9 +229,7 @@ pub enum Command {
   /// accounts from the specified backup. If the server is uninitialized,
   /// completes bootstrap restoration. If already initialized, requires
   /// confirmation and administrator credentials.
-  #[command(
-    after_help = "Examples:\n  dopbase restore ./backup.dop\n  dopbase restore ./backup.dop --setup-token dbs_... --yes\n"
-  )]
+  #[command(after_help = RESTORE_HELP)]
   Restore {
     /// Path to the .dop backup file to restore.
     path: PathBuf,
@@ -362,31 +248,23 @@ pub enum Command {
 #[derive(Subcommand, Debug)]
 pub enum ServerCommand {
   /// Run the server in the foreground. Press Ctrl+C to stop it.
-  #[command(
-    after_help = "Examples:\n  dopbase server start\n  dopbase server start --port 9000\n  dopbase server start --host 0.0.0.0 --public-url https://dopbase.example.com\n"
-  )]
+  #[command(after_help = SERVER_START_HELP)]
   Start(ServerStartArgs),
   /// Start the server in the background on macOS or Linux.
-  #[command(
-    after_help = "Examples:\n  dopbase server up\n  dopbase server up --port 9000\n  dopbase server up --docs\n"
-  )]
+  #[command(after_help = SERVER_UP_HELP)]
   Up(ServerLaunchArgs),
   /// Stop the managed background server.
-  #[command(after_help = "Examples:\n  dopbase server down\n  dopbase server down --timeout 30\n")]
+  #[command(after_help = SERVER_DOWN_HELP)]
   Down {
     /// Seconds to wait for a graceful shutdown before forcing it.
     #[arg(long, default_value_t = 10)]
     timeout: u64,
   },
   /// Show whether the local server is running in the foreground or background.
-  #[command(
-    after_help = "Examples:\n  dopbase server status\n  dopbase --data-dir /srv/dopbase server status\n"
-  )]
+  #[command(after_help = SERVER_STATUS_HELP)]
   Status,
   /// Print logs written by the managed background server.
-  #[command(
-    after_help = "Examples:\n  dopbase server logs\n  dopbase server logs --lines 50\n  dopbase server logs --follow\n"
-  )]
+  #[command(after_help = SERVER_LOGS_HELP)]
   Logs {
     /// Number of recent lines to print.
     #[arg(long, default_value_t = 100, value_name = "COUNT")]
@@ -457,36 +335,34 @@ pub enum ClientCommand {
   /// the implicit local default (http://localhost:8840). Changing servers requires
   /// interactive confirmation, stops the current managed background server,
   /// clears the saved CLI session and default, and then requires a new login.
-  #[command(
-    after_help = "Examples:\n  dopbase client connect https://dopbase.example.com\n  dopbase client connect local\n"
-  )]
+  #[command(after_help = CLIENT_CONNECT_HELP)]
   Connect {
     /// Server URL to save, or `local` to use http://localhost:8840.
     server_url: String,
   },
   /// Show the active server, connection state, login, and default environment.
-  #[command(after_help = "Examples:\n  dopbase client status\n  dopbase --json client status\n")]
+  #[command(after_help = CLIENT_STATUS_HELP)]
   Status,
 }
 #[derive(Subcommand, Debug)]
 pub enum ProjectCommand {
   /// Create an empty project.
-  #[command(after_help = "Examples:\n  dopbase project create payment-service\n")]
+  #[command(after_help = PROJECT_CREATE_HELP)]
   Create {
     /// Project name, unique on the server.
     name: String,
   },
   /// List accessible projects.
-  #[command(after_help = "Examples:\n  dopbase project list\n")]
+  #[command(after_help = PROJECT_LIST_HELP)]
   List,
   /// Show project metadata.
-  #[command(after_help = "Examples:\n  dopbase project show payment-service\n")]
+  #[command(after_help = PROJECT_SHOW_HELP)]
   Show {
     /// Project ID or name.
     project: String,
   },
   /// Rename a project.
-  #[command(after_help = "Examples:\n  dopbase project rename payment-service payments\n")]
+  #[command(after_help = PROJECT_RENAME_HELP)]
   Rename {
     /// Project ID or name.
     project: String,
@@ -496,9 +372,7 @@ pub enum ProjectCommand {
   /// Delete a project with all its environments, secrets, and tokens.
   ///
   /// Asks for confirmation unless --yes is passed.
-  #[command(
-    after_help = "Examples:\n  dopbase project delete payment-service\n  dopbase project delete payment-service --yes\n"
-  )]
+  #[command(after_help = PROJECT_DELETE_HELP)]
   Delete {
     /// Project ID or name.
     project: String,
@@ -510,9 +384,7 @@ pub enum ProjectCommand {
 #[derive(Subcommand, Debug)]
 pub enum EnvCommand {
   /// Set or clear the default environment used by `dopbase run`.
-  #[command(
-    after_help = "Examples:\n  dopbase env default payment-service/development\n  dopbase env default --clear\n"
-  )]
+  #[command(after_help = ENV_DEFAULT_HELP)]
   Default {
     #[arg(
       value_name = "ENVIRONMENT",
@@ -525,7 +397,7 @@ pub enum EnvCommand {
     clear: bool,
   },
   /// Create an environment inside a project.
-  #[command(after_help = "Examples:\n  dopbase env create payment-service production\n")]
+  #[command(after_help = ENV_CREATE_HELP)]
   Create {
     /// Project ID or name.
     project: String,
@@ -533,21 +405,19 @@ pub enum EnvCommand {
     name: String,
   },
   /// List environments, either for one project or all accessible ones.
-  #[command(after_help = "Examples:\n  dopbase env list\n  dopbase env list payment-service\n")]
+  #[command(after_help = ENV_LIST_HELP)]
   List {
     /// Limit the listing to this project (ID or name).
     project: Option<String>,
   },
   /// Show environment metadata.
-  #[command(
-    after_help = "Examples:\n  dopbase env show payment-service/production\n  dopbase env show env_01ABCDEF\n"
-  )]
+  #[command(after_help = ENV_SHOW_HELP)]
   Show {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
   /// Rename an environment.
-  #[command(after_help = "Examples:\n  dopbase env rename payment-service/production prod\n")]
+  #[command(after_help = ENV_RENAME_HELP)]
   Rename {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
@@ -557,9 +427,7 @@ pub enum EnvCommand {
   /// Delete an environment with its secrets and tokens.
   ///
   /// Asks for confirmation unless --yes is passed.
-  #[command(
-    after_help = "Examples:\n  dopbase env delete payment-service/staging\n  dopbase env delete payment-service/staging --yes\n"
-  )]
+  #[command(after_help = ENV_DELETE_HELP)]
   Delete {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
@@ -618,9 +486,7 @@ pub enum TokenCommand {
   ///
   /// The token value is shown once at creation; pass it to client commands
   /// via the DOPBASE_TOKEN environment variable.
-  #[command(
-    after_help = "Examples:\n  dopbase token create payment-service/production --name deploy\n"
-  )]
+  #[command(after_help = TOKEN_CREATE_HELP)]
   Create {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
@@ -632,13 +498,13 @@ pub enum TokenCommand {
     role: String,
   },
   /// List tokens for an environment.
-  #[command(after_help = "Examples:\n  dopbase token list payment-service/production\n")]
+  #[command(after_help = TOKEN_LIST_HELP)]
   List {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
   /// Revoke a token by ID.
-  #[command(after_help = "Examples:\n  dopbase token revoke tok_01ABCDEF\n")]
+  #[command(after_help = TOKEN_REVOKE_HELP)]
   Revoke {
     /// ID of the token to revoke.
     token_id: String,
@@ -651,7 +517,7 @@ pub enum AdminCommand {
   /// Loads the local server configuration and database directly, so it must
   /// be run on the machine hosting the server and requires an interactive
   /// terminal.
-  #[command(after_help = "Examples:\n  dopbase admin reset-password admin@example.com\n")]
+  #[command(after_help = ADMIN_RESET_PASSWORD_HELP)]
   ResetPassword {
     /// Email of the account to reset.
     email: String,
