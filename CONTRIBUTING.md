@@ -132,8 +132,8 @@ git push origin "$version"
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
-matches the Rust package version, builds the Linux, macOS, and Windows archives, creates
-`checksums.txt`, and publishes the release only after every target succeeds.
+matches the Rust package version, builds the Linux and macOS archives, creates
+`checksums.txt`, and publishes the release only after all four targets succeed.
 
 ## Review expectations
 
