@@ -82,7 +82,7 @@ Examples:
 pub(crate) const ENV_SHOW_HELP: &str = "\
 Examples:
   dopbase env show payment-service/production
-  dopbase env show env_01ABCDEF
+  dopbase env show env_1000
 ";
 pub(crate) const ENV_RENAME_HELP: &str =
   "Examples:\n  dopbase env rename payment-service/production prod\n";
@@ -101,13 +101,13 @@ Examples:
   dopbase secret delete payment-service/production API_KEY
 
 Use project/environment for readable references. Run `dopbase env list` to find
-an environment. Immutable IDs such as env_01ABCDEF are also accepted.
+an environment. Immutable IDs such as env_1000 are also accepted.
 ";
 
 pub(crate) const SECRET_LIST_HELP: &str = "\
 Examples:
   dopbase secret list payment-service/production
-  dopbase secret list env_01ABCDEF
+  dopbase secret list env_1000
 
 Run `dopbase env list` to find an environment.
 ";
@@ -144,8 +144,9 @@ Examples:
 ";
 pub(crate) const RUN_HELP: &str = "\
 Examples:
-  dopbase run payment-service/development -- npm run dev
   dopbase run -- npm run dev
+  dopbase run env_1000 -- npm run dev
+  dopbase run payment-service/development -- npm run dev
 ";
 
 pub(crate) const TOKEN_HELP: &str = "\
