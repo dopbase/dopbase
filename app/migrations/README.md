@@ -17,6 +17,7 @@ version. The current pre-release schema is assembled in this order:
 0010_session_retention.up.sql
 0011_service_accounts.up.sql
 0012_agent_tokens.up.sql
+0013_environment_id_reservations.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
