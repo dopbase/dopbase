@@ -110,7 +110,7 @@ all the context needed by secret, import, export, token, and run commands.
 Commands accept either form:
 
 ```text
-env_01ABCDEF...             # Immutable ID
+env_1000                    # Immutable ID
 payment-service/production # Readable reference
 ```
 
@@ -266,7 +266,7 @@ dopbase run payment-service/development -- npm run dev
 Automation may set `DOPBASE_ENV` instead:
 
 ```bash
-DOPBASE_ENV=env_01ABCDEF dopbase run -- ./payment-service
+DOPBASE_ENV=env_1000 dopbase run -- ./payment-service
 ```
 
 Interactive users may save a server-scoped default:
