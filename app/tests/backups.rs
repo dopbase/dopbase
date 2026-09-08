@@ -215,6 +215,20 @@ async fn backup_and_restore_lifecycle() {
   assert_eq!(status, 200);
   assert_eq!(restore_res["data"]["restored"], true);
 
+  let restored_reservation: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM environment_id_reservations WHERE id = ?")
+      .bind(env_id)
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(restored_reservation, 1);
+  let restored_next_number: i64 =
+    sqlx::query_scalar("SELECT next_number FROM environment_id_sequence WHERE id=1")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(restored_next_number, 1_001);
+
   // 8. Verify secrets are restored to their original snapshot state!
   let (status, reveal_res, _) = call(
     &router,
