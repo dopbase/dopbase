@@ -1,5 +1,3 @@
-use clap::Parser;
-
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -8,7 +6,7 @@ async fn main() {
         .unwrap_or_else(|_| "app=info,tower_http=info".into()),
     )
     .init();
-  let cli = app::cli::Cli::parse();
+  let cli = app::cli::Cli::parse_with_help();
   let json = cli.json;
   match app::cli::execute(cli).await {
     Ok(code) => std::process::exit(code),
