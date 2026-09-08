@@ -28,8 +28,7 @@ falls back to localhost, Cloud, or another endpoint.
 The per-user locations are:
 
 ```text
-Unix and macOS: ~/.dopbase/config.toml
-Windows:        %USERPROFILE%\.dopbase\config.toml
+macOS and Linux: ~/.dopbase/config.toml
 ```
 
 Use the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR` to relocate this
@@ -111,11 +110,10 @@ Only one saved connection is active in v0.1.1. Logging in again replaces the
 credential for that server. `dopbase logout` removes the active credential but
 leaves the selected server unchanged.
 
-On Unix, the data directory is mode `0700` and both session files are mode
-`0600`. On Windows, they inherit the user profile directory ACL. Separating the
-key protects a copied `session` file by itself, but an attacker that can read
-both files can decrypt the token. Use `DOPBASE_TOKEN` when the credential must
-be managed externally.
+On macOS and Linux, the data directory is mode `0700` and both session files
+are mode `0600`. Separating the key protects a copied `session` file by itself,
+but an attacker that can read both files can decrypt the token. Use
+`DOPBASE_TOKEN` when the credential must be managed externally.
 
 ## Encrypted run cache
 
