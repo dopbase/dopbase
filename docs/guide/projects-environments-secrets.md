@@ -33,9 +33,9 @@ examples are `development`, `staging`, and `production`.
 
 ```text
 payment-service
-├── development  env_01DEV...
-├── staging      env_01STG...
-└── production   env_01PRD...
+├── development  env_1000
+├── staging      env_1001
+└── production   env_1002
 ```
 
 Each environment belongs to exactly one project and receives an immutable ID.
@@ -57,7 +57,7 @@ readable environment reference or immutable ID:
 
 ```bash
 dopbase secret list payment-service/staging
-dopbase secret list env_01STG...
+dopbase secret list env_1001
 ```
 
 The environment identifies its project, so callers do not select both. Use the
