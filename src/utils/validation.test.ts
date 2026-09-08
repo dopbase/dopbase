@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSafeRedirect,
   isValidEmail,
   isValidSecretKey,
   validatePasswordLength,
@@ -9,6 +10,15 @@ describe("shared validation", () => {
   it("accepts bounded email addresses and trims input", () => {
     expect(isValidEmail(" admin@example.com ")).toBe(true);
     expect(isValidEmail("admin@example")).toBe(false);
+  });
+
+  it("accepts only same-origin paths as redirect targets", () => {
+    expect(isSafeRedirect("/workspace")).toBe(true);
+    expect(isSafeRedirect("/workspace/p/acme/e/env_1")).toBe(true);
+    expect(isSafeRedirect("https://evil.example.test/phish")).toBe(false);
+    expect(isSafeRedirect("//evil.example.test/phish")).toBe(false);
+    expect(isSafeRedirect("javascript:alert(1)")).toBe(false);
+    expect(isSafeRedirect("workspace")).toBe(false);
   });
 
   it("counts password characters consistently with the server", () => {

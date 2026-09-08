@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
-import { isValidEmail } from "~/utils/validation";
+import { isSafeRedirect, isValidEmail } from "~/utils/validation";
 
 /**
  * Login screen controller: form state, client-side validation, stable
@@ -60,7 +60,9 @@ export function useLoginController() {
       await auth.login(email.value.trim().toLowerCase(), password.value);
       const redirect = route.query.redirect;
       router.push(
-        typeof redirect === "string" ? redirect : { name: "workspace" },
+        typeof redirect === "string" && isSafeRedirect(redirect)
+          ? redirect
+          : { name: "workspace" },
       );
     } catch (error) {
       mapApiError(error);

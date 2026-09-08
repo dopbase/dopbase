@@ -794,6 +794,18 @@ pub async fn restore_database_from_archive(
     HttpError::internal()
   })?;
 
+  // Best-effort scrub: the wiped rows must not linger in the live database
+  // file or WAL after the restore replaced them.
+  if let Err(error) = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+    .execute(state.db.pool())
+    .await
+  {
+    tracing::warn!(%error, "failed to checkpoint WAL after backup restore");
+  }
+  if let Err(error) = sqlx::query("VACUUM").execute(state.db.pool()).await {
+    tracing::warn!(%error, "failed to vacuum after backup restore");
+  }
+
   // Run migrations on restored database if needed
   Ok(())
 }

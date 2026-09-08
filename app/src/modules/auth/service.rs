@@ -192,15 +192,27 @@ pub async fn reauthenticate(
   password: &str,
 ) -> Result<(), HttpError> {
   let (admin_id, email) = require_project_manager(identity)?;
+  // Password re-verification is brute-forceable through a hijacked session,
+  // so it shares the login limiter's budget for this account.
+  let limit_key = format!("password_verify:{admin_id}");
+  if !state.rate_limiter.check(&limit_key).await {
+    return Err(HttpError::new(
+      axum::http::StatusCode::TOO_MANY_REQUESTS,
+      RATE_LIMITED,
+      "Too many attempts. Please try again later.",
+    ));
+  }
   let hash = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
   if !common::verify_password_async(password.to_owned(), hash).await? {
+    state.rate_limiter.failure(&limit_key).await;
     return Err(HttpError::unauthorized(
       AUTHENTICATION_INVALID,
       "The password is incorrect.",
     ));
   }
+  state.rate_limiter.clear(&limit_key).await;
   let session_id = match identity {
     AuthIdentity::Admin { session_id, .. } => session_id,
     _ => unreachable!(),
@@ -233,16 +245,28 @@ pub async fn change_password(
   request: ChangePasswordRequest,
 ) -> Result<(), HttpError> {
   let (admin_id, email) = require_project_manager(identity)?;
+  // Verifying the current password is the same brute-force surface as
+  // reauthentication, so it shares that limiter budget.
+  let limit_key = format!("password_verify:{admin_id}");
+  if !state.rate_limiter.check(&limit_key).await {
+    return Err(HttpError::new(
+      axum::http::StatusCode::TOO_MANY_REQUESTS,
+      RATE_LIMITED,
+      "Too many attempts. Please try again later.",
+    ));
+  }
   common::validate_password(&request.new_password)?;
   let old = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
   if !common::verify_password_async(request.current_password.clone(), old).await? {
+    state.rate_limiter.failure(&limit_key).await;
     return Err(HttpError::unauthorized(
       AUTHENTICATION_INVALID,
       "The password is incorrect.",
     ));
   }
+  state.rate_limiter.clear(&limit_key).await;
   let new_hash = common::hash_password_async(request.new_password.clone()).await?;
   let mut tx = state.db.pool().begin().await?;
   sqlx::query("UPDATE admins SET password_hash=?,updated_at=? WHERE id=?")
