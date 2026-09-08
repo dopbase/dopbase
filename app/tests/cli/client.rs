@@ -91,7 +91,7 @@ async fn connection_failure_is_concise_and_actionable() {
   assert_eq!(
     message,
     "Could not connect to Dopbase at http://127.0.0.1:1.\n\
-Check that the server is running and verify the active endpoint with `dopbase status`. For local development, start it with `dopbase serve`."
+Check that the server is running and verify the active endpoint with `dopbase client status`. For local development, start it with `dopbase server start`."
   );
   assert!(!message.contains("GET /api/v1/environments"));
   assert!(!message.contains("Request:"));
