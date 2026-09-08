@@ -1,5 +1,6 @@
 use super::{model::InstanceStatus, repository};
 use crate::{
+  constants::errors::RATE_LIMITED,
   extractors::{
     require_admin, require_metadata_access, require_mutation, require_recent_browser_auth,
     require_root_browser,
@@ -123,6 +124,16 @@ pub async fn factory_reset(
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
   let (root_id, _) = require_root_browser(identity)?;
+  // The root password verification here shares the reauthentication
+  // limiter budget for this account.
+  let limit_key = format!("password_verify:{root_id}");
+  if !state.rate_limiter.check(&limit_key).await {
+    return Err(HttpError::new(
+      axum::http::StatusCode::TOO_MANY_REQUESTS,
+      RATE_LIMITED,
+      "Too many attempts. Please try again later.",
+    ));
+  }
   if request.confirmation != "FACTORY RESET" || !request.acknowledged {
     return Err(HttpError::bad_request(
       "RESET_CONFIRMATION_REQUIRED",
@@ -134,11 +145,13 @@ pub async fn factory_reset(
     .fetch_one(state.db.pool())
     .await?;
   if !crate::modules::common::verify_password_async(request.current_password, hash).await? {
+    state.rate_limiter.failure(&limit_key).await;
     return Err(HttpError::unauthorized(
       "AUTHENTICATION_INVALID",
       "The root password is incorrect.",
     ));
   }
+  state.rate_limiter.clear(&limit_key).await;
   if state
     .maintenance
     .swap(true, std::sync::atomic::Ordering::SeqCst)
@@ -169,6 +182,17 @@ pub async fn factory_reset(
         .await?;
     }
     tx.commit().await?;
+    // Best-effort scrub: deleted secret ciphertext must not linger in the
+    // database file or WAL after a reset.
+    if let Err(error) = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+      .execute(state.db.pool())
+      .await
+    {
+      tracing::warn!(%error, "failed to checkpoint WAL after factory reset");
+    }
+    if let Err(error) = sqlx::query("VACUUM").execute(state.db.pool()).await {
+      tracing::warn!(%error, "failed to vacuum after factory reset");
+    }
     let backup_dir = state.config.data_dir.join("backups");
     if let Ok(entries) = std::fs::read_dir(&backup_dir) {
       for entry in entries.flatten() {

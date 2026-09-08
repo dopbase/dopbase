@@ -59,6 +59,45 @@ describe("useLoginController", () => {
     expect(store.isAuthenticated).toBe(true);
   });
 
+  it("routes to a safe internal redirect target after sign-in", async () => {
+    routeQuery.redirect = "/workspace/p/acme/e/env_1";
+    vi.mocked(authApi.login).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      sessionKind: "browser",
+      token: null,
+      csrfToken: "csrf_1",
+    });
+    const c = useLoginController();
+    c.email.value = "a@b.c";
+    c.password.value = "pw";
+    await c.submit();
+    expect(routerPush).toHaveBeenCalledWith("/workspace/p/acme/e/env_1");
+  });
+
+  it("ignores cross-origin and protocol-relative redirect targets", async () => {
+    vi.mocked(authApi.login).mockResolvedValue({
+      adminId: "usr_1",
+      email: "a@b.c",
+      sessionKind: "browser",
+      token: null,
+      csrfToken: "csrf_1",
+    });
+    for (const redirect of [
+      "https://evil.example.test/phish",
+      "//evil.example.test/phish",
+      "javascript:alert(1)",
+    ]) {
+      routerPush.mockReset();
+      routeQuery.redirect = redirect;
+      const c = useLoginController();
+      c.email.value = "a@b.c";
+      c.password.value = "pw";
+      await c.submit();
+      expect(routerPush).toHaveBeenCalledWith({ name: "workspace" });
+    }
+  });
+
   it("honors the redirect query after login", async () => {
     vi.mocked(authApi.login).mockResolvedValueOnce({
       adminId: "usr_1",

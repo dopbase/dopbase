@@ -31,3 +31,14 @@ export function isValidSecretKey(value: string): boolean {
     SECRET_KEY_PATTERN.test(value)
   );
 }
+
+/**
+ * Only same-origin, non-protocol-relative paths may be used as post-login
+ * redirect targets. Blocks absolute URLs (`https://…`) and protocol-relative
+ * shortcuts (`//host`).
+ */
+export function isSafeRedirect(value: string): boolean {
+  return (
+    value.startsWith("/") && !value.startsWith("//") && !value.includes("://")
+  );
+}
