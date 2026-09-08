@@ -1,27 +1,52 @@
-use app::cli::args::{Cli, Command};
-use clap::{CommandFactory, Parser};
+use app::cli::args::{Cli, Command, ServerCommand};
+use clap::{CommandFactory, Parser, error::ErrorKind};
+use std::process::Command as ProcessCommand;
+
+fn contextual_help(arguments: &[&str]) -> String {
+  let error = Cli::try_parse_with_help_from(arguments).unwrap_err();
+  assert!(
+    matches!(
+      error.kind(),
+      ErrorKind::DisplayHelp | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+    ),
+    "unexpected error for {arguments:?}: {error}"
+  );
+  error.to_string()
+}
 
 #[test]
 fn parses_every_v0_1_command_shape() {
   let commands: &[&[&str]] = &[
-    &["dopbase", "serve"],
-    &["dopbase", "serve", "--data-dir", "/tmp/dopbase"],
-    &["dopbase", "serve", "--docs"],
-    &["dopbase", "serve", "--no-docs"],
-    &["dopbase", "serve", "--background"],
-    &["dopbase", "serve", "--background", "--docs"],
-    &["dopbase", "serve", "--port", "8840"],
-    &["dopbase", "serve", "--port", "9000", "--host", "0.0.0.0"],
-    &["dopbase", "serve", "--host", "localhost", "--port", "9000"],
-    &["dopbase", "serve", "--bind-address", "127.0.0.1:8840"],
-    &["dopbase", "stop"],
-    &["dopbase", "stop", "--timeout", "30"],
-    &["dopbase", "--data-dir", "/tmp/dopbase", "stop"],
-    &["dopbase", "--json", "stop"],
+    &["dopbase", "server", "start"],
+    &["dopbase", "server", "start", "--data-dir", "/tmp/dopbase"],
+    &["dopbase", "server", "start", "--docs"],
+    &["dopbase", "server", "start", "--no-docs"],
+    &["dopbase", "server", "up"],
+    &["dopbase", "server", "up", "--docs"],
+    &["dopbase", "server", "start", "--port", "8840"],
+    &[
+      "dopbase", "server", "up", "--port", "9000", "--host", "0.0.0.0",
+    ],
+    &[
+      "dopbase",
+      "server",
+      "start",
+      "--host",
+      "localhost",
+      "--port",
+      "9000",
+    ],
+    &["dopbase", "server", "down"],
+    &["dopbase", "server", "down", "--timeout", "30"],
+    &["dopbase", "--data-dir", "/tmp/dopbase", "server", "status"],
+    &["dopbase", "--json", "server", "status"],
+    &["dopbase", "server", "logs", "--lines", "50"],
+    &["dopbase", "server", "logs", "--follow"],
     &["dopbase", "client", "connect", "http://localhost:8840"],
     &["dopbase", "login"],
     &["dopbase", "logout"],
     &["dopbase", "status"],
+    &["dopbase", "client", "status"],
     &["dopbase", "init", "billing", "production", "--from", ".env"],
     &["dopbase", "project", "create", "billing"],
     &["dopbase", "project", "list"],
@@ -120,47 +145,72 @@ fn status_replaces_config_command() {
 
 #[test]
 fn docs_flags_last_flag_wins() {
-  let cli = Cli::try_parse_from(["dopbase", "serve", "--docs", "--no-docs"]).unwrap();
-  let Command::Serve(args) = cli.command else {
-    panic!("expected serve");
+  let cli = Cli::try_parse_from(["dopbase", "server", "start", "--docs", "--no-docs"]).unwrap();
+  let Command::Server {
+    command: ServerCommand::Start(args),
+  } = cli.command
+  else {
+    panic!("expected server start");
   };
-  assert_eq!(args.docs(), Some(false));
-  let cli = Cli::try_parse_from(["dopbase", "serve", "--no-docs", "--docs"]).unwrap();
-  let Command::Serve(args) = cli.command else {
-    panic!("expected serve");
+  assert_eq!(args.launch.docs(), Some(false));
+  let cli = Cli::try_parse_from(["dopbase", "server", "up", "--no-docs", "--docs"]).unwrap();
+  let Command::Server {
+    command: ServerCommand::Up(args),
+  } = cli.command
+  else {
+    panic!("expected server up");
   };
   assert_eq!(args.docs(), Some(true));
-  let cli = Cli::try_parse_from(["dopbase", "serve"]).unwrap();
-  let Command::Serve(args) = cli.command else {
-    panic!("expected serve");
+  let cli = Cli::try_parse_from(["dopbase", "server", "start"]).unwrap();
+  let Command::Server {
+    command: ServerCommand::Start(args),
+  } = cli.command
+  else {
+    panic!("expected server start");
   };
-  assert_eq!(args.docs(), None);
+  assert_eq!(args.launch.docs(), None);
 }
 
 #[test]
 fn port_and_host_flags_parse() {
-  let cli =
-    Cli::try_parse_from(["dopbase", "serve", "--port", "9000", "--host", "0.0.0.0"]).unwrap();
-  let Command::Serve(args) = cli.command else {
-    panic!("expected serve");
+  let cli = Cli::try_parse_from([
+    "dopbase", "server", "start", "--port", "9000", "--host", "0.0.0.0",
+  ])
+  .unwrap();
+  let Command::Server {
+    command: ServerCommand::Start(args),
+  } = cli.command
+  else {
+    panic!("expected server start");
   };
-  assert_eq!(args.port, Some(9000));
-  assert_eq!(args.host.as_deref(), Some("0.0.0.0"));
+  assert_eq!(args.launch.port, Some(9000));
+  assert_eq!(args.launch.host.as_deref(), Some("0.0.0.0"));
 }
 
 #[test]
-fn port_conflicts_with_bind_address() {
-  assert!(
-    Cli::try_parse_from([
+fn removed_server_forms_are_rejected() {
+  for arguments in [
+    vec!["dopbase", "serve"],
+    vec!["dopbase", "stop"],
+    vec!["dopbase", "server", "run"],
+    vec!["dopbase", "server", "start", "--background"],
+    vec![
       "dopbase",
-      "serve",
-      "--port",
-      "9000",
+      "server",
+      "start",
       "--bind-address",
       "127.0.0.1:9000",
-    ])
-    .is_err()
-  );
+    ],
+    vec![
+      "dopbase",
+      "server",
+      "start",
+      "--database-url",
+      "sqlite://other.db",
+    ],
+  ] {
+    assert!(Cli::try_parse_from(arguments).is_err());
+  }
 }
 
 #[test]
@@ -190,10 +240,261 @@ fn rejects_conflicting_file_options() {
 }
 
 #[test]
-fn top_level_help_lists_common_serve_options() {
+fn top_level_help_lists_common_server_options() {
   let help = Cli::command().render_long_help().to_string();
-  assert!(help.contains("Common serve options:"), "{help}");
+  assert!(help.contains("Common server options:"), "{help}");
   assert!(help.contains("--host <HOST>"), "{help}");
   assert!(help.contains("--port <PORT>"), "{help}");
-  assert!(help.contains("--background"), "{help}");
+  assert!(!help.contains("--background"), "{help}");
+}
+
+#[test]
+fn every_command_help_has_examples() {
+  fn check(
+    command: &mut clap::Command,
+    parent: &str,
+  ) {
+    for subcommand in command.get_subcommands_mut() {
+      if subcommand.get_name() == "help" {
+        continue;
+      }
+      let path = format!("{parent} {}", subcommand.get_name());
+      let help = subcommand.render_long_help().to_string();
+      assert!(help.contains("Examples:"), "{path}: {help}");
+      check(subcommand, &path);
+    }
+  }
+
+  check(&mut Cli::command(), "dopbase");
+}
+
+#[test]
+fn every_visible_argument_has_a_description() {
+  fn check(
+    command: &clap::Command,
+    parent: &str,
+  ) {
+    for argument in command.get_arguments() {
+      if argument.is_hide_set() || matches!(argument.get_id().as_str(), "help" | "version") {
+        continue;
+      }
+      assert!(
+        argument.get_help().is_some(),
+        "{parent}: argument '{}' has no help text",
+        argument.get_id()
+      );
+    }
+
+    for subcommand in command.get_subcommands() {
+      if subcommand.get_name() == "help" {
+        continue;
+      }
+      check(subcommand, &format!("{parent} {}", subcommand.get_name()));
+    }
+  }
+
+  check(&Cli::command(), "dopbase");
+}
+
+#[test]
+fn missing_subcommands_show_contextual_help() {
+  let cases: &[(&[&str], &str)] = &[
+    (&["dopbase"], "Quickstart:"),
+    (&["dopbase", "server"], "dopbase server logs --follow"),
+    (&["dopbase", "client"], "dopbase client connect local"),
+    (
+      &["dopbase", "project"],
+      "dopbase project create payment-service",
+    ),
+    (
+      &["dopbase", "env"],
+      "dopbase env show payment-service/production",
+    ),
+    (
+      &["dopbase", "secret"],
+      "dopbase secret list payment-service/production",
+    ),
+    (
+      &["dopbase", "token"],
+      "dopbase token create payment-service/production --name deploy",
+    ),
+    (
+      &["dopbase", "admin"],
+      "dopbase admin reset-password admin@example.com",
+    ),
+  ];
+
+  for (arguments, expected) in cases {
+    let help = contextual_help(arguments);
+    assert!(help.contains("Usage:"), "{arguments:?}: {help}");
+    assert!(help.contains(expected), "{arguments:?}: {help}");
+  }
+}
+
+#[test]
+fn incomplete_secret_commands_show_examples_and_environment_help() {
+  let cases: &[(&[&str], &[&str])] = &[
+    (
+      &["dopbase", "secret", "list"],
+      &[
+        "Usage: dopbase secret list",
+        "payment-service/production",
+        "env_01ABCDEF",
+        "dopbase env list",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "set"],
+      &[
+        "Usage: dopbase secret set",
+        "dopbase secret set payment-service/production API_KEY",
+        "prompts for the value without showing it on screen",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "set", "payment-service/production"],
+      &[
+        "Usage: dopbase secret set",
+        "dopbase secret set payment-service/production API_KEY",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "get"],
+      &[
+        "Usage: dopbase secret get",
+        "dopbase secret get payment-service/production API_KEY --reveal",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "delete"],
+      &[
+        "Usage: dopbase secret delete",
+        "dopbase secret delete payment-service/production API_KEY --yes",
+      ],
+    ),
+  ];
+
+  for (arguments, expected) in cases {
+    let help = contextual_help(arguments);
+    assert!(help.contains("Examples:"), "{arguments:?}: {help}");
+    assert!(
+      help.contains("project/environment reference"),
+      "{arguments:?}: {help}"
+    );
+    for text in *expected {
+      assert!(help.contains(text), "{arguments:?}: {help}");
+    }
+  }
+}
+
+#[test]
+fn other_incomplete_commands_show_full_help() {
+  let cases: &[&[&str]] = &[
+    &["dopbase", "client", "connect"],
+    &["dopbase", "init"],
+    &["dopbase", "project", "rename", "payment-service"],
+    &["dopbase", "env", "show"],
+    &["dopbase", "import"],
+    &["dopbase", "export", "payment-service/production"],
+    &["dopbase", "token", "create", "payment-service/production"],
+    &["dopbase", "run"],
+    &["dopbase", "run", "--"],
+    &["dopbase", "admin", "reset-password"],
+    &["dopbase", "restore"],
+  ];
+
+  for arguments in cases {
+    let help = contextual_help(arguments);
+    assert!(help.contains("Usage:"), "{arguments:?}: {help}");
+    assert!(help.contains("Example"), "{arguments:?}: {help}");
+  }
+}
+
+#[test]
+fn non_missing_argument_errors_are_preserved() {
+  let unknown =
+    Cli::try_parse_with_help_from(["dopbase", "secret", "list", "--unknown"]).unwrap_err();
+  assert_eq!(unknown.kind(), ErrorKind::UnknownArgument);
+
+  let conflict = Cli::try_parse_with_help_from([
+    "dopbase",
+    "export",
+    "payment-service/production",
+    "--output",
+    ".env",
+    "--stdout",
+  ])
+  .unwrap_err();
+  assert_eq!(conflict.kind(), ErrorKind::ArgumentConflict);
+}
+
+#[test]
+fn binary_prints_contextual_help_and_keeps_the_usage_error_exit_code() {
+  let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args(["secret", "list"])
+    .output()
+    .unwrap();
+
+  assert_eq!(output.status.code(), Some(2));
+  let help = String::from_utf8(output.stdout).unwrap();
+  assert!(help.contains("Usage: dopbase secret list"), "{help}");
+  assert!(
+    help.contains("dopbase secret list payment-service/production"),
+    "{help}"
+  );
+  assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn server_status_reports_a_stopped_data_directory() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args([
+      "--data-dir",
+      directory.path().to_str().unwrap(),
+      "--json",
+      "server",
+      "status",
+    ])
+    .output()
+    .unwrap();
+
+  assert_eq!(output.status.code(), Some(1));
+  let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+  assert_eq!(value["status"], "stopped");
+  assert_eq!(value["mode"], serde_json::Value::Null);
+  assert!(!directory.path().join("dopbase.db.lock").exists());
+}
+
+#[test]
+fn server_commands_reject_inapplicable_global_options() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let data_dir = directory.path().to_str().unwrap();
+  let cases: &[&[&str]] = &[
+    &[
+      "--data-dir",
+      data_dir,
+      "--server",
+      "http://localhost:8840",
+      "server",
+      "status",
+    ],
+    &["--data-dir", data_dir, "--json", "server", "start"],
+    &[
+      "--data-dir",
+      data_dir,
+      "--json",
+      "server",
+      "logs",
+      "--follow",
+    ],
+  ];
+
+  for arguments in cases {
+    let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+      .args(*arguments)
+      .output()
+      .unwrap();
+    assert!(!output.status.success(), "{arguments:?}");
+  }
 }
