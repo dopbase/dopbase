@@ -150,8 +150,24 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     body["error"]["SELF_DELETE_FORBIDDEN"],
     "You cannot delete your own account."
   );
+  sqlx::query("INSERT INTO environment_id_reservations(id) VALUES('env_112255')")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
   let (status, _, _) = call(&router, "POST", "/api/v1/instance/factory-reset", Some(&cookie), Some(&csrf), Some(json!({"currentPassword":"correct-horse-123","confirmation":"FACTORY RESET","acknowledged":true}))).await;
   assert_eq!(status, 200);
+  let reservation_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM environment_id_reservations")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(reservation_count, 0);
+  let next_environment_number: i64 =
+    sqlx::query_scalar("SELECT next_number FROM environment_id_sequence WHERE id=1")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(next_environment_number, 1_000);
   let (status, body, _) = call(&router, "GET", "/api/v1/bootstrap/status", None, None, None).await;
   assert_eq!(status, 200);
   assert_eq!(body["data"]["state"], "setupRequired");
