@@ -10,41 +10,82 @@ pub(super) async fn execute(
   json_output: bool,
 ) -> Result<i32> {
   let api = client::human_client(server).await?;
-  let data = match command {
+  match command {
     TokenCommand::Create {
       environment,
       name,
       role,
     } => {
       let env = environment::resolve_environment(&api, &environment).await?;
-      api
+      let data = api
         .request(
           Method::POST,
           &format!("/api/v1/environments/{}/tokens", environment::env_id(&env)?),
           Some(json!({"name":name,"role":role})),
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let token = data.get("token").unwrap_or(&serde_json::Value::Null);
+        output::print_success(&format!("Created token {name} for {environment}."));
+        output::print_fields(&[
+          ("ID:", output::string(token, "id")),
+          ("Token:", output::string(&data, "plaintextToken")),
+        ]);
+        output::print_warning("Store this token now. Dopbase will not show it again.");
+      }
     }
     TokenCommand::List { environment } => {
       let env = environment::resolve_environment(&api, &environment).await?;
-      api
+      let data = api
         .request(
           Method::GET,
           &format!("/api/v1/environments/{}/tokens", environment::env_id(&env)?),
           None,
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let rows = output::array(&data)
+          .iter()
+          .map(|token| {
+            vec![
+              output::string(token, "name"),
+              output::string(token, "id"),
+              if token.get("revokedAt").is_some_and(|value| !value.is_null()) {
+                "revoked".into()
+              } else {
+                "active".into()
+              },
+              output::timestamp(token, "lastUsedAt"),
+              output::timestamp(token, "createdAt"),
+            ]
+          })
+          .collect::<Vec<_>>();
+        output::print_table(
+          &["NAME", "ID", "STATUS", "LAST USED", "CREATED"],
+          &rows,
+          &format!("No tokens found for {environment}."),
+          &format!("{} token(s)", rows.len()),
+        );
+      }
     }
     TokenCommand::Revoke { token_id } => {
-      api
+      let data = api
         .request(
           Method::POST,
           &format!("/api/v1/tokens/{token_id}/revoke"),
           None,
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Revoked token {token_id}."));
+      }
     }
-  };
-  output::print_value(json_output, &data);
+  }
   Ok(0)
 }
