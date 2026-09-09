@@ -4,6 +4,7 @@ use crate::cli::{
   client::{self, ApiClient},
   local_config,
 };
+use crate::constants::api as api_paths;
 use anyhow::{Context, Result};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -15,10 +16,7 @@ pub(super) async fn resolve_environment(
   api
     .request(
       Method::GET,
-      &format!(
-        "/api/v1/environments/resolve?reference={}",
-        client::encode_query(reference)
-      ),
+      &api_paths::environments::resolve(reference),
       None,
     )
     .await
@@ -64,7 +62,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::POST,
-          &format!("/api/v1/projects/{project}/environments"),
+          &api_paths::projects::environments(&project),
           Some(json!({"name":name})),
         )
         .await?;
@@ -80,15 +78,7 @@ pub(super) async fn execute(
       }
     }
     EnvCommand::List { project } => {
-      let path = project.as_ref().map_or_else(
-        || "/api/v1/environments".into(),
-        |value| {
-          format!(
-            "/api/v1/environments?project={}",
-            client::encode_query(value)
-          )
-        },
-      );
+      let path = api_paths::environments::list(project.as_deref());
       let data = api.request(Method::GET, &path, None).await?;
       if json_output {
         output::print_json(&data)?;
@@ -120,7 +110,7 @@ pub(super) async fn execute(
       let env = resolve_environment(&api, &environment).await?;
       let id = env_id(&env)?;
       let data = api
-        .request(Method::GET, &format!("/api/v1/environments/{id}"), None)
+        .request(Method::GET, &api_paths::environments::item(id), None)
         .await?;
       if json_output {
         output::print_json(&data)?;
@@ -137,7 +127,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::PATCH,
-          &format!("/api/v1/environments/{id}"),
+          &api_paths::environments::item(id),
           Some(json!({"name":new_name})),
         )
         .await?;
@@ -156,18 +146,10 @@ pub(super) async fn execute(
       let env = resolve_environment(&api, &environment).await?;
       let id = env_id(&env)?;
       let secrets = api
-        .request(
-          Method::GET,
-          &format!("/api/v1/environments/{id}/secrets"),
-          None,
-        )
+        .request(Method::GET, &api_paths::secrets::collection(id), None)
         .await?;
       let tokens = api
-        .request(
-          Method::GET,
-          &format!("/api/v1/environments/{id}/tokens"),
-          None,
-        )
+        .request(Method::GET, &api_paths::tokens::collection(id), None)
         .await?;
       prompt::confirm(
         &format!(
@@ -178,7 +160,7 @@ pub(super) async fn execute(
         yes,
       )?;
       let data = api
-        .request(Method::DELETE, &format!("/api/v1/environments/{id}"), None)
+        .request(Method::DELETE, &api_paths::environments::item(id), None)
         .await?;
       if json_output {
         output::print_json(&data)?;

@@ -2,7 +2,10 @@ use super::{
   client::{self, ApiClient},
   local_config::ResolvedServer,
 };
-use crate::constants::limits::{MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT};
+use crate::constants::{
+  api,
+  limits::{MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
+};
 use crate::{config::ensure_data_dir, models::SecretInput, utils::private_file};
 use anyhow::{Context, Result, bail};
 use chacha20poly1305::{
@@ -135,14 +138,7 @@ async fn fetch_live(
   reference: &str,
 ) -> Result<RuntimeResponse> {
   let environment = api
-    .request_runtime(
-      Method::GET,
-      &format!(
-        "/api/v1/environments/resolve?reference={}",
-        client::encode_query(reference)
-      ),
-      None,
-    )
+    .request_runtime(Method::GET, &api::environments::resolve(reference), None)
     .await?;
   let id = environment
     .get("id")
@@ -152,11 +148,7 @@ async fn fetch_live(
     bail!("environment response contained an empty id");
   }
   let value = api
-    .request_runtime(
-      Method::GET,
-      &format!("/api/v1/environments/{id}/secrets/runtime"),
-      None,
-    )
+    .request_runtime(Method::GET, &api::secrets::runtime(id), None)
     .await?;
   let runtime: RuntimeResponse =
     serde_json::from_value(value).context("runtime response was invalid")?;

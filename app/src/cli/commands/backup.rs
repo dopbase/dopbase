@@ -1,5 +1,8 @@
 use super::{client as command_client, output};
-use crate::cli::{client as api_client, local_config};
+use crate::{
+  cli::{client as api_client, local_config},
+  constants::api,
+};
 use anyhow::{Context, Result};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -43,7 +46,7 @@ pub(super) async fn execute(
     None => json!({}),
   };
   let data = api
-    .request(Method::POST, "/api/v1/backups", Some(payload))
+    .request(Method::POST, api::backups::COLLECTION, Some(payload))
     .await?;
   let key = data
     .get("key")
@@ -59,7 +62,7 @@ pub(super) async fn execute(
         &format!("Downloading the backup to {}...", out_path.display()),
       );
     }
-    let download_url = format!("/api/v1/backups/{key}");
+    let download_url = api::backups::item(key);
     let bytes = api.download_bytes(&download_url).await?;
     output::write_private(&out_path, &bytes, false)?;
     Some(out_path)

@@ -1,5 +1,8 @@
 use super::{environment, output, prompt};
-use crate::cli::{client, dotenv, local_config};
+use crate::{
+  cli::{client, dotenv, local_config},
+  constants::api,
+};
 use anyhow::Result;
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -19,7 +22,7 @@ pub(super) async fn execute(
   let id = environment::env_id(&env)?;
   let entries = dotenv::parse_file(path)?;
   let mode = if replace { "replace" } else { "merge" };
-  let endpoint = format!("/api/v1/environments/{id}/secrets/import");
+  let endpoint = api::secrets::import(id);
   let mut expected_revision = None;
   if replace && !dry_run {
     let preview = api

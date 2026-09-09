@@ -3,6 +3,7 @@ use super::{
   local_config::{ResolvedServer, normalize},
   session,
 };
+use crate::constants::api;
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -186,7 +187,7 @@ impl ApiClient {
     Ok(value.get("data").cloned().unwrap_or(Value::Null))
   }
   pub async fn health(&self) -> Result<Value> {
-    self.request(Method::GET, "/api/v1/health", None).await
+    self.request(Method::GET, api::health::ROOT, None).await
   }
 
   pub async fn download_bytes(
@@ -422,7 +423,7 @@ pub async fn login(
   let client = ApiClient::new(server, None)?;
   let request = client.request(
     Method::POST,
-    "/api/v1/auth/login",
+    api::auth::LOGIN,
     Some(json!({"email":email,"password":password,"sessionKind":"cli"})),
   );
   let data = tokio::select! {
@@ -481,7 +482,7 @@ async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
     if client
-      .request(Method::GET, "/api/v1/auth/session", None)
+      .request(Method::GET, api::auth::SESSION, None)
       .await
       .is_ok()
     {
@@ -512,7 +513,7 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
       let password = prompt_password_confirmation().await?;
       let request = client.request(
         Method::POST,
-        "/api/v1/auth/reauthenticate",
+        api::auth::REAUTHENTICATE,
         Some(json!({"password":password})),
       );
       tokio::select! {
@@ -550,7 +551,4 @@ pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClie
     bail!("Dopbase authentication is required");
   }
   login(server, true).await
-}
-pub fn encode_query(value: &str) -> String {
-  url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
