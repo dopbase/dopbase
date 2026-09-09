@@ -240,6 +240,10 @@ const config = defineConfig({
               text: "Environment targeting",
               link: "/cli/environment-targeting",
             },
+            {
+              text: "Environment variables",
+              link: "/cli/environment-variables",
+            },
             { text: "Client configuration", link: "/cli/configuration" },
             { text: "Command reference", link: "/cli/commands" },
           ],

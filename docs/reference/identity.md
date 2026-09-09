@@ -70,7 +70,9 @@ manage accounts, list runner tokens, or read audit history.
 Agent tokens are displayed only once when created. They expire
 after 30 days by default, a supplied expiry must be in the future and within
 90 days. Revoking a token or deleting its account prevents subsequent access.
-See [users and AI agents](/ui/users) for account management.
+Pass an agent token to the CLI through `DOPBASE_TOKEN`, just like a runner
+token. `dopbase client status` identifies it as `ai_agent` without displaying
+the token. See [users and AI agents](/ui/users) for account management.
 
 ## Permission model
 

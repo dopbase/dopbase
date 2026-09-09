@@ -89,17 +89,17 @@ The server resolution order is:
 3. The endpoint saved by `dopbase client connect`
 4. `http://localhost:8840`
 
-Machine authentication uses `DOPBASE_TOKEN` in preference to a token saved by
-`login` in the encrypted local session file. A saved credential is used
-only when it matches the resolved server. Dopbase will not accept a token as a
-CLI argument because command-line arguments can be exposed through shell
-history and process inspection.
+Machine runners and AI agents use `DOPBASE_TOKEN`. It takes precedence over a
+token saved by `login` in the encrypted local session file. A saved credential
+is used only when it matches the resolved server. Dopbase does not accept a
+token as a CLI argument because shell history and process inspection can expose
+command-line arguments.
 
 `dopbase client status` displays the config path, resolved server and its source,
-authentication source, cached identity, login email, and the saved default
-environment. It performs a short health check and reports `connected (live)`
-or `offline (cache)` without failing when the server is unavailable. It never
-displays token contents. See
+authentication source, locally identified credential type, login email, and
+the saved default environment. It performs a short health check and reports
+`connected (live)` or `offline (cache)` without failing when the server is
+unavailable. It never displays token contents. See
 [client configuration](./configuration) for the TOML schema and override
 behavior.
 

@@ -112,8 +112,9 @@ leaves the selected server unchanged.
 
 On macOS and Linux, the data directory is mode `0700` and both session files
 are mode `0600`. Separating the key protects a copied `session` file by itself,
-but an attacker that can read both files can decrypt the token. Use
-`DOPBASE_TOKEN` when the credential must be managed externally.
+but an attacker that can read both files can decrypt the token. Machines and
+AI agents should receive their externally managed credential through
+`DOPBASE_TOKEN`.
 
 ## Encrypted run cache
 
@@ -174,8 +175,10 @@ metadata. The health probe times out after three seconds.
 
 The stable server-source values are `argument`, `environment`, `config`, and
 `default`. Authentication is `environment`, `encrypted_session`, or `none`.
-Identity is `admin`, `runner`, or `none`. An environment credential is reported
-as a runner identity and has no email.
+Identity is `admin`, `human`, `runner`, `ai_agent`, `unknown`, or `none`. Dopbase
+identifies environment credentials from their token prefix, so this field does
+not confirm that the token is valid. Environment credentials have no email in
+status output.
 
 ## Resolution order
 
