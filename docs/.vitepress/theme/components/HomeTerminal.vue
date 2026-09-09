@@ -17,7 +17,7 @@ Version 0.0.14
 <span class="success">Server: http://localhost:8840 (default)</span>
 
 <span class="prompt">$</span> dopbase init storefront development --from .env
-<span class="success">Created storefront/development (env_01DEV...)</span>
+<span class="success">Created storefront/development (env_1000)</span>
 
 <span class="prompt">$</span> dopbase run storefront/development -- npm start
 <span class="quiet">Loaded 17 secrets into the application process.</span></pre>

@@ -28,8 +28,7 @@ falls back to localhost, Cloud, or another endpoint.
 The per-user locations are:
 
 ```text
-Unix and macOS: ~/.dopbase/config.toml
-Windows:        %USERPROFILE%\.dopbase\config.toml
+macOS and Linux: ~/.dopbase/config.toml
 ```
 
 Use the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR` to relocate this
@@ -44,7 +43,7 @@ server_url = "https://dopbase.example.com"
 
 [default_environment]
 server_url = "https://dopbase.example.com"
-environment_id = "env_01ABCDEF"
+environment_id = "env_482731"
 ```
 
 `server_url` is omitted when the implicit local server is active. Dopbase
@@ -111,11 +110,10 @@ Only one saved connection is active in v0.1.1. Logging in again replaces the
 credential for that server. `dopbase logout` removes the active credential but
 leaves the selected server unchanged.
 
-On Unix, the data directory is mode `0700` and both session files are mode
-`0600`. On Windows, they inherit the user profile directory ACL. Separating the
-key protects a copied `session` file by itself, but an attacker that can read
-both files can decrypt the token. Use `DOPBASE_TOKEN` when the credential must
-be managed externally.
+On macOS and Linux, the data directory is mode `0700` and both session files
+are mode `0600`. Separating the key protects a copied `session` file by itself,
+but an attacker that can read both files can decrypt the token. Use
+`DOPBASE_TOKEN` when the credential must be managed externally.
 
 ## Encrypted run cache
 
@@ -149,7 +147,7 @@ Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
 Email:           admin@example.com
-Environment:     env_01ABCDEF (default)
+Environment:     env_482731 (default)
 ```
 
 It never displays a token or secret value. `dopbase --json client status` returns the
@@ -228,7 +226,7 @@ Other processes can target a different instance without changing global state:
 ```bash
 DOPBASE_URL=http://localhost:8840 \
 DOPBASE_TOKEN=<token-for-8840> \
-dopbase run env_01LOCAL -- ./application
+dopbase run env_482731 -- ./application
 ```
 
 Client preferences never belong in a server database. The client must resolve

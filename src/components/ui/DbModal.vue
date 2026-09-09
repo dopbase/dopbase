@@ -46,13 +46,22 @@ function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape" && !props.persistent) emit("close");
 }
 
+function focusPanel(): void {
+  requestAnimationFrame(() => {
+    const autofocusTarget = panel.value?.querySelector<HTMLElement>(
+      "[autofocus]:not([disabled])",
+    );
+    (autofocusTarget ?? panel.value)?.focus();
+  });
+}
+
 watch(
   () => props.open,
   (open) => {
     if (open) {
       document.addEventListener("keydown", onKeydown);
       acquireScrollLock();
-      requestAnimationFrame(() => panel.value?.focus());
+      focusPanel();
     } else {
       document.removeEventListener("keydown", onKeydown);
       releaseScrollLock();
@@ -64,6 +73,7 @@ onMounted(() => {
   if (props.open) {
     document.addEventListener("keydown", onKeydown);
     acquireScrollLock();
+    focusPanel();
   }
 });
 

@@ -83,6 +83,7 @@ pub async fn create(
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 409, description = "A project with this name already exists", body = crate::http::ErrorBody),
     (status = 422, description = "Names are invalid, the secret count or size exceeds the limit, or a secret key is duplicated", body = crate::http::ErrorBody),
+    (status = 500, description = "The environment ID could not be generated", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn init(

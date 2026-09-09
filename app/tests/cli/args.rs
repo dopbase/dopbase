@@ -41,9 +41,10 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "--data-dir", "/tmp/dopbase", "server", "status"],
     &["dopbase", "--json", "server", "status"],
     &["dopbase", "server", "logs", "--lines", "50"],
-    &["dopbase", "server", "logs", "--follow"],
+    &["dopbase", "server", "logs", "--watch"],
+    &["dopbase", "server", "logs", "-w"],
     &["dopbase", "server", "logs", "--clean"],
-    &["dopbase", "server", "logs", "--clean", "--follow"],
+    &["dopbase", "server", "logs", "--clean", "--watch"],
     &["dopbase", "client", "connect", "http://localhost:8840"],
     &["dopbase", "login"],
     &["dopbase", "logout"],
@@ -106,6 +107,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "token", "list", "billing/production"],
     &["dopbase", "token", "revoke", "tok_01"],
     &["dopbase", "run", "billing/production", "--", "printenv"],
+    &["dopbase", "run", "env_482731", "--", "printenv"],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "update"],
     &["dopbase", "backup"],
@@ -137,7 +139,7 @@ fn server_logs_clean_flag_parses() {
     command: ServerCommand::Logs {
       lines,
       clean,
-      follow,
+      watch,
     },
   } = cli.command
   else {
@@ -145,7 +147,13 @@ fn server_logs_clean_flag_parses() {
   };
   assert_eq!(lines, 100);
   assert!(clean);
-  assert!(!follow);
+  assert!(!watch);
+}
+
+#[test]
+fn server_logs_rejects_follow_flags() {
+  assert!(Cli::try_parse_from(["dopbase", "server", "logs", "--follow"]).is_err());
+  assert!(Cli::try_parse_from(["dopbase", "server", "logs", "-f"]).is_err());
 }
 
 #[test]
@@ -320,7 +328,7 @@ fn every_visible_argument_has_a_description() {
 fn missing_subcommands_show_contextual_help() {
   let cases: &[(&[&str], &str)] = &[
     (&["dopbase"], "Quickstart:"),
-    (&["dopbase", "server"], "dopbase server logs --follow"),
+    (&["dopbase", "server"], "dopbase server logs --watch"),
     (&["dopbase", "client"], "dopbase client connect local"),
     (
       &["dopbase", "project"],
@@ -359,7 +367,7 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
       &[
         "Usage: dopbase secret list",
         "payment-service/production",
-        "env_01ABCDEF",
+        "env_482731",
         "dopbase env list",
       ],
     ),
@@ -506,7 +514,7 @@ fn server_commands_reject_inapplicable_global_options() {
       "--json",
       "server",
       "logs",
-      "--follow",
+      "--watch",
     ],
   ];
 

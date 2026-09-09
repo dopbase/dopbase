@@ -20,6 +20,7 @@ const props = withDefaults(
     mono?: boolean;
     disabled?: boolean;
     required?: boolean;
+    autofocus?: boolean;
   }>(),
   {
     type: "text",
@@ -29,6 +30,7 @@ const props = withDefaults(
     name: undefined,
     error: undefined,
     hint: undefined,
+    autofocus: false,
   },
 );
 
@@ -93,6 +95,7 @@ function toggleReveal(): void {
           :autocomplete="autocomplete"
           :disabled="disabled"
           :required="required"
+          :autofocus="autofocus"
           :aria-invalid="error ? true : undefined"
           :aria-describedby="error ? `${id}-error` : undefined"
           class="h-full w-full bg-transparent pl-3.5 pr-3.5 text-sm text-ink-strong outline-none placeholder:text-ink-faint disabled:cursor-default"

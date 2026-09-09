@@ -79,21 +79,21 @@ Print the last 100 lines:
 dopbase server logs
 ```
 
-Choose a line count or follow new output:
+Choose a line count or watch new output:
 
 ```bash
 dopbase server logs --lines 50
-dopbase server logs --follow
+dopbase server logs --watch
 ```
 
 Clear existing output and leave the log ready for new entries:
 
 ```bash
 dopbase server logs --clean
-dopbase server logs --clean --follow
+dopbase server logs --clean --watch
 ```
 
-When combined with `--follow`, `--clean` waits for output written after the
+When combined with `--watch`, `--clean` waits for output written after the
 log was cleared.
 
 The log remains available after the background server stops. A foreground

@@ -95,6 +95,7 @@ async function submit(): Promise<void> {
         name="resource-name"
         :placeholder="placeholder"
         mono
+        autofocus
         :hint="hint"
         :error="error" />
       <div class="flex items-center justify-end gap-2">

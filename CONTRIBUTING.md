@@ -54,6 +54,10 @@ bun run docs:dev
 
 Keep each pull request focused on one problem. Match the surrounding code, add tests where behavior changes, and update public documentation when a user-facing interface changes.
 
+GitHub fills new pull requests with the repository template. Complete every
+section and check each checklist item. The template check must pass before the
+pull request can merge.
+
 Do not commit generated output from `dist/`, `docs/.vitepress/dist/`, coverage reports, editor settings, local databases, credentials, or `.env` files.
 
 Use commit messages that explain the change in plain language. A pull request should explain:
@@ -119,9 +123,15 @@ If an existing unrelated failure prevents a check from passing, describe the fai
 ## Publish a release
 
 Releases use annotated semantic-version tags. Before tagging, update the
-version in `app/Cargo.toml`, refresh `app/Cargo.lock`, and add the release notes
-to `CHANGELOG.md`. Merge those changes into `main`, then create and push the
-tag from the release commit:
+version in `package.json` and `app/Cargo.toml`, refresh `app/Cargo.lock`, and
+move the release notes from `Unreleased` to a dated version section in
+`CHANGELOG.md`. Merge those changes into `main`, then create and push the tag
+from the release commit:
+
+Start each release section with one short summary paragraph. Add only the
+sections that apply: `Added` for new features, `Improvement` for improvements,
+`Fixed` for bug fixes, `Security` for security work, and `Note` for other
+information. Each section must contain at least one entry.
 
 ```bash
 git switch main
@@ -132,8 +142,11 @@ git push origin "$version"
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
-matches the Rust package version, builds the Linux, macOS, and Windows archives, creates
-`checksums.txt`, and publishes the release only after every target succeeds.
+matches the Rust package version, builds the Linux and macOS archives, creates
+`checksums.txt`, and publishes the release only after all four targets succeed.
+The release body comes from `.github/RELEASE_TEMPLATE.md`. It includes the
+summary, the populated optional sections, and a full changelog link comparing
+the previous version with the new one.
 
 ## Review expectations
 

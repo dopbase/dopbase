@@ -83,6 +83,7 @@ pub async fn resolve(
     (status = 404, description = "The project was not found", body = crate::http::ErrorBody),
     (status = 409, description = "An environment with this name already exists in the project", body = crate::http::ErrorBody),
     (status = 422, description = "The environment name is invalid", body = crate::http::ErrorBody),
+    (status = 500, description = "The environment ID could not be generated", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn create(

@@ -27,6 +27,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Rust
@@ -78,6 +79,7 @@ jobs:
 
       - name: Test and build frontend
         run: |
+          bun run test:github
           bunx vitest run --passWithNoTests
           bun run test:installer
           bun run build
@@ -101,11 +103,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          awk -v version="${GITHUB_REF_NAME}" '
-            index($0, "## " version " -") == 1 { found=1; print; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md > release-notes.md
+          previous_version="$(node scripts/github-templates.mjs previous-version \
+            --version "${GITHUB_REF_NAME}" \
+            --commit "${GITHUB_SHA}")"
+          node scripts/github-templates.mjs render-release \
+            --version "${GITHUB_REF_NAME}" \
+            --previous-version "${previous_version}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --output release-notes.md
           test -s release-notes.md
 
       - name: Upload release notes
@@ -127,27 +132,18 @@ jobs:
             target: x86_64-unknown-linux-musl
             asset_os: linux
             asset_arch: amd64
-            binary_name: dopbase
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
             asset_os: linux
             asset_arch: arm64
-            binary_name: dopbase
           - runner: macos-15-intel
             target: x86_64-apple-darwin
             asset_os: darwin
             asset_arch: amd64
-            binary_name: dopbase
           - runner: macos-15
             target: aarch64-apple-darwin
             asset_os: darwin
             asset_arch: arm64
-            binary_name: dopbase
-          - runner: windows-2025
-            target: x86_64-pc-windows-msvc
-            asset_os: windows
-            asset_arch: amd64
-            binary_name: dopbase.exe
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
@@ -174,11 +170,6 @@ jobs:
           name: release-ui
           path: dist/
 
-      - name: Test Windows installer
-        if: matrix.asset_os == 'windows'
-        shell: pwsh
-        run: ./scripts/install.test.ps1
-
       - name: Build release binary
         shell: bash
         run: |
@@ -197,7 +188,6 @@ jobs:
             --target "${target}"
 
       - name: Smoke-test release binary
-        if: matrix.asset_os != 'windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -265,89 +255,7 @@ jobs:
           wait "${server_pid}"
           server_pid=""
 
-      - name: Smoke-test Windows release binary
-        if: matrix.asset_os == 'windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $binary = "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
-          $version = "${{ github.ref_name }}"
-          $actualVersion = (& $binary --version).Trim()
-          if ($actualVersion -ne "dopbase $version") {
-            throw "unexpected Dopbase version: $actualVersion"
-          }
-
-          $runtimeRoot = Join-Path $env:RUNNER_TEMP ("dopbase-smoke-" + [guid]::NewGuid())
-          $serverLog = Join-Path $runtimeRoot "server.log"
-          $serverError = Join-Path $runtimeRoot "server-error.log"
-          $dataDir = Join-Path $runtimeRoot "data"
-          $publicUrl = "http://127.0.0.1:$env:SMOKE_PORT"
-          New-Item -ItemType Directory -Path $runtimeRoot | Out-Null
-          $process = $null
-          try {
-            $process = Start-Process -FilePath $binary -ArgumentList @(
-              "--data-dir", $dataDir,
-              "server", "start", "--docs", "--host", "127.0.0.1", "--port", "$env:SMOKE_PORT",
-              "--public-url", $publicUrl
-            ) -RedirectStandardOutput $serverLog -RedirectStandardError $serverError -PassThru
-
-            $ready = $false
-            for ($attempt = 0; $attempt -lt 60; $attempt++) {
-              try {
-                $health = Invoke-RestMethod -Uri "$publicUrl/api/v1/health"
-                $ready = $true
-                break
-              } catch {
-                if ($process.HasExited) {
-                  Get-Content $serverLog, $serverError -ErrorAction SilentlyContinue
-                  throw "Dopbase exited before becoming ready"
-                }
-                Start-Sleep -Milliseconds 250
-              }
-            }
-            if (-not $ready) {
-              throw "Dopbase did not become ready"
-            }
-            if (
-              $health.success -ne $true -or
-              $health.data.product -ne "dopbase" -or
-              $health.data.version -ne $version -or
-              $health.data.apiVersion -ne "v1" -or
-              $health.data.status -ne "ok"
-            ) {
-              throw "unexpected health response"
-            }
-            $root = Invoke-WebRequest -UseBasicParsing -Uri "$publicUrl/"
-            if ($root.Content -notmatch '<div id="app"></div>') {
-              throw "embedded Admin UI is unavailable"
-            }
-            $openApi = Invoke-RestMethod -Uri "$publicUrl/api/v1/openapi.json"
-            if (-not $openApi.openapi) {
-              throw "OpenAPI document is unavailable"
-            }
-            Invoke-WebRequest -UseBasicParsing -Uri "$publicUrl/api/docs/" | Out-Null
-
-            foreach ($file in @("dopbase.db", "master.key", "dopbase.db.lock")) {
-              if (-not (Test-Path -LiteralPath (Join-Path $dataDir $file) -PathType Leaf)) {
-                throw "runtime data file is missing: $file"
-              }
-            }
-            if (Test-Path -LiteralPath (Join-Path $runtimeRoot "dopbase.db")) {
-              throw "database was created outside the configured data directory"
-            }
-            if ((Get-Content -Raw -LiteralPath $serverError) -notmatch [regex]::Escape("Config:     $dataDir")) {
-              throw "runtime log does not report the configured data directory"
-            }
-          } finally {
-            if ($process -and -not $process.HasExited) {
-              Stop-Process -Id $process.Id
-              $process.WaitForExit()
-            }
-            Remove-Item -Recurse -Force -LiteralPath $runtimeRoot -ErrorAction SilentlyContinue
-          }
-
       - name: Package release archive
-        if: matrix.asset_os != 'windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -359,20 +267,6 @@ jobs:
           chmod 755 "${package_dir}/dopbase"
           (cd "${package_dir}" && zip -9 --quiet "${GITHUB_WORKSPACE}/${archive}" dopbase CHANGELOG.md LICENSE NOTICE)
           unzip -Z1 "${archive}" | sort
-
-      - name: Package Windows release archive
-        if: matrix.asset_os == 'windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $version = "${{ github.ref_name }}"
-          $archive = "dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
-          $packageDir = Join-Path $env:RUNNER_TEMP ("dopbase-package-" + [guid]::NewGuid())
-          New-Item -ItemType Directory -Path $packageDir | Out-Null
-          Copy-Item "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}" (Join-Path $packageDir "dopbase.exe")
-          Copy-Item CHANGELOG.md, LICENSE, NOTICE -Destination $packageDir
-          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $archive
-          (Get-ChildItem -LiteralPath $packageDir).Name | Sort-Object
 
       - name: Upload release archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -408,12 +302,11 @@ jobs:
             "dopbase_${version}_darwin_arm64.zip"
             "dopbase_${version}_linux_amd64.zip"
             "dopbase_${version}_linux_arm64.zip"
-            "dopbase_${version}_windows_amd64.zip"
           )
           for archive in "${expected[@]}"; do
             test -f "${archive}"
           done
-          test "$(find . -maxdepth 1 -name 'dopbase_*.zip' -type f | wc -l | tr -d ' ')" = "5"
+          test "$(find . -maxdepth 1 -name 'dopbase_*.zip' -type f | wc -l | tr -d ' ')" = "4"
           sha256sum "${expected[@]}" | sort -k2 > checksums.txt
           sha256sum --check checksums.txt
 
@@ -440,7 +333,18 @@ jobs:
           release_json="$(curl --silent --show-error \
             "${api_headers[@]}" \
             "${api_url}/releases/tags/${GITHUB_REF_NAME}" || true)"
-          if ! jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
+          if jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
+            release_id="$(jq -r '.id' <<<"${release_json}")"
+            release_json="$(curl --fail --silent --show-error \
+              "${api_headers[@]}" \
+              --request PATCH \
+              --header 'Content-Type: application/json' \
+              --data "$(jq -n \
+                --arg name "Dopbase ${GITHUB_REF_NAME}" \
+                --arg body "${release_notes}" \
+                '{name: $name, body: $body}')" \
+              "${api_url}/releases/${release_id}")"
+          else
             release_json="$(curl --fail --silent --show-error \
               "${api_headers[@]}" \
               --request POST \
@@ -453,6 +357,7 @@ jobs:
                 '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, generate_release_notes: false}')" \
               "${api_url}/releases")"
           fi
+          jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"
 
           assets=(
             "release/checksums.txt"
@@ -460,7 +365,6 @@ jobs:
             "release/dopbase_${GITHUB_REF_NAME}_darwin_arm64.zip"
             "release/dopbase_${GITHUB_REF_NAME}_linux_amd64.zip"
             "release/dopbase_${GITHUB_REF_NAME}_linux_arm64.zip"
-            "release/dopbase_${GITHUB_REF_NAME}_windows_amd64.zip"
           )
           for asset in "${assets[@]}"; do
             test -f "${asset}"

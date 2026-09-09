@@ -99,8 +99,7 @@ function tokenStatus(token: RunnerToken): {
           <DbBadge v-if="tokens" class="ml-1">{{ tokens.length }}</DbBadge>
         </h3>
         <p class="mt-0.5 text-sm text-ink-muted">
-          Scoped to this environment only. Run apps with
-          <code class="font-mono text-xs">dopbase run --token …</code>
+          Scoped to this environment only.
         </p>
       </div>
       <DbButton class="ml-auto" size="sm" variant="primary" @click="openCreate">

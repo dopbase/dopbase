@@ -170,8 +170,12 @@ function closeForm(): void {
 
 async function submitForm(): Promise<void> {
   if (!form.value) return;
-  if (form.value.mode === "create" && !isValidSecretKey(form.value.key.trim())) {
-    form.value.error = "Use 1–128 characters: letters, numbers, and '_'; start with a letter or '_'.";
+  if (
+    form.value.mode === "create" &&
+    !isValidSecretKey(form.value.key.trim())
+  ) {
+    form.value.error =
+      "Use 1–128 characters: letters, numbers, and '_'; start with a letter or '_'.";
     return;
   }
   saving.value = true;
@@ -589,7 +593,7 @@ async function confirmDelete(): Promise<void> {
           name="value"
           :rows="5"
           placeholder="paste the secret value"
-          hint="Sent over HTTPS and stored encrypted; it is never shown in listings." />
+          hint="Sent over HTTPS and stored encrypted, it is never shown in listings." />
         <p v-if="form.error" class="text-xs text-crit">
           {{ form.error }}
         </p>

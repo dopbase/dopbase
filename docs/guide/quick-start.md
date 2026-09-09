@@ -24,13 +24,8 @@ On macOS or Linux, install to `~/.local/bin`:
 curl -fsSL https://dopbase.com/install.sh | sh
 ```
 
-On Windows x64, run PowerShell and install to `%LOCALAPPDATA%\Dopbase\bin`:
-
-```powershell
-irm https://raw.githubusercontent.com/dopbase/dopbase/0.1.1/scripts/install.ps1 -OutFile install.ps1
-.\install.ps1
-Remove-Item install.ps1
-```
+On Windows, run Dopbase in a Linux container with Docker. Dopbase does not
+provide a native Windows binary or PowerShell installer.
 
 Add the reported installation directory to `PATH` if the installer asks you
 to, then confirm the installation:
@@ -40,9 +35,8 @@ dopbase --version
 ```
 
 Set `DOPBASE_INSTALL_DIR` to choose another directory and
-`DOPBASE_VERSION` to install a specific release. The PowerShell installer also
-accepts `-InstallDir` and `-Version` parameters. Mirrors can set
-`DOPBASE_REPOSITORY_URL` (or PowerShell `-RepositoryUrl`); an explicit
+`DOPBASE_VERSION` to install a specific release. Mirrors can set
+`DOPBASE_REPOSITORY_URL`; an explicit
 `DOPBASE_DOWNLOAD_BASE_URL` still overrides the complete release download path.
 
 ## 2. Start the server

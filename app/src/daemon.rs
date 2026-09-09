@@ -521,7 +521,7 @@ pub async fn logs(
   data_dir: Option<&Path>,
   line_count: usize,
   clean: bool,
-  follow: bool,
+  watch: bool,
   json_output: bool,
 ) -> Result<i32> {
   let data_dir = resolve_data_dir(data_dir)?;
@@ -555,7 +555,7 @@ pub async fn logs(
       );
       return Ok(0);
     }
-    if !follow {
+    if !watch {
       println!("Background server log cleared.");
       return Ok(0);
     }
@@ -576,7 +576,7 @@ pub async fn logs(
   for line in &lines {
     println!("{line}");
   }
-  if !follow {
+  if !watch {
     return Ok(0);
   }
 

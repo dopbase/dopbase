@@ -215,6 +215,14 @@ async fn backup_and_restore_lifecycle() {
   assert_eq!(status, 200);
   assert_eq!(restore_res["data"]["restored"], true);
 
+  let restored_audit_history: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE environment_id = ?")
+      .bind(env_id)
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert!(restored_audit_history > 0);
+
   // 8. Verify secrets are restored to their original snapshot state!
   let (status, reveal_res, _) = call(
     &router,

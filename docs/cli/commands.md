@@ -59,8 +59,8 @@ See [server lifecycle](./serve) for options and examples.
 | `--master-key-file <FILE>`           | Read the master key from another file       |
 
 `server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
-accepts `--lines <COUNT>` (default 100), `--follow` or `-f`, and `--clean`.
-`--clean --follow` clears the existing log before waiting for new output.
+accepts `--lines <COUNT>` (default 100), `--watch` or `-w`, and `--clean`.
+`--clean --watch` clears the existing log before waiting for new output.
 
 The old `serve`, `serve --background`, and `stop` commands are not supported.
 Use `server start`, `server up`, and `server down` respectively.
@@ -76,9 +76,9 @@ dopbase 0.1.1 is up to date (latest release 0.1.1).
 
 When a newer release exists, the command prints the current version, the latest
 version, the release URL, and a reminder that Dopbase does not self-update.
-Install the new release with `scripts/install.sh`, `scripts/install.ps1`, or the release archive. The
-command exits with status 0 whether or not an update is available, and with
-status 1 when the release cannot be queried. Run it with `--json` for
+Install the new release with `scripts/install.sh` or a macOS or Linux release
+archive. The command exits with status 0 whether or not an update is available,
+and with status 1 when the release cannot be queried. Run it with `--json` for
 automation; no other command contacts GitHub.
 
 The server resolution order is:
@@ -110,7 +110,7 @@ all the context needed by secret, import, export, token, and run commands.
 Commands accept either form:
 
 ```text
-env_01ABCDEF...             # Immutable ID
+env_482731                  # Immutable ID
 payment-service/production # Readable reference
 ```
 
@@ -266,7 +266,7 @@ dopbase run payment-service/development -- npm run dev
 Automation may set `DOPBASE_ENV` instead:
 
 ```bash
-DOPBASE_ENV=env_01ABCDEF dopbase run -- ./payment-service
+DOPBASE_ENV=env_482731 dopbase run -- ./payment-service
 ```
 
 Interactive users may save a server-scoped default:

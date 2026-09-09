@@ -7,7 +7,7 @@ use crate::{
       SECRET_LIMIT_EXCEEDED, SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
     },
     limits::{MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
-    tokens::{ENVIRONMENT_ID_PREFIX, PROJECT_ID_PREFIX},
+    tokens::PROJECT_ID_PREFIX,
   },
   http::HttpError,
   models::{AffectedCounts, AuthIdentity},
@@ -187,8 +187,18 @@ pub async fn init(
   }
   let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project_id = token::public_id(PROJECT_ID_PREFIX);
-  let environment_id = token::public_id(ENVIRONMENT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let project = repository::insert(&mut tx, &project_id, &request.project_name, &now)
+    .await
+    .map_err(map_unique)?;
+  let environment_id = crate::modules::environments::service::insert_generated(
+    &mut tx,
+    &project_id,
+    &request.environment_name,
+    &now,
+  )
+  .await?;
   let encrypted = request
     .entries
     .iter()
@@ -200,20 +210,6 @@ pub async fn init(
     })
     .collect::<Result<Vec<_>, _>>()
     .map_err(|_| HttpError::internal())?;
-  let mut tx = state.db.pool().begin().await?;
-  let project = repository::insert(&mut tx, &project_id, &request.project_name, &now)
-    .await
-    .map_err(map_unique)?;
-  sqlx::query(
-    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?)",
-  )
-  .bind(&environment_id)
-  .bind(&project_id)
-  .bind(&request.environment_name)
-  .bind(&now)
-  .bind(&now)
-  .execute(&mut *tx)
-  .await?;
   for (entry, value) in encrypted {
     sqlx::query("INSERT INTO secrets(environment_id,key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at)VALUES(?,?,1,?,?,?,?,?,?)").bind(&environment_id).bind(&entry.key).bind(value.ciphertext).bind(value.value_nonce).bind(value.wrapped_key).bind(value.key_nonce).bind(&now).bind(&now).execute(&mut *tx).await?;
   }

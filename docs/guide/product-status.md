@@ -25,7 +25,6 @@ documentation, and SQLite storage in one executable.
 - Root-only full-instance encrypted backups with account-aware restore
 - Audit records
 - Self-hosted binaries for macOS and Linux on AMD64 and ARM64
-- A self-hosted Windows x64 binary and checksum-verifying PowerShell installer
 
 ## Current boundaries
 
@@ -34,9 +33,10 @@ created by earlier releases are not supported. Keep the matching master key
 with every backup, and test restores before relying on them for recovery.
 
 Dopbase Cloud is not available yet. The current release does not include
-Windows ARM64, automatic upgrades, or managed backups. Self-hosted operators
-remain responsible for TLS, network access, database backups, master-key
-storage, monitoring, upgrades, and incident response.
+native Windows binaries, automatic upgrades, or managed backups.
+
+Windows users must run Dopbase in a Linux container with Docker. Self-hosted operators remain responsible for TLS, network access, database backups, master-key storage,
+monitoring, upgrades, and incident response.
 
 The source is public so anyone can inspect the implementation and report
 security problems privately. Public source makes review possible, but it is not

@@ -1,6 +1,27 @@
 use super::model::EnvironmentResponse;
-use sqlx::SqlitePool;
+use sqlx::{Sqlite, SqlitePool, Transaction};
 const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
+
+pub async fn insert(
+  tx: &mut Transaction<'_, Sqlite>,
+  id: &str,
+  project_id: &str,
+  name: &str,
+  now: &str,
+) -> Result<bool, sqlx::Error> {
+  let result = sqlx::query(
+    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+  )
+  .bind(id)
+  .bind(project_id)
+  .bind(name)
+  .bind(now)
+  .bind(now)
+  .execute(&mut **tx)
+  .await?;
+  Ok(result.rows_affected() == 1)
+}
+
 pub async fn find_id(
   pool: &SqlitePool,
   id: &str,

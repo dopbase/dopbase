@@ -6,7 +6,7 @@ description: "Every Dopbase CLI command and option, with short examples."
 # CLI cheat sheet
 
 Use `payment-service/production` anywhere a command asks for an environment.
-An immutable ID such as `env_01ABCDEF` works too.
+An immutable ID such as `env_482731` works too.
 
 ## Global options
 
@@ -33,7 +33,7 @@ examples for `secret set`.
 | Start the server in the background | `dopbase server up`                   | Same options as `server start`                                                                                                                                     | `dopbase server up --docs`                           |
 | Stop the background server         | `dopbase server down`                 | `--timeout <SECONDS>` (default: `10`)                                                                                                                              | `dopbase server down --timeout 30`                   |
 | Check the local server process     | `dopbase server status`               | No command-specific options                                                                                                                                        | `dopbase server status`                              |
-| Read background logs               | `dopbase server logs`                 | `--lines <COUNT>` (default: `100`), `-f`, `--follow`, `--clean`                                                                                                    | `dopbase server logs --clean --follow`               |
+| Read background logs               | `dopbase server logs`                 | `--lines <COUNT>` (default: `100`), `-w`, `--watch`, `--clean`                                                                                                     | `dopbase server logs --clean --watch`                |
 | Select another server              | `dopbase client connect <SERVER_URL>` | No command-specific options                                                                                                                                        | `dopbase client connect https://dopbase.example.com` |
 | Return to the local server         | `dopbase client connect local`        | No command-specific options                                                                                                                                        | `dopbase client connect local`                       |
 | Check connection and login         | `dopbase client status`               | No command-specific options                                                                                                                                        | `dopbase client status`                              |
