@@ -94,8 +94,10 @@ environment variable would override the newly saved endpoint.
 
 ## Credentials
 
-`dopbase login` stores the resulting token in an encrypted extensionless
-`session` file beside `config.toml`, scoped to the normalized server URL. Its
+`dopbase login` stores a human session token in an encrypted extensionless
+`session` file beside `config.toml`, scoped to the normalized server URL.
+`dopbase login --token` reads an existing runner token from a masked prompt or
+standard input and stores it in the same file. Its
 random 32-byte key is stored separately in `session-key`. The token is never
 written to `config.toml` or a Dopbase server's SQLite database.
 
@@ -106,15 +108,14 @@ sessions remain valid but show an unknown email until the next login.
 Remote server URLs must use HTTPS. HTTP is limited to `localhost` and loopback
 IP addresses, and the client does not follow redirects.
 
-Only one saved connection is active in v0.1.2. Logging in again replaces the
-credential for that server. `dopbase logout` removes the active credential but
-leaves the selected server unchanged.
+Only one saved connection is active in v0.1.2. Logging in again, with a human
+account or runner token, replaces the saved credential. `dopbase logout`
+removes the active credential but leaves the selected server unchanged.
 
 On macOS and Linux, the data directory is mode `0700` and both session files
 are mode `0600`. Separating the key protects a copied `session` file by itself,
-but an attacker that can read both files can decrypt the token. Machines and
-AI agents should receive their externally managed credential through
-`DOPBASE_TOKEN`.
+but an attacker that can read both files can decrypt the token. Use
+`DOPBASE_TOKEN` when a deployment platform or CI system manages the credential.
 
 ## Encrypted run cache
 
@@ -191,8 +192,9 @@ The effective server is resolved in this order:
 
 Authentication is resolved in this order:
 
-1. `DOPBASE_TOKEN`
-2. The encrypted session matching the normalized active server
+1. `--token <TOKEN>` on `dopbase run`
+2. `DOPBASE_TOKEN`
+3. The encrypted credential matching the normalized active server
 
 The environment used by `dopbase run` is resolved in this order:
 

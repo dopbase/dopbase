@@ -42,7 +42,7 @@ Examples:
   dopbase client status
 ";
 
-pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n";
+pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
 pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
 pub(crate) const STATUS_HELP: &str = "Examples:\n  dopbase status\n";
 pub(crate) const INIT_HELP: &str =
@@ -164,6 +164,7 @@ Examples:
   dopbase run -- npm run dev
   dopbase run env_482731 -- npm run dev
   dopbase run payment-service/development -- npm run dev
+  dopbase run payment-service/production --token dbs_xxx -- npm start
 ";
 
 pub(crate) const TOKEN_HELP: &str = "\

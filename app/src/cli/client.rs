@@ -16,6 +16,7 @@ use std::{
 #[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
   Login,
+  TokenInput,
   PasswordConfirmation,
   ServerSwitch,
   Confirmation,
@@ -29,6 +30,7 @@ impl fmt::Display for CliCancelled {
   ) -> fmt::Result {
     formatter.write_str(match self {
       Self::Login => "Login cancelled.",
+      Self::TokenInput => "Token input cancelled.",
       Self::PasswordConfirmation => "Password confirmation cancelled.",
       Self::ServerSwitch => "Server switch cancelled.",
       Self::Confirmation => "Operation cancelled.",
@@ -69,6 +71,7 @@ pub(crate) fn is_availability_error(error: &anyhow::Error) -> bool {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
+  Argument,
   Environment,
   EncryptedSession,
   None,
@@ -77,6 +80,7 @@ pub enum CredentialSource {
 impl CredentialSource {
   pub fn as_str(self) -> &'static str {
     match self {
+      Self::Argument => "argument",
       Self::Environment => "environment",
       Self::EncryptedSession => "encrypted_session",
       Self::None => "none",
@@ -379,17 +383,48 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  if let Ok(token) = env::var(ENV_TOKEN) {
-    if token.is_empty() {
-      bail!("DOPBASE_TOKEN is set but empty");
-    }
+  credential_with_token(server, None)
+}
+
+pub fn credential_with_token(
+  server: &ResolvedServer,
+  token: Option<String>,
+) -> Result<Credential> {
+  credential_from_sources(token, env::var(ENV_TOKEN), || session::load(server))
+}
+
+#[doc(hidden)]
+pub fn credential_from_sources<F>(
+  token: Option<String>,
+  environment: Result<String, env::VarError>,
+  saved: F,
+) -> Result<Credential>
+where
+  F: FnOnce() -> Result<Option<session::StoredSession>>,
+{
+  if let Some(token) = token {
+    validate_runner_token(&token)?;
     return Ok(Credential {
       token: Some(token),
-      source: CredentialSource::Environment,
+      source: CredentialSource::Argument,
       email: None,
     });
   }
-  Ok(match session::load(server)? {
+  match environment {
+    Ok(token) => {
+      if token.is_empty() {
+        bail!("DOPBASE_TOKEN is set but empty");
+      }
+      return Ok(Credential {
+        token: Some(token),
+        source: CredentialSource::Environment,
+        email: None,
+      });
+    }
+    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_TOKEN contains invalid Unicode"),
+    Err(env::VarError::NotPresent) => {}
+  }
+  Ok(match saved()? {
     Some(session) => Credential {
       token: Some(session.token),
       source: CredentialSource::EncryptedSession,
@@ -401,6 +436,22 @@ pub fn credential(server: &ResolvedServer) -> Result<Credential> {
       email: None,
     },
   })
+}
+
+pub fn validate_runner_token(token: &str) -> Result<()> {
+  use crate::constants::tokens::RUNNER_TOKEN_PREFIX;
+
+  let encoded = token
+    .strip_prefix(RUNNER_TOKEN_PREFIX)
+    .context("Enter a Dopbase runner token beginning with dbs_.")?;
+  if encoded.len() != 43
+    || encoded
+      .bytes()
+      .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+  {
+    bail!("Enter a valid Dopbase runner token.");
+  }
+  Ok(())
 }
 pub fn save_credential(
   server: &ResolvedServer,
@@ -542,8 +593,11 @@ async fn prompt_password_confirmation() -> Result<String> {
     }
   }
 }
-pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
-  let credential = credential(server)?;
+pub async fn any_authenticated_client(
+  server: &ResolvedServer,
+  token: Option<String>,
+) -> Result<ApiClient> {
+  let credential = credential_with_token(server, token)?;
   if let Some(token) = credential.token {
     return ApiClient::new(server, Some(token));
   }

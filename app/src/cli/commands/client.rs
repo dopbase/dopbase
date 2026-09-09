@@ -195,9 +195,11 @@ pub(super) async fn show_status(
     output::print_json(&value)?;
   } else {
     let identity = credential_identity(&credential);
-    let email = match (&credential.email, credential.source) {
-      (Some(email), _) => email.as_str(),
-      (None, CredentialSource::EncryptedSession) => "unknown (run dopbase login again to refresh)",
+    let email = match (&credential.email, credential.source, identity) {
+      (Some(email), _, _) => email.as_str(),
+      (None, CredentialSource::EncryptedSession, "admin") => {
+        "unknown (run dopbase login again to refresh)"
+      }
       _ => "none",
     };
     let environment = server.default_environment().map_or_else(
@@ -267,13 +269,18 @@ pub fn status_document(
 
 fn credential_identity(credential: &Credential) -> &'static str {
   match credential.source {
-    CredentialSource::Environment => match credential.token.as_deref() {
+    CredentialSource::Argument | CredentialSource::Environment => match credential.token.as_deref()
+    {
       Some(token) if token.starts_with(ADMIN_SESSION_PREFIX) => "human",
       Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
       Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",
       _ => "unknown",
     },
-    CredentialSource::EncryptedSession => "admin",
+    CredentialSource::EncryptedSession => match credential.token.as_deref() {
+      Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
+      Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",
+      _ => "admin",
+    },
     CredentialSource::None => "none",
   }
 }

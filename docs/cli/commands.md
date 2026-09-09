@@ -24,7 +24,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase server logs`                  | Read background server logs         |
 | `dopbase client connect <server-url>`  | Validate and save another server    |
 | `dopbase client connect local`         | Return to the implicit local server |
-| `dopbase login`                        | Authenticate with the active server |
+| `dopbase login`                        | Sign in or save a runner token      |
 | `dopbase logout`                       | Remove the active saved credential  |
 | `dopbase client status`                | Show safe effective client settings |
 | `dopbase status`                       | Alias for `dopbase client status`   |
@@ -89,11 +89,13 @@ The server resolution order is:
 3. The endpoint saved by `dopbase client connect`
 4. `http://localhost:8840`
 
-Machine runners and AI agents use `DOPBASE_TOKEN`. It takes precedence over a
-token saved by `login` in the encrypted local session file. A saved credential
-is used only when it matches the resolved server. Dopbase does not accept a
-token as a CLI argument because shell history and process inspection can expose
-command-line arguments.
+Machine runners can register a credential with `dopbase login --token`. CI
+systems and deployment platforms can use `DOPBASE_TOKEN`. For `dopbase run`, an
+explicit `--token <TOKEN>` takes precedence over `DOPBASE_TOKEN`, which takes
+precedence over the encrypted credential saved by `login`. A saved credential
+is used only when it matches the resolved server. Command-line tokens may be
+visible in shell history and process inspection, so they are best kept for
+one-off overrides.
 
 `dopbase client status` displays the config path, resolved server and its source,
 authentication source, locally identified credential type, login email, and
@@ -262,6 +264,19 @@ Pass the environment directly:
 
 ```bash
 dopbase run payment-service/development -- npm run dev
+```
+
+On an application server, save its runner token once:
+
+```bash
+printf '%s' "$RUNNER_TOKEN" | dopbase login --token
+dopbase run payment-service/production -- npm start
+```
+
+Use an explicit token only for a one-off command:
+
+```bash
+dopbase run payment-service/production --token "$RUNNER_TOKEN" -- npm start
 ```
 
 Automation may set `DOPBASE_ENV` instead:

@@ -1,5 +1,5 @@
 use app::cli::{
-  client::{Credential, CredentialSource},
+  client::{Credential, CredentialSource, credential_from_sources, validate_runner_token},
   commands::{
     factory_reset_confirmation_matches, factory_reset_quarantine_path, run_environment,
     server_switch_confirmed, status_document, validate_factory_reset_target,
@@ -168,7 +168,7 @@ fn status_includes_cached_admin_email_and_default_environment() {
   let directory = TempDir::new().unwrap();
   let server = server(&directory);
   let credential = Credential {
-    token: Some("secret-token".into()),
+    token: Some("dbc_secret-token".into()),
     source: CredentialSource::EncryptedSession,
     email: Some("admin@example.com".into()),
   };
@@ -180,7 +180,64 @@ fn status_includes_cached_admin_email_and_default_environment() {
   assert_eq!(value["environment"], "env_default");
   assert_eq!(value["server_status"], "connected");
   assert_eq!(value["status_source"], "live");
-  assert!(!value.to_string().contains("secret-token"));
+  assert!(!value.to_string().contains("dbc_secret-token"));
+}
+
+#[test]
+fn status_identifies_an_encrypted_runner_token() {
+  let directory = TempDir::new().unwrap();
+  let server = server(&directory);
+  let token = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let credential = Credential {
+    token: Some(token.into()),
+    source: CredentialSource::EncryptedSession,
+    email: None,
+  };
+
+  let value = status_document(&server, &credential, true);
+  assert_eq!(value["authentication"], "encrypted_session");
+  assert_eq!(value["identity"], "runner");
+  assert!(value["email"].is_null());
+  assert!(!value.to_string().contains(token));
+}
+
+#[test]
+fn explicit_runner_token_has_priority_over_environment_and_saved_credentials() {
+  let explicit = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let credential = credential_from_sources(
+    Some(explicit.into()),
+    Ok("environment-token".into()),
+    || panic!("saved credentials must not be loaded for an explicit token"),
+  )
+  .unwrap();
+
+  assert_eq!(credential.token.as_deref(), Some(explicit));
+  assert!(matches!(credential.source, CredentialSource::Argument));
+}
+
+#[test]
+fn environment_token_has_priority_over_the_saved_credential() {
+  let environment = "dbs_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+  let credential = credential_from_sources(None, Ok(environment.into()), || {
+    panic!("saved credentials must not be loaded when DOPBASE_TOKEN is set")
+  })
+  .unwrap();
+
+  assert_eq!(credential.token.as_deref(), Some(environment));
+  assert!(matches!(credential.source, CredentialSource::Environment));
+}
+
+#[test]
+fn runner_token_validation_rejects_empty_wrong_prefix_and_wrong_length() {
+  assert!(validate_runner_token("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").is_ok());
+  for token in [
+    "",
+    "dbc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "dbs_too-short",
+    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!",
+  ] {
+    assert!(validate_runner_token(token).is_err(), "accepted {token:?}");
+  }
 }
 
 #[test]

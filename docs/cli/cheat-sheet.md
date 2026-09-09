@@ -38,7 +38,7 @@ examples for `secret set`.
 | Return to the local server         | `dopbase client connect local`        | No command-specific options                                                                                                                                        | `dopbase client connect local`                       |
 | Check connection and login         | `dopbase client status`               | No command-specific options                                                                                                                                        | `dopbase client status`                              |
 | Check connection and login (alias) | `dopbase status`                      | No command-specific options                                                                                                                                        | `dopbase status`                                     |
-| Sign in                            | `dopbase login`                       | No command-specific options                                                                                                                                        | `dopbase login`                                      |
+| Sign in                            | `dopbase login`                       | `--token` saves a runner token from a masked prompt or piped standard input                                                                                         | `printf '%s' "$RUNNER_TOKEN" \| dopbase login --token` |
 | Sign out                           | `dopbase logout`                      | No command-specific options                                                                                                                                        | `dopbase logout`                                     |
 
 `--host` defaults to `127.0.0.1` and `--port` defaults to `8840`. When
@@ -74,7 +74,7 @@ examples for `secret set`.
 | Import a dotenv file      | `dopbase import <ENVIRONMENT> <FILE>`          | `--dry-run` previews changes; `--replace` removes remote keys absent from the file; `--yes` skips confirmation | `dopbase import payment-service/staging .env.staging --dry-run`                           |
 | Export to a file          | `dopbase export <ENVIRONMENT> --output <FILE>` | `--output <FILE>` or `--stdout` is required; `--force` overwrites an existing file                             | `dopbase export payment-service/staging --output .env.staging --force`                    |
 | Export to standard output | `dopbase export <ENVIRONMENT> --stdout`        | `--stdout` conflicts with `--output`                                                                           | `dopbase export payment-service/staging --stdout`                                         |
-| Run with injected secrets | `dopbase run [ENVIRONMENT] -- <COMMAND>`       | Everything after `--` is the child command                                                                     | `dopbase run payment-service/development -- npm start`                                    |
+| Run with injected secrets | `dopbase run [ENVIRONMENT] -- <COMMAND>`       | `--token <TOKEN>` overrides other credentials; everything after `--` is the child command                       | `dopbase run payment-service/development -- npm start`                                    |
 
 ## Tokens, backups, and maintenance
 
