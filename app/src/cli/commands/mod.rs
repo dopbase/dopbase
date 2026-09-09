@@ -8,7 +8,7 @@ mod import;
 mod init;
 mod output;
 mod project;
-mod prompt;
+pub(crate) mod prompt;
 mod restore;
 mod run;
 mod secret;
@@ -19,6 +19,10 @@ pub use admin::{
   factory_reset_confirmation_matches, factory_reset_quarantine_path, validate_factory_reset_target,
 };
 pub use client::{server_switch_confirmed, status_document};
+#[doc(hidden)]
+pub use output::{render_fields, render_table};
+#[doc(hidden)]
+pub use prompt::remove_one_line_ending;
 pub use run::{RunEnvironment, run_environment};
 
 use super::{args::*, local_config};
