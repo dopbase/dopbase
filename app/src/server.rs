@@ -107,6 +107,11 @@ pub fn router(state: AppState) -> Router {
   let mut router = Router::new().merge(modules::routes());
   if state.config.docs_enabled {
     let mut openapi = modules::openapi();
+    openapi.info.title = "Dopbase API".to_string();
+    openapi.info.description = Some(
+      "API for managing Dopbase projects, environments, secrets, access, backups, and instance settings."
+        .to_string(),
+    );
     let components = openapi.components.get_or_insert_with(Default::default);
     components.add_security_scheme(
       "bearerAuth",
@@ -213,7 +218,7 @@ pub fn startup_banner(
     format!("Config:     {}", data_dir.display()),
   ];
   if docs_enabled {
-    rows.push(format!("Swagger:    {public_url}/api/docs"));
+    rows.push(format!("API Specs:  {public_url}/api/docs"));
   }
   rows.join("\n")
 }

@@ -501,6 +501,11 @@ async fn health_and_openapi_are_available() {
   assert_eq!(body["data"]["product"], "dopbase");
   let (status, spec, _) = call(&router, "GET", "/api/v1/openapi.json", None, None).await;
   assert_eq!(status, 200);
+  assert_eq!(spec["info"]["title"], "Dopbase API");
+  assert_eq!(
+    spec["info"]["description"],
+    "API for managing Dopbase projects, environments, secrets, access, backups, and instance settings."
+  );
   for path in [
     "/api/v1/health",
     "/api/v1/bootstrap/status",
