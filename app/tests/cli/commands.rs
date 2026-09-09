@@ -1,8 +1,74 @@
 use app::cli::{
   client::{Credential, CredentialSource},
-  commands::{run_environment, server_switch_confirmed, status_document},
+  commands::{
+    factory_reset_confirmation_matches, factory_reset_quarantine_path, run_environment,
+    server_switch_confirmed, status_document, validate_factory_reset_target,
+  },
   local_config::{ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource},
 };
+
+#[test]
+fn factory_reset_requires_the_exact_confirmation_phrase() {
+  assert!(factory_reset_confirmation_matches(
+    "please-wipe-out-system\n"
+  ));
+  assert!(factory_reset_confirmation_matches(
+    "please-wipe-out-system\r\n"
+  ));
+  for rejected in [
+    "",
+    "PLEASE-WIPE-OUT-SYSTEM",
+    "please wipe out system",
+    "please-wipe-out-system ",
+    " please-wipe-out-system",
+  ] {
+    assert!(
+      !factory_reset_confirmation_matches(rejected),
+      "{rejected:?}"
+    );
+  }
+}
+
+#[test]
+fn factory_reset_requires_a_local_database_inside_the_data_directory() {
+  let directory = TempDir::new().unwrap();
+  let data_dir = directory.path().join("instance");
+  let database = data_dir.join("dopbase.db");
+
+  let missing = validate_factory_reset_target(&data_dir, &database)
+    .unwrap_err()
+    .to_string();
+  assert!(missing.contains("only available on the Dopbase server host"));
+
+  std::fs::create_dir(&data_dir).unwrap();
+  std::fs::write(&database, b"database").unwrap();
+  assert_eq!(
+    validate_factory_reset_target(&data_dir, &database).unwrap(),
+    data_dir.canonicalize().unwrap()
+  );
+
+  let outside_database = directory.path().join("outside.db");
+  std::fs::write(&outside_database, b"database").unwrap();
+  let outside = validate_factory_reset_target(&data_dir, &outside_database)
+    .unwrap_err()
+    .to_string();
+  assert!(outside.contains("does not contain its database"));
+}
+
+#[test]
+fn factory_reset_quarantine_is_a_timestamped_sibling() {
+  let directory = TempDir::new().unwrap();
+  let data_dir = directory.path().join("instance");
+  let quarantine = factory_reset_quarantine_path(&data_dir).unwrap();
+  assert_eq!(quarantine.parent(), data_dir.parent());
+  assert!(
+    quarantine
+      .file_name()
+      .unwrap()
+      .to_string_lossy()
+      .starts_with("instance.factory-reset-")
+  );
+}
 use std::env::VarError;
 use tempfile::TempDir;
 
@@ -190,5 +256,36 @@ async fn restore_rejects_when_server_is_offline() {
   assert!(
     msg.contains("Cannot perform restore: Dopbase server at http://127.0.0.1:1 is not connected or offline (live status required)"),
     "unexpected message: {msg}"
+  );
+}
+
+#[tokio::test]
+async fn factory_reset_rejects_remote_and_json_modes_before_touching_local_state() {
+  use clap::Parser;
+
+  let remote = app::cli::args::Cli::try_parse_from([
+    "dopbase",
+    "--server",
+    "https://dopbase.example.com",
+    "admin",
+    "factory-reset",
+  ])
+  .unwrap();
+  assert_eq!(
+    app::cli::commands::execute(remote)
+      .await
+      .unwrap_err()
+      .to_string(),
+    "--server cannot be used with local `dopbase admin` commands"
+  );
+
+  let json =
+    app::cli::args::Cli::try_parse_from(["dopbase", "--json", "admin", "factory-reset"]).unwrap();
+  assert_eq!(
+    app::cli::commands::execute(json)
+      .await
+      .unwrap_err()
+      .to_string(),
+    "--json cannot be used with `dopbase admin factory-reset`"
   );
 }

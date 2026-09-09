@@ -86,7 +86,7 @@ Runner tokens remain a separate environment-scoped credential type.
 | Read audit events, including filtered history                              | Yes  | Yes   | No     | No       |
 | View instance status                                                       | Yes  | Yes   | Yes    | Yes      |
 | Full-instance backups and master-key download                              | Yes  | No    | No     | No       |
-| Factory reset in the Admin UI                                              | Yes  | No    | No     | No       |
+| Factory reset in the Admin UI or offline host CLI                          | Yes  | No    | No     | No       |
 
 No human can delete their own account or change their own role. An admin can
 manage another admin, but cannot modify root. Root is created only during first-run setup. Root changes its password through Account settings.
@@ -100,12 +100,15 @@ are root-only because snapshots contain every project and human account.
 
 ## Factory reset
 
-The root-only Danger Zone factory reset deletes every account (including root),
-all projects, environments, secrets, runner tokens, AI accounts and their tokens, audit history, and
-server-held backups. It preserves deployment configuration and the master key,
-then reopens first-run setup. The Admin UI requires the root password, an
-explicit acknowledgment, and typing `FACTORY RESET` all sessions are signed
-out. Backups downloaded elsewhere are not affected. See
+The root-only factory reset deletes every account (including root), all
+projects, environments, secrets, runner tokens, AI accounts and their tokens,
+audit history, and server-held backups. It preserves deployment configuration
+and the master key, then reopens first-run setup. The Admin UI requires the
+root password, an explicit acknowledgment, and `FACTORY RESET`. The offline
+`dopbase admin factory-reset` command requires the server to be stopped, the
+root password, and `please-wipe-out-system`. It moves the whole data directory
+to a timestamped quarantine path so the next start creates a fresh instance.
+See
 [factory reset](/self-hosting/factory-reset) for the confirmation steps and deletion scope.
 
 ## Token handling

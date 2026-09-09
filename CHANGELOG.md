@@ -9,6 +9,8 @@ packages, and standardizes pull request and release descriptions.
 
 ### Improvement
 
+- Added `dopbase admin factory-reset` for root-authorized, offline instance
+  resets from the server host.
 - New environments receive random six-digit IDs such as `env_482731`. Existing
   IDs continue to work.
 - The Admin UI shows the selected environment ID with a copy button and focuses

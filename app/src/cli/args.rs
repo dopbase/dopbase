@@ -200,7 +200,7 @@ pub enum Command {
     #[arg(last = true, required = true)]
     command: Vec<String>,
   },
-  /// Server administration (password reset).
+  /// Offline server administration.
   #[command(after_help = ADMIN_HELP)]
   Admin {
     #[command(subcommand)]
@@ -530,5 +530,16 @@ pub enum AdminCommand {
     /// File containing the server master key.
     #[arg(long, value_name = "FILE")]
     master_key_file: Option<PathBuf>,
+  },
+  /// Remove a local instance from the server machine.
+  ///
+  /// Moves the entire Dopbase data directory out of its active location. The
+  /// server must be stopped and an interactive root password confirmation is
+  /// required.
+  #[command(after_help = ADMIN_FACTORY_RESET_HELP)]
+  FactoryReset {
+    /// Server config file to load (server.toml).
+    #[arg(long, value_name = "FILE")]
+    config: Option<PathBuf>,
   },
 }

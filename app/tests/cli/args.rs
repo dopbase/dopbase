@@ -109,6 +109,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "run", "billing/production", "--", "printenv"],
     &["dopbase", "run", "env_482731", "--", "printenv"],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
+    &["dopbase", "admin", "factory-reset"],
     &["dopbase", "update"],
     &["dopbase", "backup"],
     &["dopbase", "backup", "my-backup"],

@@ -164,9 +164,15 @@ pub(crate) const TOKEN_REVOKE_HELP: &str = "Examples:\n  dopbase token revoke to
 pub(crate) const ADMIN_HELP: &str = "\
 Examples:
   dopbase admin reset-password admin@example.com
+  dopbase admin factory-reset
 ";
 pub(crate) const ADMIN_RESET_PASSWORD_HELP: &str =
   "Examples:\n  dopbase admin reset-password admin@example.com\n";
+pub(crate) const ADMIN_FACTORY_RESET_HELP: &str = "\
+Examples:
+  dopbase admin factory-reset
+  dopbase --data-dir /srv/dopbase admin factory-reset
+";
 
 pub(crate) const UPDATE_HELP: &str = "Examples:\n  dopbase update\n";
 pub(crate) const BACKUP_HELP: &str = "\
