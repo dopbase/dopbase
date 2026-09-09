@@ -27,6 +27,16 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function stripHtmlComments(value) {
+  let previous;
+  let current = value;
+  do {
+    previous = current;
+    current = current.replace(/<!--[\s\S]*?-->/g, "");
+  } while (current !== previous);
+  return current;
+}
+
 function occurrenceCount(value, search) {
   return value.split(search).length - 1;
 }
@@ -77,8 +87,7 @@ export function validatePullRequestBody(body) {
 
     if (section.heading === "Checklist") continue;
 
-    const visibleContent = content
-      .replace(/<!--[\s\S]*?-->/g, "")
+    const visibleContent = stripHtmlComments(content)
       .replace(headingPattern, "")
       .trim();
     if (!/[A-Za-z0-9]/.test(visibleContent)) {
