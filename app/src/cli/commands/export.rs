@@ -41,9 +41,13 @@ pub(super) async fn execute(
   } else if let Some(path) = output {
     output::write_private(&path, rendered.as_bytes(), force)?;
     if json_output {
-      output::print_value(true, &json!({"output":path,"secret_count":entries.len()}));
+      output::print_json(&json!({"output":path,"secret_count":entries.len()}))?;
     } else {
-      println!("Exported {} secret(s) to {}", entries.len(), path.display());
+      output::print_success(&format!(
+        "Exported {} secret(s) to {}.",
+        entries.len(),
+        path.display()
+      ));
     }
   }
   Ok(0)
