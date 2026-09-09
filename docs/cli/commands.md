@@ -30,6 +30,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase status`                       | Alias for `dopbase client status`   |
 | `dopbase update`                       | Check GitHub for a newer release    |
 | `dopbase admin reset-password <email>` | Reset a user password offline       |
+| `dopbase admin factory-reset`          | Reset the local instance offline    |
 
 When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint, asks for interactive confirmation,
@@ -380,6 +381,7 @@ Offline maintenance commands operate directly on the server database:
 
 ```bash
 dopbase admin reset-password admin@example.com
+dopbase admin factory-reset
 ```
 
 `admin reset-password` performs offline recovery on the host machine. Because it accesses SQLite files directly, the background or foreground server process must be stopped first to avoid database locks.
@@ -390,6 +392,16 @@ dopbase admin reset-password admin@example.com
 | `--master-key-file <FILE>` | Path to the server master key file                |
 
 The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
+
+`admin factory-reset` also requires the server to be stopped. It displays the
+exact data directory, then requires `please-wipe-out-system` and the Dopbase
+root password. There is no non-interactive bypass.
+
+The reset moves the whole data directory to a timestamped quarantine path.
+Every database, master-key, configuration, backup, log, and local CLI file
+stored inside it moves too. The next server start creates a fresh installation.
+Remove the quarantine directory yourself after checking that nothing in it is
+needed.
 
 ## Structured output
 
