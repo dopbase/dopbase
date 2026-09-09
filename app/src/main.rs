@@ -28,7 +28,10 @@ async fn main() {
         );
         std::process::exit(1)
       } else {
-        eprintln!("Error: {error:#}");
+        let style = anstyle::Style::new()
+          .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red)))
+          .effects(anstyle::Effects::BOLD);
+        anstream::eprintln!("{style}Error:{style:#} {error:#}");
         std::process::exit(1)
       }
     }
