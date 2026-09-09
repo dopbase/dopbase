@@ -433,6 +433,140 @@
   white-space: nowrap;
 }
 
+.cli-cheat-sheet .table-viewer table {
+  table-layout: fixed;
+}
+
+.cli-cheat-sheet .table-viewer:first-of-type table {
+  width: 72rem;
+}
+
+.cli-cheat-sheet .table-viewer:first-of-type th:nth-child(1) {
+  width: 12rem;
+}
+
+.cli-cheat-sheet .table-viewer:first-of-type th:nth-child(2) {
+  width: 28rem;
+}
+
+.cli-cheat-sheet .table-viewer:not(:first-of-type) table {
+  width: 96rem;
+}
+
+.cli-cheat-sheet .table-viewer:not(:first-of-type) th:nth-child(1) {
+  width: 16rem;
+}
+
+.cli-cheat-sheet .table-viewer:not(:first-of-type) th:nth-child(2) {
+  width: 26rem;
+}
+
+.cli-cheat-sheet .table-viewer:not(:first-of-type) th:nth-child(3) {
+  width: 30rem;
+}
+
+.cli-cheat-sheet .vp-doc td code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.table-viewer__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 -8px;
+}
+
+.table-viewer__toolbar button,
+.table-viewer__header button {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.table-viewer__toolbar button:hover,
+.table-viewer__header button:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+
+.table-viewer__dialog {
+  border: 0;
+  border-radius: 0;
+  height: 100dvh;
+  margin: 0;
+  max-height: none;
+  max-width: none;
+  padding: 0;
+  width: 100dvw;
+}
+
+.table-viewer__dialog::backdrop {
+  background: var(--vp-c-bg);
+}
+
+.table-viewer__content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.table-viewer__header {
+  align-items: center;
+  border-bottom: 1px solid var(--vp-c-divider);
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  padding: 14px 24px;
+}
+
+.table-viewer__header span {
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.table-viewer__viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.table-viewer__viewport--inline {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.table-viewer__viewport--inline > table {
+  display: table;
+  max-width: none;
+  overflow: visible;
+}
+
+.table-viewer__viewport--dialog {
+  padding: 8px 24px 24px;
+}
+
+.table-viewer__dialog .table-viewer__viewport table {
+  display: table;
+  max-width: none;
+  min-width: max-content;
+  overflow: visible;
+  width: max-content;
+}
+
+@media print {
+  .table-viewer__toolbar {
+    display: none;
+  }
+}
+
 @media (max-width: 639px) {
   .dopbase-path {
     grid-template-columns: 1fr;

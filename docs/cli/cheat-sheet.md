@@ -1,6 +1,7 @@
 ---
 title: "CLI cheat sheet"
 description: "Every Dopbase CLI command and option, with short examples."
+pageClass: cli-cheat-sheet
 ---
 
 # CLI cheat sheet
@@ -78,16 +79,16 @@ examples for `secret set`.
 
 ## Tokens, backups, and maintenance
 
-| Task                            | Command                                            | Command options                                                                                                                            | Example                                                                            |
-| ------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Create a runner token           | `dopbase token create <ENVIRONMENT> --name <NAME>` | `--name <NAME>` is required; `--role <ROLE>` defaults to `runner`                                                                          | `dopbase token create payment-service/production --name deploy --role runner`      |
-| List runner tokens              | `dopbase token list <ENVIRONMENT>`                 | No command-specific options                                                                                                                | `dopbase token list payment-service/production`                                    |
-| Revoke a token                  | `dopbase token revoke <TOKEN_ID>`                  | No command-specific options                                                                                                                | `dopbase token revoke tok_01ABCDEF`                                                |
-| Create a backup                 | `dopbase backup [NAME]`                            | `-o <FILE>`, `--output <FILE>` downloads a local copy                                                                                      | `dopbase backup pre-upgrade --output backup.dop`                                   |
-| Restore a backup                | `dopbase restore <FILE>`                           | `-k <KEY>`, `--key <KEY>` supplies the source master key; `--setup-token <TOKEN>` is used for first-run restore `--yes` skips confirmation | `dopbase restore backup.dop --key ./master.key --yes`                              |
-| Reset an admin password offline | `dopbase admin reset-password <EMAIL>`             | `--config <FILE>`, `--master-key-file <FILE>`                                                                                              | `dopbase admin reset-password admin@example.com --config /srv/dopbase/server.toml` |
-| Reset the local instance offline | `dopbase admin factory-reset`                      | `--config <FILE>`                                                                                                                           | `dopbase --data-dir /srv/dopbase admin factory-reset`                             |
-| Check for a new release         | `dopbase update`                                   | No command-specific options                                                                                                                | `dopbase update`                                                                   |
+| Task                             | Command                                            | Command options                                                                                                                            | Example                                                                            |
+| -------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Create a runner token            | `dopbase token create <ENVIRONMENT> --name <NAME>` | `--name <NAME>` is required; `--role <ROLE>` defaults to `runner`                                                                          | `dopbase token create payment-service/production --name deploy --role runner`      |
+| List runner tokens               | `dopbase token list <ENVIRONMENT>`                 | No command-specific options                                                                                                                | `dopbase token list payment-service/production`                                    |
+| Revoke a token                   | `dopbase token revoke <TOKEN_ID>`                  | No command-specific options                                                                                                                | `dopbase token revoke tok_01ABCDEF`                                                |
+| Create a backup                  | `dopbase backup [NAME]`                            | `-o <FILE>`, `--output <FILE>` downloads a local copy                                                                                      | `dopbase backup pre-upgrade --output backup.dop`                                   |
+| Restore a backup                 | `dopbase restore <FILE>`                           | `-k <KEY>`, `--key <KEY>` supplies the source master key; `--setup-token <TOKEN>` is used for first-run restore `--yes` skips confirmation | `dopbase restore backup.dop --key ./master.key --yes`                              |
+| Reset an admin password offline  | `dopbase admin reset-password <EMAIL>`             | `--config <FILE>`, `--master-key-file <FILE>`                                                                                              | `dopbase admin reset-password admin@example.com --config /srv/dopbase/server.toml` |
+| Reset the local instance offline | `dopbase admin factory-reset`                      | `--config <FILE>`                                                                                                                          | `dopbase --data-dir /srv/dopbase admin factory-reset`                              |
+| Check for a new release          | `dopbase update`                                   | No command-specific options                                                                                                                | `dopbase update`                                                                   |
 
 Run `dopbase help <command>` or `dopbase help <command> <subcommand>` for the
 same option descriptions in the terminal.
