@@ -5,7 +5,10 @@ use crate::{
     local_config::{self, ClientConfig},
   },
   config::{ServerConfig, ServerOverrides},
-  constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
+  constants::{
+    config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
+    tokens::{ADMIN_SESSION_PREFIX, AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX},
+  },
   daemon::ManagedDaemonState,
 };
 use anyhow::{Result, bail};
@@ -191,6 +194,7 @@ pub(super) async fn show_status(
   if json_output {
     output::print_json(&value)?;
   } else {
+    let identity = credential_identity(&credential);
     let email = match (&credential.email, credential.source) {
       (Some(email), _) => email.as_str(),
       (None, CredentialSource::EncryptedSession) => "unknown (run dopbase login again to refresh)",
@@ -211,7 +215,7 @@ pub(super) async fn show_status(
       ("Server status:", server_status.into()),
       ("Server source:", server.source.as_str().into()),
       ("Authentication:", credential.source.as_str().into()),
-      ("Identity:", credential_identity(&credential).into()),
+      ("Identity:", human_identity(identity).into()),
       ("Email:", email.into()),
       ("Environment:", environment),
     ]);
@@ -263,8 +267,21 @@ pub fn status_document(
 
 fn credential_identity(credential: &Credential) -> &'static str {
   match credential.source {
-    CredentialSource::Environment => "runner",
+    CredentialSource::Environment => match credential.token.as_deref() {
+      Some(token) if token.starts_with(ADMIN_SESSION_PREFIX) => "human",
+      Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
+      Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",
+      _ => "unknown",
+    },
     CredentialSource::EncryptedSession => "admin",
     CredentialSource::None => "none",
+  }
+}
+
+fn human_identity(identity: &str) -> &str {
+  if identity == "ai_agent" {
+    "AI agent"
+  } else {
+    identity
   }
 }

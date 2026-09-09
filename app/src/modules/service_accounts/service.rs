@@ -1,5 +1,6 @@
 use super::model::*;
 use crate::{
+  constants::tokens::{AGENT_TOKEN_ID_PREFIX, AGENT_TOKEN_PREFIX},
   extractors::{require_admin_browser, require_mutation, require_recent_browser_auth},
   http::HttpError,
   models::AuthIdentity,
@@ -234,8 +235,8 @@ pub async fn create_token(
   let _ = account(state, id).await?;
   let name = validate_name(&request.name)?;
   let expires = parse_expiry(request.expires_at)?;
-  let token_id = token::public_id("ait_");
-  let raw = token::generate("dpa_").map_err(|_| HttpError::internal())?;
+  let token_id = token::public_id(AGENT_TOKEN_ID_PREFIX);
+  let raw = token::generate(AGENT_TOKEN_PREFIX).map_err(|_| HttpError::internal())?;
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
   let result=sqlx::query("INSERT INTO agent_tokens(id,service_account_id,name,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)").bind(&token_id).bind(id).bind(&name).bind(token::hash(&raw)).bind(&now).bind(&expires).execute(&mut *tx).await;

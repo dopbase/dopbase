@@ -184,18 +184,26 @@ fn status_includes_cached_admin_email_and_default_environment() {
 }
 
 #[test]
-fn status_identifies_runner_tokens_without_an_email() {
+fn status_identifies_environment_token_types_without_exposing_tokens() {
   let directory = TempDir::new().unwrap();
   let server = server(&directory);
-  let credential = Credential {
-    token: Some("runner-token".into()),
-    source: CredentialSource::Environment,
-    email: None,
-  };
+  for (token, identity) in [
+    ("dbc_admin-secret", "human"),
+    ("dbs_runner-secret", "runner"),
+    ("dpa_agent-secret", "ai_agent"),
+    ("other-secret", "unknown"),
+  ] {
+    let credential = Credential {
+      token: Some(token.into()),
+      source: CredentialSource::Environment,
+      email: None,
+    };
 
-  let value = status_document(&server, &credential, true);
-  assert_eq!(value["identity"], "runner");
-  assert!(value["email"].is_null());
+    let value = status_document(&server, &credential, true);
+    assert_eq!(value["identity"], identity);
+    assert!(value["email"].is_null());
+    assert!(!value.to_string().contains(token));
+  }
 }
 
 #[test]
