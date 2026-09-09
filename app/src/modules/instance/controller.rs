@@ -15,7 +15,7 @@ use axum::{
 /// the database and key store. Administrator authentication is required.
 #[utoipa::path(
   get,
-  path = "/api/v1/instance",
+  path = crate::constants::api::instance::ROOT,
   tag = "instance",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -41,7 +41,7 @@ pub async fn status(
 /// Requires metadata read access (administrator session or service account token).
 #[utoipa::path(
   get,
-  path = "/api/v1/status",
+  path = crate::constants::api::instance::PUBLIC_STATUS,
   tag = "instance",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -72,7 +72,7 @@ pub async fn public_status(
 /// will be purged during a factory reset. Requires a root administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/instance/factory-reset",
+  path = crate::constants::api::instance::FACTORY_RESET,
   tag = "instance",
   security(("cookieAuth" = [])),
   responses(
@@ -99,7 +99,7 @@ pub async fn factory_reset_preview(
 /// recent authentication, CSRF header, and a root administrator browser session.
 #[utoipa::path(
   post,
-  path = "/api/v1/instance/factory-reset",
+  path = crate::constants::api::instance::FACTORY_RESET,
   tag = "instance",
   security(("cookieAuth" = [])),
   request_body = super::model::FactoryResetRequest,

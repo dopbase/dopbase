@@ -16,7 +16,7 @@ use axum::{
 /// environment. Values are never included.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}/secrets",
+  path = crate::constants::api::secrets::COLLECTION,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -43,7 +43,7 @@ pub async fn list(
 /// Return the metadata of one secret. Values are never included.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}/secrets/{key}",
+  path = crate::constants::api::secrets::ITEM,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
@@ -71,7 +71,7 @@ pub async fn get(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   put,
-  path = "/api/v1/environments/{environment_id}/secrets/{key}",
+  path = crate::constants::api::secrets::ITEM,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
@@ -104,7 +104,7 @@ pub async fn set(
 /// for browser sessions.
 #[utoipa::path(
   delete,
-  path = "/api/v1/environments/{environment_id}/secrets/{key}",
+  path = crate::constants::api::secrets::ITEM,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
@@ -133,7 +133,7 @@ pub async fn delete(
 /// recorded in the audit log.
 #[utoipa::path(
   post,
-  path = "/api/v1/environments/{environment_id}/secrets/{key}/reveal",
+  path = crate::constants::api::secrets::REVEAL,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
@@ -164,7 +164,7 @@ pub async fn reveal(
 /// sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/environments/{environment_id}/secrets/import",
+  path = crate::constants::api::secrets::IMPORT,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -198,7 +198,7 @@ pub async fn import(
 /// authentication is required.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}/secrets/layout",
+  path = crate::constants::api::secrets::LAYOUT,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -227,7 +227,7 @@ pub async fn layout(
 /// export is recorded in the audit log.
 #[utoipa::path(
   post,
-  path = "/api/v1/environments/{environment_id}/secrets/export",
+  path = crate::constants::api::secrets::EXPORT,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -259,7 +259,7 @@ pub async fn export(
 /// the audit log.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}/secrets/runtime",
+  path = crate::constants::api::secrets::RUNTIME,
   tag = "secrets",
   security(("bearerAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),

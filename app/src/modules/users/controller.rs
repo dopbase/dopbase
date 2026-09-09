@@ -15,7 +15,7 @@ use axum::{
 /// Requires an authenticated administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/users",
+  path = crate::constants::api::users::COLLECTION,
   tag = "users",
   security(("cookieAuth" = [])),
   responses(
@@ -40,7 +40,7 @@ pub async fn list(
 /// administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/users/{id}",
+  path = crate::constants::api::users::ITEM,
   tag = "users",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "User ID with usr_ prefix")),
@@ -69,7 +69,7 @@ pub async fn get(
 /// and the CSRF header.
 #[utoipa::path(
   post,
-  path = "/api/v1/users",
+  path = crate::constants::api::users::COLLECTION,
   tag = "users",
   security(("cookieAuth" = [])),
   request_body = CreateUserRequest,
@@ -101,7 +101,7 @@ pub async fn create(
 /// re-authentication and the CSRF header.
 #[utoipa::path(
   patch,
-  path = "/api/v1/users/{id}",
+  path = crate::constants::api::users::ITEM,
   tag = "users",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "User ID with usr_ prefix")),
@@ -136,7 +136,7 @@ pub async fn update(
 /// and the CSRF header.
 #[utoipa::path(
   delete,
-  path = "/api/v1/users/{id}",
+  path = crate::constants::api::users::ITEM,
   tag = "users",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "User ID with usr_ prefix")),

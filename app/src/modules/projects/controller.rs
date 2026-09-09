@@ -15,7 +15,7 @@ use axum::{
 /// Return every project. Administrator authentication is required.
 #[utoipa::path(
   get,
-  path = "/api/v1/projects",
+  path = crate::constants::api::projects::COLLECTION,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -41,7 +41,7 @@ pub async fn list(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/projects",
+  path = crate::constants::api::projects::COLLECTION,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = CreateProjectRequest,
@@ -73,7 +73,7 @@ pub async fn create(
 /// fresh instance. Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/projects/init",
+  path = crate::constants::api::projects::INIT,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = InitProjectRequest,
@@ -105,7 +105,7 @@ pub async fn init(
 /// required.
 #[utoipa::path(
   get,
-  path = "/api/v1/projects/{project_ref}",
+  path = crate::constants::api::projects::ITEM,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project_ref" = String, Path, description = "Project id or name")),
@@ -134,7 +134,7 @@ pub async fn show(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   patch,
-  path = "/api/v1/projects/{project_ref}",
+  path = crate::constants::api::projects::ITEM,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project_ref" = String, Path, description = "Project id or name")),
@@ -169,7 +169,7 @@ pub async fn rename(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   delete,
-  path = "/api/v1/projects/{project_ref}",
+  path = crate::constants::api::projects::ITEM,
   tag = "projects",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project_ref" = String, Path, description = "Project id or name")),

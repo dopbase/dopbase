@@ -7,7 +7,7 @@ use crate::http::{HttpResponse, HttpResponseFormat};
 /// load balancer and uptime probes.
 #[utoipa::path(
   get,
-  path = "/api/v1/health",
+  path = crate::constants::api::health::ROOT,
   tag = "health",
   responses(
     (status = 200, description = "Service is healthy", body = inline(HttpResponseFormat<HealthResponse>)),

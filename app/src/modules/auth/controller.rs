@@ -17,7 +17,7 @@ use axum::{
 /// receive a bearer token. Failed attempts are rate limited per email.
 #[utoipa::path(
   post,
-  path = "/api/v1/auth/login",
+  path = crate::constants::api::auth::LOGIN,
   tag = "authentication",
   request_body = LoginRequest,
   responses(
@@ -55,7 +55,7 @@ pub async fn login(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/auth/logout",
+  path = crate::constants::api::auth::LOGOUT,
   tag = "authentication",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -83,7 +83,7 @@ pub async fn logout(
 /// or CLI), and whether the authentication is still considered recent.
 #[utoipa::path(
   get,
-  path = "/api/v1/auth/session",
+  path = crate::constants::api::auth::SESSION,
   tag = "authentication",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -106,7 +106,7 @@ pub async fn session(identity: AuthIdentity) -> Result<HttpResponse<SessionRespo
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/auth/reauthenticate",
+  path = crate::constants::api::auth::REAUTHENTICATE,
   tag = "authentication",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = ReauthenticateRequest,
@@ -134,7 +134,7 @@ pub async fn reauthenticate(
 /// header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/auth/change-password",
+  path = crate::constants::api::auth::CHANGE_PASSWORD,
   tag = "authentication",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = ChangePasswordRequest,

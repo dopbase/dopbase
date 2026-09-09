@@ -15,7 +15,7 @@ use axum::{
 /// administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/service-accounts",
+  path = crate::constants::api::service_accounts::COLLECTION,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   responses(
@@ -41,7 +41,7 @@ pub async fn list(
 /// administrator browser session with recent re-authentication and the CSRF header.
 #[utoipa::path(
   post,
-  path = "/api/v1/service-accounts",
+  path = crate::constants::api::service_accounts::COLLECTION,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   request_body = CreateServiceAccountRequest,
@@ -71,7 +71,7 @@ pub async fn create(
 /// administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/service-accounts/{id}",
+  path = crate::constants::api::service_accounts::ITEM,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "Service account ID with aia_ prefix")),
@@ -100,7 +100,7 @@ pub async fn get(
 /// and the CSRF header.
 #[utoipa::path(
   delete,
-  path = "/api/v1/service-accounts/{id}",
+  path = crate::constants::api::service_accounts::ITEM,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "Service account ID with aia_ prefix")),
@@ -127,7 +127,7 @@ pub async fn delete(
 /// the service account. Requires an authenticated administrator browser session.
 #[utoipa::path(
   get,
-  path = "/api/v1/service-accounts/{id}/tokens",
+  path = crate::constants::api::service_accounts::TOKENS,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "Service account ID with aia_ prefix")),
@@ -157,7 +157,7 @@ pub async fn tokens(
 /// re-authentication and the CSRF header.
 #[utoipa::path(
   post,
-  path = "/api/v1/service-accounts/{id}/tokens",
+  path = crate::constants::api::service_accounts::TOKENS,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   params(("id" = String, Path, description = "Service account ID with aia_ prefix")),
@@ -192,7 +192,7 @@ pub async fn create_token(
 /// recent re-authentication and the CSRF header.
 #[utoipa::path(
   post,
-  path = "/api/v1/service-accounts/{id}/tokens/{token_id}/revoke",
+  path = crate::constants::api::service_accounts::REVOKE_TOKEN,
   tag = "service-accounts",
   security(("cookieAuth" = [])),
   params(
