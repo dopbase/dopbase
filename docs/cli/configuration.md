@@ -35,7 +35,7 @@ Use the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR` to relocate this
 file together with the default server data. The CLI option takes precedence
 over the environment variable.
 
-The v0.1.2 schema contains only non-secret client state:
+The v0.1.3 schema contains only non-secret client state:
 
 ```toml
 version = 1
@@ -108,7 +108,7 @@ sessions remain valid but show an unknown email until the next login.
 Remote server URLs must use HTTPS. HTTP is limited to `localhost` and loopback
 IP addresses, and the client does not follow redirects.
 
-Only one saved connection is active in v0.1.2. Logging in again, with a human
+Only one saved connection is active in v0.1.3. Logging in again, with a human
 account or runner token, replaces the saved credential. `dopbase logout`
 removes the active credential but leaves the selected server unchanged.
 
@@ -219,7 +219,7 @@ Each Dopbase server instance has its own address and server-owned SQLite
 database. For example, two local instances might listen on ports `8840` and
 `8377`.
 
-Only one endpoint can be globally active; v0.1.2 does not retain named profiles
+Only one endpoint can be globally active; v0.1.3 does not retain named profiles
 or token history for previously selected servers:
 
 ```bash

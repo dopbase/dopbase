@@ -2,18 +2,14 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## 0.1.2 - 2026-09-09
+## 0.1.3 - 2026-09-09
 
-Dopbase 0.1.2 adds an offline, root-authorized factory reset, switches new
-environments to short random IDs, improves terminal input and output, removes
-native Windows packaging, and standardizes pull request and release notes.
+Dopbase 0.1.3 improves CLI output and credential handling, keeps API routes in
+one shared catalog, expands the AI agent documentation, and trims release
+dependencies.
 
 ### Improvement
 
-- Added `dopbase admin factory-reset` for root-authorized, offline instance
-  resets from the server host.
-- New environments receive random six-digit IDs such as `env_482731`. Existing
-  IDs continue to work.
 - CLI list and detail commands now use readable tables, labeled fields, and
   concise result messages by default. `--json` keeps the existing
   machine-readable response shapes.
@@ -22,6 +18,31 @@ native Windows packaging, and standardizes pull request and release notes.
   piped input remains unchanged.
 - `dopbase login --token` can save a runner token in the encrypted local
   credential store. `dopbase run --token <TOKEN>` provides a one-off override.
+- Backend route paths now come from one shared catalog used by the server,
+  OpenAPI annotations, and CLI requests.
+- OpenAPI labels and metadata are clearer, and wide documentation tables can be
+  expanded for easier reading.
+- Added guides for AI agent access and supported environment variables.
+- Reduced application dependencies and tightened release build settings.
+
+### Security
+
+- Runtime authentication now resolves `--token`, then `DOPBASE_TOKEN`, then
+  the saved credential. Command-line tokens remain intended for one-off use
+  because process inspection and shell history may expose them.
+
+## 0.1.2 - 2026-09-09
+
+Dopbase 0.1.2 adds an offline, root-authorized factory reset, switches new
+environments to short random IDs, removes native Windows packaging, and
+standardizes pull request and release notes.
+
+### Improvement
+
+- Added `dopbase admin factory-reset` for root-authorized, offline instance
+  resets from the server host.
+- New environments receive random six-digit IDs such as `env_482731`. Existing
+  IDs continue to work.
 - The Admin UI shows the selected environment ID with a copy button and focuses
   the name field when a project or environment dialog opens.
 - `dopbase server logs --watch` and `-w` replace `--follow` and `-f`. The old
@@ -29,12 +50,6 @@ native Windows packaging, and standardizes pull request and release notes.
 - Pull request descriptions now follow a checked repository template. Release
   notes use the matching changelog section and link to the complete comparison
   between versions.
-
-### Security
-
-- Runtime authentication now resolves `--token`, then `DOPBASE_TOKEN`, then
-  the saved credential. Command-line tokens remain intended for one-off use
-  because process inspection and shell history may expose them.
 
 ### Note
 
