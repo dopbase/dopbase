@@ -1,0 +1,33 @@
+use super::output;
+use crate::cli::{client, local_config::ResolvedServer};
+use anyhow::Result;
+use serde_json::json;
+
+pub(super) async fn login(
+  server: &ResolvedServer,
+  json_output: bool,
+) -> Result<i32> {
+  let _ = client::login(server, true).await?;
+  let data = json!({"server_url":server.url,"authentication":"encrypted_session"});
+  if json_output {
+    output::print_json(&data)?;
+  } else {
+    output::print_success(&format!("Logged in to {}.", server.url));
+  }
+  Ok(0)
+}
+
+pub(super) fn logout(
+  server: &ResolvedServer,
+  json_output: bool,
+) -> Result<i32> {
+  client::remove_credential(server)?;
+  let credential = client::credential(server)?;
+  let data = json!({"server_url":server.url,"authentication":credential.source.as_str()});
+  if json_output {
+    output::print_json(&data)?;
+  } else {
+    output::print_success(&format!("Logged out from {}.", server.url));
+  }
+  Ok(0)
+}

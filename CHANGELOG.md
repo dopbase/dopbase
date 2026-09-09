@@ -5,8 +5,8 @@ All notable changes to Dopbase are documented in this file.
 ## 0.1.2 - 2026-09-09
 
 Dopbase 0.1.2 adds an offline, root-authorized factory reset, switches new
-environments to short random IDs, removes native Windows packaging, and
-standardizes pull request and release notes.
+environments to short random IDs, improves terminal input and output, removes
+native Windows packaging, and standardizes pull request and release notes.
 
 ### Improvement
 
@@ -14,6 +14,12 @@ standardizes pull request and release notes.
   resets from the server host.
 - New environments receive random six-digit IDs such as `env_482731`. Existing
   IDs continue to work.
+- CLI list and detail commands now use readable tables, labeled fields, and
+  concise result messages by default. `--json` keeps the existing
+  machine-readable response shapes.
+- Password and secret prompts show masked input. Interactive
+  `dopbase secret set --stdin` explains how to finish entering a value, while
+  piped input remains unchanged.
 - The Admin UI shows the selected environment ID with a copy button and focuses
   the name field when a project or environment dialog opens.
 - `dopbase server logs --watch` and `-w` replace `--follow` and `-f`. The old

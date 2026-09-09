@@ -1,4 +1,5 @@
 use super::{
+  commands::prompt,
   local_config::{ResolvedServer, normalize},
   session,
 };
@@ -7,15 +8,17 @@ use reqwest::Method;
 use serde_json::{Value, json};
 use std::{
   env, fmt,
-  io::{self, IsTerminal, Write},
+  io::{self, IsTerminal},
   time::Duration,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
   Login,
   PasswordConfirmation,
   ServerSwitch,
+  Confirmation,
+  SecretInput,
 }
 
 impl fmt::Display for CliCancelled {
@@ -27,6 +30,8 @@ impl fmt::Display for CliCancelled {
       Self::Login => "Login cancelled.",
       Self::PasswordConfirmation => "Password confirmation cancelled.",
       Self::ServerSwitch => "Server switch cancelled.",
+      Self::Confirmation => "Operation cancelled.",
+      Self::SecretInput => "Secret input cancelled.",
     })
   }
 }
@@ -457,23 +462,9 @@ async fn prompt_login(server: &ResolvedServer) -> Result<(String, String)> {
 
 fn prompt_credentials(server_url: &str) -> Result<(String, String)> {
   eprintln!("Dopbase login\nServer: {server_url}\n");
-  eprint!("email: ");
-  io::stderr().flush()?;
-  let mut email = String::new();
-  io::stdin()
-    .read_line(&mut email)
-    .map_err(map_prompt_error)?;
-  let email = normalize_login_email(&email)?;
-  let password = rpassword::prompt_password("password: ").map_err(map_prompt_error)?;
+  let email = prompt::email("Email:", CliCancelled::Login)?;
+  let password = prompt::password("Password:", false, CliCancelled::Login)?;
   Ok((email, password))
-}
-
-fn map_prompt_error(error: io::Error) -> anyhow::Error {
-  if error.kind() == io::ErrorKind::Interrupted {
-    CliCancelled::Login.into()
-  } else {
-    error.into()
-  }
 }
 
 pub fn normalize_login_email(value: &str) -> Result<String> {
@@ -539,13 +530,7 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
 async fn prompt_password_confirmation() -> Result<String> {
   eprintln!("Password confirmation required.");
   let mut prompt = tokio::task::spawn_blocking(|| {
-    rpassword::prompt_password("password: ").map_err(|error| {
-      if error.kind() == io::ErrorKind::Interrupted {
-        CliCancelled::PasswordConfirmation.into()
-      } else {
-        error.into()
-      }
-    })
+    prompt::password("Password:", false, CliCancelled::PasswordConfirmation)
   });
   tokio::select! {
     result = &mut prompt => result.context("password confirmation prompt task failed")?,
