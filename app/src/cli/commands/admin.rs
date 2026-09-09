@@ -1,3 +1,4 @@
+use super::{output, prompt};
 use crate::{
   cli::args::AdminCommand,
   config::{ServerConfig, ServerOverrides, database_path, ensure_data_dir},
@@ -5,7 +6,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use serde_json::json;
 use std::{
-  io::{self, IsTerminal, Write},
+  io::{self, IsTerminal},
   path::{Path, PathBuf},
 };
 
@@ -68,8 +69,8 @@ async fn factory_reset_offline(
   let (root_email, root_password_hash) =
     root.context("this instance does not have a Dopbase root account")?;
 
-  eprintln!(
-    "WARNING: Factory reset removes the entire Dopbase data directory from its active location."
+  output::print_warning(
+    "Factory reset removes the entire Dopbase data directory from its active location.",
   );
   eprintln!("Directory: {}", reset_target.display());
   eprintln!(
@@ -78,15 +79,19 @@ async fn factory_reset_offline(
   eprintln!("The next server start will create a fresh installation.");
   eprintln!("Keep an external backup of anything you need before continuing.");
   eprintln!("You must initialize Dopbase again after continuing.\n");
-  eprint!("Type {FACTORY_RESET_CONFIRMATION} to continue: ");
-  io::stderr().flush()?;
-  let mut confirmation = String::new();
-  io::stdin().read_line(&mut confirmation)?;
+  let confirmation = prompt::text(
+    &format!("Type {FACTORY_RESET_CONFIRMATION} to continue:"),
+    crate::cli::CliCancelled::Confirmation,
+  )?;
   if !factory_reset_confirmation_matches(&confirmation) {
     bail!("factory reset cancelled: confirmation text did not match");
   }
 
-  let password = rpassword::prompt_password(format!("Root password for {root_email}: "))?;
+  let password = prompt::password(
+    &format!("Root password for {root_email}:"),
+    false,
+    crate::cli::CliCancelled::PasswordConfirmation,
+  )?;
   if !crate::modules::common::verify_password(&password, &root_password_hash) {
     bail!("the root password is incorrect");
   }
@@ -100,9 +105,9 @@ async fn factory_reset_offline(
       quarantine.display()
     )
   })?;
-  println!("Factory reset complete.");
-  println!("Previous data: {}", quarantine.display());
-  println!("Start Dopbase to create a fresh installation and complete first-run setup.");
+  output::print_success("Factory reset complete.");
+  output::print_fields(&[("Previous data:", quarantine.display().to_string())]);
+  output::print_text("Start Dopbase to create a fresh installation and complete first-run setup.");
   Ok(())
 }
 
@@ -181,13 +186,7 @@ async fn reset_password(
       .fetch_optional(db.pool())
       .await?;
   let (admin_id, normalized) = admin.context("no administrator exists with that email")?;
-  let password = rpassword::prompt_password("New password: ")?;
-  let confirm = rpassword::prompt_password("Confirm new password: ")?;
-  if password != confirm {
-    bail!("passwords do not match");
-  }
-  crate::modules::common::validate_password(&password)
-    .map_err(|error| anyhow::anyhow!("{:?}", error.errors))?;
+  let password = prompt::new_password("New password:", "Confirm new password:")?;
   let hash = crate::modules::common::hash_password(&password)
     .map_err(|_| anyhow::anyhow!("password hashing failed"))?;
   let now = chrono::Utc::now().to_rfc3339();
@@ -218,6 +217,7 @@ async fn reset_password(
   tx.commit().await?;
   db.checkpoint().await?;
   db.close().await;
-  println!("Password reset complete.\nAll human sessions were revoked.");
+  output::print_success("Password reset complete.");
+  output::print_text("All human sessions were revoked.");
   Ok(())
 }
