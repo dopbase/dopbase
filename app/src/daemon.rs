@@ -259,7 +259,7 @@ pub(crate) async fn start(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let stop_command = format!("dopbase --data-dir {} server down", data_dir.display());
+  let stop_command = "dopbase server down";
   if json_output {
     print_value(
       true,
