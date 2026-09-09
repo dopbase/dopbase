@@ -1,4 +1,4 @@
-use super::output;
+use super::{output, prompt};
 use crate::{
   cli::{
     client::{self, ApiClient, Credential, CredentialSource},
@@ -8,14 +8,9 @@ use crate::{
   constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
   daemon::ManagedDaemonState,
 };
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use serde_json::{Value, json};
-use std::{
-  env,
-  io::{self, IsTerminal, Write},
-  path::Path,
-  time::Duration,
-};
+use std::{env, path::Path, time::Duration};
 
 pub(super) async fn connect(
   value: &str,
@@ -127,42 +122,13 @@ async fn confirm_server_switch(
   target: &str,
   background_server_running: bool,
 ) -> Result<()> {
-  if !io::stdin().is_terminal() {
-    bail!("interactive confirmation is required to change the active Dopbase server");
-  }
   eprintln!("Change active Dopbase server?\nCurrent: {current}\nNew:     {target}\n\nThis will:");
   if background_server_running {
     eprintln!("- stop the managed background server");
   }
   eprintln!("- delete the saved CLI session and session key");
   eprintln!("- clear the saved default environment");
-  eprint!("Continue? [y/N] ");
-  io::stderr().flush()?;
-
-  let mut prompt = tokio::task::spawn_blocking(read_server_switch_confirmation);
-  let confirmed = tokio::select! {
-    result = &mut prompt => result.context("server switch confirmation task failed")??,
-    signal = tokio::signal::ctrl_c() => {
-      signal?;
-      let _ = tokio::time::timeout(Duration::from_millis(250), &mut prompt).await;
-      return Err(client::CliCancelled::ServerSwitch.into());
-    }
-  };
-  if !confirmed {
-    return Err(client::CliCancelled::ServerSwitch.into());
-  }
-  Ok(())
-}
-
-fn read_server_switch_confirmation() -> Result<bool> {
-  let mut answer = String::new();
-  match io::stdin().read_line(&mut answer) {
-    Ok(_) => Ok(server_switch_confirmed(&answer)),
-    Err(error) if error.kind() == io::ErrorKind::Interrupted => {
-      Err(client::CliCancelled::ServerSwitch.into())
-    }
-    Err(error) => Err(error.into()),
-  }
+  prompt::confirm_with_cancel("Continue?", false, client::CliCancelled::ServerSwitch)
 }
 
 pub fn server_switch_confirmed(answer: &str) -> bool {
@@ -188,16 +154,24 @@ fn print_connection_result(
     "default_environment_cleared": default_environment_cleared,
   });
   if json_output {
-    output::print_value(true, &value);
+    output::print_json(&value).expect("serializing a JSON value cannot fail");
   } else if changed {
-    println!(
-      "Connected to {server_url}.\nPrevious server: {previous_server_url}\nBackground server stopped: {}\nCLI session removed: {}\nDefault environment cleared: {}\nRun `dopbase login` to authenticate with the new server.",
-      yes_no(background_server_stopped),
-      yes_no(session_removed),
-      yes_no(default_environment_cleared),
-    );
+    output::print_success(&format!("Connected to {server_url}."));
+    output::print_fields(&[
+      ("Previous server:", previous_server_url.to_owned()),
+      (
+        "Background server stopped:",
+        yes_no(background_server_stopped).into(),
+      ),
+      ("CLI session removed:", yes_no(session_removed).into()),
+      (
+        "Default environment cleared:",
+        yes_no(default_environment_cleared).into(),
+      ),
+    ]);
+    output::print_text("Run `dopbase login` to authenticate with the new server.");
   } else {
-    println!("Already connected to {server_url}.");
+    output::print_text(&format!("Already connected to {server_url}."));
   }
 }
 
@@ -215,7 +189,7 @@ pub(super) async fn show_status(
   let connected = server_is_connected(&server).await;
   let value = status_document(&server, &credential, connected);
   if json_output {
-    println!("{}", serde_json::to_string_pretty(&value)?);
+    output::print_json(&value)?;
   } else {
     let email = match (&credential.email, credential.source) {
       (Some(email), _) => email.as_str(),
@@ -231,17 +205,16 @@ pub(super) async fn show_status(
     } else {
       "offline (cache)"
     };
-    println!(
-      "Config file:     {}\nServer:          {}\nServer status:   {}\nServer source:   {}\nAuthentication:  {}\nIdentity:        {}\nEmail:           {}\nEnvironment:     {}",
-      server.config_path.display(),
-      server.url,
-      server_status,
-      server.source.as_str(),
-      credential.source.as_str(),
-      credential_identity(&credential),
-      email,
-      environment,
-    );
+    output::print_fields(&[
+      ("Config file:", server.config_path.display().to_string()),
+      ("Server:", server.url.clone()),
+      ("Server status:", server_status.into()),
+      ("Server source:", server.source.as_str().into()),
+      ("Authentication:", credential.source.as_str().into()),
+      ("Identity:", credential_identity(&credential).into()),
+      ("Email:", email.into()),
+      ("Environment:", environment),
+    ]);
   }
   Ok(())
 }

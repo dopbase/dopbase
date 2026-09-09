@@ -8,10 +8,12 @@ pub(super) async fn login(
   json_output: bool,
 ) -> Result<i32> {
   let _ = client::login(server, true).await?;
-  output::print_value(
-    json_output,
-    &json!({"server_url":server.url,"authentication":"encrypted_session"}),
-  );
+  let data = json!({"server_url":server.url,"authentication":"encrypted_session"});
+  if json_output {
+    output::print_json(&data)?;
+  } else {
+    output::print_success(&format!("Logged in to {}.", server.url));
+  }
   Ok(0)
 }
 
@@ -21,9 +23,11 @@ pub(super) fn logout(
 ) -> Result<i32> {
   client::remove_credential(server)?;
   let credential = client::credential(server)?;
-  output::print_value(
-    json_output,
-    &json!({"server_url":server.url,"authentication":credential.source.as_str()}),
-  );
+  let data = json!({"server_url":server.url,"authentication":credential.source.as_str()});
+  if json_output {
+    output::print_json(&data)?;
+  } else {
+    output::print_success(&format!("Logged out from {}.", server.url));
+  }
   Ok(0)
 }
