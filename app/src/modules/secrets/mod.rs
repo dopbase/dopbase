@@ -12,33 +12,33 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/environments/{environment_id}/secrets",
+      crate::constants::api::secrets::COLLECTION,
       get(controller::list),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/import",
+      crate::constants::api::secrets::IMPORT,
       post(controller::import),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/layout",
+      crate::constants::api::secrets::LAYOUT,
       get(controller::layout),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/export",
+      crate::constants::api::secrets::EXPORT,
       post(controller::export),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/runtime",
+      crate::constants::api::secrets::RUNTIME,
       get(controller::runtime),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/{key}",
+      crate::constants::api::secrets::ITEM,
       get(controller::get)
         .put(controller::set)
         .delete(controller::delete),
     )
     .route(
-      "/api/v1/environments/{environment_id}/secrets/{key}/reveal",
+      crate::constants::api::secrets::REVEAL,
       post(controller::reveal),
     )
 }

@@ -8,19 +8,19 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/service-accounts",
+      crate::constants::api::service_accounts::COLLECTION,
       get(controller::list).post(controller::create),
     )
     .route(
-      "/api/v1/service-accounts/{id}",
+      crate::constants::api::service_accounts::ITEM,
       get(controller::get).delete(controller::delete),
     )
     .route(
-      "/api/v1/service-accounts/{id}/tokens",
+      crate::constants::api::service_accounts::TOKENS,
       get(controller::tokens).post(controller::create_token),
     )
     .route(
-      "/api/v1/service-accounts/{id}/tokens/{token_id}/revoke",
+      crate::constants::api::service_accounts::REVOKE_TOKEN,
       axum::routing::post(controller::revoke_token),
     )
 }

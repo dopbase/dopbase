@@ -11,14 +11,20 @@ mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
-    .route("/api/v1/environments", get(controller::list))
-    .route("/api/v1/environments/resolve", get(controller::resolve))
     .route(
-      "/api/v1/projects/{project_ref}/environments",
+      crate::constants::api::environments::COLLECTION,
+      get(controller::list),
+    )
+    .route(
+      crate::constants::api::environments::RESOLVE,
+      get(controller::resolve),
+    )
+    .route(
+      crate::constants::api::projects::ENVIRONMENTS,
       post(controller::create),
     )
     .route(
-      "/api/v1/environments/{environment_id}",
+      crate::constants::api::environments::ITEM,
       get(controller::show)
         .patch(controller::rename)
         .delete(controller::delete),

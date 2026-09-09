@@ -11,15 +11,21 @@ mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
-    .route("/api/v1/auth/login", post(controller::login))
-    .route("/api/v1/auth/logout", post(controller::logout))
-    .route("/api/v1/auth/session", get(controller::session))
+    .route(crate::constants::api::auth::LOGIN, post(controller::login))
     .route(
-      "/api/v1/auth/reauthenticate",
+      crate::constants::api::auth::LOGOUT,
+      post(controller::logout),
+    )
+    .route(
+      crate::constants::api::auth::SESSION,
+      get(controller::session),
+    )
+    .route(
+      crate::constants::api::auth::REAUTHENTICATE,
       post(controller::reauthenticate),
     )
     .route(
-      "/api/v1/auth/change-password",
+      crate::constants::api::auth::CHANGE_PASSWORD,
       post(controller::change_password),
     )
 }

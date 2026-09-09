@@ -7,11 +7,11 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/users",
+      crate::constants::api::users::COLLECTION,
       get(controller::list).post(controller::create),
     )
     .route(
-      "/api/v1/users/{id}",
+      crate::constants::api::users::ITEM,
       get(controller::get)
         .patch(controller::update)
         .delete(controller::delete),

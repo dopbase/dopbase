@@ -12,12 +12,15 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/projects",
+      crate::constants::api::projects::COLLECTION,
       get(controller::list).post(controller::create),
     )
-    .route("/api/v1/projects/init", post(controller::init))
     .route(
-      "/api/v1/projects/{project_ref}",
+      crate::constants::api::projects::INIT,
+      post(controller::init),
+    )
+    .route(
+      crate::constants::api::projects::ITEM,
       get(controller::show)
         .patch(controller::rename)
         .delete(controller::delete),

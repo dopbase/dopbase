@@ -24,7 +24,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
   config::{ServerConfig, database_path, ensure_data_dir},
-  constants::errors::{INTERNAL_ERROR, REQUEST_INVALID},
+  constants::{
+    api,
+    errors::{INTERNAL_ERROR, REQUEST_INVALID},
+  },
   http::HttpError,
   middlewares, modules,
   services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
@@ -117,7 +120,7 @@ pub fn router(state: AppState) -> Router {
       "csrfHeader",
       SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Dopbase-CSRF"))),
     );
-    router = router.merge(SwaggerUi::new("/api/docs").url("/api/v1/openapi.json", openapi));
+    router = router.merge(SwaggerUi::new(api::docs::UI).url(api::docs::OPENAPI, openapi));
   }
   router
     .fallback(static_fallback)
@@ -144,11 +147,11 @@ async fn maintenance_gate(
   next: Next,
 ) -> Response {
   if state.maintenance.load(std::sync::atomic::Ordering::SeqCst)
-    && request.uri().path().starts_with("/api/")
+    && request.uri().path().starts_with(api::PREFIX)
     && !request
       .uri()
       .path()
-      .starts_with("/api/v1/instance/factory-reset")
+      .starts_with(api::instance::FACTORY_RESET)
   {
     return HttpError::new(
       StatusCode::SERVICE_UNAVAILABLE,
@@ -368,7 +371,7 @@ impl Drop for InstanceLock {
 }
 
 async fn static_fallback(uri: Uri) -> Response {
-  if uri.path().starts_with("/api/") {
+  if uri.path().starts_with(api::PREFIX) {
     return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
       .into_response();
   }
