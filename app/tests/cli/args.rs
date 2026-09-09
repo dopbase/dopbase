@@ -1,4 +1,5 @@
 use app::cli::args::{Cli, Command, ServerCommand};
+use app::constants::config::executable_environment_names;
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use std::process::Command as ProcessCommand;
 
@@ -284,6 +285,29 @@ fn top_level_help_lists_common_server_options() {
   assert!(help.contains("--host <HOST>"), "{help}");
   assert!(help.contains("--port <PORT>"), "{help}");
   assert!(!help.contains("--background"), "{help}");
+}
+
+#[test]
+fn top_level_help_lists_every_executable_environment_variable() {
+  let help = Cli::command().render_long_help().to_string();
+  assert!(help.contains("Environment variables:"), "{help}");
+  let environment_help = help
+    .split_once("Environment variables:")
+    .unwrap()
+    .1
+    .split_once("Run 'dopbase help <command>'")
+    .unwrap()
+    .0;
+  for name in executable_environment_names() {
+    assert!(
+      environment_help.contains(name),
+      "missing {name} from environment variable help:\n{help}"
+    );
+  }
+  assert!(
+    environment_help.contains("Bearer token for a machine runner or AI agent"),
+    "{help}"
+  );
 }
 
 #[test]

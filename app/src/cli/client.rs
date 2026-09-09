@@ -3,7 +3,7 @@ use super::{
   local_config::{ResolvedServer, normalize},
   session,
 };
-use crate::constants::api;
+use crate::constants::{api, config::ENV_TOKEN};
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -379,7 +379,7 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  if let Ok(token) = env::var("DOPBASE_TOKEN") {
+  if let Ok(token) = env::var(ENV_TOKEN) {
     if token.is_empty() {
       bail!("DOPBASE_TOKEN is set but empty");
     }

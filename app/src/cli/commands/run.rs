@@ -2,6 +2,7 @@ use crate::cli::{
   client, local_config,
   runtime_cache::{self, RuntimeSource},
 };
+use crate::constants::config::ENV_RUN_ENVIRONMENT;
 use anyhow::{Context, Result, bail};
 use std::env;
 
@@ -12,7 +13,7 @@ pub(super) async fn execute(
 ) -> Result<i32> {
   let selection = run_environment(
     environment,
-    env::var("DOPBASE_ENV"),
+    env::var(ENV_RUN_ENVIRONMENT),
     server.default_environment(),
   )?;
   let api = client::any_authenticated_client(server).await?;
