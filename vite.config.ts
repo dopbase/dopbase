@@ -17,6 +17,9 @@ export default defineConfig({
   },
   build: {
     rolldownOptions: {
+      checks: {
+        pluginTimings: false, // turn off the PLUGIN_TIMINGS message
+      },
       output: {
         assetFileNames,
       },
