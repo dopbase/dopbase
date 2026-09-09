@@ -32,10 +32,14 @@ pub(super) async fn execute(
     EnvCommand::Default { environment, clear } => {
       if clear {
         let cleared = local_config::clear_default_environment(server)?;
-        output::print_value(
-          json_output,
-          &json!({"server_url":server.url,"environment":Value::Null,"cleared":cleared}),
-        );
+        let data = json!({"server_url":server.url,"environment":Value::Null,"cleared":cleared});
+        if json_output {
+          output::print_json(&data)?;
+        } else if cleared {
+          output::print_success("Cleared the default environment.");
+        } else {
+          output::print_text("No default environment was set.");
+        }
         return Ok(0);
       }
       let reference = environment.context("default environment is required")?;
@@ -43,44 +47,86 @@ pub(super) async fn execute(
       let environment = resolve_environment(&api, &reference).await?;
       let id = env_id(&environment)?;
       local_config::save_default_environment(server, id)?;
-      output::print_value(
-        json_output,
-        &json!({"server_url":server.url,"environment":environment,"default":true}),
-      );
+      let data = json!({"server_url":server.url,"environment":environment,"default":true});
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Set {reference} as the default environment."));
+      }
       return Ok(0);
     }
     command => command,
   };
   let api = client::human_client(server).await?;
-  let data = match command {
+  match command {
     EnvCommand::Default { .. } => unreachable!(),
     EnvCommand::Create { project, name } => {
-      api
+      let data = api
         .request(
           Method::POST,
           &format!("/api/v1/projects/{project}/environments"),
           Some(json!({"name":name})),
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!(
+          "Created environment {}/{} ({}).",
+          output::string(&data, "projectName"),
+          output::string(&data, "name"),
+          output::string(&data, "id")
+        ));
+      }
     }
     EnvCommand::List { project } => {
-      let path = project.map_or_else(
+      let path = project.as_ref().map_or_else(
         || "/api/v1/environments".into(),
         |value| {
           format!(
             "/api/v1/environments?project={}",
-            client::encode_query(&value)
+            client::encode_query(value)
           )
         },
       );
-      api.request(Method::GET, &path, None).await?
+      let data = api.request(Method::GET, &path, None).await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let rows = output::array(&data)
+          .iter()
+          .map(|environment| {
+            vec![
+              output::string(environment, "projectName"),
+              output::string(environment, "name"),
+              output::string(environment, "id"),
+              output::timestamp(environment, "updatedAt"),
+            ]
+          })
+          .collect::<Vec<_>>();
+        let empty = project.as_ref().map_or_else(
+          || "No environments found.".to_owned(),
+          |project| format!("No environments found for {project}."),
+        );
+        output::print_table(
+          &["PROJECT", "ENVIRONMENT", "ID", "UPDATED"],
+          &rows,
+          &empty,
+          &format!("{} environment(s)", rows.len()),
+        );
+      }
     }
     EnvCommand::Show { environment } => {
       let env = resolve_environment(&api, &environment).await?;
       let id = env_id(&env)?;
-      api
+      let data = api
         .request(Method::GET, &format!("/api/v1/environments/{id}"), None)
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        print_environment(&data);
+      }
     }
     EnvCommand::Rename {
       environment,
@@ -88,13 +134,23 @@ pub(super) async fn execute(
     } => {
       let env = resolve_environment(&api, &environment).await?;
       let id = env_id(&env)?;
-      api
+      let data = api
         .request(
           Method::PATCH,
           &format!("/api/v1/environments/{id}"),
           Some(json!({"name":new_name})),
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!(
+          "Renamed environment to {}/{} ({}).",
+          output::string(&data, "projectName"),
+          output::string(&data, "name"),
+          output::string(&data, "id")
+        ));
+      }
     }
     EnvCommand::Delete { environment, yes } => {
       let env = resolve_environment(&api, &environment).await?;
@@ -121,13 +177,40 @@ pub(super) async fn execute(
         ),
         yes,
       )?;
-      api
+      let data = api
         .request(Method::DELETE, &format!("/api/v1/environments/{id}"), None)
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Deleted environment {environment}."));
+        print_affected(&data);
+      }
     }
-  };
-  output::print_value(json_output, &data);
+  }
   Ok(0)
+}
+
+fn print_environment(value: &Value) {
+  output::print_fields(&[
+    ("Project:", output::string(value, "projectName")),
+    ("Environment:", output::string(value, "name")),
+    ("ID:", output::string(value, "id")),
+    ("Created:", output::timestamp(value, "createdAt")),
+    ("Updated:", output::timestamp(value, "updatedAt")),
+  ]);
+}
+
+fn print_affected(value: &Value) {
+  let affected = value.get("affected").unwrap_or(&Value::Null);
+  output::print_fields(&[
+    (
+      "Environments:",
+      output::number(affected, "environments").to_string(),
+    ),
+    ("Secrets:", output::number(affected, "secrets").to_string()),
+    ("Tokens:", output::number(affected, "tokens").to_string()),
+  ]);
 }
 
 pub(super) fn env_id(value: &Value) -> Result<&str> {
