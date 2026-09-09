@@ -54,7 +54,6 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
       "secrets",
       "environment_env_layout",
       "environments",
-      "environment_id_reservations",
       "projects",
       "sessions",
       "service_accounts",
@@ -65,10 +64,6 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
         .await
         .with_context(|| format!("failed to resume factory reset for {table}"))?;
     }
-    sqlx::query("UPDATE environment_id_sequence SET next_number=1000 WHERE id=1")
-      .execute(&mut *tx)
-      .await
-      .context("failed to reset environment id sequence")?;
     tx.commit()
       .await
       .context("failed to commit resumed factory reset")?;

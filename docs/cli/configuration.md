@@ -43,7 +43,7 @@ server_url = "https://dopbase.example.com"
 
 [default_environment]
 server_url = "https://dopbase.example.com"
-environment_id = "env_1000"
+environment_id = "env_482731"
 ```
 
 `server_url` is omitted when the implicit local server is active. Dopbase
@@ -147,7 +147,7 @@ Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
 Email:           admin@example.com
-Environment:     env_1000 (default)
+Environment:     env_482731 (default)
 ```
 
 It never displays a token or secret value. `dopbase --json client status` returns the
@@ -226,7 +226,7 @@ Other processes can target a different instance without changing global state:
 ```bash
 DOPBASE_URL=http://localhost:8840 \
 DOPBASE_TOKEN=<token-for-8840> \
-dopbase run env_1000 -- ./application
+dopbase run env_482731 -- ./application
 ```
 
 Client preferences never belong in a server database. The client must resolve

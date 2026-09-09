@@ -173,7 +173,6 @@ pub async fn factory_reset(
       "secrets",
       "environment_env_layout",
       "environments",
-      "environment_id_reservations",
       "projects",
       "sessions",
       "admins",
@@ -182,9 +181,6 @@ pub async fn factory_reset(
         .execute(&mut *tx)
         .await?;
     }
-    sqlx::query("UPDATE environment_id_sequence SET next_number=1000 WHERE id=1")
-      .execute(&mut *tx)
-      .await?;
     tx.commit().await?;
     // Best-effort scrub: deleted secret ciphertext must not linger in the
     // database file or WAL after a reset.

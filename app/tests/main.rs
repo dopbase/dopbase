@@ -125,8 +125,18 @@ async fn bootstrap_admin(
   login["data"]["token"].as_str().unwrap().to_owned()
 }
 
+fn assert_environment_id(id: &str) {
+  assert_eq!(id.len(), 10, "unexpected environment ID: {id}");
+  assert!(id.starts_with("env_"), "unexpected environment ID: {id}");
+  assert!(
+    id[4..].bytes().all(|byte| byte.is_ascii_digit()),
+    "unexpected environment ID: {id}"
+  );
+  assert_ne!(id, "env_000000");
+}
+
 #[tokio::test]
-async fn environment_ids_are_short_and_never_reused() {
+async fn environment_ids_are_six_digit() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;
   let (status, _, _) = call(
@@ -148,12 +158,13 @@ async fn environment_ids_are_short_and_never_reused() {
   )
   .await;
   assert_eq!(status, 201);
-  assert_eq!(first["data"]["id"], "env_1000");
+  let first_id = first["data"]["id"].as_str().unwrap().to_owned();
+  assert_environment_id(&first_id);
 
   let (status, _, _) = call(
     &router,
     "DELETE",
-    "/api/v1/environments/env_1000",
+    &format!("/api/v1/environments/{first_id}"),
     Some(&token),
     None,
   )
@@ -169,7 +180,8 @@ async fn environment_ids_are_short_and_never_reused() {
   )
   .await;
   assert_eq!(status, 201);
-  assert_eq!(second["data"]["id"], "env_1001");
+  let second_id = second["data"]["id"].as_str().unwrap().to_owned();
+  assert_environment_id(&second_id);
 
   let (status, initialized, _) = call(
     &router,
@@ -184,11 +196,16 @@ async fn environment_ids_are_short_and_never_reused() {
   )
   .await;
   assert_eq!(status, 201);
-  assert_eq!(initialized["data"]["environmentId"], "env_1002");
+  let initialized_id = initialized["data"]["environmentId"]
+    .as_str()
+    .unwrap()
+    .to_owned();
+  assert_environment_id(&initialized_id);
+  assert_ne!(initialized_id, second_id);
   let (status, revealed, _) = call(
     &router,
     "POST",
-    "/api/v1/environments/env_1002/secrets/API_KEY/reveal",
+    &format!("/api/v1/environments/{initialized_id}/secrets/API_KEY/reveal"),
     Some(&token),
     None,
   )
@@ -196,17 +213,11 @@ async fn environment_ids_are_short_and_never_reused() {
   assert_eq!(status, 200);
   assert_eq!(revealed["data"]["value"], "private");
 
-  let reserved: Vec<String> =
-    sqlx::query_scalar("SELECT id FROM environment_id_reservations ORDER BY id")
-      .fetch_all(state.db.pool())
-      .await
-      .unwrap();
-  assert_eq!(reserved, ["env_1000", "env_1001", "env_1002"]);
   state.db.close().await;
 }
 
 #[tokio::test]
-async fn environment_ids_grow_from_four_to_five_and_six_digits() {
+async fn environment_id_creation_retries_insert_collisions() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;
   let (status, _, _) = call(
@@ -214,68 +225,45 @@ async fn environment_ids_grow_from_four_to_five_and_six_digits() {
     "POST",
     "/api/v1/projects",
     Some(&token),
-    Some(json!({"name":"boundaries"})),
+    Some(json!({"name":"collisions"})),
   )
   .await;
   assert_eq!(status, 201);
 
-  for (number, name, expected) in [
-    (9_999, "last-four-digit", "env_9999"),
-    (10_000, "first-five-digit", "env_10000"),
-    (99_999, "last-five-digit", "env_99999"),
-    (100_000, "first-six-digit", "env_100000"),
-  ] {
-    sqlx::query("UPDATE environment_id_sequence SET next_number=? WHERE id=1")
-      .bind(number)
-      .execute(state.db.pool())
-      .await
-      .unwrap();
-    let (status, environment, _) = call(
-      &router,
-      "POST",
-      "/api/v1/projects/boundaries/environments",
-      Some(&token),
-      Some(json!({"name":name})),
-    )
-    .await;
-    assert_eq!(status, 201);
-    assert_eq!(environment["data"]["id"], expected);
-  }
-  state.db.close().await;
-}
-
-#[tokio::test]
-async fn environment_id_sequence_skips_an_existing_reservation() {
-  let (_directory, state, router) = test_app().await;
-  let token = bootstrap_admin(&state, &router).await;
-  sqlx::query("INSERT INTO environment_id_reservations(id) VALUES('env_1000')")
+  sqlx::query("CREATE TABLE environment_insert_attempts(count INTEGER NOT NULL)")
     .execute(state.db.pool())
     .await
     .unwrap();
-  let (status, _, _) = call(
-    &router,
-    "POST",
-    "/api/v1/projects",
-    Some(&token),
-    Some(json!({"name":"collision"})),
+  sqlx::query("INSERT INTO environment_insert_attempts(count) VALUES(0)")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  sqlx::query(
+    "CREATE TRIGGER ignore_first_four_environment_inserts BEFORE INSERT ON environments WHEN (SELECT count FROM environment_insert_attempts)<4 BEGIN UPDATE environment_insert_attempts SET count=count+1; SELECT RAISE(IGNORE); END",
   )
-  .await;
-  assert_eq!(status, 201);
+  .execute(state.db.pool())
+  .await
+  .unwrap();
   let (status, environment, _) = call(
     &router,
     "POST",
-    "/api/v1/projects/collision/environments",
+    "/api/v1/projects/collisions/environments",
     Some(&token),
     Some(json!({"name":"production"})),
   )
   .await;
   assert_eq!(status, 201);
-  assert_eq!(environment["data"]["id"], "env_1001");
+  assert_environment_id(environment["data"]["id"].as_str().unwrap());
+  let ignored_attempts: i64 = sqlx::query_scalar("SELECT count FROM environment_insert_attempts")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(ignored_attempts, 4);
   state.db.close().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn concurrent_environment_creation_allocates_unique_sequential_ids() {
+async fn concurrent_environment_creation_allocates_unique_random_ids() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;
   let (status, _, _) = call(
@@ -313,21 +301,22 @@ async fn concurrent_environment_creation_allocates_unique_sequential_ids() {
     assert_eq!(status, 201, "environment create body: {body:?}");
     ids.push(body["data"]["id"].as_str().unwrap().to_owned());
   }
+  for id in &ids {
+    assert_environment_id(id);
+  }
   ids.sort();
-  assert_eq!(
-    ids,
-    (1_000..1_010)
-      .map(|number| format!("env_{number}"))
-      .collect::<Vec<_>>()
-  );
+  ids.dedup();
+  assert_eq!(ids.len(), 10);
   state.db.close().await;
 }
 
 #[tokio::test]
-async fn exhausted_environment_ids_return_internal_error_and_roll_back_init() {
+async fn repeated_environment_id_collisions_return_internal_error_and_roll_back_init() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;
-  sqlx::query("UPDATE environment_id_sequence SET next_number=1000000 WHERE id=1")
+  sqlx::query(
+    "CREATE TRIGGER reject_environment_inserts BEFORE INSERT ON environments BEGIN SELECT RAISE(IGNORE); END",
+  )
     .execute(state.db.pool())
     .await
     .unwrap();

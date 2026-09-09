@@ -28,7 +28,7 @@ environment-scoped runner tokens.
 
 ```bash
 export DOPBASE_TOKEN=dbs_xxxxxxxxxxxxxxxxx
-dopbase run env_1000 -- npm start
+dopbase run env_482731 -- npm start
 ```
 
 `DOPBASE_TOKEN` is preferred over a saved human login when it is present.

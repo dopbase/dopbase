@@ -6,7 +6,13 @@ import SecretsPanel from "./components/SecretsPanel.vue";
 import TokensPanel from "./components/TokensPanel.vue";
 import NameDialog from "./components/NameDialog.vue";
 import { DashboardLayout } from "~/layouts";
-import { DbButton, DbEmptyState, DbSkeleton } from "~/components/ui";
+import {
+  DbBadge,
+  DbButton,
+  DbCopyButton,
+  DbEmptyState,
+  DbSkeleton,
+} from "~/components/ui";
 import { BoxIcon, FolderIcon, LayersIcon } from "~/assets/icons";
 
 /**
@@ -130,6 +136,15 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
                 {{ selectedEnvironment.name }}
               </span>
             </nav>
+
+            <div class="flex items-center gap-2">
+              <DbBadge data-testid="environment-id">
+                {{ selectedEnvironment.id }}
+              </DbBadge>
+              <DbCopyButton
+                :value="selectedEnvironment.id"
+                label="Copy ID" />
+            </div>
 
             <div
               class="ml-auto flex items-center gap-1 rounded-control border border-line bg-panel p-1">

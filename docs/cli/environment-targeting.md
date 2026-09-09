@@ -9,9 +9,12 @@ Dopbase uses explicit environment targeting for management commands. It does
 not place configuration in an application repository. For `dopbase run`, it
 can remember one server-scoped default environment in the user configuration.
 
-Environment IDs start at `env_1000` and count upward. They stay four digits
-until `env_9999`, then grow to five and six digits as needed. Existing longer
-IDs continue to work.
+New environment IDs use six random digits, such as `env_482731`. Existing IDs
+continue to work.
+
+An environment ID is safe to include in deployment configuration, but it is
+not a credential. Secret access still requires an authenticated administrator
+or a runner token scoped to that environment.
 
 The server connection is separate machine-global state. With no configured
 server, Dopbase uses `http://localhost:8840`; `client connect` can select another
@@ -23,7 +26,7 @@ read or changed:
 ```bash
 dopbase secret list storefront/production
 dopbase import storefront/staging .env.staging
-dopbase run env_1000 -- ./storefront
+dopbase run env_482731 -- ./storefront
 ```
 
 For repeated interactive runs, save the immutable environment ID as the
@@ -43,9 +46,9 @@ An environment belongs to exactly one project:
 
 ```text
 storefront
-├── development  env_1000
-├── staging      env_1001
-└── production   env_1002
+├── development  env_482731
+├── staging      env_190482
+└── production   env_735104
 ```
 
 The environment reference therefore identifies both the project and the set

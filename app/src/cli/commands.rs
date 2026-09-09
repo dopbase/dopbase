@@ -127,12 +127,12 @@ async fn execute_server(
     ServerCommand::Logs {
       lines,
       clean,
-      follow,
+      watch,
     } => {
-      if json_output && follow {
-        bail!("--json cannot be used with `dopbase server logs --follow`");
+      if json_output && watch {
+        bail!("--json cannot be used with `dopbase server logs --watch`");
       }
-      crate::daemon::logs(data_dir.as_deref(), lines, clean, follow, json_output).await
+      crate::daemon::logs(data_dir.as_deref(), lines, clean, watch, json_output).await
     }
   }
 }

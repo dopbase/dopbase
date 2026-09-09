@@ -41,15 +41,16 @@ different from `DATABASE_URL` in `production`.
 Selection lives in the URL, not in some hidden app state:
 
 ```text
-/workspace/p/payment-service/e/env_1000
+/workspace/p/payment-service/e/env_482731
 ```
 
 The project part uses the name; the environment part uses its immutable ID.
 Bookmark a production environment, paste a link to a teammate, or put the URL
 in a runbook. The link opens the same place later.
 
-The environment ID in the address is the same ID the CLI accepts. Copy it from
-the URL when a `dopbase run` or deployment config needs it.
+The environment ID in the address is the same ID the CLI accepts. The selected
+environment header shows the ID with a copy button for `dopbase run` and
+deployment configuration.
 
 ## Runner tokens
 

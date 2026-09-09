@@ -59,8 +59,8 @@ See [server lifecycle](./serve) for options and examples.
 | `--master-key-file <FILE>`           | Read the master key from another file       |
 
 `server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
-accepts `--lines <COUNT>` (default 100), `--follow` or `-f`, and `--clean`.
-`--clean --follow` clears the existing log before waiting for new output.
+accepts `--lines <COUNT>` (default 100), `--watch` or `-w`, and `--clean`.
+`--clean --watch` clears the existing log before waiting for new output.
 
 The old `serve`, `serve --background`, and `stop` commands are not supported.
 Use `server start`, `server up`, and `server down` respectively.
@@ -110,7 +110,7 @@ all the context needed by secret, import, export, token, and run commands.
 Commands accept either form:
 
 ```text
-env_1000                    # Immutable ID
+env_482731                  # Immutable ID
 payment-service/production # Readable reference
 ```
 
@@ -266,7 +266,7 @@ dopbase run payment-service/development -- npm run dev
 Automation may set `DOPBASE_ENV` instead:
 
 ```bash
-DOPBASE_ENV=env_1000 dopbase run -- ./payment-service
+DOPBASE_ENV=env_482731 dopbase run -- ./payment-service
 ```
 
 Interactive users may save a server-scoped default:

@@ -4,8 +4,8 @@ use crate::{
   constants::errors::{ENVIRONMENT_NAME_INVALID, TOKEN_SCOPE_INVALID},
   http::HttpError,
   models::{AffectedCounts, AuthIdentity},
-  services::environment_id::{self, LAST_ENVIRONMENT_NUMBER},
   state::AppState,
+  utils::generator,
 };
 use chrono::Utc;
 use sqlx::{Sqlite, Transaction};
@@ -27,19 +27,23 @@ pub(crate) async fn insert_generated(
   name: &str,
   now: &str,
 ) -> Result<String, HttpError> {
-  let mut number = repository::next_id_number(tx).await?;
-  while number <= LAST_ENVIRONMENT_NUMBER {
-    let id = environment_id::from_number(number);
-    if repository::reserve_id(tx, &id).await? {
-      repository::advance_id_number(tx, number + 1).await?;
-      repository::insert(tx, &id, project_id, name, now)
-        .await
-        .map_err(unique)?;
+  const MAX_ATTEMPTS: usize = 5;
+  for _ in 0..MAX_ATTEMPTS {
+    let id = generator::environment_id().map_err(|error| {
+      tracing::error!(%error, "failed to generate environment id");
+      HttpError::internal()
+    })?;
+    if repository::insert(tx, &id, project_id, name, now)
+      .await
+      .map_err(unique)?
+    {
       return Ok(id);
     }
-    number += 1;
   }
-  tracing::error!("environment id number space is exhausted");
+  tracing::error!(
+    attempts = MAX_ATTEMPTS,
+    "environment id generation collided repeatedly"
+  );
   Err(HttpError::internal())
 }
 

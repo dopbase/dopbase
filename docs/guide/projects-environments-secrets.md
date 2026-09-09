@@ -33,13 +33,14 @@ examples are `development`, `staging`, and `production`.
 
 ```text
 payment-service
-├── development  env_1000
-├── staging      env_1001
-└── production   env_1002
+├── development  env_482731
+├── staging      env_190482
+└── production   env_735104
 ```
 
-Each environment belongs to exactly one project and receives an immutable ID.
-The same key can have a different encrypted value in each environment.
+Each environment belongs to exactly one project and receives an immutable,
+six-digit ID. The number is random, so IDs do not reveal creation order. The
+same key can have a different encrypted value in each environment.
 
 Create and inspect environments with:
 
@@ -57,7 +58,7 @@ readable environment reference or immutable ID:
 
 ```bash
 dopbase secret list payment-service/staging
-dopbase secret list env_1001
+dopbase secret list env_190482
 ```
 
 The environment identifies its project, so callers do not select both. Use the

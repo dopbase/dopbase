@@ -4,13 +4,17 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
-This release uses shorter environment IDs, removes native Windows packages,
-and standardizes pull request and release descriptions.
+This release uses short random environment IDs, removes native Windows
+packages, and standardizes pull request and release descriptions.
 
 ### Improvement
 
-- New environments receive short sequential IDs starting at `env_1000`.
-  Existing IDs continue to work, and deleted IDs are not reused.
+- New environments receive random six-digit IDs such as `env_482731`. Existing
+  IDs continue to work.
+- The Admin UI shows the selected environment ID with a copy button and focuses
+  the name field when a project or environment dialog opens.
+- `dopbase server logs --watch` and `-w` replace `--follow` and `-f`. The old
+  flags are no longer accepted.
 - Pull request descriptions now follow a checked repository template. Release
   notes use the matching changelog section and link to the complete comparison
   between versions.

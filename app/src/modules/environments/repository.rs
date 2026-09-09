@@ -2,43 +2,15 @@ use super::model::EnvironmentResponse;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
 
-pub async fn reserve_id(
-  tx: &mut Transaction<'_, Sqlite>,
-  id: &str,
-) -> Result<bool, sqlx::Error> {
-  let result = sqlx::query("INSERT OR IGNORE INTO environment_id_reservations(id)VALUES(?)")
-    .bind(id)
-    .execute(&mut **tx)
-    .await?;
-  Ok(result.rows_affected() == 1)
-}
-
-pub async fn next_id_number(tx: &mut Transaction<'_, Sqlite>) -> Result<u32, sqlx::Error> {
-  sqlx::query_scalar("SELECT next_number FROM environment_id_sequence WHERE id=1")
-    .fetch_one(&mut **tx)
-    .await
-}
-
-pub async fn advance_id_number(
-  tx: &mut Transaction<'_, Sqlite>,
-  next_number: u32,
-) -> Result<(), sqlx::Error> {
-  sqlx::query("UPDATE environment_id_sequence SET next_number=? WHERE id=1")
-    .bind(next_number)
-    .execute(&mut **tx)
-    .await?;
-  Ok(())
-}
-
 pub async fn insert(
   tx: &mut Transaction<'_, Sqlite>,
   id: &str,
   project_id: &str,
   name: &str,
   now: &str,
-) -> Result<(), sqlx::Error> {
-  sqlx::query(
-    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?)",
+) -> Result<bool, sqlx::Error> {
+  let result = sqlx::query(
+    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
   )
   .bind(id)
   .bind(project_id)
@@ -47,7 +19,7 @@ pub async fn insert(
   .bind(now)
   .execute(&mut **tx)
   .await?;
-  Ok(())
+  Ok(result.rows_affected() == 1)
 }
 
 pub async fn find_id(

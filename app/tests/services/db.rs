@@ -58,14 +58,12 @@ async fn creates_owner_only_database_file() {
 
 #[tokio::test]
 async fn migrations_apply_rollback_and_reapply() {
-  const TABLES: [&str; 13] = [
+  const TABLES: [&str; 11] = [
     "instance_metadata",
     "admins",
     "sessions",
     "projects",
     "environments",
-    "environment_id_reservations",
-    "environment_id_sequence",
     "secrets",
     "runner_tokens",
     "audit_events",
@@ -104,52 +102,6 @@ async fn migrations_apply_rollback_and_reapply() {
   MIGRATOR.run(db.pool()).await.unwrap();
   assert_schema_objects(&db, "table", &TABLES, true).await;
   assert_schema_objects(&db, "index", &INDEXES, true).await;
-  db.close().await;
-}
-
-#[tokio::test]
-async fn environment_id_migration_reserves_active_and_audited_ids() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let database = directory.path().join("environment-id-migration.db");
-  let db = DbClient::connect(&format!("sqlite://{}", database.display()))
-    .await
-    .unwrap();
-
-  MIGRATOR.run(db.pool()).await.unwrap();
-  MIGRATOR.undo(db.pool(), 12).await.unwrap();
-  sqlx::query(
-    "INSERT INTO projects(id,name,created_at,updated_at) VALUES('prj_test','project','now','now')",
-  )
-  .execute(db.pool())
-  .await
-  .unwrap();
-  sqlx::query("INSERT INTO environments(id,project_id,name,created_at,updated_at) VALUES('env_active','prj_test','production','now','now')")
-    .execute(db.pool())
-    .await
-    .unwrap();
-  sqlx::query("INSERT INTO audit_events(id,actor_type,action,environment_id,created_at) VALUES('evt_test','admin','environment.deleted','env_deleted','now')")
-    .execute(db.pool())
-    .await
-    .unwrap();
-  sqlx::query("INSERT INTO audit_events(id,actor_type,action,environment_id,created_at) VALUES('evt_numeric','admin','environment.deleted','env_4321','now')")
-    .execute(db.pool())
-    .await
-    .unwrap();
-
-  MIGRATOR.run(db.pool()).await.unwrap();
-
-  let ids: Vec<String> =
-    sqlx::query_scalar("SELECT id FROM environment_id_reservations ORDER BY id")
-      .fetch_all(db.pool())
-      .await
-      .unwrap();
-  assert_eq!(ids, ["env_4321", "env_active", "env_deleted"]);
-  let next_number: i64 =
-    sqlx::query_scalar("SELECT next_number FROM environment_id_sequence WHERE id=1")
-      .fetch_one(db.pool())
-      .await
-      .unwrap();
-  assert_eq!(next_number, 4_322);
   db.close().await;
 }
 
