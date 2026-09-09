@@ -32,3 +32,16 @@ fn duplicate_instance_reports_running_server() {
   );
   drop(first);
 }
+
+#[test]
+fn instance_lock_reports_held_and_released_states() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let database_url = format!("sqlite://{}", directory.path().join("server.db").display());
+  assert!(!InstanceLock::is_held(&database_url).unwrap());
+
+  let lock = InstanceLock::acquire(&database_url).unwrap();
+  assert!(InstanceLock::is_held(&database_url).unwrap());
+
+  drop(lock);
+  assert!(!InstanceLock::is_held(&database_url).unwrap());
+}
