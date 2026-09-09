@@ -13,7 +13,6 @@ use chacha20poly1305::{
   aead::{Aead, Payload},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use fs2::FileExt;
 use hkdf::Hkdf;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -231,7 +230,7 @@ fn save(
   )?;
   secure_directory(&paths.directory)?;
   let lock = open_lock(&paths.lock)?;
-  lock.lock_exclusive().context("failed to lock run cache")?;
+  lock.lock().context("failed to lock run cache")?;
   let local_key = load_or_create_key(&paths.key)?;
   let derived_key = derive_key(&local_key, credential, &server.url)?;
   let mut document = match read_document(&paths.cache, &derived_key[..]) {

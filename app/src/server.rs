@@ -13,7 +13,6 @@ use axum::{
   middleware::Next,
   response::{IntoResponse, Response},
 };
-use fs2::FileExt;
 use tower_http::{
   request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
   timeout::TimeoutLayer,
@@ -321,7 +320,7 @@ impl InstanceLock {
     }
     let file = Self::open(database_url)?;
     file
-      .try_lock_exclusive()
+      .try_lock()
       .context(
         "Dopbase server is already running for this database. \nStop the running server before starting another one",
       )?;
@@ -337,13 +336,15 @@ impl InstanceLock {
       return Ok(false);
     }
     let file = OpenOptions::new().read(true).write(true).open(path)?;
-    match file.try_lock_exclusive() {
+    match file.try_lock() {
       Ok(()) => {
         file.unlock()?;
         Ok(false)
       }
-      Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
-      Err(error) => Err(error).context("failed to inspect the Dopbase database lock"),
+      Err(std::fs::TryLockError::WouldBlock) => Ok(true),
+      Err(std::fs::TryLockError::Error(error)) => {
+        Err(error).context("failed to inspect the Dopbase database lock")
+      }
     }
   }
 

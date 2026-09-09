@@ -6,7 +6,6 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
@@ -382,8 +381,8 @@ pub fn client_config_path(data_dir: Option<&Path>) -> Result<PathBuf> {
 }
 
 pub fn dopbase_home() -> PathBuf {
-  BaseDirs::new()
-    .map(|dirs| dirs.home_dir().join(DATA_DIRECTORY_NAME))
+  env::home_dir()
+    .map(|home| home.join(DATA_DIRECTORY_NAME))
     .unwrap_or_else(|| PathBuf::from(DATA_DIRECTORY_NAME))
 }
 
@@ -427,14 +426,14 @@ fn resolve_path(path: &Path) -> Result<PathBuf> {
 
 fn expand_home(path: &Path) -> PathBuf {
   let value = path.to_string_lossy();
-  let Some(base) = BaseDirs::new() else {
+  let Some(home) = env::home_dir() else {
     return path.to_path_buf();
   };
   if value == "~" {
-    return base.home_dir().to_path_buf();
+    return home;
   }
   if let Some(rest) = value.strip_prefix("~/") {
-    return base.home_dir().join(rest);
+    return home.join(rest);
   }
   path.to_path_buf()
 }

@@ -132,7 +132,7 @@ pub fn validate_factory_reset_target(
   if target.parent().is_none() {
     bail!("refusing to use the filesystem root as the Dopbase data directory");
   }
-  if directories::BaseDirs::new().is_some_and(|dirs| target == dirs.home_dir()) {
+  if std::env::home_dir().is_some_and(|home| target == home) {
     bail!("refusing to use the home directory as the Dopbase data directory");
   }
   let current = std::env::current_dir()?.canonicalize()?;
