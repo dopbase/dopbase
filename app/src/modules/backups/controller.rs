@@ -19,7 +19,7 @@ use crate::{
 /// Return the list of all backup snapshots stored on the server.
 #[utoipa::path(
   get,
-  path = "/api/v1/backups",
+  path = crate::constants::api::backups::COLLECTION,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -43,7 +43,7 @@ pub async fn list(
 /// Trigger an atomic point-in-time snapshot of the database, encrypted with the server master key.
 #[utoipa::path(
   post,
-  path = "/api/v1/backups",
+  path = crate::constants::api::backups::COLLECTION,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = CreateBackupRequest,
@@ -71,7 +71,7 @@ pub async fn create(
 /// Download the encrypted backup archive.
 #[utoipa::path(
   get,
-  path = "/api/v1/backups/{key}",
+  path = crate::constants::api::backups::ITEM,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("key" = String, Path, description = "Backup key / filename")),
@@ -113,7 +113,7 @@ pub async fn download(
 /// Returns the server's 32-byte master encryption key as a binary file.
 #[utoipa::path(
   get,
-  path = "/api/v1/backups/master-key",
+  path = crate::constants::api::backups::MASTER_KEY,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -162,7 +162,7 @@ pub async fn download_master_key(
 /// Upload an existing encrypted backup file to the server.
 #[utoipa::path(
   post,
-  path = "/api/v1/backups/upload",
+  path = crate::constants::api::backups::UPLOAD,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   responses(
@@ -227,7 +227,7 @@ pub async fn upload(
 /// Restores the database from an encrypted backup archive.
 #[utoipa::path(
   post,
-  path = "/api/v1/backups/{key}/restore",
+  path = crate::constants::api::backups::RESTORE,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("key" = String, Path, description = "Backup key / filename")),
@@ -271,7 +271,7 @@ pub async fn restore(
 /// Deletes an encrypted backup archive from the server.
 #[utoipa::path(
   delete,
-  path = "/api/v1/backups/{key}",
+  path = crate::constants::api::backups::ITEM,
   tag = "backups",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("key" = String, Path, description = "Backup key / filename")),

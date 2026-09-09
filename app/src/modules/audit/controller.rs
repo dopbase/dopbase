@@ -14,7 +14,7 @@ use axum::extract::{Query, State};
 /// fetch the next page.
 #[utoipa::path(
   get,
-  path = "/api/v1/audit-events",
+  path = crate::constants::api::audit::COLLECTION,
   tag = "audit",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(AuditQuery),

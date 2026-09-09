@@ -1,5 +1,8 @@
 use super::{output, prompt};
-use crate::cli::{args::ProjectCommand, client, local_config};
+use crate::{
+  cli::{args::ProjectCommand, client, local_config},
+  constants::api as api_paths,
+};
 use anyhow::Result;
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -13,7 +16,11 @@ pub(super) async fn execute(
   match command {
     ProjectCommand::Create { name } => {
       let data = api
-        .request(Method::POST, "/api/v1/projects", Some(json!({"name":name})))
+        .request(
+          Method::POST,
+          api_paths::projects::COLLECTION,
+          Some(json!({"name":name})),
+        )
         .await?;
       if json_output {
         output::print_json(&data)?;
@@ -26,7 +33,9 @@ pub(super) async fn execute(
       }
     }
     ProjectCommand::List => {
-      let data = api.request(Method::GET, "/api/v1/projects", None).await?;
+      let data = api
+        .request(Method::GET, api_paths::projects::COLLECTION, None)
+        .await?;
       if json_output {
         output::print_json(&data)?;
       } else {
@@ -50,7 +59,7 @@ pub(super) async fn execute(
     }
     ProjectCommand::Show { project } => {
       let data = api
-        .request(Method::GET, &format!("/api/v1/projects/{project}"), None)
+        .request(Method::GET, &api_paths::projects::item(&project), None)
         .await?;
       if json_output {
         output::print_json(&data)?;
@@ -67,7 +76,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::PATCH,
-          &format!("/api/v1/projects/{project}"),
+          &api_paths::projects::item(&project),
           Some(json!({"name":new_name})),
         )
         .await?;
@@ -83,7 +92,7 @@ pub(super) async fn execute(
     }
     ProjectCommand::Delete { project, yes } => {
       let detail = api
-        .request(Method::GET, &format!("/api/v1/projects/{project}"), None)
+        .request(Method::GET, &api_paths::projects::item(&project), None)
         .await?;
       let name = detail
         .get("name")
@@ -92,10 +101,7 @@ pub(super) async fn execute(
       let environments = api
         .request(
           Method::GET,
-          &format!(
-            "/api/v1/environments?project={}",
-            client::encode_query(&project)
-          ),
+          &api_paths::environments::list(Some(&project)),
           None,
         )
         .await?;
@@ -105,7 +111,7 @@ pub(super) async fn execute(
         yes,
       )?;
       let data = api
-        .request(Method::DELETE, &format!("/api/v1/projects/{project}"), None)
+        .request(Method::DELETE, &api_paths::projects::item(&project), None)
         .await?;
       if json_output {
         output::print_json(&data)?;

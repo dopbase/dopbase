@@ -1,4 +1,16 @@
 pub(crate) const AFTER_HELP: &str = "\
+Environment variables:
+  DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent; overrides the saved login
+  DOPBASE_URL                     Server URL for client commands when --server is not set
+  DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
+  DOPBASE_HOST                    Server bind host
+  DOPBASE_PORT                    Server port (default: 8840)
+  DOPBASE_PUBLIC_URL              Public URL
+  DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
+  DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
+  DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
+
 Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server up                        # run the server in the background
@@ -30,7 +42,7 @@ Examples:
   dopbase client status
 ";
 
-pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n";
+pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
 pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
 pub(crate) const STATUS_HELP: &str = "Examples:\n  dopbase status\n";
 pub(crate) const INIT_HELP: &str =
@@ -152,6 +164,7 @@ Examples:
   dopbase run -- npm run dev
   dopbase run env_482731 -- npm run dev
   dopbase run payment-service/development -- npm run dev
+  dopbase run payment-service/production --token dbs_xxx -- npm start
 ";
 
 pub(crate) const TOKEN_HELP: &str = "\

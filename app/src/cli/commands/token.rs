@@ -1,5 +1,8 @@
 use super::{environment, output};
-use crate::cli::{args::TokenCommand, client, local_config};
+use crate::{
+  cli::{args::TokenCommand, client, local_config},
+  constants::api as api_paths,
+};
 use anyhow::Result;
 use reqwest::Method;
 use serde_json::json;
@@ -20,7 +23,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::POST,
-          &format!("/api/v1/environments/{}/tokens", environment::env_id(&env)?),
+          &api_paths::tokens::collection(environment::env_id(&env)?),
           Some(json!({"name":name,"role":role})),
         )
         .await?;
@@ -41,7 +44,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::GET,
-          &format!("/api/v1/environments/{}/tokens", environment::env_id(&env)?),
+          &api_paths::tokens::collection(environment::env_id(&env)?),
           None,
         )
         .await?;
@@ -74,11 +77,7 @@ pub(super) async fn execute(
     }
     TokenCommand::Revoke { token_id } => {
       let data = api
-        .request(
-          Method::POST,
-          &format!("/api/v1/tokens/{token_id}/revoke"),
-          None,
-        )
+        .request(Method::POST, &api_paths::tokens::revoke(&token_id), None)
         .await?;
       if json_output {
         output::print_json(&data)?;

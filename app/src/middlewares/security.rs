@@ -1,3 +1,4 @@
+use crate::constants::api;
 use axum::{
   http::{HeaderName, header},
   middleware::Next,
@@ -10,7 +11,7 @@ pub async fn headers(
   request: axum::extract::Request,
   next: Next,
 ) -> Response {
-  let is_api = request.uri().path().starts_with("/api/");
+  let is_api = request.uri().path().starts_with(api::PREFIX);
   let mut response = next.run(request).await;
   let headers = response.headers_mut();
   let mut insert_if_absent = |name: HeaderName, value: &'static str| {

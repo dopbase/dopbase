@@ -57,9 +57,9 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       client::show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
-    Command::Login => {
+    Command::Login { token } => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
-      auth::login(&server, json_output).await
+      auth::login(&server, token, json_output).await
     }
     Command::Logout => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
@@ -120,8 +120,9 @@ async fn execute_client(
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run {
       environment,
+      token,
       command,
-    } => run::execute(server, environment, command).await,
+    } => run::execute(server, environment, token, command).await,
     Command::Backup { name, output } => backup::execute(server, name, output, json_output).await,
     Command::Restore {
       path,

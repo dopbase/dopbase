@@ -1,5 +1,8 @@
 use super::output;
-use crate::cli::{client, dotenv, local_config::ResolvedServer};
+use crate::{
+  cli::{client, dotenv, local_config::ResolvedServer},
+  constants::api,
+};
 use anyhow::Result;
 use reqwest::Method;
 use serde_json::json;
@@ -17,7 +20,7 @@ pub(super) async fn execute(
   let data = api
     .request(
       Method::POST,
-      "/api/v1/projects/init",
+      api::projects::INIT,
       Some(json!({"projectName":&project,"environmentName":&environment,"entries":entries})),
     )
     .await?;

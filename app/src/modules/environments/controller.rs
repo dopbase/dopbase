@@ -16,7 +16,7 @@ use axum::{
 /// `project` query parameter. Administrator authentication is required.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments",
+  path = crate::constants::api::environments::COLLECTION,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project" = Option<String>, Query, description = "Filter environments by project reference")),
@@ -43,7 +43,7 @@ pub async fn list(
 /// restricted to the environment they belong to.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/resolve",
+  path = crate::constants::api::environments::RESOLVE,
   tag = "environments",
   security(("bearerAuth" = [])),
   params(("reference" = String, Query, description = "Environment id or project/name reference")),
@@ -71,7 +71,7 @@ pub async fn resolve(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/projects/{project_ref}/environments",
+  path = crate::constants::api::projects::ENVIRONMENTS,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project_ref" = String, Path, description = "Project id or name")),
@@ -105,7 +105,7 @@ pub async fn create(
 /// Fetch one environment by id. Administrator authentication is required.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}",
+  path = crate::constants::api::environments::ITEM,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -135,7 +135,7 @@ pub async fn show(
 /// sessions.
 #[utoipa::path(
   patch,
-  path = "/api/v1/environments/{environment_id}",
+  path = crate::constants::api::environments::ITEM,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -170,7 +170,7 @@ pub async fn rename(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   delete,
-  path = "/api/v1/environments/{environment_id}",
+  path = crate::constants::api::environments::ITEM,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),

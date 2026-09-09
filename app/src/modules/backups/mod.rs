@@ -14,18 +14,24 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/backups",
+      crate::constants::api::backups::COLLECTION,
       get(controller::list).post(controller::create),
     )
     .route(
-      "/api/v1/backups/master-key",
+      crate::constants::api::backups::MASTER_KEY,
       get(controller::download_master_key),
     )
-    .route("/api/v1/backups/upload", post(controller::upload))
     .route(
-      "/api/v1/backups/{key}",
+      crate::constants::api::backups::UPLOAD,
+      post(controller::upload),
+    )
+    .route(
+      crate::constants::api::backups::ITEM,
       get(controller::download).delete(controller::delete),
     )
-    .route("/api/v1/backups/{key}/restore", post(controller::restore))
+    .route(
+      crate::constants::api::backups::RESTORE,
+      post(controller::restore),
+    )
     .layer(DefaultBodyLimit::max(250 * 1024 * 1024))
 }

@@ -151,6 +151,17 @@ const config = defineConfig({
   ],
   markdown: {
     theme: { light: "github-light", dark: "github-dark" },
+    config(md) {
+      const tableOpen = md.renderer.rules.table_open;
+      const tableClose = md.renderer.rules.table_close;
+
+      if (!tableOpen) return;
+
+      md.renderer.rules.table_open = (tokens, idx, options, env, slf) =>
+        `<TableViewer>${tableOpen(tokens, idx, options, env, slf)}`;
+      md.renderer.rules.table_close = (tokens, idx, options, env, slf) =>
+        `${tableClose?.(tokens, idx, options, env, slf) ?? slf.renderToken(tokens, idx, options)}</TableViewer>`;
+    },
   },
   vite: {
     publicDir: "../public",
@@ -239,6 +250,10 @@ const config = defineConfig({
             {
               text: "Environment targeting",
               link: "/cli/environment-targeting",
+            },
+            {
+              text: "Environment variables",
+              link: "/cli/environment-variables",
             },
             { text: "Client configuration", link: "/cli/configuration" },
             { text: "Command reference", link: "/cli/commands" },

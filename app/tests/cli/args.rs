@@ -1,6 +1,14 @@
 use app::cli::args::{Cli, Command, ServerCommand};
+use app::cli::{
+  local_config::{ClientConfig, ResolvedServer, ServerSource},
+  session,
+};
+use app::constants::config::executable_environment_names;
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use std::process::Command as ProcessCommand;
+use std::{
+  io::Write,
+  process::{Command as ProcessCommand, Stdio},
+};
 
 fn contextual_help(arguments: &[&str]) -> String {
   let error = Cli::try_parse_with_help_from(arguments).unwrap_err();
@@ -47,6 +55,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "server", "logs", "--clean", "--watch"],
     &["dopbase", "client", "connect", "http://localhost:8840"],
     &["dopbase", "login"],
+    &["dopbase", "login", "--token"],
     &["dopbase", "logout"],
     &["dopbase", "status"],
     &["dopbase", "client", "status"],
@@ -108,6 +117,15 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "token", "revoke", "tok_01"],
     &["dopbase", "run", "billing/production", "--", "printenv"],
     &["dopbase", "run", "env_482731", "--", "printenv"],
+    &[
+      "dopbase",
+      "run",
+      "env_482731",
+      "--token",
+      "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "--",
+      "printenv",
+    ],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "admin", "factory-reset"],
     &["dopbase", "update"],
@@ -132,6 +150,30 @@ fn parses_every_v0_1_command_shape() {
     Cli::try_parse_from(*command)
       .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
   }
+}
+
+#[test]
+fn run_token_must_appear_before_the_child_command_separator() {
+  let cli = Cli::try_parse_from([
+    "dopbase",
+    "run",
+    "env_482731",
+    "--token",
+    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "--",
+    "printenv",
+    "--token",
+    "child-value",
+  ])
+  .unwrap();
+  let Command::Run { token, command, .. } = cli.command else {
+    panic!("expected run command");
+  };
+  assert_eq!(
+    token.as_deref(),
+    Some("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+  );
+  assert_eq!(command, ["printenv", "--token", "child-value"]);
 }
 
 #[test]
@@ -284,6 +326,29 @@ fn top_level_help_lists_common_server_options() {
   assert!(help.contains("--host <HOST>"), "{help}");
   assert!(help.contains("--port <PORT>"), "{help}");
   assert!(!help.contains("--background"), "{help}");
+}
+
+#[test]
+fn top_level_help_lists_every_executable_environment_variable() {
+  let help = Cli::command().render_long_help().to_string();
+  assert!(help.contains("Environment variables:"), "{help}");
+  let environment_help = help
+    .split_once("Environment variables:")
+    .unwrap()
+    .1
+    .split_once("Run 'dopbase help <command>'")
+    .unwrap()
+    .0;
+  for name in executable_environment_names() {
+    assert!(
+      environment_help.contains(name),
+      "missing {name} from environment variable help:\n{help}"
+    );
+  }
+  assert!(
+    environment_help.contains("Bearer token for a machine runner or AI agent"),
+    "{help}"
+  );
 }
 
 #[test]
@@ -481,6 +546,51 @@ fn binary_prints_contextual_help_and_keeps_the_usage_error_exit_code() {
     "{help}"
   );
   assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn login_token_reads_stdin_and_saves_an_encrypted_runner_credential() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let token = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let mut child = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args([
+      "--data-dir",
+      directory.path().to_str().unwrap(),
+      "--json",
+      "login",
+      "--token",
+    ])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .unwrap();
+  child
+    .stdin
+    .take()
+    .unwrap()
+    .write_all(format!("{token}\n").as_bytes())
+    .unwrap();
+  let output = child.wait_with_output().unwrap();
+
+  assert!(output.status.success(), "{:?}", output);
+  assert!(!String::from_utf8_lossy(&output.stdout).contains(token));
+  assert!(!String::from_utf8_lossy(&output.stderr).contains(token));
+  let server = ResolvedServer {
+    url: "http://localhost:8840".into(),
+    source: ServerSource::Default,
+    config_path: directory.path().join("config.toml"),
+    config: ClientConfig::default(),
+  };
+  let stored = session::load(&server).unwrap().unwrap();
+  assert_eq!(stored.token, token);
+  assert!(stored.email.is_none());
+  let encrypted = std::fs::read(directory.path().join("session")).unwrap();
+  assert!(
+    !encrypted
+      .windows(token.len())
+      .any(|value| value == token.as_bytes())
+  );
 }
 
 #[test]

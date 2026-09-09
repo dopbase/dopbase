@@ -13,7 +13,6 @@ use axum::{
   middleware::Next,
   response::{IntoResponse, Response},
 };
-use fs2::FileExt;
 use tower_http::{
   request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
   timeout::TimeoutLayer,
@@ -24,7 +23,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
   config::{ServerConfig, database_path, ensure_data_dir},
-  constants::errors::{INTERNAL_ERROR, REQUEST_INVALID},
+  constants::{
+    api,
+    errors::{INTERNAL_ERROR, REQUEST_INVALID},
+  },
   http::HttpError,
   middlewares, modules,
   services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
@@ -104,6 +106,11 @@ pub fn router(state: AppState) -> Router {
   let mut router = Router::new().merge(modules::routes());
   if state.config.docs_enabled {
     let mut openapi = modules::openapi();
+    openapi.info.title = "Dopbase API".to_string();
+    openapi.info.description = Some(
+      "API for managing Dopbase projects, environments, secrets, access, backups, and instance settings."
+        .to_string(),
+    );
     let components = openapi.components.get_or_insert_with(Default::default);
     components.add_security_scheme(
       "bearerAuth",
@@ -117,7 +124,7 @@ pub fn router(state: AppState) -> Router {
       "csrfHeader",
       SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Dopbase-CSRF"))),
     );
-    router = router.merge(SwaggerUi::new("/api/docs").url("/api/v1/openapi.json", openapi));
+    router = router.merge(SwaggerUi::new(api::docs::UI).url(api::docs::OPENAPI, openapi));
   }
   router
     .fallback(static_fallback)
@@ -144,11 +151,11 @@ async fn maintenance_gate(
   next: Next,
 ) -> Response {
   if state.maintenance.load(std::sync::atomic::Ordering::SeqCst)
-    && request.uri().path().starts_with("/api/")
+    && request.uri().path().starts_with(api::PREFIX)
     && !request
       .uri()
       .path()
-      .starts_with("/api/v1/instance/factory-reset")
+      .starts_with(api::instance::FACTORY_RESET)
   {
     return HttpError::new(
       StatusCode::SERVICE_UNAVAILABLE,
@@ -210,7 +217,7 @@ pub fn startup_banner(
     format!("Config:     {}", data_dir.display()),
   ];
   if docs_enabled {
-    rows.push(format!("Swagger:    {public_url}/api/docs"));
+    rows.push(format!("API Specs:  {public_url}/api/docs"));
   }
   rows.join("\n")
 }
@@ -313,7 +320,7 @@ impl InstanceLock {
     }
     let file = Self::open(database_url)?;
     file
-      .try_lock_exclusive()
+      .try_lock()
       .context(
         "Dopbase server is already running for this database. \nStop the running server before starting another one",
       )?;
@@ -329,13 +336,15 @@ impl InstanceLock {
       return Ok(false);
     }
     let file = OpenOptions::new().read(true).write(true).open(path)?;
-    match file.try_lock_exclusive() {
+    match file.try_lock() {
       Ok(()) => {
         file.unlock()?;
         Ok(false)
       }
-      Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
-      Err(error) => Err(error).context("failed to inspect the Dopbase database lock"),
+      Err(std::fs::TryLockError::WouldBlock) => Ok(true),
+      Err(std::fs::TryLockError::Error(error)) => {
+        Err(error).context("failed to inspect the Dopbase database lock")
+      }
     }
   }
 
@@ -368,7 +377,7 @@ impl Drop for InstanceLock {
 }
 
 async fn static_fallback(uri: Uri) -> Response {
-  if uri.path().starts_with("/api/") {
+  if uri.path().starts_with(api::PREFIX) {
     return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
       .into_response();
   }

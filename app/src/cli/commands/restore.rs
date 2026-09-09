@@ -3,6 +3,7 @@ use crate::cli::{
   client::{self as api_client, ApiClient},
   local_config,
 };
+use crate::constants::api;
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::Value;
@@ -48,7 +49,7 @@ pub(super) async fn execute(
 
   let anon_client = ApiClient::new(server, None)?;
   let status_res = anon_client
-    .request(Method::GET, "/api/v1/bootstrap/status", None)
+    .request(Method::GET, api::bootstrap::STATUS, None)
     .await?;
 
   let state = status_res
@@ -85,7 +86,7 @@ pub(super) async fn execute(
       .context("--setup-token is required when restoring an uninitialized server")?;
     let res = anon_client
       .upload_bootstrap_multipart(
-        "/api/v1/bootstrap/restore",
+        api::bootstrap::RESTORE,
         file_name,
         bytes,
         master_key_bytes,
@@ -115,7 +116,7 @@ pub(super) async fn execute(
     }
     let upload_res = auth_client
       .upload_backup_multipart(
-        "/api/v1/backups/upload",
+        api::backups::UPLOAD,
         file_name,
         bytes,
         master_key_bytes.clone(),
@@ -129,7 +130,7 @@ pub(super) async fn execute(
     if !json_output {
       output::print_progress(3, 3, "Restoring database tables and running migrations...");
     }
-    let restore_url = format!("/api/v1/backups/{key}/restore");
+    let restore_url = api::backups::restore(key);
     let restore_body = master_key_bytes
       .as_ref()
       .map(|k| serde_json::json!({ "master_key": hex::encode(k) }));

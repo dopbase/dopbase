@@ -31,9 +31,21 @@ scoped to that environment:
 
 ```bash
 export DOPBASE_URL=https://dopbase.example.com
-export DOPBASE_TOKEN=<environment-runner-token>
+printf '%s' "$RUNNER_TOKEN" | dopbase login --token
 dopbase run env_482731 -- ./payment-service
 ```
+
+This stores one encrypted credential for the selected server. Saving another
+human login or runner token replaces it. CI systems can set `DOPBASE_TOKEN`
+instead. For a one-off override, use:
+
+```bash
+dopbase run env_482731 --token "$RUNNER_TOKEN" -- ./payment-service
+```
+
+Credential priority is `--token`, then `DOPBASE_TOKEN`, then the saved
+credential. Command-line tokens may appear in shell history or process
+inspection, so prefer a saved token for a long-running server.
 
 The environment can instead come from deployment-time configuration:
 

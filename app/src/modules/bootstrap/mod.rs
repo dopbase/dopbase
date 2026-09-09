@@ -12,8 +12,17 @@ mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
-    .route("/api/v1/bootstrap/status", get(controller::status))
-    .route("/api/v1/bootstrap/admin", post(controller::create_admin))
-    .route("/api/v1/bootstrap/restore", post(controller::restore))
+    .route(
+      crate::constants::api::bootstrap::STATUS,
+      get(controller::status),
+    )
+    .route(
+      crate::constants::api::bootstrap::ADMIN,
+      post(controller::create_admin),
+    )
+    .route(
+      crate::constants::api::bootstrap::RESTORE,
+      post(controller::restore),
+    )
     .layer(DefaultBodyLimit::max(250 * 1024 * 1024))
 }

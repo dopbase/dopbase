@@ -12,8 +12,11 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
-      "/api/v1/environments/{environment_id}/tokens",
+      crate::constants::api::tokens::COLLECTION,
       get(controller::list).post(controller::create),
     )
-    .route("/api/v1/tokens/{token_id}/revoke", post(controller::revoke))
+    .route(
+      crate::constants::api::tokens::REVOKE,
+      post(controller::revoke),
+    )
 }

@@ -16,7 +16,7 @@ use axum::{
 /// state. Plaintext tokens are never included.
 #[utoipa::path(
   get,
-  path = "/api/v1/environments/{environment_id}/tokens",
+  path = crate::constants::api::tokens::COLLECTION,
   tag = "tokens",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -45,7 +45,7 @@ pub async fn list(
 /// supported. Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/environments/{environment_id}/tokens",
+  path = crate::constants::api::tokens::COLLECTION,
   tag = "tokens",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
@@ -79,7 +79,7 @@ pub async fn create(
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
-  path = "/api/v1/tokens/{token_id}/revoke",
+  path = crate::constants::api::tokens::REVOKE,
   tag = "tokens",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("token_id" = String, Path, description = "Runner token id")),

@@ -3,6 +3,7 @@ use super::{
   local_config::{ResolvedServer, normalize},
   session,
 };
+use crate::constants::{api, config::ENV_TOKEN};
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -15,6 +16,7 @@ use std::{
 #[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
   Login,
+  TokenInput,
   PasswordConfirmation,
   ServerSwitch,
   Confirmation,
@@ -28,6 +30,7 @@ impl fmt::Display for CliCancelled {
   ) -> fmt::Result {
     formatter.write_str(match self {
       Self::Login => "Login cancelled.",
+      Self::TokenInput => "Token input cancelled.",
       Self::PasswordConfirmation => "Password confirmation cancelled.",
       Self::ServerSwitch => "Server switch cancelled.",
       Self::Confirmation => "Operation cancelled.",
@@ -68,6 +71,7 @@ pub(crate) fn is_availability_error(error: &anyhow::Error) -> bool {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
+  Argument,
   Environment,
   EncryptedSession,
   None,
@@ -76,6 +80,7 @@ pub enum CredentialSource {
 impl CredentialSource {
   pub fn as_str(self) -> &'static str {
     match self {
+      Self::Argument => "argument",
       Self::Environment => "environment",
       Self::EncryptedSession => "encrypted_session",
       Self::None => "none",
@@ -186,7 +191,7 @@ impl ApiClient {
     Ok(value.get("data").cloned().unwrap_or(Value::Null))
   }
   pub async fn health(&self) -> Result<Value> {
-    self.request(Method::GET, "/api/v1/health", None).await
+    self.request(Method::GET, api::health::ROOT, None).await
   }
 
   pub async fn download_bytes(
@@ -378,17 +383,48 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  if let Ok(token) = env::var("DOPBASE_TOKEN") {
-    if token.is_empty() {
-      bail!("DOPBASE_TOKEN is set but empty");
-    }
+  credential_with_token(server, None)
+}
+
+pub fn credential_with_token(
+  server: &ResolvedServer,
+  token: Option<String>,
+) -> Result<Credential> {
+  credential_from_sources(token, env::var(ENV_TOKEN), || session::load(server))
+}
+
+#[doc(hidden)]
+pub fn credential_from_sources<F>(
+  token: Option<String>,
+  environment: Result<String, env::VarError>,
+  saved: F,
+) -> Result<Credential>
+where
+  F: FnOnce() -> Result<Option<session::StoredSession>>,
+{
+  if let Some(token) = token {
+    validate_runner_token(&token)?;
     return Ok(Credential {
       token: Some(token),
-      source: CredentialSource::Environment,
+      source: CredentialSource::Argument,
       email: None,
     });
   }
-  Ok(match session::load(server)? {
+  match environment {
+    Ok(token) => {
+      if token.is_empty() {
+        bail!("DOPBASE_TOKEN is set but empty");
+      }
+      return Ok(Credential {
+        token: Some(token),
+        source: CredentialSource::Environment,
+        email: None,
+      });
+    }
+    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_TOKEN contains invalid Unicode"),
+    Err(env::VarError::NotPresent) => {}
+  }
+  Ok(match saved()? {
     Some(session) => Credential {
       token: Some(session.token),
       source: CredentialSource::EncryptedSession,
@@ -400,6 +436,22 @@ pub fn credential(server: &ResolvedServer) -> Result<Credential> {
       email: None,
     },
   })
+}
+
+pub fn validate_runner_token(token: &str) -> Result<()> {
+  use crate::constants::tokens::RUNNER_TOKEN_PREFIX;
+
+  let encoded = token
+    .strip_prefix(RUNNER_TOKEN_PREFIX)
+    .context("Enter a Dopbase runner token beginning with dbs_.")?;
+  if encoded.len() != 43
+    || encoded
+      .bytes()
+      .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+  {
+    bail!("Enter a valid Dopbase runner token.");
+  }
+  Ok(())
 }
 pub fn save_credential(
   server: &ResolvedServer,
@@ -422,7 +474,7 @@ pub async fn login(
   let client = ApiClient::new(server, None)?;
   let request = client.request(
     Method::POST,
-    "/api/v1/auth/login",
+    api::auth::LOGIN,
     Some(json!({"email":email,"password":password,"sessionKind":"cli"})),
   );
   let data = tokio::select! {
@@ -481,7 +533,7 @@ async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
     if client
-      .request(Method::GET, "/api/v1/auth/session", None)
+      .request(Method::GET, api::auth::SESSION, None)
       .await
       .is_ok()
     {
@@ -512,7 +564,7 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
       let password = prompt_password_confirmation().await?;
       let request = client.request(
         Method::POST,
-        "/api/v1/auth/reauthenticate",
+        api::auth::REAUTHENTICATE,
         Some(json!({"password":password})),
       );
       tokio::select! {
@@ -541,8 +593,11 @@ async fn prompt_password_confirmation() -> Result<String> {
     }
   }
 }
-pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
-  let credential = credential(server)?;
+pub async fn any_authenticated_client(
+  server: &ResolvedServer,
+  token: Option<String>,
+) -> Result<ApiClient> {
+  let credential = credential_with_token(server, token)?;
   if let Some(token) = credential.token {
     return ApiClient::new(server, Some(token));
   }
@@ -550,7 +605,4 @@ pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClie
     bail!("Dopbase authentication is required");
   }
   login(server, true).await
-}
-pub fn encode_query(value: &str) -> String {
-  url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }

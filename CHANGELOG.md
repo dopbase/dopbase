@@ -20,6 +20,8 @@ native Windows packaging, and standardizes pull request and release notes.
 - Password and secret prompts show masked input. Interactive
   `dopbase secret set --stdin` explains how to finish entering a value, while
   piped input remains unchanged.
+- `dopbase login --token` can save a runner token in the encrypted local
+  credential store. `dopbase run --token <TOKEN>` provides a one-off override.
 - The Admin UI shows the selected environment ID with a copy button and focuses
   the name field when a project or environment dialog opens.
 - `dopbase server logs --watch` and `-w` replace `--follow` and `-f`. The old
@@ -27,6 +29,12 @@ native Windows packaging, and standardizes pull request and release notes.
 - Pull request descriptions now follow a checked repository template. Release
   notes use the matching changelog section and link to the complete comparison
   between versions.
+
+### Security
+
+- Runtime authentication now resolves `--token`, then `DOPBASE_TOKEN`, then
+  the saved credential. Command-line tokens remain intended for one-off use
+  because process inspection and shell history may expose them.
 
 ### Note
 

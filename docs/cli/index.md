@@ -38,6 +38,9 @@ project selection is required.
 Read [target projects and environments](./environment-targeting) for the full
 development, staging, and production workflow.
 
+See [environment variables](./environment-variables) for every supported
+`DOPBASE_*` setting, including sample values and precedence rules.
+
 ## Typical sequence
 
 1. Start the default local server, or obtain another Dopbase endpoint.

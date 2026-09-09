@@ -14,7 +14,7 @@ use axum::{
 /// (`setupRequired`) or is already ready.
 #[utoipa::path(
   get,
-  path = "/api/v1/bootstrap/status",
+  path = crate::constants::api::bootstrap::STATUS,
   tag = "bootstrap",
   responses(
     (status = 200, description = "Bootstrap state fetched", body = inline(HttpResponseFormat<BootstrapStatus>)),
@@ -38,7 +38,7 @@ pub async fn status(
 /// cookie, and a CSRF token is returned for subsequent mutations.
 #[utoipa::path(
   post,
-  path = "/api/v1/bootstrap/admin",
+  path = crate::constants::api::bootstrap::ADMIN,
   tag = "bootstrap",
   request_body = BootstrapAdminRequest,
   responses(
@@ -77,7 +77,7 @@ pub async fn create_admin(
 /// The archive must be encrypted with this server's master encryption key.
 #[utoipa::path(
   post,
-  path = "/api/v1/bootstrap/restore",
+  path = crate::constants::api::bootstrap::RESTORE,
   tag = "bootstrap",
   responses(
     (status = 200, description = "Backup restored and server initialized", body = inline(HttpResponseFormat<BootstrapRestoreResponse>)),

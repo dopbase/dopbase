@@ -97,7 +97,14 @@ pub enum Command {
   },
   /// Authenticate with the active server.
   #[command(after_help = LOGIN_HELP)]
-  Login,
+  Login {
+    /// Save a runner token instead of signing in with email and password.
+    ///
+    /// In a terminal, Dopbase prompts for the token without echoing it. When
+    /// standard input is piped, Dopbase reads the token from standard input.
+    #[arg(long)]
+    token: bool,
+  },
   /// Remove the saved credential for the active server.
   #[command(after_help = LOGOUT_HELP)]
   Logout,
@@ -196,6 +203,9 @@ pub enum Command {
   Run {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: Option<String>,
+    /// Runner token for this invocation. Overrides DOPBASE_TOKEN and the saved credential.
+    #[arg(long, value_name = "TOKEN")]
+    token: Option<String>,
     /// Command to run with the injected secrets.
     #[arg(last = true, required = true)]
     command: Vec<String>,

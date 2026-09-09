@@ -56,6 +56,14 @@ async fn call(
   (status, json, headers)
 }
 
+async fn get(
+  router: &Router,
+  path: &str,
+) -> axum::response::Response {
+  let request = Request::builder().uri(path).body(Body::empty()).unwrap();
+  router.clone().oneshot(request).await.unwrap()
+}
+
 async fn admin_environment() -> (TempDir, app::state::AppState, Router, String, String) {
   let (directory, state, router) = test_app().await;
   let setup = state.setup.read().await.token.clone().unwrap();
@@ -501,6 +509,11 @@ async fn health_and_openapi_are_available() {
   assert_eq!(body["data"]["product"], "dopbase");
   let (status, spec, _) = call(&router, "GET", "/api/v1/openapi.json", None, None).await;
   assert_eq!(status, 200);
+  assert_eq!(spec["info"]["title"], "Dopbase API");
+  assert_eq!(
+    spec["info"]["description"],
+    "API for managing Dopbase projects, environments, secrets, access, backups, and instance settings."
+  );
   for path in [
     "/api/v1/health",
     "/api/v1/bootstrap/status",
@@ -527,6 +540,11 @@ async fn health_and_openapi_are_available() {
     "/api/v1/environments/{environment_id}/tokens",
     "/api/v1/tokens/{token_id}/revoke",
     "/api/v1/audit-events",
+    "/api/v1/backups",
+    "/api/v1/backups/master-key",
+    "/api/v1/backups/upload",
+    "/api/v1/backups/{key}",
+    "/api/v1/backups/{key}/restore",
     "/api/v1/instance",
     "/api/v1/status",
     "/api/v1/instance/factory-reset",
@@ -660,6 +678,32 @@ async fn docs_can_be_enabled_per_config() {
   let (status, spec, _) = call(&router, "GET", "/api/v1/openapi.json", None, None).await;
   assert_eq!(status, 200);
   assert!(spec["paths"]["/api/v1/health"].is_object());
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn embedded_admin_assets_keep_spa_and_cache_behavior() {
+  let (_directory, state, router) = test_app().await;
+
+  let root = get(&router, "/").await;
+  assert_eq!(root.status(), 200);
+  assert_eq!(root.headers()[header::CONTENT_TYPE], "text/html");
+  assert_eq!(root.headers()[header::CACHE_CONTROL], "no-cache");
+
+  let spa_route = get(&router, "/projects/example/settings").await;
+  assert_eq!(spa_route.status(), 200);
+  assert_eq!(spa_route.headers()[header::CONTENT_TYPE], "text/html");
+  assert_eq!(spa_route.headers()[header::CACHE_CONTROL], "no-cache");
+
+  let asset = get(&router, "/favicon.svg").await;
+  assert_eq!(asset.status(), 200);
+  assert_eq!(asset.headers()[header::CONTENT_TYPE], "image/svg+xml");
+  assert_eq!(
+    asset.headers()[header::CACHE_CONTROL],
+    "public, max-age=31536000, immutable"
+  );
+
+  assert_eq!(get(&router, "/missing.js").await.status(), 404);
   state.db.close().await;
 }
 

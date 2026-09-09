@@ -27,17 +27,25 @@ CI jobs, servers, containers, deployment systems, and automation use
 environment-scoped runner tokens.
 
 ```bash
-export DOPBASE_TOKEN=dbs_xxxxxxxxxxxxxxxxx
+dopbase login --token
 dopbase run env_482731 -- npm start
 ```
 
-`DOPBASE_TOKEN` is preferred over a saved human login when it is present.
+The prompt does not echo the token. A provisioning script can pipe it instead:
 
-Interactive `dopbase login` encrypts its token in the extensionless `session`
-file under the Dopbase data directory. The separate `session-key` file holds
-the random local encryption key. The global TOML config contains the selected
-server but never the token. A saved credential is used only for its
-matching server.
+```bash
+printf '%s' "$RUNNER_TOKEN" | dopbase login --token
+```
+
+For one run, pass `--token <TOKEN>` before the child-command separator. CI and
+deployment platforms can set `DOPBASE_TOKEN`. Authentication uses the command
+flag first, then `DOPBASE_TOKEN`, then the saved credential.
+
+`dopbase login` and `dopbase login --token` encrypt their credential in the
+extensionless `session` file under the Dopbase data directory. The separate
+`session-key` file holds the random local encryption key. The global TOML
+config contains the selected server but never the token. A saved credential is
+used only for its matching server. Saving another credential replaces it.
 
 The encrypted payload also caches the administrator email for offline
 `dopbase client status` output. The password is never stored.
@@ -70,7 +78,9 @@ manage accounts, list runner tokens, or read audit history.
 Agent tokens are displayed only once when created. They expire
 after 30 days by default, a supplied expiry must be in the future and within
 90 days. Revoking a token or deleting its account prevents subsequent access.
-See [users and AI agents](/ui/users) for account management.
+Pass an agent token to the CLI through `DOPBASE_TOKEN`, just like a runner
+token. `dopbase client status` identifies it as `ai_agent` without displaying
+the token. See [users and AI agents](/ui/users) for account management.
 
 ## Permission model
 
@@ -116,8 +126,9 @@ See
 Tokens must be scoped, revocable, and hidden from logs. Operators should use the narrowest permissions available and rotate a token immediately if it may have been exposed.
 
 `dopbase run` removes Dopbase authentication variables before starting the
-child process. Dopbase does not accept tokens as command-line arguments because
-they may be exposed through process inspection or shell history.
+child process. A token passed with `--token` may be exposed through process
+inspection or shell history, so use a saved token or `DOPBASE_TOKEN` for normal
+deployment workflows.
 
 The session and key files are restricted to the current user where the platform
 supports it. An attacker that can read both files can decrypt the token; use

@@ -1,6 +1,7 @@
 use super::{environment, output};
 use crate::{
   cli::{client, dotenv, local_config},
+  constants::api,
   models::SecretInput,
 };
 use anyhow::{Context, Result, bail};
@@ -27,10 +28,7 @@ pub(super) async fn execute(
   let data = api
     .request(
       Method::POST,
-      &format!(
-        "/api/v1/environments/{}/secrets/export",
-        environment::env_id(&env)?
-      ),
+      &api::secrets::export(environment::env_id(&env)?),
       None,
     )
     .await?;

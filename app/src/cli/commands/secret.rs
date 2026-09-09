@@ -1,5 +1,8 @@
 use super::{environment, output, prompt};
-use crate::cli::{args::SecretCommand, client, local_config};
+use crate::{
+  cli::{args::SecretCommand, client, local_config},
+  constants::api as api_paths,
+};
 use anyhow::{Result, bail};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -21,10 +24,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::GET,
-          &format!(
-            "/api/v1/environments/{}/secrets",
-            environment::env_id(&env)?
-          ),
+          &api_paths::secrets::collection(environment::env_id(&env)?),
           None,
         )
         .await?;
@@ -70,10 +70,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::PUT,
-          &format!(
-            "/api/v1/environments/{}/secrets/{key}",
-            environment::env_id(&env)?
-          ),
+          &api_paths::secrets::item(environment::env_id(&env)?, &key),
           Some(json!({"value":value})),
         )
         .await?;
@@ -98,15 +95,9 @@ pub(super) async fn execute(
     } => {
       let env = environment::resolve_environment(&api, &environment).await?;
       let action = if reveal {
-        format!(
-          "/api/v1/environments/{}/secrets/{key}/reveal",
-          environment::env_id(&env)?
-        )
+        api_paths::secrets::reveal(environment::env_id(&env)?, &key)
       } else {
-        format!(
-          "/api/v1/environments/{}/secrets/{key}",
-          environment::env_id(&env)?
-        )
+        api_paths::secrets::item(environment::env_id(&env)?, &key)
       };
       let data = api
         .request(
@@ -145,10 +136,7 @@ pub(super) async fn execute(
       let data = api
         .request(
           Method::DELETE,
-          &format!(
-            "/api/v1/environments/{}/secrets/{key}",
-            environment::env_id(&env)?
-          ),
+          &api_paths::secrets::item(environment::env_id(&env)?, &key),
           None,
         )
         .await?;
