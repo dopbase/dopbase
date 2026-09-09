@@ -80,7 +80,10 @@ after 30 days by default, a supplied expiry must be in the future and within
 90 days. Revoking a token or deleting its account prevents subsequent access.
 Pass an agent token to the CLI through `DOPBASE_TOKEN`, just like a runner
 token. `dopbase client status` identifies it as `ai_agent` without displaying
-the token. See [users and AI agents](/ui/users) for account management.
+the token. Use this role when an agent needs configuration context for tasks
+such as checking variable names or preparing an `.env.example` file. It is not
+a runtime credential. See [AI agent access](/guide/ai-agent-access) for a
+practical workflow and [users and AI agents](/ui/users) for account management.
 
 ## Permission model
 

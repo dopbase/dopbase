@@ -54,7 +54,8 @@ recovered later.
 
 AI access is read-only and does not include secret values. Secret names and
 project details can still be sensitive, so create accounts only for agents you
-trust.
+trust. The [AI agent access guide](/guide/ai-agent-access) shows how to pass the
+token to an agent, inspect metadata, and choose tasks that fit this role.
 
 Deleting an AI account also removes its access tokens. Choose **Delete** and
 type the agent's name to confirm.
