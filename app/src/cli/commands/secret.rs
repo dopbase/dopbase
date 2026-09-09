@@ -2,8 +2,8 @@ use super::{environment, output, prompt};
 use crate::cli::{args::SecretCommand, client, local_config};
 use anyhow::{Result, bail};
 use reqwest::Method;
-use serde_json::json;
-use std::io::{self, IsTerminal, Read};
+use serde_json::{Value, json};
+use std::io::{self, IsTerminal};
 
 pub(super) async fn execute(
   command: SecretCommand,
@@ -15,10 +15,10 @@ pub(super) async fn execute(
   } else {
     client::human_client(server).await?
   };
-  let data = match command {
+  match command {
     SecretCommand::List { environment } => {
       let env = environment::resolve_environment(&api, &environment).await?;
-      api
+      let data = api
         .request(
           Method::GET,
           &format!(
@@ -27,7 +27,31 @@ pub(super) async fn execute(
           ),
           None,
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let rows = output::array(&data)
+          .iter()
+          .map(|secret| {
+            vec![
+              output::string(secret, "key"),
+              secret
+                .get("version")
+                .and_then(Value::as_i64)
+                .unwrap_or_default()
+                .to_string(),
+              output::timestamp(secret, "updatedAt"),
+            ]
+          })
+          .collect::<Vec<_>>();
+        output::print_table(
+          &["KEY", "VERSION", "UPDATED"],
+          &rows,
+          &format!("No secrets found in {environment}."),
+          &format!("{} secret(s)", rows.len()),
+        );
+      }
     }
     SecretCommand::Set {
       environment,
@@ -35,17 +59,15 @@ pub(super) async fn execute(
       stdin,
     } => {
       let value = if stdin {
-        let mut value = String::new();
-        io::stdin().read_to_string(&mut value)?;
-        value
+        prompt::read_secret_stdin(&key)?
       } else {
         if !io::stdin().is_terminal() {
           bail!("use --stdin when setting a secret non-interactively");
         }
-        rpassword::prompt_password("Secret value: ")?
+        prompt::password("Secret value:", true, client::CliCancelled::SecretInput)?
       };
       let env = environment::resolve_environment(&api, &environment).await?;
-      api
+      let data = api
         .request(
           Method::PUT,
           &format!(
@@ -54,7 +76,20 @@ pub(super) async fn execute(
           ),
           Some(json!({"value":value})),
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Saved {key} in {environment}."));
+        output::print_fields(&[(
+          "Version:",
+          data
+            .get("version")
+            .and_then(Value::as_i64)
+            .unwrap_or_default()
+            .to_string(),
+        )]);
+      }
     }
     SecretCommand::Get {
       environment,
@@ -73,13 +108,32 @@ pub(super) async fn execute(
           environment::env_id(&env)?
         )
       };
-      api
+      let data = api
         .request(
           if reveal { Method::POST } else { Method::GET },
           &action,
           None,
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else if reveal {
+        output::print_raw(&output::string(&data, "value"))?;
+      } else {
+        output::print_fields(&[
+          ("Key:", output::string(&data, "key")),
+          (
+            "Version:",
+            data
+              .get("version")
+              .and_then(Value::as_i64)
+              .unwrap_or_default()
+              .to_string(),
+          ),
+          ("Created:", output::timestamp(&data, "createdAt")),
+          ("Updated:", output::timestamp(&data, "updatedAt")),
+        ]);
+      }
     }
     SecretCommand::Delete {
       environment,
@@ -88,7 +142,7 @@ pub(super) async fn execute(
     } => {
       prompt::confirm(&format!("Delete secret {key} from {environment}?"), yes)?;
       let env = environment::resolve_environment(&api, &environment).await?;
-      api
+      let data = api
         .request(
           Method::DELETE,
           &format!(
@@ -97,9 +151,13 @@ pub(super) async fn execute(
           ),
           None,
         )
-        .await?
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Deleted {key} from {environment}."));
+      }
     }
-  };
-  output::print_value(json_output, &data);
+  }
   Ok(0)
 }
