@@ -124,6 +124,7 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "restore", "/tmp/backup.dop"],
     &["dopbase", "restore", "/tmp/backup.dop", "--yes"],
     &["dopbase", "--json", "project", "list"],
+    &["dopbase", "project", "list", "--json"],
     &["dopbase", "--data-dir", "/tmp/dopbase", "status"],
   ];
 
@@ -131,6 +132,14 @@ fn parses_every_v0_1_command_shape() {
     Cli::try_parse_from(*command)
       .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
   }
+}
+
+#[test]
+fn global_output_flag_works_before_or_after_the_command() {
+  let before = Cli::try_parse_from(["dopbase", "--json", "env", "list", "billing"]).unwrap();
+  let after = Cli::try_parse_from(["dopbase", "env", "list", "billing", "--json"]).unwrap();
+  assert!(before.json);
+  assert!(after.json);
 }
 
 #[test]
@@ -377,7 +386,7 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
       &[
         "Usage: dopbase secret set",
         "dopbase secret set payment-service/production API_KEY",
-        "prompts for the value without showing it on screen",
+        "uses a masked prompt and displays * for each character",
       ],
     ),
     (

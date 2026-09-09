@@ -447,14 +447,14 @@ pub enum SecretCommand {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
-  /// Set a secret through a hidden prompt or read it from standard input.
+  /// Set a secret through a masked prompt or read it from standard input.
   #[command(after_help = SECRET_SET_HELP)]
   Set {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Secret key name.
     key: String,
-    /// Read the value from standard input instead of prompting for it.
+    /// Read until EOF; in a terminal, finish with Ctrl+D (Ctrl+Z then Enter on Windows).
     #[arg(long)]
     stdin: bool,
   },

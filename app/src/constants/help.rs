@@ -115,9 +115,14 @@ Run `dopbase env list` to find an environment.
 pub(crate) const SECRET_SET_HELP: &str = "\
 Examples:
   dopbase secret set payment-service/production API_KEY
+  dopbase secret set payment-service/production API_KEY --stdin
   printf '%s' \"$API_KEY\" | dopbase secret set payment-service/production API_KEY --stdin
 
-Without --stdin, Dopbase prompts for the value without showing it on screen.
+Without --stdin, Dopbase uses a masked prompt and displays * for each character.
+
+With --stdin, Dopbase reads the value until EOF. In a terminal, paste or type
+the value, then press Ctrl+D. On Windows, press Ctrl+Z, then Enter. Piped input
+is read exactly as supplied.
 ";
 
 pub(crate) const SECRET_GET_HELP: &str = "\
@@ -224,7 +229,7 @@ Examples:
 pub(crate) const CLIENT_STATUS_HELP: &str = "\
 Examples:
   dopbase client status
-  dopbase --json client status
+  dopbase client status --json
 ";
 
 pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Environment ID or project/environment reference, for example \
