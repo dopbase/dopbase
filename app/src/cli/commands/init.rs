@@ -18,9 +18,26 @@ pub(super) async fn execute(
     .request(
       Method::POST,
       "/api/v1/projects/init",
-      Some(json!({"projectName":project,"environmentName":environment,"entries":entries})),
+      Some(json!({"projectName":&project,"environmentName":&environment,"entries":entries})),
     )
     .await?;
-  output::print_value(json_output, &data);
+  if json_output {
+    output::print_json(&data)?;
+  } else {
+    let created_project = data.get("project").unwrap_or(&serde_json::Value::Null);
+    output::print_success(&format!("Initialized {project}/{environment}."));
+    output::print_fields(&[
+      ("Project ID:", output::string(created_project, "id")),
+      ("Environment ID:", output::string(&data, "environmentId")),
+      (
+        "Secrets:",
+        data
+          .get("secretCount")
+          .and_then(serde_json::Value::as_u64)
+          .unwrap_or_default()
+          .to_string(),
+      ),
+    ]);
+  }
   Ok(0)
 }
