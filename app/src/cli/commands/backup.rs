@@ -31,9 +31,10 @@ pub(super) async fn execute(
 
   let steps_total = if output.is_some() { 2 } else { 1 };
   if !json_output {
-    eprintln!(
-      "==> [1/{steps_total}] Creating encrypted backup snapshot on server ({})...",
-      server.url
+    output::print_progress(
+      1,
+      steps_total,
+      &format!("Creating an encrypted backup on {}...", server.url),
     );
   }
   let api = api_client::human_client(server).await?;
@@ -52,9 +53,10 @@ pub(super) async fn execute(
 
   let local_path_saved = if let Some(out_path) = output {
     if !json_output {
-      eprintln!(
-        "==> [2/{steps_total}] Downloading backup archive to {}...",
-        out_path.display()
+      output::print_progress(
+        2,
+        steps_total,
+        &format!("Downloading the backup to {}...", out_path.display()),
       );
     }
     let download_url = format!("/api/v1/backups/{key}");
@@ -70,23 +72,23 @@ pub(super) async fn execute(
     if let Some(p) = &local_path_saved {
       out_json["localPath"] = json!(p);
     }
-    output::print_value(true, &out_json);
+    output::print_json(&out_json)?;
   } else {
-    println!();
-    println!("Backup Completed Successfully");
-    println!("  Filename: {}", key);
-    println!("  Size:     {}", format_bytes(size));
-    println!("  Server:   {} (~/.dopbase/backups/{})", server.url, key);
-    if let Some(p) = &local_path_saved {
-      println!("  Saved To: {}", p.display());
+    output::print_success("Backup complete.");
+    let mut fields = vec![
+      ("Filename:", key.to_owned()),
+      ("Size:", format_bytes(size)),
+      (
+        "Server:",
+        format!("{} (~/.dopbase/backups/{key})", server.url),
+      ),
+    ];
+    if let Some(path) = &local_path_saved {
+      fields.push(("Saved to:", path.display().to_string()));
     }
-    println!("  Status:   Ready");
-    println!();
-    println!(
-      "  Notice: This backup is encrypted with this instance's master key (~/.dopbase/master.key)."
-    );
-    println!(
-      "          Restoring on a different server requires both this .dop file and the master key."
+    output::print_fields(&fields);
+    output::print_warning(
+      "This backup uses the instance master key. Restoring it on another server requires both files.",
     );
   }
 

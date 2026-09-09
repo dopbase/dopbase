@@ -57,7 +57,7 @@ pub(super) async fn execute(
     .unwrap_or("ready");
 
   if !yes {
-    eprintln!("WARNING: Restoring will overwrite existing projects, environments, and secrets.");
+    output::print_warning("Restoring will overwrite existing projects, environments, and secrets.");
     prompt::confirm(
       &format!("Proceed with restoring from \"{}\"?", path.display()),
       yes,
@@ -66,11 +66,19 @@ pub(super) async fn execute(
 
   if state == "setupRequired" {
     if !json_output {
-      eprintln!(
-        "==> [1/2] Connecting to uninitialized Dopbase server at {}...",
-        server.url
+      output::print_progress(
+        1,
+        2,
+        &format!(
+          "Connecting to the uninitialized server at {}...",
+          server.url
+        ),
       );
-      eprintln!("==> [2/2] Restoring system snapshot and initializing instance...");
+      output::print_progress(
+        2,
+        2,
+        "Restoring the snapshot and initializing the instance...",
+      );
     }
     let setup_token = setup_token
       .as_deref()
@@ -86,23 +94,24 @@ pub(super) async fn execute(
       .await?;
 
     if json_output {
-      output::print_value(true, &res);
+      output::print_json(&res)?;
     } else {
-      println!();
-      println!("Restore Completed Successfully");
-      println!("  Source:   {}", path.display());
-      println!("  Server:   {} (Initialized)", server.url);
-      println!("  Sign in:  {}/login", server.url);
-      println!("  Status:   Ready");
+      output::print_success("Restore complete.");
+      output::print_fields(&[
+        ("Source:", path.display().to_string()),
+        ("Server:", format!("{} (initialized)", server.url)),
+        ("Sign in:", format!("{}/login", server.url)),
+        ("Status:", "ready".into()),
+      ]);
     }
   } else {
     if !json_output {
-      eprintln!("==> [1/3] Authenticating administrator session...");
+      output::print_progress(1, 3, "Authenticating the administrator session...");
     }
     let auth_client = api_client::recently_authenticated_client(server).await?;
 
     if !json_output {
-      eprintln!("==> [2/3] Uploading backup snapshot to server...");
+      output::print_progress(2, 3, "Uploading the backup snapshot...");
     }
     let upload_res = auth_client
       .upload_backup_multipart(
@@ -118,7 +127,7 @@ pub(super) async fn execute(
       .context("Uploaded backup missing key")?;
 
     if !json_output {
-      eprintln!("==> [3/3] Restoring database tables and running migrations...");
+      output::print_progress(3, 3, "Restoring database tables and running migrations...");
     }
     let restore_url = format!("/api/v1/backups/{key}/restore");
     let restore_body = master_key_bytes
@@ -129,14 +138,15 @@ pub(super) async fn execute(
       .await?;
 
     if json_output {
-      output::print_value(true, &restore_res);
+      output::print_json(&restore_res)?;
     } else {
-      println!();
-      println!("Restore Completed Successfully");
-      println!("  Source:   {}", path.display());
-      println!("  Key:      {}", key);
-      println!("  Server:   {}", server.url);
-      println!("  Status:   Ready");
+      output::print_success("Restore complete.");
+      output::print_fields(&[
+        ("Source:", path.display().to_string()),
+        ("Key:", key.to_owned()),
+        ("Server:", server.url.clone()),
+        ("Status:", "ready".into()),
+      ]);
     }
   }
 
