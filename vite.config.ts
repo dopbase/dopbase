@@ -52,6 +52,7 @@ export default defineConfig({
       "src/**/*.route.ts",
       "src/**/*.story.vue",
       "src/assets/**",
+      "scripts/**/*.test.mjs",
     ],
     coverage: {
       provider: "v8",

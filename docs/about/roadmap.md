@@ -1,13 +1,13 @@
 ---
 title: "Roadmap"
-description: "The Dopbase roadmap: what ships in 0.1.1 and what is planned next."
+description: "The Dopbase roadmap: what ships in 0.1.2 and what is planned next."
 ---
 
 # Roadmap
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## Current release: v0.1.1
+## Current release: v0.1.2
 
 - Authentication
 - Projects and environments

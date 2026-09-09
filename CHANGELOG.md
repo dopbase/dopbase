@@ -2,10 +2,11 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## Unreleased
+## 0.1.2 - 2026-09-09
 
-This release uses short random environment IDs, removes native Windows
-packages, and standardizes pull request and release descriptions.
+Dopbase 0.1.2 adds an offline, root-authorized factory reset, switches new
+environments to short random IDs, removes native Windows packaging, and
+standardizes pull request and release notes.
 
 ### Improvement
 

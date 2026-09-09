@@ -5,7 +5,7 @@ description: "Install Dopbase, start a local secrets server, import an existing 
 
 # Quick start
 
-This walkthrough installs Dopbase 0.1.1, starts a local server, imports an
+This walkthrough installs Dopbase 0.1.2, starts a local server, imports an
 existing `.env` file, and runs an application with its secrets.
 
 ::: warning Fresh install required
@@ -50,7 +50,7 @@ The default local server exposes:
 ```text
 Dopbase
 Secure, Simple and Private
-Version 0.1.1
+Version 0.1.2
 
 Admin UI:   http://localhost:8840
 API:        http://localhost:8840/api/v1
