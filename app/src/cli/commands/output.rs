@@ -22,3 +22,10 @@ pub(super) fn print_value(
     );
   }
 }
+pub(super) fn write_private(
+  path: &Path,
+  contents: &[u8],
+  force: bool,
+) -> Result<()> {
+  crate::utils::private_file::write(path, contents, force)
+}
