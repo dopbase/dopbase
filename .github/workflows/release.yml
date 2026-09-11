@@ -195,7 +195,7 @@ jobs:
           version="${GITHUB_REF_NAME}"
           bind_address="127.0.0.1:${SMOKE_PORT}"
           public_url="http://${bind_address}"
-          test "$("${binary}" --version)" = "dopbase ${version}"
+          test "$("${binary}" --version)" = "v${version}"
 
           runtime_root="$(mktemp -d)"
           data_dir="${runtime_root}/data"
