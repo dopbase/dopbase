@@ -5,14 +5,13 @@ import {
   DbAlert,
   DbBadge,
   DbButton,
-  DbCode,
   DbConfirmDialog,
-  DbCopyButton,
   DbEmptyState,
   DbInput,
   DbModal,
   DbSkeleton,
 } from "~/components/ui";
+import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon } from "~/assets/icons";
 import { formatRelativeTime, formatDateTime } from "~/utils/format";
 import type { RunnerToken } from "~/services";
@@ -291,33 +290,13 @@ function tokenStatus(token: RunnerToken): {
       </form>
     </DbModal>
 
-    <!-- Created token: shown exactly once -->
-    <DbModal
+    <OneTimeTokenDialog
+      :id="created?.token.id ?? ''"
       :open="created !== null"
-      title="Token created"
-      size="md"
-      persistent>
-      <div v-if="created" class="flex flex-col gap-4">
-        <p class="text-sm text-ink">
-          Copy the token now. It is stored only as a hash, this plaintext is
-          shown <span class="font-semibold text-ink-strong">once</span> and
-          cannot be recovered.
-        </p>
-        <div class="flex flex-wrap items-center gap-3">
-          <code
-            class="min-w-0 flex-1 break-all rounded border border-accent/30 bg-canvas px-3 py-2 font-mono text-xs text-accent-strong">
-            {{ created.plaintextToken }}
-          </code>
-          <DbCopyButton :value="created.plaintextToken" label="Copy" />
-        </div>
-        <DbCode>{{ created.token.name }} · {{ created.token.id }}</DbCode>
-        <div class="flex items-center justify-end">
-          <DbButton variant="primary" @click="acknowledgeCreated">
-            I've stored it safely
-          </DbButton>
-        </div>
-      </div>
-    </DbModal>
+      title="Runner token created"
+      :name="created?.token.name ?? ''"
+      :token="created?.plaintextToken ?? ''"
+      @acknowledge="acknowledgeCreated" />
 
     <!-- Revoke token -->
     <DbConfirmDialog

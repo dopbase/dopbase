@@ -5,14 +5,13 @@ import {
   DbAlert,
   DbBadge,
   DbButton,
-  DbCode,
   DbConfirmDialog,
-  DbCopyButton,
   DbInput,
   DbModal,
   DbSelect,
   DbSkeleton,
 } from "~/components/ui";
+import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon, LockIcon, PlusIcon } from "~/assets/icons";
 
 const {
@@ -367,37 +366,14 @@ const {
         </form>
       </DbModal>
 
-      <!-- AI Agent Token Created Flash Modal -->
-      <DbModal
+      <OneTimeTokenDialog
+        :id="createdAgentToken?.token.id ?? ''"
         :open="createdAgentToken !== null"
         title="AI agent token generated"
-        size="md"
-        persistent>
-        <div v-if="createdAgentToken" class="flex flex-col gap-4">
-          <p class="text-sm text-ink">
-            Please copy and store this token now. It will only be shown
-            <span class="font-semibold text-ink-strong">once</span> and cannot
-            be recovered. This token is valid for
-            <span class="font-semibold text-ink-strong">30 days</span>.
-          </p>
-          <div class="flex flex-wrap items-center gap-3">
-            <code
-              class="min-w-0 flex-1 break-all rounded border border-accent/30 bg-canvas px-3 py-2 font-mono text-xs text-accent-strong"
-              data-testid="agent-token-plaintext">
-              {{ createdAgentToken.plaintextToken }}
-            </code>
-            <DbCopyButton
-              :value="createdAgentToken.plaintextToken"
-              label="Copy" />
-          </div>
-          <DbCode>{{ createdAgentToken.token.name }} · {{ createdAgentToken.token.id }}</DbCode>
-          <div class="flex items-center justify-end">
-            <DbButton variant="primary" @click="acknowledgeCreatedToken">
-              I've stored it safely
-            </DbButton>
-          </div>
-        </div>
-      </DbModal>
+        :name="createdAgentToken?.token.name ?? ''"
+        :token="createdAgentToken?.plaintextToken ?? ''"
+        detail="This token expires in 30 days."
+        @acknowledge="acknowledgeCreatedToken" />
     </div>
   </DashboardLayout>
 </template>
