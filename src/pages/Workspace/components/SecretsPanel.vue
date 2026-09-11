@@ -9,6 +9,7 @@ import {
   DbAlert,
   DbBadge,
   DbButton,
+  DbCheckbox,
   DbConfirmDialog,
   DbCopyButton,
   DbEmptyState,
@@ -87,7 +88,14 @@ const {
 } = controller;
 
 type FormState =
-  | { mode: "create"; key: string; value: string; error: string | null }
+  | {
+      mode: "create";
+      key: string;
+      value: string;
+      useEmptyValue: boolean;
+      valueDraft: string;
+      error: string | null;
+    }
   | {
       mode: "edit";
       secret: SecretMetadata;
@@ -157,7 +165,14 @@ const showImport = ref(false);
 const showExport = ref(false);
 
 function openCreate(): void {
-  form.value = { mode: "create", key: "", value: "", error: null };
+  form.value = {
+    mode: "create",
+    key: "",
+    value: "",
+    useEmptyValue: false,
+    valueDraft: "",
+    error: null,
+  };
 }
 
 function openEdit(secret: SecretMetadata): void {
@@ -168,6 +183,20 @@ function closeForm(): void {
   if (!saving.value) form.value = null;
 }
 
+function setUseEmptyValue(enabled: boolean): void {
+  const current = form.value;
+  if (!current || current.mode !== "create") return;
+  if (enabled) {
+    current.valueDraft = current.value;
+    current.value = "";
+  } else {
+    current.value = current.valueDraft;
+    current.valueDraft = "";
+  }
+  current.useEmptyValue = enabled;
+  current.error = null;
+}
+
 async function submitForm(): Promise<void> {
   if (!form.value) return;
   if (
@@ -176,6 +205,14 @@ async function submitForm(): Promise<void> {
   ) {
     form.value.error =
       "Use 1 to 128 characters. Use letters, numbers, and '_', and start with a letter or '_'.";
+    return;
+  }
+  if (
+    form.value.mode === "create" &&
+    !form.value.useEmptyValue &&
+    form.value.value.length === 0
+  ) {
+    form.value.error = "Enter a value or select Use empty value.";
     return;
   }
   saving.value = true;
@@ -335,7 +372,7 @@ async function confirmDelete(): Promise<void> {
       <DbEmptyState
         v-else-if="secrets && secrets.length === 0"
         title="No secrets in this environment"
-        description="Add a single key, or import an existing .env file — values are encrypted before they are stored.">
+        description="Add a single key, or import an existing .env file, values are encrypted before they are stored.">
         <template #icon>
           <KeyIcon class="h-5 w-5" />
         </template>
@@ -592,8 +629,21 @@ async function confirmDelete(): Promise<void> {
           label="Value"
           name="value"
           :rows="5"
+          :disabled="form.mode === 'create' && form.useEmptyValue"
+          :required="form.mode === 'create' && !form.useEmptyValue"
           placeholder="paste the secret value"
-          hint="Sent over HTTPS and stored encrypted, it is never shown in listings." />
+          :hint="
+            form.mode === 'create' && form.useEmptyValue
+              ? 'This secret will be saved with an empty value.'
+              : 'Sent over HTTPS and stored encrypted, it is never shown in listings.'
+          "
+          @input="form.error = null" />
+        <DbCheckbox
+          v-if="form.mode === 'create'"
+          :model-value="form.useEmptyValue"
+          label="Use empty value"
+          :disabled="saving"
+          @update:model-value="setUseEmptyValue" />
         <p v-if="form.error" class="text-xs text-crit">
           {{ form.error }}
         </p>

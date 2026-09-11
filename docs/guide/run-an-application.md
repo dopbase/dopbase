@@ -47,6 +47,11 @@ Credential priority is `--token`, then `DOPBASE_TOKEN`, then the saved
 credential. Command-line tokens may appear in shell history or process
 inspection, so prefer a saved token for a long-running server.
 
+`dopbase run` never opens a login prompt. If no credential is available, it
+stops and asks you to run `dopbase login` or set `DOPBASE_TOKEN`. Invalid,
+expired, and revoked credentials also stop the command before the application
+starts.
+
 The environment can instead come from deployment-time configuration:
 
 ```bash

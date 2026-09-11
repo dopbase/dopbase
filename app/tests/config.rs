@@ -1,8 +1,9 @@
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use app::config::{
-  EnvironmentOverrides, ServerConfig, ServerOverrides, ensure_data_dir, sqlite_url,
+  EnvironmentOverrides, PublicUrlSource, ServerConfig, ServerOverrides, ensure_data_dir,
+  resolve_implicit_public_url, sqlite_url,
 };
 use app::constants::config::{
   DATABASE_FILENAME, DEFAULT_BIND_ADDRESS, DEFAULT_PORT, DEFAULT_PUBLIC_URL, MASTER_KEY_FILENAME,
@@ -183,21 +184,55 @@ fn host_and_port_compose_bind_address() {
 }
 
 #[test]
-fn remote_host_without_public_url_fails_with_guidance() {
+fn concrete_network_host_derives_an_http_public_url_with_a_warning() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");
   fs::create_dir_all(&data_dir).unwrap();
-  let result = ServerConfig::load_with_environment(
+  let config = ServerConfig::load_with_environment(
     &ServerOverrides {
       data_dir: Some(data_dir),
-      host: Some("0.0.0.0".into()),
+      host: Some("192.168.1.20".into()),
+      port: Some(9000),
       ..Default::default()
     },
     EnvironmentOverrides::default(),
-  );
-  let error = result.unwrap_err().to_string();
-  assert!(error.contains("public_url is required"), "{error}");
+  )
+  .unwrap();
+  assert_eq!(config.public_url, "http://192.168.1.20:9000");
+  assert_eq!(config.public_url_source, PublicUrlSource::NetworkInferred);
+  let warning = config.inferred_public_url_warning().unwrap();
+  assert!(warning.contains("does not encrypt credentials or secrets"));
+  assert!(warning.contains("DOPBASE_PUBLIC_URL"));
+  assert!(warning.contains("server.toml"));
+}
+
+#[test]
+fn wildcard_network_hosts_use_the_detected_address() {
+  let (ipv4, source) = resolve_implicit_public_url(
+    "0.0.0.0:8840".parse().unwrap(),
+    Some(IpAddr::from([10, 20, 30, 40])),
+  )
+  .unwrap();
+  assert_eq!(ipv4, "http://10.20.30.40:8840");
+  assert_eq!(source, PublicUrlSource::NetworkInferred);
+
+  let (ipv6, source) = resolve_implicit_public_url(
+    "[::]:8840".parse().unwrap(),
+    Some("2001:db8::25".parse().unwrap()),
+  )
+  .unwrap();
+  assert_eq!(ipv6, "http://[2001:db8::25]:8840");
+  assert_eq!(source, PublicUrlSource::NetworkInferred);
+}
+
+#[test]
+fn wildcard_network_host_without_a_detected_address_has_guidance() {
+  let error = resolve_implicit_public_url("0.0.0.0:8840".parse().unwrap(), None)
+    .unwrap_err()
+    .to_string();
+  assert!(error.contains("could not infer a public URL"), "{error}");
   assert!(error.contains("--public-url"), "{error}");
+  assert!(error.contains("DOPBASE_PUBLIC_URL"), "{error}");
 }
 
 #[test]

@@ -252,6 +252,9 @@ pub(crate) async fn start(
       crate::server::startup_banner(&config.public_url, &data_dir, config.docs_enabled,)
     );
   }
+  if let Some(warning) = config.inferred_public_url_warning() {
+    eprintln!("Warning: {warning}\n");
+  }
   if let Some(token) = &started.setup_token {
     eprintln!(
       "{}",

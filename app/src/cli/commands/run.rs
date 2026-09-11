@@ -12,14 +12,19 @@ pub(super) async fn execute(
   token: Option<String>,
   command: Vec<String>,
 ) -> Result<i32> {
+  let api = client::any_authenticated_client(server, token).await?;
   let selection = run_environment(
     environment,
     env::var(ENV_RUN_ENVIRONMENT),
     server.default_environment(),
   )?;
-  let api = client::any_authenticated_client(server, token).await?;
   let loaded = runtime_cache::load(server, &api, &selection.reference).await;
   let loaded = match loaded {
+    Err(error) if client::is_authentication_error(&error) => {
+      bail!(
+        "Dopbase authentication failed. Run `dopbase login` again or set a valid DOPBASE_TOKEN."
+      )
+    }
     Err(error)
       if selection.source == RunEnvironmentSource::Default
         && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
