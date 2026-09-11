@@ -209,7 +209,7 @@ async fn stop_never_signals_a_live_process_from_an_unowned_stale_pid_file() {
 
   let result = stop(Some(directory.path()), Duration::from_secs(1), false).await;
   let message = result.unwrap_err().to_string();
-  assert!(message.contains("refusing to signal"), "{message}");
+  assert!(message.contains("Refusing to signal"), "{message}");
   assert!(unrelated.try_wait().unwrap().is_none());
   unrelated.kill().unwrap();
   let _ = unrelated.wait();

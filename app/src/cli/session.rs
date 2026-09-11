@@ -43,16 +43,16 @@ pub fn load(server: &ResolvedServer) -> Result<Option<StoredSession>> {
   let stored = fs::read(&session_path)
     .with_context(|| format!("failed to read saved session at {}", session_path.display()))?;
   if stored.len() <= HEADER_LENGTH || &stored[..MAGIC.len()] != MAGIC {
-    bail!("saved Dopbase session has an invalid format; run dopbase logout and dopbase login");
+    bail!("saved Dopbase session has an invalid format. Run dopbase logout and dopbase login");
   }
   if stored[MAGIC.len()] != VERSION {
     bail!(
-      "saved Dopbase session uses an unsupported version; run dopbase logout and dopbase login"
+      "saved Dopbase session uses an unsupported version. Run dopbase logout and dopbase login"
     );
   }
   let key = read_key(&key_path).with_context(|| {
     format!(
-      "saved Dopbase session key is unavailable at {}; run dopbase logout and dopbase login",
+      "saved Dopbase session key is unavailable at {}. Run dopbase logout and dopbase login",
       key_path.display()
     )
   })?;
@@ -70,14 +70,14 @@ pub fn load(server: &ResolvedServer) -> Result<Option<StoredSession>> {
     .map(Zeroizing::new)
     .map_err(|_| {
       anyhow::anyhow!(
-        "could not decrypt saved Dopbase session; run dopbase logout and dopbase login"
+        "could not decrypt saved Dopbase session. Run dopbase logout and dopbase login"
       )
     })?;
   let payload: SessionPayload = serde_json::from_slice(&clear).map_err(|_| {
-    anyhow::anyhow!("saved Dopbase session is invalid; run dopbase logout and dopbase login")
+    anyhow::anyhow!("saved Dopbase session is invalid. Run dopbase logout and dopbase login")
   })?;
   if payload.token.is_empty() {
-    bail!("saved Dopbase session is invalid; run dopbase logout and dopbase login");
+    bail!("saved Dopbase session is invalid. Run dopbase logout and dopbase login");
   }
   Ok((payload.server_url == server.url).then_some(StoredSession {
     token: payload.token,
@@ -162,7 +162,7 @@ fn load_or_create_key(
     return read_key(path);
   }
   if session_exists {
-    bail!("saved Dopbase session key is missing; run dopbase logout and dopbase login");
+    bail!("saved Dopbase session key is missing. Run dopbase logout and dopbase login");
   }
   let mut generated = Zeroizing::new(vec![0_u8; KEY_LENGTH]);
   getrandom::fill(&mut generated)?;

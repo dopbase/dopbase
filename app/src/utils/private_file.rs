@@ -41,7 +41,7 @@ pub fn write(
         Ok(()) => fs::remove_file(&temporary)?,
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
           bail!(
-            "{} already exists; pass --force to overwrite it",
+            "{} already exists. Pass --force to overwrite it",
             path.display()
           )
         }

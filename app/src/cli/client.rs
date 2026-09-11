@@ -183,7 +183,7 @@ impl ApiClient {
               format!("{code}: {}", message.as_str().unwrap_or("Request failed."))
             })
             .collect::<Vec<_>>()
-            .join("; ")
+            .join("\n")
         })
         .unwrap_or_else(|| format!("server returned {status}"));
       bail!(errors);
@@ -221,7 +221,7 @@ impl ApiClient {
               format!("{code}: {}", message.as_str().unwrap_or("Download failed."))
             })
             .collect::<Vec<_>>()
-            .join("; ")
+            .join("\n")
         })
         .unwrap_or_else(|| format!("server returned {status}"));
       bail!(errors);
@@ -320,7 +320,7 @@ impl ApiClient {
               format!("{code}: {}", message.as_str().unwrap_or("Upload failed."))
             })
             .collect::<Vec<_>>()
-            .join("; ")
+            .join("\n")
         })
         .unwrap_or_else(|| format!("server returned {status}"));
       bail!(errors);
@@ -349,7 +349,7 @@ Check the server health and network connection, then try again."
   } else if error.is_connect() {
     format!(
       "Could not connect to Dopbase at {base_url}.\n\
-Check that the server is running and verify the active endpoint with `dopbase client status`. For local development, start it with `dopbase server start`."
+Check that the server is running and verify the active endpoint with `dopbase client status`."
     )
   } else {
     format!(
@@ -468,7 +468,7 @@ pub async fn login(
   save: bool,
 ) -> Result<ApiClient> {
   if !io::stdin().is_terminal() {
-    bail!("interactive login requires a terminal; set DOPBASE_TOKEN for automation");
+    bail!("interactive login requires a terminal. Set DOPBASE_TOKEN for automation");
   }
   let (email, password) = prompt_login(server).await?;
   let client = ApiClient::new(server, None)?;

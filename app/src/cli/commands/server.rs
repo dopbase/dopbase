@@ -48,7 +48,7 @@ pub(super) async fn execute(
           &resolved_data_dir.join(DATABASE_FILENAME),
         ))?
       {
-        bail!("the server is running in the foreground; stop it with Ctrl+C");
+        bail!("the server is running in the foreground. Stop it with Ctrl+C");
       }
       crate::daemon::stop(
         data_dir.as_deref(),

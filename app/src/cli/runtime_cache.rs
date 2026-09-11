@@ -197,7 +197,7 @@ fn load_after_failure(
 ) -> Result<RuntimeLoad> {
   let cached = load_cached(server, api.credential_token()?, reference).with_context(|| {
     format!(
-      "{reason}; environment variables were not injected and the child was not started because no usable encrypted cache is available for {reference}"
+      "{reason}. Environment variables were not injected, and the child was not started because no usable encrypted cache is available for {reference}"
     )
   })?;
   let fetched_at = cached.fetched_at.to_rfc3339_opts(SecondsFormat::Secs, true);
