@@ -60,9 +60,10 @@ describe("OneTimeTokenDialog", () => {
     });
     mountDialog();
 
-    const copy = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Copy token"),
+    const copy = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Copy"]',
     );
+    expect(copy).not.toBeNull();
     copy?.click();
     await nextTick();
     await nextTick();
