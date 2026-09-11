@@ -21,7 +21,7 @@ import type { RunnerToken } from "~/services";
  * TokensPanel — runner-token management for one environment.
  *
  * A newly created token's plaintext is shown exactly once inside a
- * persistent dialog; closing it after explicit acknowledgment discards the
+ * persistent dialog. Closing it after explicit acknowledgment discards the
  * value permanently.
  */
 const props = defineProps<{ environmentId: string }>();
@@ -63,7 +63,7 @@ async function submitCreate(): Promise<void> {
     await create(newName.value.trim());
     showCreate.value = false;
   } catch {
-    // Error surfaced via controller.actionError; keep the dialog open.
+    // Keep the dialog open because controller.actionError shows the error.
   }
 }
 

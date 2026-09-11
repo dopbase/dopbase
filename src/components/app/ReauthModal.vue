@@ -7,7 +7,7 @@ import { ref } from "vue";
 /**
  * ReauthModal — global "confirm your password" dialog.
  *
- * Mounted once inside `DashboardLayout`; opens automatically whenever any
+ * Mounted once inside `DashboardLayout`. It opens automatically whenever any
  * API call answers 403 RECENT_AUTHENTICATION_REQUIRED (reveal, export) and
  * re-runs the parked action after a successful confirmation.
  */

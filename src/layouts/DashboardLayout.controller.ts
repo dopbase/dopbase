@@ -21,7 +21,7 @@ export function useDashboardLayoutController() {
     try {
       await auth.logout();
     } catch {
-      // The store already cleared local state (session + CSRF); the server
+      // The store already cleared local state (session + CSRF). The server
       // session is revoked or unreachable — either way, leave the dashboard.
     } finally {
       await router.push({ name: "login" });

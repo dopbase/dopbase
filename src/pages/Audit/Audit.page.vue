@@ -17,7 +17,7 @@ import type { AuditEvent } from "~/services";
 /**
  * Audit — the append-only trail of every administrative and runner action.
  * Cursor-paginated, filterable, and expandable per row for IDs and
- * metadata; project/environment names resolve from loaded lists while the
+ * metadata. Project and environment names resolve from loaded lists while the
  * immutable IDs stay visible in the detail view.
  */
 const controller = useAuditController();
@@ -45,7 +45,6 @@ const expandedId = ref<string | null>(null);
 function toggle(event: AuditEvent): void {
   expandedId.value = expandedId.value === event.id ? null : event.id;
 }
-
 </script>
 
 <template>

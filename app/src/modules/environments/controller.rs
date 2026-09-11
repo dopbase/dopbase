@@ -175,7 +175,7 @@ pub async fn rename(
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
   responses(
-    (status = 200, description = "Environment deleted; affected resource counts are returned", body = inline(HttpResponseFormat<DeleteEnvironmentResponse>)),
+    (status = 200, description = "Environment deleted. Affected resource counts are returned", body = inline(HttpResponseFormat<DeleteEnvironmentResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),

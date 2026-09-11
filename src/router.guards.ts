@@ -9,7 +9,7 @@ import { useAuthStore } from "~/stores/auth.store";
  * 1. Resolve the public bootstrap status once (cheap GET, cached in store).
  * 2. `/setup` is only reachable while the server is uninitialized —
  *    including stale tabs after bootstrap closes.
- * 3. Protected routes require a session; an absent or expired cookie
+ * 3. Protected routes require a session. An absent or expired cookie
  *    redirects to `/login` with the intended destination preserved.
  * 4. Signed-in admins never see `/login` again.
  */

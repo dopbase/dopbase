@@ -34,7 +34,7 @@ export function useLoginController() {
     return Object.keys(errors).length === 0;
   }
 
-  /** Branches on stable server codes; everything else stays generic. */
+  /** Branches on stable server codes. Everything else stays generic. */
   function mapApiError(error: unknown): void {
     if (error instanceof ApiError) {
       if (error.hasCode("EMAIL_INVAILD")) {

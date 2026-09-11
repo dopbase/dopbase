@@ -46,7 +46,7 @@ pub async fn status(
     (status = 401, description = "The setup token is invalid", body = crate::http::ErrorBody),
     (status = 409, description = "This instance has already been initialized", body = crate::http::ErrorBody),
     (status = 422, description = "Email or password is invalid", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many setup attempts; try again later", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many setup attempts. Try again later", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn create_admin(
@@ -83,7 +83,7 @@ pub async fn create_admin(
     (status = 200, description = "Backup restored and server initialized", body = inline(HttpResponseFormat<BootstrapRestoreResponse>)),
     (status = 400, description = "Failed to decrypt or corrupted backup", body = crate::http::ErrorBody),
     (status = 409, description = "This instance has already been initialized", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many attempts; try again later", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many attempts. Try again later", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn restore(

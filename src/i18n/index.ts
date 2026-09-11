@@ -21,7 +21,7 @@ function storedLocale(): Locale {
 
 /**
  * Native vue-i18n instance backed by the flat camelCase catalogs in
- * `~/locales`. Installed app-wide in `main.ts`; the Composition API
+ * `~/locales`. Installed app-wide in `main.ts`. The Composition API
  * (`legacy: false`) powers `useI18n()` inside components. A key missing
  * at runtime falls back to English, then to the key itself.
  */
@@ -39,7 +39,7 @@ watch(i18n.global.locale, (next) => {
   try {
     localStorage.setItem(STORAGE_KEY, next);
   } catch {
-    // Storage unavailable; keep the locale in-memory only.
+    // Storage is unavailable, so keep the locale in memory only.
   }
 });
 

@@ -1,7 +1,7 @@
 import { apiRequest } from "./http.client";
 
 /**
- * Public bootstrap state. Only `setupRequired` or `ready` is ever revealed;
+ * Public bootstrap state. Only `setupRequired` or `ready` is ever revealed.
  * anything else is normalized to `ready`.
  */
 export interface BootstrapStatus {

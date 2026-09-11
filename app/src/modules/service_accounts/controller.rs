@@ -164,7 +164,7 @@ pub async fn tokens(
   request_body = CreateAgentTokenRequest,
   responses(
     (status = 201, description = "Agent token created", body = inline(HttpResponseFormat<CreatedAgentTokenResponse>)),
-    (status = 400, description = "Invalid expiration timestamp; must be in the future and within 90 days", body = crate::http::ErrorBody),
+    (status = 400, description = "Invalid expiration timestamp. It must be in the future and within 90 days", body = crate::http::ErrorBody),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator browser session with recent authentication and CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The service account was not found", body = crate::http::ErrorBody),

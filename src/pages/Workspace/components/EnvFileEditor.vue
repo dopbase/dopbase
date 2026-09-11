@@ -6,7 +6,7 @@ import type { EnvFileIssue } from "~/utils/env-file";
 /**
  * EnvFileEditor — a lightweight, dependency-free `.env` editor.
  *
- * A transparent textarea sits on top of a tokenized highlight overlay; both
+ * A transparent textarea sits on top of a tokenized highlight overlay. Both
  * layers share identical typography and wrapping so they stay aligned. The
  * overlay rows embed the line-number gutter, so wrapped lines keep the
  * gutter aligned. Malformed lines are highlighted and listed below.
@@ -43,7 +43,7 @@ const emit = defineEmits<{
   save: [];
 }>();
 
-/** Gutter width in `ch` units; the textarea's left padding must match. */
+/** Gutter width in `ch` units. The textarea's left padding must match. */
 const GUTTER_CH = 6;
 const MAX_SHOWN_ISSUES = 8;
 

@@ -6,7 +6,7 @@ import { DownloadIcon } from "~/assets/icons";
 
 /**
  * ExportSecretsDialog — downloads the environment's secrets as a `.env`
- * file. Requires recent password authentication; the 403 reauth challenge
+ * file. Requires recent password authentication. The 403 reauth challenge
  * is handled by the global reauthentication dialog.
  */
 const props = defineProps<{
@@ -57,10 +57,7 @@ async function confirmExport(): Promise<void> {
   try {
     const content = await props.action(signal);
     if (signal.aborted) return;
-    download(
-      content,
-      `${target.projectName}_${target.environmentName}.env`,
-    );
+    download(content, `${target.projectName}_${target.environmentName}.env`);
     if (signal.aborted) return;
     emit("exported");
     emit("close");

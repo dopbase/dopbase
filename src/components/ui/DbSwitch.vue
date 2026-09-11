@@ -2,7 +2,7 @@
 /**
  * DbSwitch — PocketBase-style toggle (41×24 rounded track, floating
  * white knob) with the Dopbase purple active state. A visually-hidden
- * native checkbox keeps keyboard, focus, and a11y behavior; the track
+ * native checkbox keeps keyboard, focus, and a11y behavior. The track
  * and knob are presentation bound to the model value.
  * Presentation-only.
  */

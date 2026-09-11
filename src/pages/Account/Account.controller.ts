@@ -12,7 +12,7 @@ import {
 /**
  * Account screen controller: session display and password rotation.
  *
- * Changing the password revokes every human session server-side; the
+ * Changing the password revokes every human session server-side. The
  * controller clears local session state and routes back to `/login`.
  */
 export function useAccountController() {

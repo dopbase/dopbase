@@ -12,7 +12,7 @@ import type { AffectedCounts, Environment, Project } from "~/services";
  *
  * The selected project is addressed by its unique name and the selected
  * environment by its immutable id — both live exclusively in the URL.
- * Mutating actions throw on failure so calling dialogs can render errors;
+ * Mutating actions throw on failure so calling dialogs can render errors.
  * navigation happens only after success.
  */
 export function useWorkspaceController() {

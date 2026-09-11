@@ -81,7 +81,7 @@ pub struct FactoryResetPreview {
 pub struct FactoryResetRequest {
   /// Current root administrator password.
   pub current_password: String,
-  /// Exact confirmation text; must match `FACTORY RESET`.
+  /// Exact confirmation text, which must match `FACTORY RESET`.
   pub confirmation: String,
   /// Confirmation acknowledging complete data loss.
   pub acknowledged: bool,

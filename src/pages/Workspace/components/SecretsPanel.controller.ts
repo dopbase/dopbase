@@ -54,7 +54,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   /** Whether the editor view is active. Content lives only while it is. */
   const editorOpen = ref(false);
   const editorContent = ref<string | null>(null);
-  /** The content as last loaded or saved; the dirty-check baseline. */
+  /** The content as last loaded or saved, which is the dirty-check baseline. */
   const editorBaseline = ref<string | null>(null);
   const editorLoading = ref(false);
   const editorLoadError = ref<string | null>(null);
@@ -116,7 +116,9 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     wipeEditor();
   });
 
-  const revealCountdown = computed(() => formatCountdown(revealSecondsLeft.value));
+  const revealCountdown = computed(() =>
+    formatCountdown(revealSecondsLeft.value),
+  );
 
   function describeError(cause: unknown, fallback: string): string {
     if (cause instanceof ApiError && cause.firstCode === "REQUEST_INVALID") {
@@ -209,7 +211,9 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
       ? { entries: [], issues: [] as EnvFileIssue[] }
       : parseEnvFileLines(editorContent.value),
   );
-  const editorIssues = computed<EnvFileIssue[]>(() => parsedEditor.value.issues);
+  const editorIssues = computed<EnvFileIssue[]>(
+    () => parsedEditor.value.issues,
+  );
   const editorEntries = computed(() => parsedEditor.value.entries);
   const editorDirty = computed(
     () =>

@@ -24,7 +24,7 @@ async function copy(): Promise<void> {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => (copied.value = false), 2000);
   } catch {
-    // Clipboard unavailable (permissions/insecure context); stay silent.
+    // Stay silent when clipboard access is unavailable due to permissions or context.
   }
 }
 </script>
