@@ -47,7 +47,7 @@ The server validates the backup archive against its master encryption key, resto
 Setup creates the protected root account. Root and admin can create additional
 admin and member users through [Users](./users). Invitations and password reset
 by email are not available. Offline recovery with the master key is the
-fallback; see [identity and tokens](/reference/identity).
+fallback. See [identity and tokens](/reference/identity).
 
 ## Signing in
 

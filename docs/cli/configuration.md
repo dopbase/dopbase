@@ -122,7 +122,7 @@ but an attacker that can read both files can decrypt the token. Use
 `dopbase run` stores its latest successfully fetched runtime environments under
 `run-cache/` beside `config.toml`. Cache payloads use authenticated
 XChaCha20-Poly1305 encryption and an independent random key in `run-cache-key`.
-Server-derived cache filenames and lock files contain no secret values; cache
+Server-derived cache filenames and lock files contain no secret values. Cache
 files and the key are mode `0600` inside mode `0700` directories on Unix.
 
 The encryption key for each server cache is derived from the local cache key,
@@ -135,7 +135,7 @@ The cache has no automatic expiry because it exists to support extended
 outages. Offline use can therefore inject values that were changed or revoked
 on the unavailable server. `run` always reports cached use, its UTC fetch time,
 and its age. Delete `run-cache/` and `run-cache-key` to remove all locally
-cached runtime values; the next successful live run creates fresh material.
+cached runtime values. The next successful live run creates fresh material.
 
 ## Inspect effective configuration
 
@@ -219,7 +219,7 @@ Each Dopbase server instance has its own address and server-owned SQLite
 database. For example, two local instances might listen on ports `8840` and
 `8377`.
 
-Only one endpoint can be globally active; v0.1.3 does not retain named profiles
+Only one endpoint can be globally active. v0.1.3 does not retain named profiles
 or token history for previously selected servers:
 
 ```bash

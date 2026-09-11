@@ -32,7 +32,7 @@ You can select a self-hosted endpoint again with `dopbase client connect`. The c
 
 Use `dopbase client connect local` to return to the implicit
 `http://localhost:8840` default. Connecting validates the destination and clears
-the credential from the previous active server; run `dopbase login` against the
+the credential from the previous active server. Run `dopbase login` against the
 new destination.
 
 The selected Cloud URL is stored in the user's machine-global config. The login

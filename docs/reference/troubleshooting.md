@@ -20,7 +20,7 @@ Dopbase does not fall back to that local default.
 
 Connecting and logging in are separate. Run `dopbase client status` to verify the
 resolved endpoint and authentication source. A saved token is used only for the
-normalized server that issued it; a token issued by one server is not reused on
+normalized server that issued it. A token issued by one server is not reused on
 another.
 
 If the encrypted session is missing or damaged, run `dopbase logout` and then
@@ -62,7 +62,7 @@ An old cache cannot be unlocked after logout or token rotation. A damaged cache
 or missing `run-cache-key` also fails closed. When the server is available, run
 the command successfully to replace that server's cache. To discard all cached
 runtime values, remove `run-cache/` and `run-cache-key` from the Dopbase data
-directory; do not remove the separate `session-key` unless you also intend to
+directory. Do not remove the separate `session-key` unless you also intend to
 invalidate the saved CLI login.
 
 ## A secret appeared in logs

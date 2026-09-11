@@ -36,14 +36,14 @@ dopbase run payment-service/development -- npm start
 
 A production build embeds the Vue Admin UI in that executable. By default, its
 SQLite database, lock files, configuration, and local master key live under
-`~/.dopbase`; use `--data-dir` or `DOPBASE_DATA_DIR` to relocate them.
+`~/.dopbase`. Use `--data-dir` or `DOPBASE_DATA_DIR` to relocate them.
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
 Dopbase 0.1.3 includes four roles, user management, read-only AI accounts, an
 instance overview, and crash-safe factory reset. See [users and AI agents](./docs/ui/users.md)
 and [role permissions](./docs/reference/identity.md) for how access works.
-Version 0.1.0 starts with a fresh data directory; databases and backups from
+Version 0.1.0 starts with a fresh data directory. Databases and backups from
 earlier releases are not supported.
 
 ## How it works
@@ -116,7 +116,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full setup, checks, and pull-re
 
 Keep `app/src/` production-only. All Rust test cases belong under `app/tests/`
 as integration tests. Do not add `#[cfg(test)]` modules, `#[test]`,
-`#[tokio::test]`, or `*_test.rs` files anywhere under `app/src/`; add or update
+`#[tokio::test]`, or `*_test.rs` files anywhere under `app/src/`. Add or update
 the corresponding test file in `app/tests/` instead. This keeps the production
 source tree clean and makes the test boundary clear for both humans and AI
 contributors.

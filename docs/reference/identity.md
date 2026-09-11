@@ -52,7 +52,7 @@ The encrypted payload also caches the administrator email for offline
 
 Plaintext `secret get --reveal` and `export` operations in the official CLI
 require interactive password confirmation every time. This is a CLI safety
-gate; direct HTTP clients continue to follow the server's existing recent-
+gate. Direct HTTP clients continue to follow the server's existing recent-
 authentication policy.
 
 For application servers, create a runner token scoped to one environment:
@@ -87,7 +87,7 @@ practical workflow and [users and AI agents](/ui/users) for account management.
 
 ## Permission model
 
-The four roles are static. All projects are shared across the instance; no
+The four roles are static. All projects are shared across the instance. No
 user-to-project assignments, custom roles, or configurable permissions exist.
 Runner tokens remain a separate environment-scoped credential type.
 
@@ -119,8 +119,9 @@ audit history, and server-held backups. It preserves deployment configuration
 and the master key, then reopens first-run setup. The Admin UI requires the
 root password, an explicit acknowledgment, and `FACTORY RESET`. The offline
 `dopbase admin factory-reset` command requires the server to be stopped, the
-root password, and `please-wipe-out-system`. It moves the whole data directory
-to a timestamped quarantine path so the next start creates a fresh instance.
+root password, and `please-wipe-out-system`. It saves the whole data directory
+as a timestamped ZIP before removing it. Pass `--no-backup` to remove the data
+without creating the ZIP. The next start creates a fresh instance.
 See
 [factory reset](/self-hosting/factory-reset) for the confirmation steps and deletion scope.
 
@@ -134,5 +135,5 @@ inspection or shell history, so use a saved token or `DOPBASE_TOKEN` for normal
 deployment workflows.
 
 The session and key files are restricted to the current user where the platform
-supports it. An attacker that can read both files can decrypt the token; use
+supports it. An attacker that can read both files can decrypt the token. Use
 `DOPBASE_TOKEN` when an externally managed credential is required.

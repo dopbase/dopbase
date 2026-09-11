@@ -22,9 +22,9 @@ version. The current pre-release schema is assembled in this order:
 The up file applies the change. The down file removes only that version's
 change and must be safe when versions are reverted in reverse order. No
 existing table is rebuilt or altered by these migrations. Runtime
-startup applies up migrations only; rollback is a maintenance and test
+startup applies up migrations only. Rollback is a maintenance and test
 operation, not a public Dopbase CLI command.
 
 The database test suite applies all migrations, rolls back to version zero,
-and reapplies them. Never edit a migration after release; add a new numbered
+and reapplies them. Never edit a migration after release. Add a new numbered
 pair instead.

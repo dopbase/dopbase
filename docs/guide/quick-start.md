@@ -36,7 +36,7 @@ dopbase --version
 
 Set `DOPBASE_INSTALL_DIR` to choose another directory and
 `DOPBASE_VERSION` to install a specific release. Mirrors can set
-`DOPBASE_REPOSITORY_URL`; an explicit
+`DOPBASE_REPOSITORY_URL`. An explicit
 `DOPBASE_DOWNLOAD_BASE_URL` still overrides the complete release download path.
 
 ## 2. Start the server
@@ -58,7 +58,7 @@ Config:     ~/.dopbase
 ```
 
 The same address serves the Admin UI in a browser. The first visit walks you
-through claiming the server with the setup token; the [Admin UI guide](/ui/)
+through claiming the server with the setup token. The [Admin UI guide](/ui/)
 covers every screen.
 
 Keep this process running while you use the client.
