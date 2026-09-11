@@ -2,7 +2,7 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## Unreleased
+## 0.1.5 - 2026-09-11
 
 Dopbase now supports more self-hosted connection formats, creates a recovery
 archive before host-side factory resets, and uses clearer copy across the CLI,
