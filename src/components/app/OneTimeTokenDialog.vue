@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { KeyIcon } from "~/assets/icons";
+import { InfoIcon } from "~/assets/icons";
 import { DbAlert, DbButton, DbCopyButton, DbModal } from "~/components/ui";
 
 const props = defineProps<{
@@ -48,7 +48,7 @@ function handleCopyError(): void {
         class="flex items-start gap-3 rounded-card border border-warn/30 bg-warn/10 p-3.5">
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-warn/30 bg-canvas/40 text-warn">
-          <KeyIcon class="h-4 w-4" />
+          <InfoIcon class="h-4 w-4" />
         </div>
         <p class="text-sm text-ink">
           Copy this token now. It is shown once and cannot be recovered.
@@ -57,11 +57,12 @@ function handleCopyError(): void {
       </div>
 
       <section
-        class="overflow-hidden rounded-card border border-accent/35 bg-canvas shadow-[inset_3px_0_0_0_var(--color-accent)]"
+        class="overflow-hidden rounded-card border border-accent/35 bg-canvas"
         aria-label="One-time token">
         <div
           class="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
-          <span class="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-accent-strong">
+          <span
+            class="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-accent-strong">
             One-time token
           </span>
           <span class="text-xs text-ink-faint">plaintext</span>
@@ -79,13 +80,14 @@ function handleCopyError(): void {
           <DbCopyButton
             class="justify-center sm:self-stretch"
             :value="token"
-            label="Copy token"
+            label="Copy"
             @copied="handleCopied"
             @copy-error="handleCopyError" />
         </div>
       </section>
 
-      <div class="grid gap-2 rounded-control bg-raised px-3.5 py-3 text-sm sm:grid-cols-2">
+      <div
+        class="gap-2 rounded-control bg-raised px-3.5 py-3 text-sm grid-cols-2">
         <div class="min-w-0">
           <p class="text-xs text-ink-muted">Name</p>
           <p class="truncate font-mono text-xs text-ink-strong">{{ name }}</p>

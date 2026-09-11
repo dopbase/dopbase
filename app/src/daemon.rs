@@ -247,13 +247,13 @@ pub(crate) async fn start(
   drop(_lock);
   let started = spawn(&data_dir, flags).await?;
   if !json_output {
-    eprintln!(
+    anstream::eprintln!(
       "\n{}\n",
       crate::server::startup_banner(&config.public_url, &data_dir, config.docs_enabled,)
     );
   }
   if let Some(warning) = config.inferred_public_url_warning() {
-    eprintln!("Warning: {warning}\n");
+    anstream::eprintln!("{}\n", crate::server::startup_warning(&warning));
   }
   if let Some(token) = &started.setup_token {
     eprintln!(
