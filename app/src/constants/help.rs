@@ -164,6 +164,7 @@ Examples:
   dopbase run -- npm run dev
   dopbase run env_482731 -- npm run dev
   dopbase run payment-service/development -- npm run dev
+  dopbase run payment-service/production -t dbs_xxx -- npm start
   dopbase run payment-service/production --token dbs_xxx -- npm start
 ";
 

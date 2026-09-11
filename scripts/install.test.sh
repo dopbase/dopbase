@@ -29,7 +29,7 @@ printf '%s\n' \
   'esac' >"${mock_bin}/curl"
 chmod 755 "${mock_bin}/curl"
 
-printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "dopbase 0.0.12"' >"${test_dir}/dopbase"
+printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "v0.0.12"' >"${test_dir}/dopbase"
 chmod 755 "${test_dir}/dopbase"
 
 (cd "$test_dir" && zip -q "${release_dir}/dopbase_0.0.12_darwin_arm64.zip" dopbase)
@@ -55,7 +55,7 @@ TEST_REAL_CURL="$real_curl" \
   sh "${root_dir}/scripts/install.sh" >/dev/null
 
 test -x "${install_dir}/dopbase"
-test "$("${install_dir}/dopbase" --version)" = "dopbase 0.0.12"
+test "$("${install_dir}/dopbase" --version)" = "v0.0.12"
 
 PATH="${mock_bin}:${PATH}" \
 TEST_UNAME_S=Darwin \
