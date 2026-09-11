@@ -17,6 +17,9 @@ Admin UI, API documentation, and public guides.
 
 ### Improvement
 
+- `dopbase run -t <TOKEN>` is now a short form of `--token <TOKEN>`.
+- `dopbase -v` now prints the installed version as `v<version>`. The existing
+  `-V` and `--version` flags use the same output.
 - CLI errors, prompts, and help text provide clearer recovery steps and use
   consistent terms.
 - Frontend copy, OpenAPI descriptions, source comments, and public

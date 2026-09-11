@@ -20,7 +20,7 @@ option when it does not apply, such as `--server` with a local server command.
 | `--data-dir <DIR>` | Use another directory for Dopbase state and configuration                           | `dopbase --data-dir /srv/dopbase server status`             |
 | `--json`           | Print machine-readable JSON where the command supports it                           | `dopbase --json project list`                               |
 | `-h`, `--help`     | Show help for the current command                                                   | `dopbase secret set --help`                                 |
-| `-V`, `--version`  | Show the installed Dopbase version                                                  | `dopbase --version`                                         |
+| `-v`, `-V`, `--version` | Show the installed Dopbase version                                             | `dopbase -v`                                                |
 
 The built-in help command accepts the same command path. For example,
 `dopbase help secret set` shows the usage, argument descriptions, options, and
@@ -75,7 +75,7 @@ examples for `secret set`.
 | Import a dotenv file      | `dopbase import <ENVIRONMENT> <FILE>`          | `--dry-run` previews changes. `--replace` removes remote keys absent from the file. `--yes` skips confirmation | `dopbase import payment-service/staging .env.staging --dry-run`                           |
 | Export to a file          | `dopbase export <ENVIRONMENT> --output <FILE>` | `--output <FILE>` or `--stdout` is required. `--force` overwrites an existing file                             | `dopbase export payment-service/staging --output .env.staging --force`                    |
 | Export to standard output | `dopbase export <ENVIRONMENT> --stdout`        | `--stdout` conflicts with `--output`                                                                           | `dopbase export payment-service/staging --stdout`                                         |
-| Run with injected secrets | `dopbase run [ENVIRONMENT] -- <COMMAND>`       | `--token <TOKEN>` overrides other credentials. Everything after `--` is the child command                      | `dopbase run payment-service/development -- npm start`                                    |
+| Run with injected secrets | `dopbase run [ENVIRONMENT] -- <COMMAND>`       | `-t <TOKEN>` or `--token <TOKEN>` overrides other credentials. Everything after `--` is the child command      | `dopbase run payment-service/development -- npm start`                                    |
 
 ## Tokens, backups, and maintenance
 

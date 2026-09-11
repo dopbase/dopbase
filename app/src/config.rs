@@ -344,7 +344,7 @@ impl ServerConfig {
   pub fn inferred_public_url_warning(&self) -> Option<String> {
     (self.public_url_source == PublicUrlSource::NetworkInferred).then(|| {
       format!(
-        "No public URL is configured. Using {}. This HTTP URL does not encrypt credentials or secrets and may be wrong behind a proxy or NAT. Set --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml.",
+        "No public URL is configured. Using {}.\nSet --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml.\nThis HTTP URL does not encrypt credentials or secrets.",
         self.public_url
       )
     })

@@ -1,6 +1,7 @@
-use clap::{Args, Parser, Subcommand, error::ErrorKind};
+use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
 use std::{
   ffi::{OsStr, OsString},
+  io::{self, Write},
   path::PathBuf,
 };
 
@@ -10,12 +11,21 @@ use crate::constants::help::*;
 #[command(
   name = "dopbase",
   version,
+  disable_version_flag = true,
   about = "Secrets management in one binary",
   long_about = "Dopbase keeps application secrets in one binary: run a server, store \
 secrets per project and environment, and inject them into any command with `run`.",
   after_help = AFTER_HELP
 )]
 pub struct Cli {
+  /// Print the installed Dopbase version.
+  #[arg(
+    short = 'v',
+    visible_short_alias = 'V',
+    long = "version",
+    action = ArgAction::Version
+  )]
+  version: Option<bool>,
   /// Client endpoint for this invocation, overriding the saved server and
   /// DOPBASE_URL. This does not apply to local server commands.
   #[arg(long, global = true, value_name = "URL")]
@@ -61,6 +71,7 @@ impl Cli {
     let arguments = std::env::args_os().collect::<Vec<_>>();
     match Self::try_parse_from(arguments.clone()) {
       Ok(cli) => cli,
+      Err(error) if error.kind() == ErrorKind::DisplayVersion => Self::exit_with_version(),
       Err(error)
         if matches!(
           error.kind(),
@@ -76,6 +87,15 @@ impl Cli {
       }
       Err(error) => error.exit(),
     }
+  }
+
+  fn exit_with_version() -> ! {
+    let mut stdout = io::stdout().lock();
+    if let Err(write_error) = writeln!(stdout, "v{}", env!("CARGO_PKG_VERSION")) {
+      clap::Error::raw(ErrorKind::Io, write_error).exit();
+    }
+    drop(stdout);
+    std::process::exit(0)
   }
 }
 
@@ -204,7 +224,7 @@ pub enum Command {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: Option<String>,
     /// Runner token for this invocation. Overrides DOPBASE_TOKEN and the saved credential.
-    #[arg(long, value_name = "TOKEN")]
+    #[arg(short = 't', long, value_name = "TOKEN")]
     token: Option<String>,
     /// Command to run with the injected secrets.
     #[arg(last = true, required = true)]

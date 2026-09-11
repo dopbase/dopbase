@@ -126,6 +126,15 @@ fn parses_every_v0_1_command_shape() {
       "--",
       "printenv",
     ],
+    &[
+      "dopbase",
+      "run",
+      "env_482731",
+      "-t",
+      "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "--",
+      "printenv",
+    ],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "admin", "factory-reset"],
     &["dopbase", "admin", "factory-reset", "--no-backup"],
@@ -187,6 +196,49 @@ fn run_token_must_appear_before_the_child_command_separator() {
     Some("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
   );
   assert_eq!(command, ["printenv", "--token", "child-value"]);
+}
+
+#[test]
+fn run_accepts_the_short_token_flag() {
+  let cli = Cli::try_parse_from([
+    "dopbase",
+    "run",
+    "env_482731",
+    "-t",
+    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "--",
+    "printenv",
+    "-t",
+    "child-value",
+  ])
+  .unwrap();
+  let Command::Run { token, command, .. } = cli.command else {
+    panic!("expected run command");
+  };
+  assert_eq!(
+    token.as_deref(),
+    Some("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+  );
+  assert_eq!(command, ["printenv", "-t", "child-value"]);
+}
+
+#[test]
+fn login_does_not_accept_the_short_token_flag() {
+  assert!(Cli::try_parse_from(["dopbase", "login", "-t"]).is_err());
+}
+
+#[test]
+fn version_flags_print_only_the_prefixed_version() {
+  let expected = format!("v{}\n", env!("CARGO_PKG_VERSION"));
+  for flag in ["-v", "-V", "--version"] {
+    let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+      .arg(flag)
+      .output()
+      .unwrap();
+    assert!(output.status.success(), "{flag}: {output:?}");
+    assert_eq!(output.stdout, expected.as_bytes(), "{flag}");
+    assert!(output.stderr.is_empty(), "{flag}: {output:?}");
+  }
 }
 
 #[test]
@@ -334,7 +386,18 @@ fn rejects_conflicting_file_options() {
 
 #[test]
 fn top_level_help_lists_common_server_options() {
-  let help = Cli::command().render_long_help().to_string();
+  let mut command = Cli::command();
+  let version = command
+    .get_arguments()
+    .find(|argument| argument.get_long() == Some("version"))
+    .unwrap();
+  assert_eq!(version.get_short(), Some('v'));
+  assert!(
+    version
+      .get_visible_short_aliases()
+      .is_some_and(|aliases| aliases.contains(&'V'))
+  );
+  let help = command.render_long_help().to_string();
   assert!(help.contains("Common server options:"), "{help}");
   assert!(help.contains("--host <HOST>"), "{help}");
   assert!(help.contains("--port <PORT>"), "{help}");

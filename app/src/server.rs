@@ -4,6 +4,7 @@ use std::{
   time::Duration,
 };
 
+use anstyle::{AnsiColor, Color, Effects, Style};
 use anyhow::{Context, Result};
 use axum::{
   Router,
@@ -207,8 +208,9 @@ pub fn startup_banner(
   docs_enabled: bool,
 ) -> String {
   let public_url = public_url.trim_end_matches('/');
+  let heading = Style::new().effects(Effects::BOLD);
   let mut rows = vec![
-    "Dopbase".to_string(),
+    format!("{heading}Dopbase{heading:#}"),
     "Secure, Simple and Private".to_string(),
     format!("Version {}", env!("CARGO_PKG_VERSION")),
     String::new(),
@@ -220,6 +222,13 @@ pub fn startup_banner(
     rows.push(format!("API Specs:  {public_url}/api/docs"));
   }
   rows.join("\n")
+}
+
+pub fn startup_warning(warning: &str) -> String {
+  let style = Style::new()
+    .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+    .effects(Effects::BOLD);
+  format!("{style}Warning: {style:#}{warning}")
 }
 
 /// Formats the one-time setup token message shown on first run, including a
@@ -265,7 +274,7 @@ pub async fn serve_with_ready(
     ready.ok(std::process::id(), setup_token.as_deref());
   }
   let public_url = state.config.public_url.trim_end_matches('/');
-  eprintln!(
+  anstream::eprintln!(
     "\n{}\n",
     startup_banner(
       public_url,
@@ -274,7 +283,7 @@ pub async fn serve_with_ready(
     )
   );
   if let Some(warning) = state.config.inferred_public_url_warning() {
-    eprintln!("Warning: {warning}\n");
+    anstream::eprintln!("{}\n", startup_warning(&warning));
   }
   if let Some(setup) = setup_token.as_deref() {
     eprintln!("{}", setup_token_message(public_url, setup));

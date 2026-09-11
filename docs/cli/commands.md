@@ -91,11 +91,11 @@ The server resolution order is:
 
 Machine runners can register a credential with `dopbase login --token`. CI
 systems and deployment platforms can use `DOPBASE_TOKEN`. For `dopbase run`, an
-explicit `--token <TOKEN>` takes precedence over `DOPBASE_TOKEN`, which takes
-precedence over the encrypted credential saved by `login`. A saved credential
-is used only when it matches the resolved server. Command-line tokens may be
-visible in shell history and process inspection, so they are best kept for
-one-off overrides.
+explicit `-t <TOKEN>` or `--token <TOKEN>` takes precedence over
+`DOPBASE_TOKEN`, followed by the encrypted credential saved by `login`. A saved
+credential is used only when it matches the resolved server. Command-line
+tokens may be visible in shell history and process inspection, so they are best
+kept for one-off overrides.
 
 `dopbase client status` displays the config path, resolved server and its source,
 authentication source, locally identified credential type, login email, and
@@ -276,7 +276,7 @@ dopbase run payment-service/production -- npm start
 Use an explicit token only for a one-off command:
 
 ```bash
-dopbase run payment-service/production --token "$RUNNER_TOKEN" -- npm start
+dopbase run payment-service/production -t "$RUNNER_TOKEN" -- npm start
 ```
 
 Automation may set `DOPBASE_ENV` instead:

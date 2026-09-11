@@ -31,7 +31,7 @@ Add the reported installation directory to `PATH` if the installer asks you
 to, then confirm the installation:
 
 ```bash
-dopbase --version
+dopbase -v
 ```
 
 Set `DOPBASE_INSTALL_DIR` to choose another directory and
