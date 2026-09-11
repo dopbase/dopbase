@@ -1,6 +1,6 @@
 use std::{
   env, fs,
-  net::{IpAddr, SocketAddr},
+  net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
   path::{Path, PathBuf},
   str::FromStr,
 };
@@ -62,11 +62,16 @@ pub struct ServerConfig {
   #[serde(skip)]
   pub daemonized: bool,
   pub master_key: MasterKeyConfig,
-  /// True when public_url came from an explicit source. Otherwise it is
-  /// derived from the bind address as `http://localhost:{port}` for loopback.
-  /// Remote binds fail closed and require an explicit value.
+  /// Records whether the public URL was configured or derived at startup.
   #[serde(skip)]
-  pub public_url_explicit: bool,
+  pub public_url_source: PublicUrlSource,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PublicUrlSource {
+  Explicit,
+  LoopbackDefault,
+  NetworkInferred,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -158,7 +163,7 @@ impl ServerConfig {
       shutdown_grace_seconds: 10,
       docs_enabled: false,
       daemonized: false,
-      public_url_explicit: false,
+      public_url_source: PublicUrlSource::LoopbackDefault,
     }
   }
 
@@ -231,7 +236,7 @@ impl ServerConfig {
     }
     if let Some(value) = file.public_url {
       self.public_url = value;
-      self.public_url_explicit = true;
+      self.public_url_source = PublicUrlSource::Explicit;
     }
     if let Some(value) = file.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
@@ -256,7 +261,7 @@ impl ServerConfig {
   ) -> Result<()> {
     if let Some(value) = environment.public_url {
       self.public_url = value;
-      self.public_url_explicit = true;
+      self.public_url_source = PublicUrlSource::Explicit;
     }
     if let Some(value) = environment.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value
@@ -278,7 +283,7 @@ impl ServerConfig {
   ) {
     if let Some(value) = &overrides.public_url {
       self.public_url.clone_from(value);
-      self.public_url_explicit = true;
+      self.public_url_source = PublicUrlSource::Explicit;
     }
     if let Some(value) = overrides.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
@@ -316,26 +321,33 @@ impl ServerConfig {
     Ok(())
   }
 
-  /// When public_url was not configured explicitly, derive it from the bind
-  /// address so `--port` alone is enough for local development. Remote binds
-  /// fail closed: Dopbase does not trust the Host header and will not guess
-  /// its public address.
+  /// Derive a client-facing URL when no explicit public URL was configured.
   fn derive_public_url(&mut self) -> Result<()> {
-    if self.public_url_explicit {
+    if self.public_url_source == PublicUrlSource::Explicit {
       return Ok(());
     }
     let bind: SocketAddr = self.bind_address.parse().context("invalid bind_address")?;
-    if !bind.ip().is_loopback() {
-      bail!(
-        "public_url is required when binding beyond loopback (bind_address = \"{}\").\n\
-         Dopbase does not trust the Host header, so it cannot guess its public address.\n\
-         Set --public-url (or public_url in server.toml) to the URL clients will use,\n\
-         e.g. --public-url https://dopbase.example.com",
-        self.bind_address
-      );
-    }
-    self.public_url = format!("http://localhost:{}", bind.port());
+    let detected = if bind.ip().is_unspecified() {
+      Some(
+        detect_primary_ip(bind.ip())
+          .map_err(|error| missing_public_url_error(bind, Some(error)))?,
+      )
+    } else {
+      None
+    };
+    let (public_url, source) = resolve_implicit_public_url(bind, detected)?;
+    self.public_url = public_url;
+    self.public_url_source = source;
     Ok(())
+  }
+
+  pub fn inferred_public_url_warning(&self) -> Option<String> {
+    (self.public_url_source == PublicUrlSource::NetworkInferred).then(|| {
+      format!(
+        "No public URL is configured. Using {}. This HTTP URL does not encrypt credentials or secrets and may be wrong behind a proxy or NAT. Set --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml.",
+        self.public_url
+      )
+    })
   }
 
   pub fn validate(&self) -> Result<()> {
@@ -343,16 +355,26 @@ impl ServerConfig {
       bail!("unsupported server configuration version {}", self.version);
     }
     let bind = SocketAddr::from_str(&self.bind_address).context("invalid bind_address")?;
-    if self.public_url_explicit {
+    if self.public_url_source == PublicUrlSource::Explicit {
       let public = Url::parse(&self.public_url).context("invalid public_url")?;
       if !matches!(public.scheme(), "http" | "https") || public.host_str().is_none() {
         bail!("public_url must be an absolute HTTP or HTTPS URL");
       }
       validate_endpoint_transport(&public)?;
-    } else if !bind.ip().is_loopback() {
-      // load() derives public_url for loopback binds before validating, so a
-      // non-loopback bind reaching here means the value was never configured.
-      bail!("public_url must be configured for a non-loopback bind address");
+    } else {
+      let public = Url::parse(&self.public_url).context("invalid derived public_url")?;
+      if public.scheme() != "http" || public.host_str().is_none() {
+        bail!("derived public_url must be an absolute HTTP URL");
+      }
+      match self.public_url_source {
+        PublicUrlSource::LoopbackDefault if !bind.ip().is_loopback() => {
+          return Err(missing_public_url_error(bind, None));
+        }
+        PublicUrlSource::NetworkInferred if bind.ip().is_loopback() => {
+          bail!("a loopback bind address cannot use an inferred network public URL");
+        }
+        _ => {}
+      }
     }
     if !self.database_url.starts_with("sqlite:") {
       bail!("database_url must use SQLite");
@@ -368,6 +390,80 @@ impl ServerConfig {
     }
     Ok(())
   }
+}
+
+#[doc(hidden)]
+pub fn resolve_implicit_public_url(
+  bind: SocketAddr,
+  detected: Option<IpAddr>,
+) -> Result<(String, PublicUrlSource)> {
+  if bind.ip().is_loopback() {
+    return Ok((
+      format!("http://localhost:{}", bind.port()),
+      PublicUrlSource::LoopbackDefault,
+    ));
+  }
+  let ip = if bind.ip().is_unspecified() {
+    detected.ok_or_else(|| missing_public_url_error(bind, None))?
+  } else {
+    bind.ip()
+  };
+  if ip.is_loopback() || ip.is_unspecified() || !same_ip_family(bind.ip(), ip) {
+    return Err(missing_public_url_error(bind, None));
+  }
+  Ok((
+    format!("http://{}", SocketAddr::new(ip, bind.port())),
+    PublicUrlSource::NetworkInferred,
+  ))
+}
+
+fn same_ip_family(
+  first: IpAddr,
+  second: IpAddr,
+) -> bool {
+  matches!(
+    (first, second),
+    (IpAddr::V4(_), IpAddr::V4(_)) | (IpAddr::V6(_), IpAddr::V6(_))
+  )
+}
+
+fn detect_primary_ip(family: IpAddr) -> Result<IpAddr> {
+  let (local, probe) = match family {
+    IpAddr::V4(_) => (
+      SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
+      SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 80),
+    ),
+    IpAddr::V6(_) => (
+      SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
+      SocketAddr::new(
+        IpAddr::V6(
+          "2001:db8::1"
+            .parse()
+            .expect("valid IPv6 documentation address"),
+        ),
+        80,
+      ),
+    ),
+  };
+  let socket = UdpSocket::bind(local).context("failed to inspect local network routes")?;
+  socket
+    .connect(probe)
+    .context("no matching outbound network route was found")?;
+  Ok(socket.local_addr()?.ip())
+}
+
+fn missing_public_url_error(
+  bind: SocketAddr,
+  source: Option<anyhow::Error>,
+) -> anyhow::Error {
+  let reason = source
+    .map(|error| format!(" Could not detect a usable local IP address: {error}."))
+    .unwrap_or_default();
+  anyhow::anyhow!(
+    "Dopbase could not infer a public URL for {bind}.{reason}\n\
+     Set --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml,\n\
+     for example: --public-url https://dopbase.example.com"
+  )
 }
 
 pub fn resolve_data_dir(argument: Option<&Path>) -> Result<PathBuf> {

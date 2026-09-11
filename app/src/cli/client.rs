@@ -69,6 +69,30 @@ pub(crate) fn is_availability_error(error: &anyhow::Error) -> bool {
   error.downcast_ref::<AvailabilityError>().is_some()
 }
 
+#[derive(Debug)]
+struct ResponseError {
+  status: reqwest::StatusCode,
+  message: String,
+}
+
+impl fmt::Display for ResponseError {
+  fn fmt(
+    &self,
+    formatter: &mut fmt::Formatter<'_>,
+  ) -> fmt::Result {
+    formatter.write_str(&self.message)
+  }
+}
+
+impl std::error::Error for ResponseError {}
+
+#[doc(hidden)]
+pub fn is_authentication_error(error: &anyhow::Error) -> bool {
+  error
+    .downcast_ref::<ResponseError>()
+    .is_some_and(|error| error.status == reqwest::StatusCode::UNAUTHORIZED)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
   Argument,
@@ -186,7 +210,13 @@ impl ApiClient {
             .join("\n")
         })
         .unwrap_or_else(|| format!("server returned {status}"));
-      bail!(errors);
+      return Err(
+        ResponseError {
+          status,
+          message: errors,
+        }
+        .into(),
+      );
     }
     Ok(value.get("data").cloned().unwrap_or(Value::Null))
   }
@@ -598,11 +628,16 @@ pub async fn any_authenticated_client(
   token: Option<String>,
 ) -> Result<ApiClient> {
   let credential = credential_with_token(server, token)?;
+  authenticated_client(server, credential)
+}
+
+#[doc(hidden)]
+pub fn authenticated_client(
+  server: &ResolvedServer,
+  credential: Credential,
+) -> Result<ApiClient> {
   if let Some(token) = credential.token {
     return ApiClient::new(server, Some(token));
   }
-  if credential.source == CredentialSource::Environment || !io::stdin().is_terminal() {
-    bail!("Dopbase authentication is required");
-  }
-  login(server, true).await
+  bail!("Dopbase authentication is required. Run `dopbase login` first or set DOPBASE_TOKEN.")
 }

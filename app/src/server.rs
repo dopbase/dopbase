@@ -273,6 +273,9 @@ pub async fn serve_with_ready(
       state.config.docs_enabled
     )
   );
+  if let Some(warning) = state.config.inferred_public_url_warning() {
+    eprintln!("Warning: {warning}\n");
+  }
   if let Some(setup) = setup_token.as_deref() {
     eprintln!("{}", setup_token_message(public_url, setup));
   }

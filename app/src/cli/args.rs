@@ -306,11 +306,11 @@ pub struct ServerLaunchArgs {
   #[arg(long, value_name = "PORT")]
   pub port: Option<u16>,
   /// Network interface to bind, e.g. 127.0.0.1 (default) or 0.0.0.0 to expose
-  /// the server. Requires --public-url when binding beyond loopback.
+  /// the server. Without --public-url, Dopbase uses a detected network IP.
   #[arg(long, value_name = "HOST")]
   pub host: Option<String>,
   /// Public URL clients use to reach this server (banners, generated links).
-  /// Optional for loopback binds and required with --host 0.0.0.0.
+  /// Recommended for network binds, reverse proxies, and HTTPS.
   #[arg(long, value_name = "URL")]
   pub public_url: Option<String>,
   /// Seconds to wait for in-flight requests during shutdown.
