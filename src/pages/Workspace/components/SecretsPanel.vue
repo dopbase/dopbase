@@ -372,7 +372,7 @@ async function confirmDelete(): Promise<void> {
       <DbEmptyState
         v-else-if="secrets && secrets.length === 0"
         title="No secrets in this environment"
-        description="Add a single key, or import an existing .env file — values are encrypted before they are stored.">
+        description="Add a single key, or import an existing .env file, values are encrypted before they are stored.">
         <template #icon>
           <KeyIcon class="h-5 w-5" />
         </template>
