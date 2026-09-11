@@ -22,13 +22,25 @@ The default listener is `127.0.0.1:8840`. Change the host or port separately:
 
 ```bash
 dopbase server start --port 9000
+dopbase server start --host 0.0.0.0
 dopbase server start \
   --host 0.0.0.0 \
   --public-url https://dopbase.example.com
 ```
 
-A non-loopback host requires an HTTPS public URL. Dopbase does not infer the
-public URL from request headers.
+Without a public URL, Dopbase uses the primary network IP and prints a warning.
+The inferred URL uses HTTP, so traffic is not encrypted. It may also be wrong
+when Dopbase runs behind NAT or a reverse proxy. Set the public URL explicitly
+for deployments:
+
+```bash
+dopbase server start --public-url https://dopbase.example.com
+export DOPBASE_PUBLIC_URL=https://dopbase.example.com
+```
+
+You can also set `public_url = "https://dopbase.example.com"` in `server.toml`.
+Explicit remote URLs must use HTTPS. Dopbase never derives its public URL from
+request headers.
 
 ## Run in the background
 
