@@ -1,5 +1,5 @@
 use crate::{
-  config::{client_config_path, ensure_data_dir, validate_endpoint_transport},
+  config::{client_config_path, ensure_data_dir},
   constants::config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
 };
 use anyhow::{Context, Result, bail};
@@ -8,7 +8,7 @@ use std::{
   env, fs,
   path::{Path, PathBuf},
 };
-use url::Url;
+use url::{Host, ParseError, Url};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ClientConfig {
@@ -133,20 +133,114 @@ pub fn write(
   crate::utils::private_file::write(path, text.as_bytes(), true)
 }
 pub fn normalize(value: &str) -> Result<String> {
-  let mut url = Url::parse(value).context("server URL must be absolute")?;
-  if !matches!(url.scheme(), "http" | "https") {
-    bail!("server URL must use HTTP or HTTPS");
+  if value != value.trim() {
+    bail!(invalid_server_address(value));
   }
-  validate_endpoint_transport(&url)?;
+  let mut url = Url::parse(value).map_err(|error| {
+    if error == ParseError::InvalidPort {
+      invalid_server_port()
+    } else {
+      invalid_server_address(value)
+    }
+  })?;
+  if !matches!(url.scheme(), "http" | "https") {
+    bail!(
+      "The server address must use http:// or https://. For example: https://dopbase.example.com"
+    );
+  }
+  validate_host(value, &url)?;
   if !url.username().is_empty() || url.password().is_some() {
     bail!("server URL must not contain credentials");
   }
   if url.query().is_some() || url.fragment().is_some() {
     bail!("server URL must not contain a query or fragment");
   }
+  if url.port() == Some(0) {
+    bail!(invalid_server_port());
+  }
   let path = url.path().trim_end_matches('/').to_owned();
   url.set_path(&path);
   Ok(url.to_string().trim_end_matches('/').to_owned())
+}
+
+pub fn normalize_connect_target(value: &str) -> Result<String> {
+  if value != value.trim() || value.is_empty() {
+    bail!(invalid_server_address(value));
+  }
+  if value.contains("://") {
+    return normalize(value);
+  }
+
+  if let Ok(ip) = value.parse::<std::net::IpAddr>() {
+    return normalize(&match ip {
+      std::net::IpAddr::V4(ip) => format!("http://{ip}"),
+      std::net::IpAddr::V6(ip) => format!("http://[{ip}]"),
+    });
+  }
+
+  match Url::parse(&format!("http://{value}")) {
+    Ok(url) => {
+      if matches!(url.host(), Some(Host::Ipv4(_) | Host::Ipv6(_)))
+        && url.path() == "/"
+        && url.query().is_none()
+        && url.fragment().is_none()
+        && url.username().is_empty()
+        && url.password().is_none()
+      {
+        return normalize(url.as_str());
+      }
+      if matches!(url.host(), Some(Host::Domain(host)) if valid_domain(host)) {
+        bail!(
+          "Server domains must include http:// or https://. For example: https://dopbase.example.com"
+        );
+      }
+    }
+    Err(ParseError::InvalidPort) => bail!(invalid_server_port()),
+    Err(_) => {}
+  }
+
+  bail!(invalid_server_address(value))
+}
+
+fn validate_host(
+  value: &str,
+  url: &Url,
+) -> Result<()> {
+  match url.host() {
+    Some(Host::Domain("localhost")) | Some(Host::Ipv4(_) | Host::Ipv6(_)) => Ok(()),
+    Some(Host::Domain(host)) if valid_domain(host) => Ok(()),
+    _ => bail!(invalid_server_address(value)),
+  }
+}
+
+fn valid_domain(host: &str) -> bool {
+  host.len() <= 253
+    && host.contains('.')
+    && host.split('.').all(|label| {
+      !label.is_empty()
+        && label.len() <= 63
+        && label
+          .bytes()
+          .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        && label
+          .as_bytes()
+          .first()
+          .is_some_and(u8::is_ascii_alphanumeric)
+        && label
+          .as_bytes()
+          .last()
+          .is_some_and(u8::is_ascii_alphanumeric)
+    })
+}
+
+fn invalid_server_address(value: &str) -> anyhow::Error {
+  anyhow::anyhow!(
+    "The server address \"{value}\" is not valid. Enter an HTTP or HTTPS domain, or an IP address with an optional port. For example: https://dopbase.example.com or 192.168.1.20:8840"
+  )
+}
+
+fn invalid_server_port() -> anyhow::Error {
+  anyhow::anyhow!("The server port must be between 1 and 65535. For example: 192.168.1.20:8840")
 }
 fn version() -> u32 {
   1

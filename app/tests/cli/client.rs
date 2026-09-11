@@ -91,7 +91,7 @@ async fn connection_failure_is_concise_and_actionable() {
   assert_eq!(
     message,
     "Could not connect to Dopbase at http://127.0.0.1:1.\n\
-Check that the server is running and verify the active endpoint with `dopbase client status`. For local development, start it with `dopbase server start`."
+Check that the server is running and verify the active endpoint with `dopbase client status`."
   );
   assert!(!message.contains("GET /api/v1/environments"));
   assert!(!message.contains("Request:"));
@@ -101,7 +101,7 @@ Check that the server is running and verify the active endpoint with `dopbase cl
 }
 
 #[test]
-fn api_client_rejects_an_unvalidated_remote_http_server() {
+fn api_client_accepts_a_validated_remote_http_server() {
   let directory = TempDir::new().unwrap();
   let server = ResolvedServer {
     url: "http://dopbase.example.com".into(),
@@ -110,11 +110,8 @@ fn api_client_rejects_an_unvalidated_remote_http_server() {
     config: ClientConfig::default(),
   };
 
-  let error = ApiClient::new(&server, Some("secret-token".into()))
-    .err()
-    .unwrap()
-    .to_string();
-  assert!(error.contains("remote URLs must use HTTPS"), "{error}");
+  let client = ApiClient::new(&server, Some("secret-token".into())).unwrap();
+  assert_eq!(client.base_url, "http://dopbase.example.com");
 }
 
 #[tokio::test]

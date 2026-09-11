@@ -164,7 +164,7 @@ pub enum Command {
   },
   /// Export an environment's secrets to a dotenv file or stdout.
   ///
-  /// Requires --output <FILE> or --stdout; --force overwrites an existing
+  /// Requires --output <FILE> or --stdout. --force overwrites an existing
   /// file. Every export requires interactive password confirmation.
   #[command(after_help = EXPORT_HELP)]
   Export {
@@ -196,7 +196,7 @@ pub enum Command {
   /// Falls back to DOPBASE_ENV, then the active server's saved default, when
   /// no environment argument is given. Secret values are passed to the child
   /// process only and are never printed. A successful fetch refreshes an
-  /// encrypted local cache; if the server is unavailable, the last cache for
+  /// encrypted local cache. If the server is unavailable, the last cache for
   /// the same server, environment, and credential is used. Everything after
   /// `--` is the command to run.
   #[command(after_help = RUN_HELP)]
@@ -224,7 +224,7 @@ pub enum Command {
   /// Backs up projects, environments, secrets, runner tokens, and admin
   /// accounts into an XChaCha20-Poly1305 encrypted .dop archive. Without [name],
   /// a timestamped name is generated automatically. Stored on the server by
-  /// default; specify -o/--output to also download and save locally.
+  /// default. Specify -o/--output to also download and save locally.
   #[command(after_help = BACKUP_HELP)]
   Backup {
     /// Optional backup name (default: dopbase_backup_<timestamp>.dop).
@@ -310,7 +310,7 @@ pub struct ServerLaunchArgs {
   #[arg(long, value_name = "HOST")]
   pub host: Option<String>,
   /// Public URL clients use to reach this server (banners, generated links).
-  /// Optional for loopback binds; required with --host 0.0.0.0.
+  /// Optional for loopback binds and required with --host 0.0.0.0.
   #[arg(long, value_name = "URL")]
   pub public_url: Option<String>,
   /// Seconds to wait for in-flight requests during shutdown.
@@ -344,13 +344,14 @@ impl ServerLaunchArgs {
 pub enum ClientCommand {
   /// Validate a server URL and save it as the active server.
   ///
-  /// Remote servers must use HTTPS. Accepts the `local` alias to return to
-  /// the implicit local default (http://localhost:8840). Changing servers requires
-  /// interactive confirmation, stops the current managed background server,
-  /// clears the saved CLI session and default, and then requires a new login.
+  /// Domains must include http:// or https://. Bare IP addresses use HTTP.
+  /// Accepts the `local` alias to return to the implicit local default
+  /// (http://localhost:8840). Changing servers requires interactive
+  /// confirmation, stops the current managed background server, clears the
+  /// saved CLI session and default, and then requires a new login.
   #[command(after_help = CLIENT_CONNECT_HELP)]
   Connect {
-    /// Server URL to save, or `local` to use http://localhost:8840.
+    /// Server URL or bare IP to save, or `local` to use http://localhost:8840.
     server_url: String,
   },
   /// Show the active server, connection state, login, and default environment.
@@ -464,7 +465,7 @@ pub enum SecretCommand {
     environment: String,
     /// Secret key name.
     key: String,
-    /// Read until EOF; in a terminal, finish with Ctrl+D (Ctrl+Z then Enter on Windows).
+    /// Read until EOF. In a terminal, finish with Ctrl+D (Ctrl+Z then Enter on Windows).
     #[arg(long)]
     stdin: bool,
   },
@@ -497,7 +498,7 @@ pub enum SecretCommand {
 pub enum TokenCommand {
   /// Create an access token for an environment (e.g. for CI/CD).
   ///
-  /// The token value is shown once at creation; pass it to client commands
+  /// The token value is shown once at creation. Pass it to client commands
   /// via the DOPBASE_TOKEN environment variable.
   #[command(after_help = TOKEN_CREATE_HELP)]
   Create {
@@ -543,13 +544,16 @@ pub enum AdminCommand {
   },
   /// Remove a local instance from the server machine.
   ///
-  /// Moves the entire Dopbase data directory out of its active location. The
-  /// server must be stopped and an interactive root password confirmation is
-  /// required.
+  /// Removes the entire Dopbase data directory from its active location. A ZIP
+  /// backup is created first unless --no-backup is passed. The server must be
+  /// stopped and an interactive root password confirmation is required.
   #[command(after_help = ADMIN_FACTORY_RESET_HELP)]
   FactoryReset {
     /// Server config file to load (server.toml).
     #[arg(long, value_name = "FILE")]
     config: Option<PathBuf>,
+    /// Permanently reset the instance without creating a ZIP backup.
+    #[arg(long)]
+    no_backup: bool,
   },
 }

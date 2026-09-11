@@ -1,6 +1,6 @@
 pub(crate) const AFTER_HELP: &str = "\
 Environment variables:
-  DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent; overrides the saved login
+  DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
@@ -189,6 +189,7 @@ pub(crate) const ADMIN_RESET_PASSWORD_HELP: &str =
 pub(crate) const ADMIN_FACTORY_RESET_HELP: &str = "\
 Examples:
   dopbase admin factory-reset
+  dopbase admin factory-reset --no-backup
   dopbase --data-dir /srv/dopbase admin factory-reset
 ";
 
@@ -237,6 +238,8 @@ Examples:
 pub(crate) const CLIENT_CONNECT_HELP: &str = "\
 Examples:
   dopbase client connect https://dopbase.example.com
+  dopbase client connect http://dopbase.internal
+  dopbase client connect 192.168.1.20:8840
   dopbase client connect local
 ";
 pub(crate) const CLIENT_STATUS_HELP: &str = "\

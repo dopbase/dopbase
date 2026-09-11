@@ -1,7 +1,8 @@
 use app::cli::{
   client::{Credential, CredentialSource, credential_from_sources, validate_runner_token},
   commands::{
-    factory_reset_confirmation_matches, factory_reset_quarantine_path, run_environment,
+    complete_factory_reset, factory_reset_archive_path, factory_reset_confirmation_matches,
+    factory_reset_quarantine_path, insecure_transport_warning, run_environment,
     server_switch_confirmed, status_document, validate_factory_reset_target,
   },
   local_config::{ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource},
@@ -67,6 +68,107 @@ fn factory_reset_quarantine_is_a_timestamped_sibling() {
       .unwrap()
       .to_string_lossy()
       .starts_with("instance.factory-reset-")
+  );
+}
+
+#[test]
+fn factory_reset_creates_a_zip_and_removes_the_data_directory() {
+  use std::io::Read;
+
+  let directory = TempDir::new().unwrap();
+  let data_dir = directory.path().join("instance");
+  let nested = data_dir.join("backups");
+  std::fs::create_dir_all(&nested).unwrap();
+  std::fs::write(data_dir.join("dopbase.db"), b"database").unwrap();
+  std::fs::write(nested.join("existing.dop"), b"backup").unwrap();
+
+  let archive = complete_factory_reset(&data_dir, false).unwrap().unwrap();
+  assert!(!data_dir.exists());
+  assert!(archive.exists());
+  assert_eq!(
+    archive,
+    factory_reset_archive_path(
+      &archive.with_file_name(
+        archive
+          .file_name()
+          .unwrap()
+          .to_string_lossy()
+          .trim_end_matches(".zip")
+      )
+    )
+  );
+
+  let file = std::fs::File::open(&archive).unwrap();
+  let mut zip = zip::ZipArchive::new(file).unwrap();
+  let root = "instance";
+  let mut database = String::new();
+  zip
+    .by_name(&format!("{root}/dopbase.db"))
+    .unwrap()
+    .read_to_string(&mut database)
+    .unwrap();
+  assert_eq!(database, "database");
+  assert!(zip.by_name(&format!("{root}/backups/existing.dop")).is_ok());
+
+  #[cfg(unix)]
+  {
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(
+      std::fs::metadata(&archive).unwrap().permissions().mode() & 0o777,
+      0o600
+    );
+  }
+}
+
+#[test]
+fn factory_reset_no_backup_removes_data_without_an_archive() {
+  let directory = TempDir::new().unwrap();
+  let data_dir = directory.path().join("instance");
+  std::fs::create_dir_all(&data_dir).unwrap();
+  std::fs::write(data_dir.join("dopbase.db"), b"database").unwrap();
+
+  assert!(complete_factory_reset(&data_dir, true).unwrap().is_none());
+  assert!(!data_dir.exists());
+  assert!(
+    std::fs::read_dir(directory.path())
+      .unwrap()
+      .next()
+      .is_none()
+  );
+}
+
+#[cfg(unix)]
+#[test]
+fn factory_reset_restores_data_when_the_zip_cannot_include_a_symlink() {
+  use std::os::unix::fs::symlink;
+
+  let directory = TempDir::new().unwrap();
+  let data_dir = directory.path().join("instance");
+  std::fs::create_dir_all(&data_dir).unwrap();
+  std::fs::write(data_dir.join("dopbase.db"), b"database").unwrap();
+  symlink(directory.path(), data_dir.join("outside")).unwrap();
+
+  let error = complete_factory_reset(&data_dir, false)
+    .unwrap_err()
+    .to_string();
+  assert!(error.contains("ZIP backup could not be created"), "{error}");
+  assert!(data_dir.exists());
+  assert!(data_dir.join("outside").is_symlink());
+  assert_eq!(
+    std::fs::read_dir(directory.path())
+      .unwrap()
+      .filter_map(Result::ok)
+      .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "zip"))
+      .count(),
+    0
+  );
+}
+
+#[test]
+fn insecure_transport_warning_names_the_server_and_the_risk() {
+  assert_eq!(
+    insecure_transport_warning("http://192.168.1.20:8840"),
+    "Plain HTTP does not encrypt traffic to http://192.168.1.20:8840. Credentials and secrets could be exposed. Use HTTPS whenever possible."
   );
 }
 use std::env::VarError;

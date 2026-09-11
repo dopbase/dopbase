@@ -1,4 +1,4 @@
-use app::cli::args::{Cli, Command, ServerCommand};
+use app::cli::args::{AdminCommand, Cli, Command, ServerCommand};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   session,
@@ -128,6 +128,7 @@ fn parses_every_v0_1_command_shape() {
     ],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
     &["dopbase", "admin", "factory-reset"],
+    &["dopbase", "admin", "factory-reset", "--no-backup"],
     &["dopbase", "update"],
     &["dopbase", "backup"],
     &["dopbase", "backup", "my-backup"],
@@ -150,6 +151,18 @@ fn parses_every_v0_1_command_shape() {
     Cli::try_parse_from(*command)
       .unwrap_or_else(|error| panic!("failed to parse {command:?}: {error}"));
   }
+}
+
+#[test]
+fn factory_reset_parses_no_backup() {
+  let cli = Cli::try_parse_from(["dopbase", "admin", "factory-reset", "--no-backup"]).unwrap();
+  let Command::Admin {
+    command: AdminCommand::FactoryReset { no_backup, .. },
+  } = cli.command
+  else {
+    panic!("expected factory-reset command");
+  };
+  assert!(no_backup);
 }
 
 #[test]
