@@ -40,10 +40,10 @@ human login or runner token replaces it. CI systems can set `DOPBASE_TOKEN`
 instead. For a one-off override, use:
 
 ```bash
-dopbase run env_482731 --token "$RUNNER_TOKEN" -- ./payment-service
+dopbase run env_482731 -t "$RUNNER_TOKEN" -- ./payment-service
 ```
 
-Credential priority is `--token`, then `DOPBASE_TOKEN`, then the saved
+Credential priority is `-t` or `--token`, then `DOPBASE_TOKEN`, then the saved
 credential. Command-line tokens may appear in shell history or process
 inspection, so prefer a saved token for a long-running server.
 

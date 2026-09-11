@@ -37,9 +37,9 @@ The prompt does not echo the token. A provisioning script can pipe it instead:
 printf '%s' "$RUNNER_TOKEN" | dopbase login --token
 ```
 
-For one run, pass `--token <TOKEN>` before the child-command separator. CI and
-deployment platforms can set `DOPBASE_TOKEN`. Authentication uses the command
-flag first, then `DOPBASE_TOKEN`, then the saved credential.
+For one run, pass `-t <TOKEN>` or `--token <TOKEN>` before the child-command
+separator. CI and deployment platforms can set `DOPBASE_TOKEN`. Authentication
+uses the command flag first, then `DOPBASE_TOKEN`, then the saved credential.
 
 `dopbase login` and `dopbase login --token` encrypt their credential in the
 extensionless `session` file under the Dopbase data directory. The separate

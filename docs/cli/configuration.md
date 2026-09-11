@@ -192,7 +192,7 @@ The effective server is resolved in this order:
 
 Authentication is resolved in this order:
 
-1. `--token <TOKEN>` on `dopbase run`
+1. `-t <TOKEN>` or `--token <TOKEN>` on `dopbase run`
 2. `DOPBASE_TOKEN`
 3. The encrypted credential matching the normalized active server
 
