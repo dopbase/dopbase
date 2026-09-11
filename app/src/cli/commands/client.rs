@@ -29,8 +29,11 @@ pub(super) async fn connect(
   let target = if value == "local" {
     DEFAULT_PUBLIC_URL.to_owned()
   } else {
-    local_config::normalize(value)?
+    local_config::normalize_connect_target(value)?
   };
+  if target.starts_with("http://") {
+    output::print_warning(&insecure_transport_warning(&target));
+  }
   let prospective = local_config::ResolvedServer {
     url: target.clone(),
     source: local_config::ServerSource::Argument,
@@ -118,6 +121,12 @@ pub(super) async fn connect(
     default_environment_cleared,
   );
   Ok(())
+}
+
+pub fn insecure_transport_warning(server_url: &str) -> String {
+  format!(
+    "Plain HTTP does not encrypt traffic to {server_url}. Credentials and secrets could be exposed. Use HTTPS whenever possible."
+  )
 }
 
 async fn confirm_server_switch(

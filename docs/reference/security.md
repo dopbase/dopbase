@@ -61,13 +61,13 @@ Authorized users may need to reveal or export a value. These operations should b
 Successful `dopbase run` operations cache their runtime payload locally using
 XChaCha20-Poly1305 with a fresh nonce. A separate local cache key and the exact
 credential that fetched the payload are both required to derive the decryption
-key. Cache files, metadata, key names, and values are encrypted; logs expose
+key. Cache files, metadata, key names, and values are encrypted. Logs expose
 only safe runtime metadata, cache source, fetch time, age, and key count.
 
 An unavailable server cannot confirm whether a credential or secret was later
 revoked. Offline fallback therefore deliberately favors availability and may
 inject stale values. It is limited to connection failures, timeouts, and server
-5xx responses; an explicit authentication, authorization, or not-found response
+5xx responses. An explicit authentication, authorization, or not-found response
 always fails closed.
 
 ## Reporting vulnerabilities

@@ -62,14 +62,14 @@ dopbase export payment-service/staging --stdout
 File export refuses to overwrite an existing path without `--force` and uses
 restrictive permissions where supported. Export reveals plaintext values, so
 it is permission-controlled and audited. Every CLI export requires an
-interactive password confirmation; there is no non-interactive bypass.
+interactive password confirmation. There is no non-interactive bypass.
 
 Prefer [`dopbase run`](./run-an-application) when an application only needs
 secrets in its process environment.
 
 The same import and export workflows are available in the browser. The Admin UI
 parses the file locally, shows a key review and a dry-run summary before
-applying, and downloads exports; see [import and export](/ui/import-export).
+applying, and downloads exports. See [import and export](/ui/import-export).
 
 ## Handle values safely
 

@@ -17,7 +17,7 @@ export type SetupMode = "setup" | "restore";
 /**
  * First-run setup controller: claims the uninitialized server with the
  * one-time setup token, creates the single admin, and starts the returned
- * session; OR restores the entire instance from an encrypted .dop backup.
+ * session, or restores the entire instance from an encrypted .dop backup.
  */
 export function useSetupController() {
   const router = useRouter();

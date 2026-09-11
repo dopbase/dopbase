@@ -43,7 +43,7 @@ pub(super) async fn execute(
       reason,
     } => {
       eprintln!(
-        "Dopbase warning: {reason}; using encrypted cache fetched at {fetched_at} ({age} old)."
+        "Dopbase warning: {reason}. Using encrypted cache fetched at {fetched_at} ({age} old)."
       );
     }
   }

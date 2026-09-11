@@ -77,7 +77,7 @@ pub async fn get(
   params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
   request_body = SetSecretRequest,
   responses(
-    (status = 200, description = "Secret stored; the new metadata is returned", body = inline(HttpResponseFormat<SecretMetadata>)),
+    (status = 200, description = "Secret stored. The new metadata is returned", body = inline(HttpResponseFormat<SecretMetadata>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
@@ -129,7 +129,7 @@ pub async fn delete(
 /// Reveal a secret value
 ///
 /// Decrypt and return a secret value. Requires recent password
-/// authentication and the CSRF header for browser sessions; the access is
+/// authentication and the CSRF header for browser sessions. The access is
 /// recorded in the audit log.
 #[utoipa::path(
   post,
@@ -170,7 +170,7 @@ pub async fn reveal(
   params(("environment_id" = String, Path, description = "Environment id")),
   request_body = ImportSecretsRequest,
   responses(
-    (status = 200, description = "Import applied (or previewed when dry run); added, updated, unchanged, and deleted keys are returned", body = inline(HttpResponseFormat<ImportSecretsResponse>)),
+    (status = 200, description = "Import applied, or previewed when dry run. Added, updated, unchanged, and deleted keys are returned", body = inline(HttpResponseFormat<ImportSecretsResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
@@ -223,7 +223,7 @@ pub async fn layout(
 /// Export all secrets
 ///
 /// Decrypt and return every secret in the environment. Requires recent
-/// password authentication and the CSRF header for browser sessions; the
+/// password authentication and the CSRF header for browser sessions. The
 /// export is recorded in the audit log.
 #[utoipa::path(
   post,
@@ -254,7 +254,7 @@ pub async fn export(
 /// Fetch runtime secrets
 ///
 /// Return every decrypted secret of an environment for use by a runner.
-/// Administrators may fetch any environment; runner tokens are restricted
+/// Administrators may fetch any environment. Runner tokens are restricted
 /// to the environment their token belongs to. The access is recorded in
 /// the audit log.
 #[utoipa::path(

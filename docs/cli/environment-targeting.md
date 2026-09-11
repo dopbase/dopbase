@@ -17,7 +17,7 @@ not a credential. Secret access still requires an authenticated administrator
 or a runner token scoped to that environment.
 
 The server connection is separate machine-global state. With no configured
-server, Dopbase uses `http://localhost:8840`; `client connect` can select another
+server, Dopbase uses `http://localhost:8840`. `client connect` can select another
 endpoint. See [client configuration](./configuration).
 
 This keeps the selected environment visible at the point where secrets are

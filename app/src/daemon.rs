@@ -25,7 +25,7 @@ const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// One-shot readiness reporter used by the supervised server process.
 ///
 /// When the server is started by [`start`], the parent process inherits a pipe
-/// write end into the child as `READY_FD`; the child reports `ok …` or
+/// write end into the child as `READY_FD`. The child reports `ok …` or
 /// `error …` exactly once so the foreground command can relay the real startup
 /// error (bind failure, master-key problem, …) to the user.
 pub struct Ready {
@@ -71,7 +71,7 @@ impl Ready {
     self.report(line);
   }
 
-  /// Report a startup failure; `message` must be a single line, so any
+  /// Report a startup failure. `message` must be a single line, so any
   /// newlines in the error chain are flattened.
   pub fn fail(
     &self,
@@ -318,7 +318,7 @@ async fn spawn(
     .stdout(Stdio::from(log))
     .stderr(Stdio::from(log_error));
   // Strip DOPBASE_* variables so the child resolves its configuration from
-  // the explicit flags above; everything else (PATH, HOME, RUST_LOG, …)
+  // the explicit flags above. Everything else (PATH, HOME, RUST_LOG, …)
   // passes through.
   for variable in crate::constants::config::daemon_environment_names() {
     command.env_remove(variable);
@@ -333,7 +333,7 @@ async fn spawn(
     unsafe {
       command.pre_exec(move || {
         let _ = nix::unistd::setsid();
-        // Re-open the readiness pipe as READY_FD; dup2 also clears the
+        // Re-open the readiness pipe as READY_FD. dup2 also clears the
         // close-on-exec flag std sets on the pipe, so the descriptor
         // survives exec. The returned owner of READY_FD is forgotten —
         // the child keeps it open for the readiness report.
@@ -358,11 +358,11 @@ async fn spawn(
   let line = match tokio::time::timeout(READY_TIMEOUT, read).await {
     Ok(Ok(Ok(line))) if !line.trim().is_empty() => line,
     Ok(_) => bail!(
-      "the background server exited before becoming ready; see {}",
+      "the background server exited before becoming ready. See {}",
       log_path.display()
     ),
     Err(_) => bail!(
-      "the background server did not become ready within {}s; see {}",
+      "the background server did not become ready within {}s. See {}",
       READY_TIMEOUT.as_secs(),
       log_path.display()
     ),
@@ -384,10 +384,10 @@ async fn spawn(
     }
     Some("error") => {
       let message = line.trim().strip_prefix("error ").unwrap_or(line.trim());
-      bail!("{message}; see {}", log_path.display());
+      bail!("{message}. See {}", log_path.display());
     }
     _ => bail!(
-      "the background server reported an unexpected readiness state; see {}",
+      "the background server reported an unexpected readiness state. See {}",
       log_path.display()
     ),
   }
@@ -434,7 +434,7 @@ pub async fn stop_managed(
     Err(error) => {
       let _ = remove_pid_file(&path);
       return Err(error.context(format!(
-        "removed the unreadable PID file {}; if a daemon is still running, stop it manually",
+        "removed the unreadable PID file {}. If a daemon is still running, stop it manually",
         path.display()
       )));
     }
@@ -448,7 +448,7 @@ pub async fn stop_managed(
       let _ = ownership.unlock();
       let _ = remove_pid_file(&path);
       bail!(
-        "no running Dopbase daemon owns {}; refusing to signal pid {} and removing the stale PID file",
+        "no running Dopbase daemon owns {}. Refusing to signal pid {} and removing the stale PID file",
         path.display(),
         pid_file.pid,
       );
@@ -487,7 +487,7 @@ pub async fn stop_managed(
   }
   if !stopped {
     bail!(
-      "the daemon (pid {}) did not stop; check {}",
+      "the daemon (pid {}) did not stop. Check {}",
       pid_file.pid,
       path.display()
     );

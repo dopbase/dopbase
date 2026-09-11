@@ -54,7 +54,7 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 let csrfProvider: () => string | null = () => null;
 
 /**
- * Registers where the CSRF token comes from. Called once by the auth store;
+ * Registers where the CSRF token comes from. Called once by the auth store.
  * mutating requests read the token lazily on every call.
  */
 export function registerCsrfProvider(provider: () => string | null): void {
@@ -95,7 +95,7 @@ export interface ApiRequestOptions {
    * (login and first-admin bootstrap) which run before any CSRF token exists.
    */
   anonymous?: boolean;
-  /** Response payload format; defaults to "json". */
+  /** Response payload format. Defaults to "json". */
   responseType?: "json" | "blob";
   /** Suppresses global 401/reauthentication notifications for form checks. */
   notifyAuthEvents?: boolean;
@@ -112,15 +112,16 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
       error?: ApiErrorCodeMap;
     };
     const codes = payload.error;
-    if (!codes || typeof codes !== "object" || Object.keys(codes).length === 0) {
+    if (
+      !codes ||
+      typeof codes !== "object" ||
+      Object.keys(codes).length === 0
+    ) {
       return new ApiError(response.status, {
         INTERNAL_ERROR: "The server reported an error.",
       });
     }
-    return new ApiError(
-      response.status,
-      codes,
-    );
+    return new ApiError(response.status, codes);
   } catch {
     return new ApiError(response.status, {
       INTERNAL_ERROR: "The server returned an unreadable error response.",

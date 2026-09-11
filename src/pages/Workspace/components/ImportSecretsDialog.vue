@@ -7,7 +7,7 @@ import { useImportSecretsDialogController } from "./ImportSecretsDialog.controll
 /**
  * ImportSecretsDialog — picks and parses a `.env` file locally, then hands
  * the parsed entries to the full-page review (`environment-import` route)
- * via the import store. Values are never rendered; the review happens on
+ * via the import store. Values are never rendered. The review happens on
  * the page, not in this popup, so large files scroll freely.
  */
 const props = defineProps<{

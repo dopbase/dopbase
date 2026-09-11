@@ -37,7 +37,7 @@ function onInput(event: Event): void {
 <template>
   <div class="flex flex-col gap-1.5">
     <!-- PocketBase-style field: label inside the filled, borderless
-         textarea; the fill lightens on focus. -->
+         textarea. The fill lightens on focus. -->
     <div
       class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
       :class="[

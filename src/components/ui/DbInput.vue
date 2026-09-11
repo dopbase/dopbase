@@ -5,7 +5,7 @@ import { EyeIcon, EyeOffIcon } from "~/assets/icons";
 /**
  * DbInput — labeled text input with inline validation and hint slots.
  * Password inputs get a built-in show/hide (eye) toggle.
- * Presentation-only; validation messages are passed in as props.
+ * Presentation-only. Validation messages are passed in as props.
  */
 const props = withDefaults(
   defineProps<{
@@ -50,8 +50,8 @@ const resolvedType = computed(() =>
  * Password fields default to a masked-dots placeholder so users can
  * spot the password field even without an explicit label hint.
  */
-const resolvedPlaceholder = computed(() =>
-  props.placeholder ?? (isPassword.value ? "••••••••" : undefined),
+const resolvedPlaceholder = computed(
+  () => props.placeholder ?? (isPassword.value ? "••••••••" : undefined),
 );
 
 function onInput(event: Event): void {

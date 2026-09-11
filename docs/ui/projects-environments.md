@@ -44,7 +44,7 @@ Selection lives in the URL, not in some hidden app state:
 /workspace/p/payment-service/e/env_482731
 ```
 
-The project part uses the name; the environment part uses its immutable ID.
+The project part uses the name. The environment part uses its immutable ID.
 Bookmark a production environment, paste a link to a teammate, or put the URL
 in a runbook. The link opens the same place later.
 

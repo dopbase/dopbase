@@ -6,12 +6,12 @@ description: "Import a .env file into a Dopbase environment and export values ba
 # Import and export
 
 Most projects start with a `.env` file somewhere. Import brings it into
-Dopbase; export gets values back out when something needs the file form.
+Dopbase. Export gets values back out when something needs the file form.
 
 ## Importing a `.env` file
 
 1. Open the environment that should receive the values and choose **Import**.
-2. Pick the file. Parsing happens in your browser; nothing is uploaded yet.
+2. Pick the file. Parsing happens in your browser. Nothing is uploaded yet.
    Lines that cannot be parsed are skipped and counted, with the reasons
    listed.
 3. Review on the next page. It lists the key names the file contains. Values

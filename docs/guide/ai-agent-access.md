@@ -20,8 +20,8 @@ Use an AI agent token for tasks such as:
 
 - checking whether variables referenced by the code exist in Dopbase;
 - comparing the secret names in development, staging, and production;
-- finding a missing or renamed variable without exposing its value;
-- creating an `.env.example` file with empty placeholders; or
+- finding a missing or renamed variable without exposing its value
+- creating an `.env.example` file with empty placeholders
 - reviewing deployment files that refer to environment variables.
 
 An agent token cannot verify whether a stored credential works, run integration

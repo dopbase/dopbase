@@ -37,7 +37,7 @@ function persistCsrf(token: string | null): void {
     if (token) sessionStorage.setItem(CSRF_STORAGE_KEY, token);
     else sessionStorage.removeItem(CSRF_STORAGE_KEY);
   } catch {
-    // Storage unavailable; keep the token in memory only.
+    // Storage is unavailable, so keep the token in memory only.
   }
 }
 
@@ -63,7 +63,9 @@ export const useAuthStore = defineStore("auth", () => {
 
   const isAuthenticated = computed(() => session.value !== null);
   const isRoot = computed(() => session.value?.role === "root");
-  const isAdmin = computed(() => session.value?.role === "root" || session.value?.role === "admin");
+  const isAdmin = computed(
+    () => session.value?.role === "root" || session.value?.role === "admin",
+  );
 
   function setCsrf(token: string | null): void {
     csrfToken.value = token;
@@ -122,7 +124,7 @@ export const useAuthStore = defineStore("auth", () => {
     if (response.csrfToken) setCsrf(response.csrfToken);
   }
 
-  /** Re-checks the cookie session; throws ApiError(401) when absent. */
+  /** Re-checks the cookie session and throws ApiError(401) when absent. */
   async function fetchSession(): Promise<void> {
     const response = await authApi.fetchSession();
     session.value = {

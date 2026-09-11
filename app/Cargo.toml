@@ -29,11 +29,7 @@ axum = { version = "0.8", default-features = false, features = [
   "tracing",
 ] }
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
-tower-http = { version = "0.7", features = [
-  "request-id",
-  "timeout",
-  "trace",
-] }
+tower-http = { version = "0.7", features = ["request-id", "timeout", "trace"] }
 # API Documentation
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
@@ -59,6 +55,7 @@ url = "2"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
+  "rustls-tls-native-roots",
   "multipart",
 ] }
 # Envelope encryption (authenticated encryption)
@@ -90,6 +87,7 @@ nix = { version = "0.30", features = ["signal", "process", "fs"] }
 tower = { version = "0.5", features = ["util"] }
 
 [profile.release]
+opt-level = "z"
 strip = "symbols"
 lto = "thin"
 codegen-units = 1

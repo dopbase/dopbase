@@ -1,6 +1,6 @@
 use app::cli::local_config::{
   ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource, clear_default_environment,
-  normalize, read, save_default_environment,
+  normalize, normalize_connect_target, read, save_default_environment,
 };
 use tempfile::TempDir;
 
@@ -92,26 +92,107 @@ fn old_configuration_without_a_default_still_loads() {
 }
 
 #[test]
-fn server_urls_require_https_except_on_loopback() {
+fn explicit_server_urls_accept_http_and_https() {
   for url in [
     "https://dopbase.example.com",
+    "http://dopbase.example.com",
     "http://localhost:8840",
     "http://127.0.0.42:8840",
     "http://[::1]:8840",
+    "http://192.168.1.10:8840",
+    "http://[2001:db8::1]:8840",
   ] {
     assert!(normalize(url).is_ok(), "expected {url} to be accepted");
   }
+}
 
-  for url in [
-    "http://dopbase.example.com",
-    "http://192.168.1.10:8840",
-    "http://localhost.example.com:8840",
-    "http://[2001:db8::1]:8840",
+#[test]
+fn bare_ip_addresses_default_to_http() {
+  assert_eq!(
+    normalize_connect_target("192.168.1.20").unwrap(),
+    "http://192.168.1.20"
+  );
+  assert_eq!(
+    normalize_connect_target("192.168.1.20:8840").unwrap(),
+    "http://192.168.1.20:8840"
+  );
+  assert_eq!(
+    normalize_connect_target("2001:db8::1").unwrap(),
+    "http://[2001:db8::1]"
+  );
+  assert_eq!(
+    normalize_connect_target("[2001:db8::1]:8840").unwrap(),
+    "http://[2001:db8::1]:8840"
+  );
+}
+
+#[test]
+fn bare_domains_require_an_explicit_scheme() {
+  assert_eq!(
+    normalize_connect_target("dopbase.example.com")
+      .unwrap_err()
+      .to_string(),
+    "Server domains must include http:// or https://. For example: https://dopbase.example.com"
+  );
+}
+
+#[test]
+fn invalid_server_input_explains_the_accepted_formats() {
+  let error = normalize_connect_target("sdkfsdf").unwrap_err().to_string();
+  assert!(error.contains("is not valid"), "{error}");
+  assert!(error.contains("https://dopbase.example.com"), "{error}");
+  assert!(error.contains("192.168.1.20:8840"), "{error}");
+
+  for value in [
+    " http://dopbase.example.com",
+    "http://sdkfsdf",
+    "192.168.1.999",
   ] {
-    let error = normalize(url).unwrap_err().to_string();
     assert!(
-      error.contains("remote URLs must use HTTPS"),
-      "{url}: {error}"
+      normalize_connect_target(value)
+        .unwrap_err()
+        .to_string()
+        .contains("is not valid"),
+      "{value}"
     );
   }
+}
+
+#[test]
+fn invalid_server_ports_have_a_focused_error() {
+  for value in [
+    "192.168.1.20:0",
+    "192.168.1.20:65536",
+    "https://dopbase.example.com:0",
+    "https://dopbase.example.com:65536",
+  ] {
+    assert_eq!(
+      normalize_connect_target(value).unwrap_err().to_string(),
+      "The server port must be between 1 and 65535. For example: 192.168.1.20:8840",
+      "{value}"
+    );
+  }
+}
+
+#[test]
+fn unsupported_schemes_and_url_metadata_are_rejected() {
+  assert_eq!(
+    normalize_connect_target("ftp://dopbase.example.com")
+      .unwrap_err()
+      .to_string(),
+    "The server address must use http:// or https://. For example: https://dopbase.example.com"
+  );
+
+  assert!(
+    normalize_connect_target("https://user:pass@dopbase.example.com")
+      .unwrap_err()
+      .to_string()
+      .contains("must not contain credentials")
+  );
+  assert!(
+    normalize_connect_target("https://dopbase.example.com?mode=test")
+      .unwrap_err()
+      .to_string()
+      .contains("must not contain a query or fragment")
+  );
 }

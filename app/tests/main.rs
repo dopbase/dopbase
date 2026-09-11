@@ -985,7 +985,7 @@ async fn env_layout_persists_with_import_and_omits_values() {
 async fn password_reverification_is_rate_limited() {
   let (_directory, state, router, token, _environment_id) = admin_environment().await;
   // Five wrong attempts exhaust the account budget shared by reauthenticate,
-  // change-password, and factory-reset; the sixth is throttled.
+  // change-password, and factory-reset. The sixth is throttled.
   for _ in 0..5 {
     let (status, _, _) = call(
       &router,

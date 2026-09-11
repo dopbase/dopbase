@@ -135,7 +135,7 @@ response errors never fall back to cache.
 
 The cache is bound to the normalized server URL and exact session or runner
 token that populated it. A logout or token rotation therefore makes the old
-cache unavailable. Cache entries do not expire automatically; an offline run
+cache unavailable. Cache entries do not expire automatically. An offline run
 prints the original fetch time and age so operators can judge staleness.
 
 Managed values override same-named variables inherited from the parent process.

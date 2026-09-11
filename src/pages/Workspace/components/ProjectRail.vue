@@ -17,7 +17,7 @@ import type { Environment, Project } from "~/services";
  *
  * Renders the hierarchy and selection state plus all project/environment
  * create, rename, and delete interactions. Destructive dialogs require
- * typing the resource name; environment deletion lists affected counts.
+ * typing the resource name. Environment deletion lists affected counts.
  */
 const props = defineProps<{ controller: WorkspaceController }>();
 
@@ -58,7 +58,7 @@ async function openEnvDelete(environment: Environment): Promise<void> {
       environment.id,
     );
   } catch {
-    // The preview is best-effort; deletion still confirms by name.
+    // The preview is best effort. Deletion still confirms by name.
   }
 }
 

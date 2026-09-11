@@ -16,7 +16,7 @@ interface PendingOperation {
 
 const pending: PendingOperation[] = [];
 
-// One listener serves every caller; mounting a panel no longer grows the
+// One listener serves every caller. Mounting a panel no longer grows the
 // HTTP client's global listener set.
 onReauthenticationRequired(() => {
   error.value = null;

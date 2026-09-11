@@ -65,7 +65,7 @@ Errors map stable codes to safe messages:
 
 Validation may report more than one code in the `error` object. Clients must
 branch on the code rather than the English message or object ordering. Request
-correlation is returned in the `X-Request-Id` header; errors never include
+correlation is returned in the `X-Request-Id` header. Errors never include
 request bodies, plaintext secrets, tokens, key material, SQL, or filesystem
 details.
 

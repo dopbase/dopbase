@@ -16,7 +16,7 @@ export interface CreateTokenRequest {
 
 export interface CreatedTokenResponse {
   token: RunnerToken;
-  /** Shown exactly once; only its hash is persisted server-side. */
+  /** Shown exactly once. Only its hash is persisted server-side. */
   plaintextToken: string;
 }
 

@@ -51,7 +51,7 @@ pub async fn list(
   params(("environment_id" = String, Path, description = "Environment id")),
   request_body = CreateTokenRequest,
   responses(
-    (status = 201, description = "Token created; the plaintext token is returned once", body = inline(HttpResponseFormat<CreatedTokenResponse>)),
+    (status = 201, description = "Token created. The plaintext token is returned once", body = inline(HttpResponseFormat<CreatedTokenResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
@@ -75,7 +75,7 @@ pub async fn create(
 
 /// Revoke a runner token
 ///
-/// Permanently revoke a runner token; the change cannot be undone.
+/// Permanently revoke a runner token. The change cannot be undone.
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,

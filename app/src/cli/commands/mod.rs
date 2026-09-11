@@ -16,9 +16,10 @@ mod server;
 mod token;
 
 pub use admin::{
-  factory_reset_confirmation_matches, factory_reset_quarantine_path, validate_factory_reset_target,
+  complete_factory_reset, factory_reset_archive_path, factory_reset_confirmation_matches,
+  factory_reset_quarantine_path, validate_factory_reset_target,
 };
-pub use client::{server_switch_confirmed, status_document};
+pub use client::{insecure_transport_warning, server_switch_confirmed, status_document};
 #[doc(hidden)]
 pub use output::{render_fields, render_table};
 #[doc(hidden)]
@@ -44,7 +45,7 @@ pub async fn execute(cli: Cli) -> Result<i32> {
     } => {
       if server_argument.is_some() {
         bail!(
-          "--server cannot be used with `dopbase client connect`; pass the destination as the positional server URL"
+          "--server cannot be used with `dopbase client connect`. Pass the destination as the positional server URL"
         );
       }
       client::connect(&server_url, data_dir.as_deref(), json_output).await?;

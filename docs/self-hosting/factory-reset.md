@@ -12,7 +12,7 @@ setup again. Only root can use it from the Admin UI or from the server host.
 Factory reset removes every project, environment, secret, user account, access
 token, audit record, and backup from the active instance. This includes the
 root account and signs everyone out. The Admin UI deletes this data. The host
-command moves the complete data directory to a quarantine path.
+command saves the complete data directory as a ZIP before removing it.
 
 This action cannot be undone from the console. Do not continue unless you
 understand what will be removed and no longer need the data.
@@ -55,11 +55,19 @@ phrase is case-sensitive and does not allow extra spaces. There is no flag to
 bypass the prompts.
 
 Use `--data-dir` or `--config` when the instance does not use the default path.
-The command moves the whole data directory to a timestamped quarantine path.
-Every database, master-key, configuration, backup, log, and local CLI file
-stored inside it moves too. Files configured outside the data directory are not
-moved. Remove the quarantine directory yourself after checking that you no
-longer need it.
+The command writes the whole data directory to a timestamped ZIP beside the
+directory, then removes the active data. The ZIP includes every database,
+master-key, configuration, backup, log, and local CLI file stored inside the
+directory. Files configured outside the data directory are not included.
+
+To reset without creating the ZIP, run:
+
+```bash
+dopbase admin factory-reset --no-backup
+```
+
+This mode permanently removes the data after the same confirmation phrase and
+root-password checks. Keep an external backup before using it.
 
 ## After reset
 

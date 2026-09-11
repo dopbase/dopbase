@@ -271,6 +271,6 @@ async fn unavailable_server_without_cache_does_not_provide_runtime_values() {
     .await
     .unwrap_err()
     .to_string();
-  assert!(error.contains("environment variables were not injected"));
+  assert!(error.contains("Environment variables were not injected"));
   assert!(error.contains("child was not started"));
 }

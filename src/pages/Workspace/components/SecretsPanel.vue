@@ -50,7 +50,7 @@ const environmentIdRef = computed(() => props.environmentId);
 const controller = useSecretsPanelController(environmentIdRef);
 const route = useRoute();
 // Returning from the full-page import sets an `imported` timestamp in the
-// query; refetch so the table reflects what was just applied.
+// query. Refetch so the table reflects what was just applied.
 watch(
   () => route.query.imported,
   () => {
@@ -175,7 +175,7 @@ async function submitForm(): Promise<void> {
     !isValidSecretKey(form.value.key.trim())
   ) {
     form.value.error =
-      "Use 1–128 characters: letters, numbers, and '_'; start with a letter or '_'.";
+      "Use 1 to 128 characters. Use letters, numbers, and '_', and start with a letter or '_'.";
     return;
   }
   saving.value = true;
@@ -578,7 +578,7 @@ async function confirmDelete(): Promise<void> {
           name="key"
           placeholder="DATABASE_URL"
           mono
-          hint="Letters, numbers, '_', '-'; cannot start with a number." />
+          hint="Use letters, numbers, '_', and '-'. The first character cannot be a number." />
         <div v-else class="flex flex-col gap-1.5">
           <span class="text-xs font-medium text-ink-muted">Key</span>
           <DbCode>{{ form.secret.key }}</DbCode>

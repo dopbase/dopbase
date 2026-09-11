@@ -11,7 +11,7 @@ export const AUDIT_PAGE_SIZE = 25;
 /**
  * Audit screen controller: cursor-paginated event listing with filters for
  * action, project, environment, and actor. Changing any filter reloads
- * from the first page; "Load more" appends the next cursor page.
+ * from the first page. "Load more" appends the next cursor page.
  */
 export function useAuditController() {
   const items = ref<AuditEvent[]>([]);
@@ -34,7 +34,10 @@ export function useAuditController() {
 
   const projectOptions = computed(() => [
     { label: "All projects", value: "" },
-    ...projects.value.map((project) => ({ label: project.name, value: project.id })),
+    ...projects.value.map((project) => ({
+      label: project.name,
+      value: project.id,
+    })),
   ]);
   const environmentOptions = computed(() => [
     { label: "All environments", value: "" },
@@ -47,7 +50,9 @@ export function useAuditController() {
     projects.value.find((project) => project.id === id)?.name ?? id ?? "—";
   const environmentName = (id: string | null): string => {
     if (!id) return "—";
-    const match = environments.value.find((environment) => environment.id === id);
+    const match = environments.value.find(
+      (environment) => environment.id === id,
+    );
     return match ? `${match.projectName}/${match.name}` : id;
   };
 
@@ -109,7 +114,7 @@ export function useAuditController() {
       projects.value = projectList;
       environments.value = environmentList;
     } catch {
-      // Filter dropdowns stay empty; the log itself still renders.
+      // Filter dropdowns stay empty while the log itself still renders.
     }
   }
 

@@ -32,7 +32,7 @@ pub fn validate_endpoint_transport(url: &Url) -> Result<()> {
   };
   if !is_loopback {
     bail!(
-      "remote URLs must use HTTPS; HTTP is only allowed for localhost or a loopback IP address"
+      "remote URLs must use HTTPS. HTTP is only allowed for localhost or a loopback IP address"
     );
   }
   Ok(())
@@ -63,8 +63,8 @@ pub struct ServerConfig {
   pub daemonized: bool,
   pub master_key: MasterKeyConfig,
   /// True when public_url came from an explicit source. Otherwise it is
-  /// derived from the bind address (`http://localhost:{port}` for loopback;
-  /// remote binds fail closed and require an explicit value).
+  /// derived from the bind address as `http://localhost:{port}` for loopback.
+  /// Remote binds fail closed and require an explicit value.
   #[serde(skip)]
   pub public_url_explicit: bool,
 }

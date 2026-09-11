@@ -7,7 +7,7 @@ import { useImportSecretsController } from "./ImportSecrets.controller";
  * ImportSecrets — full-page review of a parsed `.env` import.
  *
  * The upload dialog parses the file and hands it over via the import
- * store; this page renders the review at full height so large files
+ * store. This page renders the review at full height so large files
  * scroll freely (the popup version could not). Keys are listed but values
  * are never rendered. Landing here without a pending import for this
  * environment (direct URL, reload) bounces back to the environment.

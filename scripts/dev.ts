@@ -56,7 +56,7 @@ const firstExit = await Promise.race(
 
 if (!stopping) {
   console.error(
-    `${firstExit.name} exited with code ${firstExit.exitCode}; stopping development.`,
+    `${firstExit.name} exited with code ${firstExit.exitCode}. Stopping development.`,
   );
   await stop("SIGTERM", firstExit.exitCode);
 }

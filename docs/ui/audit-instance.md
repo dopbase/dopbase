@@ -5,7 +5,7 @@ description: "Review what happened on your Dopbase server with the audit log and
 
 # Audit and instance status
 
-Audit shows recorded activity; Instance shows server health and an overview
+Audit shows recorded activity. Instance shows server health and an overview
 of what is stored on your instance.
 
 ## The audit log

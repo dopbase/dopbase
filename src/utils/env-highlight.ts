@@ -3,7 +3,7 @@
  *
  * Pure presentation: tokens must concatenate back to the exact line text so
  * the overlay stays pixel-aligned with the transparent textarea above it.
- * Authoritative validation comes from `parseEnvFileLines`; malformed lines
+ * Authoritative validation comes from `parseEnvFileLines`. Malformed lines
  * here merely collapse into a single "error" token.
  */
 
@@ -70,7 +70,7 @@ function tokenizeValue(rawValue: string): EnvToken[] {
 }
 
 /**
- * Tokenizes a single `.env` line. Blank lines yield an empty token list;
+ * Tokenizes a single `.env` line. Blank lines yield an empty token list.
  * comments, assignments, and malformed lines follow the same grammar as
  * `parseEnvFileLines`.
  */

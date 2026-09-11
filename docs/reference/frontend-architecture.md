@@ -49,7 +49,7 @@ place that calls `fetch`.
 When tracing an action, start at the template event, find the controller method
 returned to that template, then follow its service call.
 
-Error codes come from `ApiError`; controllers map stable error codes to field or
+Error codes come from `ApiError`. Controllers map stable error codes to field or
 operation messages. Never branch on English server messages.
 
 ## Asynchronous requests

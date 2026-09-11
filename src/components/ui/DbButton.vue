@@ -4,7 +4,7 @@ import DbSpinner from "./DbSpinner.vue";
 
 /**
  * DbButton — the single button primitive for every interactive surface.
- * Presentation-only; carries no business logic.
+ * Presentation-only and carries no business logic.
  */
 const props = withDefaults(
   defineProps<{
@@ -20,7 +20,7 @@ const props = withDefaults(
 const variantClasses = computed(() => {
   switch (props.variant) {
     case "primary":
-      // Solid brand fill; hover/active lighten the base (PocketBase's
+      // Solid brand fill. Hover and active states lighten the base (PocketBase's
       // alt-color convention) instead of swapping to a different hue.
       return "bg-accent text-white hover:bg-accent-alt1 active:bg-accent-alt2";
     case "ghost":

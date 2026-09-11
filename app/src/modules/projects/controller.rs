@@ -174,7 +174,7 @@ pub async fn rename(
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("project_ref" = String, Path, description = "Project id or name")),
   responses(
-    (status = 200, description = "Project deleted; affected resource counts are returned", body = inline(HttpResponseFormat<DeleteProjectResponse>)),
+    (status = 200, description = "Project deleted. Affected resource counts are returned", body = inline(HttpResponseFormat<DeleteProjectResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The project was not found", body = crate::http::ErrorBody),

@@ -7,7 +7,7 @@ description: "Reference for every Dopbase CLI command in v0.1.3: connections, au
 
 This page defines the implemented v0.1.3 command surface. Dopbase does not infer a
 project or environment from the current directory. Management commands receive
-an environment reference directly; `run` may use a server-scoped default from
+an environment reference directly. `run` may use a server-scoped default from
 the user configuration.
 
 For a compact table of every command, command-specific option, and example, see
@@ -80,7 +80,7 @@ version, the release URL, and a reminder that Dopbase does not self-update.
 Install the new release with `scripts/install.sh` or a macOS or Linux release
 archive. The command exits with status 0 whether or not an update is available,
 and with status 1 when the release cannot be queried. Run it with `--json` for
-automation; no other command contacts GitHub.
+automation. No other command contacts GitHub.
 
 The server resolution order is:
 
@@ -123,7 +123,7 @@ environment is renamed.
 
 Project names are unique within one Dopbase server. Environment names are
 unique within their project. IDs belong to the Dopbase server that created
-them; an ID from one server cannot address a resource on another server.
+them. An ID from one server cannot address a resource on another server.
 
 ## Bootstrap a project
 
@@ -155,7 +155,7 @@ count, but never secret values.
 
 `<project>` accepts an immutable project ID or project name. Deleting a project
 also deletes its environments, secrets, and scoped tokens. Dopbase shows the
-affected resource counts and requires confirmation; automation must pass
+affected resource counts and requires confirmation. Automation must pass
 `--yes`.
 
 ## Environment commands
@@ -211,7 +211,7 @@ number of additions, updates, unchanged values, and deletions without changing
 server state.
 
 Use `--replace` to make the remote environment match the file exactly. Replace
-shows the keys that would be deleted and requires confirmation; non-interactive
+shows the keys that would be deleted and requires confirmation. Non-interactive
 use also requires `--yes`.
 
 The complete file is parsed and validated before any secret changes are made.
@@ -235,7 +235,7 @@ audit event. The CLI also requires interactive password confirmation for every
 export. Non-interactive export is intentionally rejected.
 
 The same workflows exist in the Admin UI, with a visual review and dry-run
-summary before anything is stored; see [import and export](/ui/import-export).
+summary before anything is stored. See [import and export](/ui/import-export).
 
 ## Runner tokens
 
@@ -397,6 +397,7 @@ Offline maintenance commands operate directly on the server database:
 ```bash
 dopbase admin reset-password admin@example.com
 dopbase admin factory-reset
+dopbase admin factory-reset --no-backup
 ```
 
 `admin reset-password` performs offline recovery on the host machine. Because it accesses SQLite files directly, the background or foreground server process must be stopped first to avoid database locks.
@@ -412,11 +413,13 @@ The command requires an interactive terminal, prompts for a new password (12 to 
 exact data directory, then requires `please-wipe-out-system` and the Dopbase
 root password. There is no non-interactive bypass.
 
-The reset moves the whole data directory to a timestamped quarantine path.
-Every database, master-key, configuration, backup, log, and local CLI file
-stored inside it moves too. The next server start creates a fresh installation.
-Remove the quarantine directory yourself after checking that nothing in it is
-needed.
+By default, the reset saves the whole data directory to a timestamped ZIP next
+to that directory, then removes the active data. The ZIP includes every
+database, master-key, configuration, backup, log, and local CLI file stored
+inside the directory. The next server start creates a fresh installation.
+
+Pass `--no-backup` to remove the data directory without creating the ZIP. The
+same confirmation phrase and root password are still required.
 
 ## Structured output
 

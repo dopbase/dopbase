@@ -27,15 +27,29 @@ Select a self-hosted or Cloud endpoint:
 
 ```bash
 dopbase client connect https://dopbase.example.com
+dopbase client connect http://dopbase.internal.example
+dopbase client connect 192.168.1.20:8840
 ```
 
 The command normalizes the URL and verifies that it is a compatible Dopbase
 server before changing machine-global state. If validation fails, the previous
 server and credential remain active.
 
-Remote servers must use HTTPS. Plain HTTP is accepted only for `localhost` and
-loopback IP addresses such as `127.0.0.1` and `::1`. The client does not follow
-redirects, so the configured endpoint must be the final Dopbase URL.
+Domain names must include `http://` or `https://`. A bare domain such as
+`dopbase.example.com` is rejected with an example of the required format.
+Bare IPv4 and IPv6 addresses are accepted and use HTTP by default. Add the
+scheme when an IP address uses HTTPS.
+
+The CLI prints a warning before contacting any server over HTTP because login
+credentials and secrets are not protected by transport encryption. Use HTTPS
+whenever possible. The client does not follow redirects, so the configured
+endpoint must be the final Dopbase URL.
+
+Invalid hosts, malformed IP addresses, unsupported schemes, and ports outside
+1 to 65535 are rejected before a network request. Each validation error shows
+a valid example. A valid address that cannot be reached reports a connection
+error instead, while a reachable non-Dopbase endpoint reports a compatibility
+error.
 
 An actual server change requires a yes/no confirmation. The warning identifies
 the current and destination endpoints and explains that Dopbase will stop the
@@ -67,7 +81,7 @@ dopbase login
 After validating `http://localhost:8840`, Dopbase removes the configured server
 override and returns to the implicit local default.
 
-`DOPBASE_URL` must be unset before changing the saved endpoint; otherwise its
+`DOPBASE_URL` must be unset before changing the saved endpoint. Otherwise, its
 environment override would remain active instead of the newly selected server.
 
 ## Cloud uses the same command

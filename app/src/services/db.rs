@@ -10,7 +10,7 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// SQLite database client backed by an async sqlx connection pool.
 ///
-/// Cheap to clone; every clone shares the same underlying pool.
+/// Cheap to clone because every clone shares the same underlying pool.
 #[derive(Clone, Debug)]
 pub struct DbClient {
   pool: SqlitePool,

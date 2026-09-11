@@ -105,7 +105,7 @@ pub(crate) fn confirm_with_cancel(
     return Ok(());
   }
   if !io::stdin().is_terminal() {
-    bail!("confirmation is required; pass --yes for non-interactive use");
+    bail!("confirmation is required. Pass --yes for non-interactive use");
   }
   let confirmed = Confirm::new(question)
     .with_default(false)

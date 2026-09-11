@@ -9,8 +9,8 @@ use axum::extract::{Query, State};
 /// List audit events
 ///
 /// Return a cursor-paginated page of audit events, newest first. Filter by
-/// `action`, `projectId`, `environmentId`, or `actor`; `limit` is clamped
-/// to 1-200. The `nextCursor` value is opaque; pass it back unchanged to
+/// `action`, `projectId`, `environmentId`, or `actor`. `limit` is clamped
+/// to 1-200. The `nextCursor` value is opaque. Pass it back unchanged to
 /// fetch the next page.
 #[utoipa::path(
   get,

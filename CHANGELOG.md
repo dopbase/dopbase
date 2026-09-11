@@ -2,6 +2,31 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+Dopbase now supports more self-hosted connection formats, creates a recovery
+archive before host-side factory resets, and uses clearer copy across the CLI,
+Admin UI, API documentation, and public guides.
+
+### Added
+
+- `dopbase client connect` accepts explicit HTTP URLs and bare IPv4 or IPv6
+  addresses with optional ports. Bare IP addresses use HTTP by default.
+- `dopbase admin factory-reset` saves the complete data directory as a ZIP
+  before removing it. Pass `--no-backup` to reset without creating the archive.
+
+### Improvement
+
+- CLI errors, prompts, and help text provide clearer recovery steps and use
+  consistent terms.
+- Frontend copy, OpenAPI descriptions, source comments, and public
+  documentation use shorter, more direct language.
+
+### Security
+
+- The CLI warns before connecting over HTTP because the transport does not
+  protect credentials or secrets. HTTPS remains the recommended protocol.
+
 ## 0.1.3 - 2026-09-09
 
 Dopbase 0.1.3 improves CLI output and credential handling, keeps API routes in

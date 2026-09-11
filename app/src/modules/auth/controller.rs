@@ -13,7 +13,7 @@ use axum::{
 /// Log in
 ///
 /// Verify the email and password and start a session. Browser sessions
-/// also receive an HTTP-only session cookie and a CSRF token; CLI sessions
+/// also receive an HTTP-only session cookie and a CSRF token. CLI sessions
 /// receive a bearer token. Failed attempts are rate limited per email.
 #[utoipa::path(
   post,
@@ -24,7 +24,7 @@ use axum::{
     (status = 200, description = "Session started", body = inline(HttpResponseFormat<LoginResponse>)),
     (status = 401, description = "The email or password is incorrect", body = crate::http::ErrorBody),
     (status = 422, description = "Login input is invalid", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many login attempts; try again later", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many login attempts. Try again later", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn login(
@@ -139,7 +139,7 @@ pub async fn reauthenticate(
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   request_body = ChangePasswordRequest,
   responses(
-    (status = 200, description = "Password changed; all sessions were revoked", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 200, description = "Password changed. All sessions were revoked", body = inline(HttpResponseFormat<serde_json::Value>)),
     (status = 401, description = "The current password is incorrect", body = crate::http::ErrorBody),
     (status = 403, description = "The request is missing or fails the CSRF check", body = crate::http::ErrorBody),
     (status = 422, description = "The new password does not meet the policy", body = crate::http::ErrorBody),

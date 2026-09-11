@@ -6,7 +6,7 @@ description: "Add teammates, choose their roles, and manage read-only AI account
 # Users and AI agents
 
 Root and admin can open **Users** to manage who uses the instance. Add accounts
-from the Admin UI; there is no CLI command for creating users.
+from the Admin UI. There is no CLI command for creating users.
 
 ## Choose a role
 
