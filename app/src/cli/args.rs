@@ -8,7 +8,7 @@ use std::{
 use crate::{
   cli::commands::{
     admin, auth, backup, client, environment, export, import, init, project, restore, run, secret,
-    server, token,
+    server, token, update,
   },
   constants::help::*,
 };
@@ -201,7 +201,7 @@ pub enum Command {
     command: AdminCommand,
   },
   /// Check GitHub for a newer Dopbase release (informational only).
-  #[command(after_help = UPDATE_HELP)]
+  #[command(after_help = update::HELP)]
   Update,
   /// Create an encrypted backup snapshot of the Dopbase instance.
   ///
