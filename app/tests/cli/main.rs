@@ -5,6 +5,7 @@ mod dotenv;
 mod local_config;
 mod output;
 mod runtime_cache;
+mod secret_commands;
 mod secret_format;
 mod session;
 mod update;
