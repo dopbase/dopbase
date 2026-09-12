@@ -7,8 +7,8 @@ use std::{
 
 use crate::{
   cli::commands::{
-    admin, auth, backup, client, environment, export, import, init, project, restore, run, secret,
-    server, token, update,
+    admin, auth, backup, cache, client, environment, export, import, init, project, restore, run,
+    secret, server, token, update,
   },
   constants::help::*,
 };
@@ -16,6 +16,7 @@ use crate::{
 pub use admin::AdminCommand;
 pub use auth::LoginArgs;
 pub use backup::BackupArgs;
+pub use cache::CacheCommand;
 pub use client::ClientCommand;
 pub use environment::EnvCommand;
 pub use export::ExportArgs;
@@ -194,6 +195,12 @@ pub enum Command {
   /// `--` is the command to run.
   #[command(after_help = run::HELP)]
   Run(RunArgs),
+  /// Inspect and clean the encrypted runtime cache for the active server.
+  #[command(after_help = cache::HELP)]
+  Cache {
+    #[command(subcommand)]
+    command: CacheCommand,
+  },
   /// Offline server administration.
   #[command(after_help = admin::HELP)]
   Admin {

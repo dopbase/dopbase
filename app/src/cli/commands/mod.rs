@@ -7,6 +7,7 @@
 pub mod admin;
 pub mod auth;
 pub mod backup;
+pub mod cache;
 pub mod client;
 pub mod environment;
 pub mod export;
@@ -99,6 +100,7 @@ async fn execute_client(
     Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run(args) => run::execute(server, args).await,
+    Command::Cache { command } => cache::execute(command, server, json_output),
     Command::Backup(args) => backup::execute(server, args, json_output).await,
     Command::Restore(args) => restore::execute(server, args, json_output).await,
     _ => bail!("unsupported command"),
