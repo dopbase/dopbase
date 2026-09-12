@@ -17,7 +17,7 @@ consistent project and environment references across the CLI and Admin UI.
 - `dopbase cache clean` removes entries older than 14 days by default, with
   options for a different age, a dry run, or complete cleanup.
 
-### Changed
+### Improvement
 
 - `dopbase init` now accepts one `PROJECT_NAME/ENVIRONMENT_NAME` target.
 - `dopbase env create` now accepts one `PROJECT_REF/ENVIRONMENT_NAME` target.
