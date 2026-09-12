@@ -4,6 +4,13 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- `dopbase cache list` shows safe metadata for the active server's encrypted
+  runtime cache.
+- `dopbase cache clean` removes entries older than 14 days by default, with
+  options for a different age, a dry run, or complete cleanup.
+
 ### Changed
 
 - `dopbase init` now accepts one `PROJECT_NAME/ENVIRONMENT_NAME` target.
