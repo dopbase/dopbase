@@ -26,8 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
-pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
 pub(crate) const INIT_HELP: &str = "\
 Examples:
   dopbase init payment-service/development --from .env

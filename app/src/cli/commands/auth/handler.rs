@@ -6,9 +6,10 @@ use std::io::{self, IsTerminal, Read};
 
 pub(crate) async fn login(
   server: &ResolvedServer,
-  token: bool,
+  args: super::LoginArgs,
   json_output: bool,
 ) -> Result<i32> {
+  let token = args.token;
   if token {
     let token = read_runner_token()?;
     client::validate_runner_token(&token)?;

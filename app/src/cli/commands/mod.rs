@@ -1,5 +1,5 @@
 mod admin;
-mod auth;
+pub mod auth;
 mod backup;
 pub mod client;
 mod environment;
@@ -57,9 +57,9 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       client::show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
-    Command::Login { token } => {
+    Command::Login(args) => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
-      auth::login(&server, token, json_output).await
+      auth::login(&server, args, json_output).await
     }
     Command::Logout => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;

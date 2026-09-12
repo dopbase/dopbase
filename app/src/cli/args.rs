@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{client, server},
+    commands::{auth, client, server},
     environment_target,
     environment_target::EnvironmentTarget,
     secret_format::SecretFormat,
@@ -17,6 +17,7 @@ use crate::{
 
 pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 pub use client::ClientCommand;
+pub use auth::LoginArgs;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -127,17 +128,10 @@ pub enum Command {
     command: ClientCommand,
   },
   /// Authenticate with the active server.
-  #[command(after_help = LOGIN_HELP)]
-  Login {
-    /// Save a runner token instead of signing in with email and password.
-    ///
-    /// In a terminal, Dopbase prompts for the token without echoing it. When
-    /// standard input is piped, Dopbase reads the token from standard input.
-    #[arg(long)]
-    token: bool,
-  },
+  #[command(after_help = auth::LOGIN_HELP)]
+  Login(LoginArgs),
   /// Remove the saved credential for the active server.
-  #[command(after_help = LOGOUT_HELP)]
+  #[command(after_help = auth::LOGOUT_HELP)]
   Logout,
   /// Alias for `dopbase client status`.
   #[command(after_help = client::STATUS_ALIAS_HELP)]
