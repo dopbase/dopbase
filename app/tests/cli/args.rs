@@ -1,4 +1,4 @@
-use app::cli::args::{AdminCommand, Cli, Command, InitArgs, ServerCommand};
+use app::cli::args::{AdminCommand, Cli, Command, ImportArgs, InitArgs, ServerCommand};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   secret_format::SecretFormat,
@@ -432,10 +432,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     import.command,
-    Command::Import {
+    Command::Import(ImportArgs {
       format: Some(SecretFormat::Json),
       ..
-    }
+    })
   ));
 
   let export = Cli::try_parse_from([

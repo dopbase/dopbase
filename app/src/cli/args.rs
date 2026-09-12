@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{auth, client, environment, init, project, secret, server, token},
+    commands::{auth, client, environment, import, init, project, secret, server, token},
     secret_format::SecretFormat,
   },
   constants::help::*,
@@ -16,6 +16,7 @@ use crate::{
 pub use auth::LoginArgs;
 pub use client::ClientCommand;
 pub use environment::EnvCommand;
+pub use import::ImportArgs;
 pub use init::InitArgs;
 pub use project::ProjectCommand;
 pub use secret::SecretCommand;
@@ -164,25 +165,8 @@ pub enum Command {
   ///
   /// Existing keys are kept unless --replace is passed. Use --dry-run to
   /// preview the result without changing anything.
-  #[command(after_help = IMPORT_HELP)]
-  Import {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Secret file to import, or - to read from stdin.
-    path: PathBuf,
-    /// Input format. Required for stdin; otherwise inferred from the filename.
-    #[arg(long, value_enum)]
-    format: Option<SecretFormat>,
-    /// Preview what would change without applying it.
-    #[arg(long)]
-    dry_run: bool,
-    /// Overwrite existing keys and delete keys missing from the file.
-    #[arg(long, conflicts_with = "dry_run")]
-    replace: bool,
-    /// Skip confirmation prompts (for automation).
-    #[arg(long)]
-    yes: bool,
-  },
+  #[command(after_help = import::HELP)]
+  Import(ImportArgs),
   /// Export an environment's secrets as dotenv, JSON, or YAML.
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing

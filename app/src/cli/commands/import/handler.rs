@@ -1,45 +1,31 @@
-use crate::cli::{
-  commands::environment,
-  output, prompt,
-};
+use crate::cli::{commands::environment, output, prompt};
 use crate::{
   cli::{client, local_config, secret_format},
   constants::api,
 };
 use anyhow::Result;
 use reqwest::Method;
-use serde_json::{Value, json};
-use std::path::Path;
-
 use secret_format::SecretFormat;
-
-pub(crate) struct ImportOptions<'a> {
-  pub path: &'a Path,
-  pub format: Option<SecretFormat>,
-  pub dry_run: bool,
-  pub replace: bool,
-  pub yes: bool,
-  pub json_output: bool,
-}
+use serde_json::{Value, json};
 
 pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
-  reference: &str,
-  options: ImportOptions<'_>,
+  args: ImportArgs,
+  json_output: bool,
 ) -> Result<i32> {
-  let ImportOptions {
+  let ImportArgs {
+    environment,
     path,
     format,
     dry_run,
     replace,
     yes,
-    json_output,
-  } = options;
-  let format = SecretFormat::for_input(path, format)?;
+  } = args;
+  let format = SecretFormat::for_input(&path, format)?;
   let api = client::human_client(server).await?;
-  let env = environment::resolve_environment(&api, reference).await?;
+  let env = environment::resolve_environment(&api, &environment).await?;
   let id = environment::env_id(&env)?;
-  let entries = secret_format::read(path, Some(format))?;
+  let entries = secret_format::read(&path, Some(format))?;
   let mode = if replace { "replace" } else { "merge" };
   let endpoint = api::secrets::import(id);
   let mut expected_revision = None;
@@ -92,7 +78,7 @@ pub(crate) async fn execute(
     if dry_run {
       output::print_text("Dry run complete. No changes were applied.");
     } else {
-      output::print_success(&format!("Imported secrets into {reference}."));
+      output::print_success(&format!("Imported secrets into {environment}."));
     }
     output::print_fields(&[
       ("Mode:", mode.into()),
@@ -104,3 +90,4 @@ pub(crate) async fn execute(
   }
   Ok(0)
 }
+use super::ImportArgs;

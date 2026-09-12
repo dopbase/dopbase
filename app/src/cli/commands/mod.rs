@@ -4,7 +4,7 @@ mod backup;
 pub mod client;
 pub mod environment;
 mod export;
-mod import;
+pub mod import;
 pub mod init;
 pub mod project;
 mod restore;
@@ -89,28 +89,7 @@ async fn execute_client(
     Command::Project { command } => project::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,
-    Command::Import {
-      environment,
-      path,
-      format,
-      dry_run,
-      replace,
-      yes,
-    } => {
-      import::execute(
-        server,
-        &environment,
-        import::ImportOptions {
-          path: &path,
-          format,
-          dry_run,
-          replace,
-          yes,
-          json_output,
-        },
-      )
-      .await
-    }
+    Command::Import(args) => import::execute(server, args, json_output).await,
     Command::Export {
       environment,
       output,
