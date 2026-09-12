@@ -9,8 +9,8 @@
  * - Attaches the session CSRF header to mutating requests for browser
  *   sessions. The token is provided by the auth store via
  *   {@link registerCsrfProvider} to keep this module store-free.
- * - Notifies registered listeners on 401 (session expired) and on 403
- *   `RECENT_AUTHENTICATION_REQUIRED` (reveal/export need a fresh password).
+ * - Notifies registered listeners when the session or its CSRF token is no
+ *   longer valid, and when reveal/export needs a fresh password confirmation.
  */
 
 export interface ApiEnvelope<T> {
@@ -49,6 +49,7 @@ export class ApiError extends Error {
 }
 
 const CSRF_HEADER = "X-Dopbase-CSRF";
+const CSRF_DENIED_MESSAGE = "A valid CSRF token is required.";
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let csrfProvider: () => string | null = () => null;
@@ -64,12 +65,19 @@ export function registerCsrfProvider(provider: () => string | null): void {
 type Listener = () => void;
 
 const unauthorizedListeners = new Set<Listener>();
+const sessionExpiredListeners = new Set<Listener>();
 const reauthListeners = new Set<Listener>();
 
 /** Subscribes to 401 responses (expired/invalid session). Returns an off fn. */
 export function onUnauthorized(listener: Listener): () => void {
   unauthorizedListeners.add(listener);
   return () => unauthorizedListeners.delete(listener);
+}
+
+/** Subscribes to CSRF rejections that require a new browser session. */
+export function onSessionExpired(listener: Listener): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => sessionExpiredListeners.delete(listener);
 }
 
 /**
@@ -97,7 +105,7 @@ export interface ApiRequestOptions {
   anonymous?: boolean;
   /** Response payload format. Defaults to "json". */
   responseType?: "json" | "blob";
-  /** Suppresses global 401/reauthentication notifications for form checks. */
+  /** Suppresses 401 and recent-password notifications during form checks. */
   notifyAuthEvents?: boolean;
 }
 
@@ -187,6 +195,12 @@ export async function apiRequest<T>(
     const apiError = await parseErrorResponse(response);
     if (options.notifyAuthEvents !== false && response.status === 401)
       emit(unauthorizedListeners);
+    if (
+      response.status === 403 &&
+      apiError.codes.AUTHORIZATION_DENIED === CSRF_DENIED_MESSAGE
+    ) {
+      emit(sessionExpiredListeners);
+    }
     if (
       response.status === 403 &&
       apiError.hasCode("RECENT_AUTHENTICATION_REQUIRED")

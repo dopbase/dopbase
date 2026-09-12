@@ -3,7 +3,11 @@ import { defineStore } from "pinia";
 import { bootstrapAdmin, fetchBootstrapStatus } from "~/services/bootstrap.api";
 import * as authApi from "~/services/auth.api";
 import type { AccountRole, SessionKind } from "~/services/auth.api";
-import { onUnauthorized, registerCsrfProvider } from "~/services/http.client";
+import {
+  onSessionExpired,
+  onUnauthorized,
+  registerCsrfProvider,
+} from "~/services/http.client";
 
 export interface AdminSession {
   adminId: string;
@@ -47,19 +51,22 @@ function persistCsrf(token: string | null): void {
  * Owns the browser session object, the CSRF token backing the
  * `X-Dopbase-CSRF` header, and the public bootstrap state that decides
  * whether new visitors land on `/setup` or `/login`. Registering the CSRF
- * provider and the 401 listener here keeps `services/` store-free.
+ * provider and session listeners here keeps `services/` store-free.
  */
 export const useAuthStore = defineStore("auth", () => {
   const session = ref<AdminSession | null>(null);
   const bootstrapState = ref<BootstrapState>("unknown");
   const csrfToken = ref<string | null>(restoreCsrf());
+  const sessionExpired = ref(false);
 
   registerCsrfProvider(() => csrfToken.value);
-  onUnauthorized(() => {
+  function expireSession(): void {
     session.value = null;
-    persistCsrf(null);
-    csrfToken.value = null;
-  });
+    setCsrf(null);
+    sessionExpired.value = true;
+  }
+  onUnauthorized(expireSession);
+  onSessionExpired(expireSession);
 
   const isAuthenticated = computed(() => session.value !== null);
   const isRoot = computed(() => session.value?.role === "root");
@@ -103,6 +110,7 @@ export const useAuthStore = defineStore("auth", () => {
       lastLoginAt: response.lastLoginAt ?? null,
     };
     setCsrf(response.csrfToken);
+    sessionExpired.value = false;
     bootstrapState.value = "ready";
   }
 
@@ -122,6 +130,7 @@ export const useAuthStore = defineStore("auth", () => {
       lastLoginAt: response.lastLoginAt ?? null,
     };
     if (response.csrfToken) setCsrf(response.csrfToken);
+    sessionExpired.value = false;
   }
 
   /** Re-checks the cookie session and throws ApiError(401) when absent. */
@@ -135,6 +144,7 @@ export const useAuthStore = defineStore("auth", () => {
       role: response.role ?? "admin",
       lastLoginAt: response.lastLoginAt ?? null,
     };
+    sessionExpired.value = false;
   }
 
   /** Revokes the session server-side and clears all local state. */
@@ -144,6 +154,7 @@ export const useAuthStore = defineStore("auth", () => {
     } finally {
       session.value = null;
       setCsrf(null);
+      sessionExpired.value = false;
     }
   }
 
@@ -151,6 +162,7 @@ export const useAuthStore = defineStore("auth", () => {
     session.value = null;
     setCsrf(null);
     bootstrapState.value = "unknown";
+    sessionExpired.value = false;
   }
 
   /** Confirms the password, enabling reveal/export for ten minutes. */
@@ -173,12 +185,14 @@ export const useAuthStore = defineStore("auth", () => {
     await authApi.changePassword(currentPassword, newPassword);
     session.value = null;
     setCsrf(null);
+    sessionExpired.value = false;
   }
 
   return {
     session,
     bootstrapState,
     csrfToken,
+    sessionExpired,
     isAuthenticated,
     isRoot,
     isAdmin,

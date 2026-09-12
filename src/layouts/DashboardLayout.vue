@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
 import {
   ArchiveIcon,
+  AlertTriangleIcon,
   DopbaseIcon,
   FolderIcon,
   HistoryIcon,
@@ -12,7 +13,7 @@ import {
   UsersIcon,
   LogOutIcon,
 } from "~/assets/icons";
-import { DbSpinner } from "~/components/ui";
+import { DbButton, DbModal, DbSpinner } from "~/components/ui";
 import ReauthModal from "~/components/app/ReauthModal.vue";
 import { useDashboardLayoutController } from "./DashboardLayout.controller";
 
@@ -26,7 +27,8 @@ import { useDashboardLayoutController } from "./DashboardLayout.controller";
  */
 const route = useRoute();
 const auth = useAuthStore();
-const { email, loggingOut, logout } = useDashboardLayoutController();
+const { email, sessionExpired, loggingOut, logout, signInAgain } =
+  useDashboardLayoutController();
 
 const navItems = [
   {
@@ -146,5 +148,28 @@ const consoleLabel = computed(() =>
     </main>
 
     <ReauthModal />
+
+    <DbModal
+      :open="sessionExpired"
+      title="Session expired"
+      size="sm"
+      persistent>
+      <div class="flex flex-col gap-4">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-warn/30 bg-warn/10 text-warn">
+            <AlertTriangleIcon class="h-4 w-4" />
+          </div>
+          <p class="text-sm text-ink">
+            Your session has expired. Sign in again to continue.
+          </p>
+        </div>
+        <div class="flex justify-end">
+          <DbButton variant="primary" @click="signInAgain">
+            Sign in again
+          </DbButton>
+        </div>
+      </div>
+    </DbModal>
   </div>
 </template>

@@ -3,6 +3,7 @@ import {
   ApiError,
   apiRequest,
   onReauthenticationRequired,
+  onSessionExpired,
   onUnauthorized,
   registerCsrfProvider,
 } from "./http.client";
@@ -110,6 +111,49 @@ describe("apiRequest", () => {
     );
     await expect(apiRequest("/x")).rejects.toBeInstanceOf(ApiError);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies session-expiry listeners when the CSRF token is rejected", async () => {
+    const spy = vi.fn();
+    const off = onSessionExpired(spy);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          success: false,
+          error: {
+            AUTHORIZATION_DENIED: "A valid CSRF token is required.",
+          },
+        },
+        403,
+      ),
+    );
+
+    await expect(
+      apiRequest("/api/v1/projects", {
+        method: "POST",
+        notifyAuthEvents: false,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(spy).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it("does not expire the session for other authorization denials", async () => {
+    const spy = vi.fn();
+    const off = onSessionExpired(spy);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          success: false,
+          error: { AUTHORIZATION_DENIED: "This action is not allowed." },
+        },
+        403,
+      ),
+    );
+
+    await expect(apiRequest("/x")).rejects.toBeInstanceOf(ApiError);
+    expect(spy).not.toHaveBeenCalled();
+    off();
   });
 
   it("can suppress auth notifications for credential checks", async () => {

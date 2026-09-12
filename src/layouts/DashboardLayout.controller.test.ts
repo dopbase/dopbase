@@ -5,12 +5,15 @@ import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 
-const { routerPush } = vi.hoisted(() => ({
+const { routerPush, routerReplace, route } = vi.hoisted(() => ({
   routerPush: vi.fn(),
+  routerReplace: vi.fn(),
+  route: { fullPath: "/projects/p/billing/e/env_1" },
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: routerPush }),
+  useRoute: () => route,
+  useRouter: () => ({ push: routerPush, replace: routerReplace }),
 }));
 
 vi.mock("~/services/auth.api");
@@ -18,6 +21,7 @@ vi.mock("~/services/auth.api");
 beforeEach(() => {
   setActivePinia(createPinia());
   routerPush.mockReset();
+  routerReplace.mockReset();
   sessionStorage.clear();
 });
 
@@ -71,5 +75,16 @@ describe("useDashboardLayoutController", () => {
     const store = useAuthStore();
     expect(store.session).toBeNull();
     expect(store.csrfToken).toBeNull();
+  });
+
+  it("returns to the interrupted page after signing in again", async () => {
+    const c = useDashboardLayoutController();
+
+    await c.signInAgain();
+
+    expect(routerReplace).toHaveBeenCalledWith({
+      name: "login",
+      query: { redirect: "/projects/p/billing/e/env_1" },
+    });
   });
 });
