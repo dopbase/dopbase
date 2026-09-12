@@ -26,15 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const SERVER_HELP: &str = "\
-Examples:
-  dopbase server start
-  dopbase server up --port 9000
-  dopbase server status
-  dopbase server logs --watch
-  dopbase server down
-";
-
 pub(crate) const CLIENT_HELP: &str = "\
 Examples:
   dopbase client connect https://dopbase.example.com
@@ -210,38 +201,6 @@ pub(crate) const RESTORE_HELP: &str = "\
 Examples:
   dopbase restore ./backup.dop
   dopbase restore ./backup.dop --setup-token dbs_... --yes
-";
-
-pub(crate) const SERVER_START_HELP: &str = "\
-Examples:
-  dopbase server start
-  dopbase server start --port 9000
-  dopbase server start --host 0.0.0.0 --public-url https://dopbase.example.com
-";
-pub(crate) const SERVER_UP_HELP: &str = "\
-Examples:
-  dopbase server up
-  dopbase server up --port 9000
-  dopbase server up --host 0.0.0.0
-  dopbase server up --host 0.0.0.0 --public-url http://203.0.113.10:8840
-  dopbase server up --docs
-";
-pub(crate) const SERVER_DOWN_HELP: &str = "\
-Examples:
-  dopbase server down
-  dopbase server down --timeout 30
-";
-pub(crate) const SERVER_STATUS_HELP: &str = "\
-Examples:
-  dopbase server status
-  dopbase --data-dir /srv/dopbase server status
-";
-pub(crate) const SERVER_LOGS_HELP: &str = "\
-Examples:
-  dopbase server logs
-  dopbase server logs --lines 50
-  dopbase server logs --watch
-  dopbase server logs --clean
 ";
 
 pub(crate) const CLIENT_CONNECT_HELP: &str = "\

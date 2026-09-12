@@ -10,7 +10,7 @@ mod project;
 mod restore;
 pub mod run;
 mod secret;
-mod server;
+pub mod server;
 mod token;
 pub mod update;
 

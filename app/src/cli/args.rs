@@ -1,4 +1,4 @@
-use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
+use clap::{ArgAction, Parser, Subcommand, error::ErrorKind};
 use std::{
   ffi::{OsStr, OsString},
   io::{self, Write},
@@ -6,9 +6,16 @@ use std::{
 };
 
 use crate::{
-  cli::{environment_target, environment_target::EnvironmentTarget, secret_format::SecretFormat},
+  cli::{
+    commands::server,
+    environment_target,
+    environment_target::EnvironmentTarget,
+    secret_format::SecretFormat,
+  },
   constants::help::*,
 };
+
+pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -105,7 +112,7 @@ impl Cli {
 #[derive(Subcommand, Debug)]
 pub enum Command {
   /// Start, stop, inspect, and read logs from a local Dopbase server.
-  #[command(after_help = SERVER_HELP)]
+  #[command(after_help = server::HELP)]
   Server {
     #[command(subcommand)]
     command: ServerCommand,
@@ -287,91 +294,6 @@ pub enum Command {
   },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum ServerCommand {
-  /// Run the server in the foreground. Press Ctrl+C to stop it.
-  #[command(after_help = SERVER_START_HELP)]
-  Start(ServerStartArgs),
-  /// Start the server in the background on macOS or Linux.
-  #[command(after_help = SERVER_UP_HELP)]
-  Up(ServerLaunchArgs),
-  /// Stop the managed background server.
-  #[command(after_help = SERVER_DOWN_HELP)]
-  Down {
-    /// Seconds to wait for a graceful shutdown before forcing it.
-    #[arg(long, default_value_t = 10)]
-    timeout: u64,
-  },
-  /// Show whether the local server is running in the foreground or background.
-  #[command(after_help = SERVER_STATUS_HELP)]
-  Status,
-  /// Print logs written by the managed background server.
-  #[command(after_help = SERVER_LOGS_HELP)]
-  Logs {
-    /// Number of recent lines to print.
-    #[arg(long, default_value_t = 100, value_name = "COUNT")]
-    lines: usize,
-    /// Clear the background server log before reading or watching it.
-    #[arg(long)]
-    clean: bool,
-    /// Continue printing new lines until Ctrl+C.
-    #[arg(short = 'w', long)]
-    watch: bool,
-  },
-}
-
-#[derive(Args, Debug, Default)]
-pub struct ServerStartArgs {
-  #[command(flatten)]
-  pub launch: ServerLaunchArgs,
-  /// Internal: set by `server up` on the detached child process.
-  #[arg(long, hide = true)]
-  pub supervised: bool,
-}
-
-#[derive(Args, Clone, Debug, Default)]
-pub struct ServerLaunchArgs {
-  /// Server config file to load (default: server.toml in the data dir).
-  #[arg(long, value_name = "FILE")]
-  pub config: Option<PathBuf>,
-  /// Port to listen on (default: 8840).
-  #[arg(long, value_name = "PORT")]
-  pub port: Option<u16>,
-  /// Network interface to bind, e.g. 127.0.0.1 (default) or 0.0.0.0 to expose
-  /// the server. Without --public-url, remote binds show SERVER_HOST.
-  #[arg(long, value_name = "HOST")]
-  pub host: Option<String>,
-  /// Public URL clients use to reach this server (banners, generated links).
-  /// Recommended for network binds, reverse proxies, and HTTPS.
-  #[arg(long, value_name = "URL")]
-  pub public_url: Option<String>,
-  /// Seconds to wait for in-flight requests during shutdown.
-  #[arg(long, value_name = "SECONDS")]
-  pub shutdown_grace_seconds: Option<u64>,
-  /// Enable Swagger UI at /api/docs. Off by default.
-  #[arg(long, overrides_with = "no_docs")]
-  pub docs: bool,
-  /// Disable the API documentation for this run, overriding server.toml or DOPBASE_DOCS.
-  #[arg(long, overrides_with = "docs")]
-  pub no_docs: bool,
-  /// Read the server master key from this file.
-  #[arg(long, value_name = "FILE")]
-  pub master_key_file: Option<PathBuf>,
-}
-
-impl ServerLaunchArgs {
-  /// Fold the `--docs`/`--no-docs` pair into a single tri-state value
-  /// (last flag on the command line wins).
-  pub fn docs(&self) -> Option<bool> {
-    if self.docs {
-      Some(true)
-    } else if self.no_docs {
-      Some(false)
-    } else {
-      None
-    }
-  }
-}
 #[derive(Subcommand, Debug)]
 pub enum ClientCommand {
   /// Validate a server URL and save it as the active server.
