@@ -134,8 +134,24 @@ replaces the inaccessible cache for that server.
 The cache has no automatic expiry because it exists to support extended
 outages. Offline use can therefore inject values that were changed or revoked
 on the unavailable server. `run` always reports cached use, its UTC fetch time,
-and its age. Delete `run-cache/` and `run-cache-key` to remove all locally
-cached runtime values. The next successful live run creates fresh material.
+and its age.
+
+Use `dopbase cache list` to inspect the active server's cache without showing
+secret names or values. The command reports the server URL, project,
+environment, immutable environment ID, fetch time, age, and known aliases.
+It reads only the cache file derived from the active server URL and needs the
+same saved session or `DOPBASE_TOKEN` that created the cache.
+
+`dopbase cache clean` removes entries older than 14 days by default. Pass
+`--older-than <AGE>` to choose another age, using `s`, `m`, `h`, or `d`, or
+pass `--all` to remove entries regardless of age. Cleanup requires confirmation
+unless `--yes` is present. `--dry-run` shows the matching entries without
+writing files. Both commands support global `--json` output.
+
+Cleanup rewrites the encrypted document atomically while holding its lock. If
+the last entry is removed, Dopbase deletes that server's cache document but
+keeps the local cache key and lock file. The next successful live run creates a
+new document.
 
 ## Inspect effective configuration
 

@@ -145,6 +145,11 @@ fn parses_every_v0_1_command_shape() {
       "--",
       "printenv",
     ],
+    &["dopbase", "cache", "list"],
+    &["dopbase", "cache", "clean"],
+    &["dopbase", "cache", "clean", "--older-than", "30d"],
+    &["dopbase", "cache", "clean", "--dry-run", "--all"],
+    &["dopbase", "cache", "clean", "--all", "--yes"],
     &[
       "dopbase",
       "run",
@@ -616,6 +621,7 @@ fn missing_subcommands_show_contextual_help() {
       &["dopbase", "token"],
       "dopbase token create payment-service/production --name deploy",
     ),
+    (&["dopbase", "cache"], "dopbase cache clean --all --yes"),
     (
       &["dopbase", "admin"],
       "dopbase admin reset-password admin@example.com",

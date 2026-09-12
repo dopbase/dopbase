@@ -8,6 +8,8 @@ use app::cli::{
   local_config::{ClientConfig, DefaultEnvironment, ResolvedServer, ServerSource},
 };
 
+mod cache;
+
 #[test]
 fn factory_reset_requires_the_exact_confirmation_phrase() {
   assert!(factory_reset_confirmation_matches(

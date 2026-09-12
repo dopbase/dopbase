@@ -336,6 +336,40 @@ authorization, not-found, malformed-response, missing-cache, or cache-integrity
 failures stop before the child starts. Once started, signals are forwarded and
 the child's exit status is returned to the calling shell.
 
+## Runtime cache maintenance
+
+Inspect safe metadata for the active server's encrypted runtime cache:
+
+```bash
+dopbase cache list
+dopbase cache list --json
+```
+
+The output includes the server URL, project and environment names, immutable
+environment ID, fetch time, age, and aliases. It never includes secret names,
+values, cache keys, nonces, or ciphertext.
+
+Remove entries older than 14 days:
+
+```bash
+dopbase cache clean --dry-run
+dopbase cache clean --yes
+```
+
+Set a different age with a positive whole number followed by `s`, `m`, `h`, or
+`d`. An entry must be strictly older than the cutoff, so an entry exactly 14
+days old is kept by the default cleanup.
+
+```bash
+dopbase cache clean --older-than 30d --yes
+dopbase cache clean --all --yes
+```
+
+Only `--all` ignores age. Cleanup asks for confirmation unless `--yes` is
+present. `--dry-run` never writes to the cache and does not ask for
+confirmation. These commands work offline, but the active credential must be
+able to unlock the cache.
+
 ## backup
 
 Create an encrypted system-level snapshot containing all projects, environments,
