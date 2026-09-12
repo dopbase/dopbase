@@ -1,8 +1,6 @@
+use super::AdminCommand;
 use crate::cli::{output, prompt};
-use crate::{
-  cli::args::AdminCommand,
-  config::{ServerConfig, ServerOverrides, database_path, ensure_data_dir},
-};
+use crate::config::{ServerConfig, ServerOverrides, database_path, ensure_data_dir};
 use anyhow::{Context, Result, bail};
 use serde_json::json;
 use std::{

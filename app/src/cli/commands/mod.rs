@@ -1,4 +1,4 @@
-mod admin;
+pub mod admin;
 pub mod auth;
 pub mod backup;
 pub mod client;

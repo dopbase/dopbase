@@ -7,12 +7,13 @@ use std::{
 
 use crate::{
   cli::commands::{
-    auth, backup, client, environment, export, import, init, project, restore, run, secret, server,
-    token,
+    admin, auth, backup, client, environment, export, import, init, project, restore, run, secret,
+    server, token,
   },
   constants::help::*,
 };
 
+pub use admin::AdminCommand;
 pub use auth::LoginArgs;
 pub use backup::BackupArgs;
 pub use client::ClientCommand;
@@ -194,7 +195,7 @@ pub enum Command {
   #[command(after_help = run::HELP)]
   Run(RunArgs),
   /// Offline server administration.
-  #[command(after_help = ADMIN_HELP)]
+  #[command(after_help = admin::HELP)]
   Admin {
     #[command(subcommand)]
     command: AdminCommand,
@@ -218,38 +219,4 @@ pub enum Command {
   /// confirmation and administrator credentials.
   #[command(after_help = restore::HELP)]
   Restore(RestoreArgs),
-}
-
-#[derive(Subcommand, Debug)]
-pub enum AdminCommand {
-  /// Reset a user's password (offline recovery on the server machine).
-  ///
-  /// Loads the local server configuration and database directly, so it must
-  /// be run on the machine hosting the server and requires an interactive
-  /// terminal.
-  #[command(after_help = ADMIN_RESET_PASSWORD_HELP)]
-  ResetPassword {
-    /// Email of the account to reset.
-    email: String,
-    /// Server config file to load (server.toml).
-    #[arg(long, value_name = "FILE")]
-    config: Option<PathBuf>,
-    /// File containing the server master key.
-    #[arg(long, value_name = "FILE")]
-    master_key_file: Option<PathBuf>,
-  },
-  /// Remove a local instance from the server machine.
-  ///
-  /// Removes the entire Dopbase data directory from its active location. A ZIP
-  /// backup is created first unless --no-backup is passed. The server must be
-  /// stopped and an interactive root password confirmation is required.
-  #[command(after_help = ADMIN_FACTORY_RESET_HELP)]
-  FactoryReset {
-    /// Server config file to load (server.toml).
-    #[arg(long, value_name = "FILE")]
-    config: Option<PathBuf>,
-    /// Permanently reset the instance without creating a ZIP backup.
-    #[arg(long)]
-    no_backup: bool,
-  },
 }
