@@ -137,6 +137,8 @@ operation:
 
 ```bash
 dopbase init payment-service development --from .env
+dopbase init worker development --from secrets.json
+cat secrets.yml | dopbase init storefront development --from - --format yaml
 ```
 
 The command validates the complete file before changing server state. The
@@ -208,6 +210,8 @@ Import into an existing environment with:
 
 ```bash
 dopbase import payment-service/staging .env.staging
+dopbase import payment-service/staging secrets.json
+cat secrets.yml | dopbase import payment-service/staging - --format yaml
 ```
 
 Import merges by default: keys in the file are created or updated, while
@@ -219,28 +223,40 @@ Use `--replace` to make the remote environment match the file exactly. Replace
 shows the keys that would be deleted and requires confirmation. Non-interactive
 use also requires `--yes`.
 
-The complete file is parsed and validated before any secret changes are made.
-Blank lines and comments are ignored, empty values are valid, and variable or
-command substitution is not performed. Duplicate or invalid keys fail the
-entire import. Output includes key names and counts when useful, but never
-values.
+The CLI infers JSON from `.json`, YAML from `.yaml` or `.yml`, and dotenv from
+every other filename. This keeps names such as `.env.production` compatible.
+Pass `--format <dotenv|json|yaml>` to override inference. Stdin uses `-` and
+always requires `--format`.
+
+JSON and YAML input must be one flat mapping of string keys to string values.
+Nested objects, arrays, numbers, booleans, null values, duplicate keys, and
+empty keys fail the complete import. Dotenv does not expand variables or run
+command substitutions. All formats allow empty string values but must contain
+at least one secret. Errors may name a key, but never print its value.
 
 Export requires an explicit destination:
 
 ```bash
 dopbase export payment-service/staging --output .env.staging
-dopbase export payment-service/staging --stdout
+dopbase export payment-service/staging --output secrets.json
+dopbase export payment-service/staging --stdout --format yaml
 ```
 
-`--output` and `--stdout` are mutually exclusive. File export refuses to
-overwrite an existing path unless `--force` is passed and creates the file with
-restrictive permissions where the platform supports them. Export and stdout
-reveal plaintext values and therefore require reveal permission and create an
-audit event. The CLI also requires interactive password confirmation for every
-export. Non-interactive export is intentionally rejected.
+`--output` and `--stdout` are mutually exclusive. File output infers its format
+from the filename, while stdout defaults to dotenv. `--format` overrides either
+default. JSON and YAML keys are sorted for stable output. Global `--json`
+controls command status output and cannot be combined with plaintext
+`--stdout`.
 
-The same workflows exist in the Admin UI, with a visual review and dry-run
-summary before anything is stored. See [import and export](/ui/import-export).
+File export refuses to overwrite an existing path unless `--force` is passed
+and creates the file with restrictive permissions where the platform supports
+them. Export and stdout reveal plaintext values and therefore require reveal
+permission and create an audit event. The CLI also requires interactive
+password confirmation for every export. Non-interactive export is rejected.
+
+The Admin UI provides the same workflow for dotenv files, with a visual review
+and dry-run summary before anything is stored. See
+[import and export](/ui/import-export).
 
 ## Runner tokens
 

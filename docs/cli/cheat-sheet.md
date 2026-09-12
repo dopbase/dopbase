@@ -49,7 +49,7 @@ examples for `secret set`.
 
 | Task                                   | Command                                              | Command options             | Example                                                |
 | -------------------------------------- | ---------------------------------------------------- | --------------------------- | ------------------------------------------------------ |
-| Create a project and first environment | `dopbase init <PROJECT> <ENVIRONMENT> --from <FILE>` | `--from <FILE>` (required)  | `dopbase init payment-service development --from .env` |
+| Create a project and first environment | `dopbase init <PROJECT> <ENVIRONMENT> --from <FILE\|->` | `--from` is required. `--format <dotenv\|json\|yaml>` overrides inference and is required for stdin | `dopbase init payment-service development --from secrets.json` |
 | Create a project                       | `dopbase project create <NAME>`                      | No command-specific options | `dopbase project create payment-service`               |
 | List projects                          | `dopbase project list`                               | No command-specific options | `dopbase project list`                                 |
 | Show a project                         | `dopbase project show <PROJECT>`                     | No command-specific options | `dopbase project show payment-service`                 |
@@ -72,9 +72,9 @@ examples for `secret set`.
 | Show secret metadata      | `dopbase secret get <ENVIRONMENT> <KEY>`       | No command-specific options                                                                                    | `dopbase secret get payment-service/production API_KEY`                                   |
 | Reveal a secret           | `dopbase secret get <ENVIRONMENT> <KEY>`       | `--reveal` prints the value after password confirmation                                                        | `dopbase secret get payment-service/production API_KEY --reveal`                          |
 | Delete a secret           | `dopbase secret delete <ENVIRONMENT> <KEY>`    | `--yes` skips confirmation                                                                                     | `dopbase secret delete payment-service/production API_KEY --yes`                          |
-| Import a dotenv file      | `dopbase import <ENVIRONMENT> <FILE>`          | `--dry-run` previews changes. `--replace` removes remote keys absent from the file. `--yes` skips confirmation | `dopbase import payment-service/staging .env.staging --dry-run`                           |
-| Export to a file          | `dopbase export <ENVIRONMENT> --output <FILE>` | `--output <FILE>` or `--stdout` is required. `--force` overwrites an existing file                             | `dopbase export payment-service/staging --output .env.staging --force`                    |
-| Export to standard output | `dopbase export <ENVIRONMENT> --stdout`        | `--stdout` conflicts with `--output`                                                                           | `dopbase export payment-service/staging --stdout`                                         |
+| Import a secret file      | `dopbase import <ENVIRONMENT> <FILE\|->`       | Supports dotenv, JSON, and YAML. `--format` is required for stdin. `--dry-run`, `--replace`, and `--yes` keep their existing behavior | `dopbase import payment-service/staging secrets.json --dry-run`                           |
+| Export to a file          | `dopbase export <ENVIRONMENT> --output <FILE>` | `--output` or `--stdout` is required. `--format` overrides inference. `--force` overwrites an existing file | `dopbase export payment-service/staging --output secrets.yml --force`                    |
+| Export to standard output | `dopbase export <ENVIRONMENT> --stdout`        | Defaults to dotenv. Use `--format json` or `--format yaml` for another serialization                         | `dopbase export payment-service/staging --stdout --format json`                          |
 | Run with injected secrets | `dopbase run [ENVIRONMENT] -- <COMMAND>`       | `-t <TOKEN>` or `--token <TOKEN>` overrides other credentials. Everything after `--` is the child command      | `dopbase run payment-service/development -- npm start`                                    |
 
 ## Tokens, backups, and maintenance

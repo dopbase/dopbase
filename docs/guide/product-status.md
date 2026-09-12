@@ -13,7 +13,7 @@ documentation, and SQLite storage in one executable.
 
 - Projects, environments, and individually managed secrets
 - Encryption before persistence with separate master-key material
-- `.env` import and export
+- dotenv, JSON, and YAML import and export through the CLI
 - An embedded browser Admin UI covering setup, sign-in, project and
   environment management, secret management with a `.env` editor, runner
   tokens, audit events, and instance status

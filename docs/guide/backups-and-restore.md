@@ -12,7 +12,7 @@ relying on it for production data.
 :::
 
 Dopbase includes a native, full-system backup and disaster recovery engine. Unlike
-per-environment `.env` export and import, a backup captures the complete server
+per-environment secret export and import, a backup captures the complete server
 state in an encrypted archive: all projects, environments, secret keys and
 version histories, runner tokens, and administrator accounts.
 
