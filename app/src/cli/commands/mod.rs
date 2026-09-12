@@ -7,7 +7,7 @@ pub mod export;
 pub mod import;
 pub mod init;
 pub mod project;
-mod restore;
+pub mod restore;
 pub mod run;
 pub mod secret;
 pub mod server;
@@ -94,12 +94,7 @@ async fn execute_client(
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run(args) => run::execute(server, args).await,
     Command::Backup(args) => backup::execute(server, args, json_output).await,
-    Command::Restore {
-      path,
-      key,
-      setup_token,
-      yes,
-    } => restore::execute(server, path, key, setup_token, yes, json_output).await,
+    Command::Restore(args) => restore::execute(server, args, json_output).await,
     _ => bail!("unsupported command"),
   }
 }

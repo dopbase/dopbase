@@ -7,7 +7,8 @@ use std::{
 
 use crate::{
   cli::commands::{
-    auth, backup, client, environment, export, import, init, project, run, secret, server, token,
+    auth, backup, client, environment, export, import, init, project, restore, run, secret, server,
+    token,
   },
   constants::help::*,
 };
@@ -20,6 +21,7 @@ pub use export::ExportArgs;
 pub use import::ImportArgs;
 pub use init::InitArgs;
 pub use project::ProjectCommand;
+pub use restore::RestoreArgs;
 pub use run::RunArgs;
 pub use secret::SecretCommand;
 pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
@@ -214,20 +216,8 @@ pub enum Command {
   /// accounts from the specified backup. If the server is uninitialized,
   /// completes bootstrap restoration. If already initialized, requires
   /// confirmation and administrator credentials.
-  #[command(after_help = RESTORE_HELP)]
-  Restore {
-    /// Path to the .dop backup file to restore.
-    path: PathBuf,
-    /// Master key file path or 64-character hex string (required when restoring onto a new server).
-    #[arg(short, long, value_name = "KEY")]
-    key: Option<String>,
-    /// Setup token printed by the target server when restoring an uninitialized instance.
-    #[arg(long, value_name = "TOKEN")]
-    setup_token: Option<String>,
-    /// Skip confirmation prompt.
-    #[arg(long)]
-    yes: bool,
-  },
+  #[command(after_help = restore::HELP)]
+  Restore(RestoreArgs),
 }
 
 #[derive(Subcommand, Debug)]

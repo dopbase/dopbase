@@ -1,25 +1,25 @@
 use crate::cli::{
-  commands::client as command_client,
-  output, prompt,
-};
-use crate::cli::{
   client::{self as api_client, ApiClient},
   local_config,
 };
+use crate::cli::{commands::client as command_client, output, prompt};
 use crate::constants::api;
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
-  path: PathBuf,
-  key_input: Option<String>,
-  setup_token: Option<String>,
-  yes: bool,
+  args: RestoreArgs,
   json_output: bool,
 ) -> Result<i32> {
+  let RestoreArgs {
+    path,
+    key: key_input,
+    setup_token,
+    yes,
+  } = args;
   if !path.exists() {
     bail!("Backup file not found: {}", path.display());
   }
@@ -156,3 +156,4 @@ pub(crate) async fn execute(
 
   Ok(0)
 }
+use super::RestoreArgs;
