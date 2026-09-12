@@ -1,6 +1,6 @@
 mod admin;
 pub mod auth;
-mod backup;
+pub mod backup;
 pub mod client;
 pub mod environment;
 pub mod export;
@@ -93,7 +93,7 @@ async fn execute_client(
     Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run(args) => run::execute(server, args).await,
-    Command::Backup { name, output } => backup::execute(server, name, output, json_output).await,
+    Command::Backup(args) => backup::execute(server, args, json_output).await,
     Command::Restore {
       path,
       key,

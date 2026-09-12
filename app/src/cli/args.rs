@@ -7,12 +7,13 @@ use std::{
 
 use crate::{
   cli::commands::{
-    auth, client, environment, export, import, init, project, run, secret, server, token,
+    auth, backup, client, environment, export, import, init, project, run, secret, server, token,
   },
   constants::help::*,
 };
 
 pub use auth::LoginArgs;
+pub use backup::BackupArgs;
 pub use client::ClientCommand;
 pub use environment::EnvCommand;
 pub use export::ExportArgs;
@@ -205,14 +206,8 @@ pub enum Command {
   /// accounts into an XChaCha20-Poly1305 encrypted .dop archive. Without [name],
   /// a timestamped name is generated automatically. Stored on the server by
   /// default. Specify -o/--output to also download and save locally.
-  #[command(after_help = BACKUP_HELP)]
-  Backup {
-    /// Optional backup name (default: dopbase_backup_<timestamp>.dop).
-    name: Option<String>,
-    /// Optional local file path to download and save the backup to.
-    #[arg(short, long, value_name = "FILE")]
-    output: Option<PathBuf>,
-  },
+  #[command(after_help = backup::HELP)]
+  Backup(BackupArgs),
   /// Restore the instance from an encrypted .dop backup file.
   ///
   /// Restores all projects, environments, secrets, runner tokens, and admin

@@ -6,8 +6,6 @@ use crate::{
 use anyhow::{Context, Result};
 use reqwest::Method;
 use serde_json::{Value, json};
-use std::path::PathBuf;
-
 fn format_bytes(bytes: u64) -> String {
   const KIB: u64 = 1024;
   const MIB: u64 = KIB * 1024;
@@ -26,10 +24,10 @@ fn format_bytes(bytes: u64) -> String {
 
 pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
-  name: Option<String>,
-  output: Option<PathBuf>,
+  args: BackupArgs,
   json_output: bool,
 ) -> Result<i32> {
+  let BackupArgs { name, output } = args;
   command_client::ensure_server_is_connected(server, "backup").await?;
 
   let steps_total = if output.is_some() { 2 } else { 1 };
@@ -97,3 +95,4 @@ pub(crate) async fn execute(
 
   Ok(0)
 }
+use super::BackupArgs;

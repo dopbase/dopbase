@@ -41,11 +41,6 @@ Examples:
 ";
 
 pub(crate) const UPDATE_HELP: &str = "Examples:\n  dopbase update\n";
-pub(crate) const BACKUP_HELP: &str = "\
-Examples:
-  dopbase backup
-  dopbase backup pre-migration --output ./pre-migration.dop
-";
 pub(crate) const RESTORE_HELP: &str = "\
 Examples:
   dopbase restore ./backup.dop
