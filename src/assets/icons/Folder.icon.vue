@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * FolderIcon — projects in the workspace rail.
+ * FolderIcon for projects in the project rail.
  * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });

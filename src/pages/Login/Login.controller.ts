@@ -62,7 +62,7 @@ export function useLoginController() {
       router.push(
         typeof redirect === "string" && isSafeRedirect(redirect)
           ? redirect
-          : { name: "workspace" },
+          : { name: "projects" },
       );
     } catch (error) {
       mapApiError(error);

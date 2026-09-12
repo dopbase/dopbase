@@ -15,8 +15,8 @@ import { DbButton } from "~/components/ui";
     <p class="max-w-md text-sm text-ink-muted">
       The page you requested is not part of the Dopbase admin console.
     </p>
-    <RouterLink to="/workspace">
-      <DbButton variant="primary">Back to workspace</DbButton>
+    <RouterLink to="/projects">
+      <DbButton variant="primary">Back to projects</DbButton>
     </RouterLink>
   </div>
 </template>

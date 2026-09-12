@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
 
 /**
@@ -10,9 +10,11 @@ import { useAuthStore } from "~/stores/auth.store";
  */
 export function useDashboardLayoutController() {
   const router = useRouter();
+  const route = useRoute();
   const auth = useAuthStore();
 
   const email = computed(() => auth.session?.email ?? "");
+  const sessionExpired = computed(() => auth.sessionExpired);
   const loggingOut = ref(false);
 
   async function logout(): Promise<void> {
@@ -29,9 +31,18 @@ export function useDashboardLayoutController() {
     }
   }
 
+  async function signInAgain(): Promise<void> {
+    await router.replace({
+      name: "login",
+      query: { redirect: route.fullPath },
+    });
+  }
+
   return {
     email,
+    sessionExpired,
     loggingOut,
     logout,
+    signInAgain,
   };
 }

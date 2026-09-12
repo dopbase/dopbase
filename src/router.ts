@@ -5,8 +5,8 @@ import { installRouterGuards } from "./router.guards";
  * Route table for the Admin UI.
  *
  * Selection state lives in the URL: a project is addressed by its unique
- * name (`/workspace/p/:projectRef`) and an environment by its immutable id
- * (`/workspace/p/:projectRef/e/:environmentId`). No global "active
+ * name (`/projects/p/:projectRef`) and an environment by its immutable id
+ * (`/projects/p/:projectRef/e/:environmentId`). No global "active
  * environment" is stored anywhere else.
  */
 export const router = createRouter({
@@ -14,7 +14,7 @@ export const router = createRouter({
   routes: [
     {
       path: "/",
-      redirect: { name: "workspace" },
+      redirect: { name: "projects" },
     },
     {
       path: "/login",
@@ -29,29 +29,29 @@ export const router = createRouter({
       meta: { public: true, setupOnly: true },
     },
     {
-      path: "/workspace",
-      name: "workspace",
-      component: () => import("~/pages/Workspace/Workspace.page.vue"),
+      path: "/projects",
+      name: "projects",
+      component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/workspace/p/:projectRef",
+      path: "/projects/p/:projectRef",
       name: "project",
-      component: () => import("~/pages/Workspace/Workspace.page.vue"),
+      component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/workspace/p/:projectRef/e/:environmentId",
+      path: "/projects/p/:projectRef/e/:environmentId",
       name: "environment",
-      component: () => import("~/pages/Workspace/Workspace.page.vue"),
+      component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/workspace/p/:projectRef/e/:environmentId/tokens",
+      path: "/projects/p/:projectRef/e/:environmentId/tokens",
       name: "environment-tokens",
-      component: () => import("~/pages/Workspace/Workspace.page.vue"),
+      component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/workspace/p/:projectRef/e/:environmentId/import",
+      path: "/projects/p/:projectRef/e/:environmentId/import",
       name: "environment-import",
-      component: () => import("~/pages/Workspace/ImportSecrets.page.vue"),
+      component: () => import("~/pages/Projects/ImportSecrets.page.vue"),
     },
     {
       path: "/backups",

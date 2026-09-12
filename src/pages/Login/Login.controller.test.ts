@@ -41,7 +41,7 @@ describe("useLoginController", () => {
     expect(authApi.login).not.toHaveBeenCalled();
   });
 
-  it("signs in and routes to the workspace", async () => {
+  it("signs in and routes to projects", async () => {
     vi.mocked(authApi.login).mockResolvedValueOnce({
       adminId: "usr_1",
       email: "a@b.c",
@@ -54,13 +54,13 @@ describe("useLoginController", () => {
     c.password.value = "pw";
     await c.submit();
     expect(authApi.login).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith({ name: "workspace" });
+    expect(routerPush).toHaveBeenCalledWith({ name: "projects" });
     const store = useAuthStore();
     expect(store.isAuthenticated).toBe(true);
   });
 
   it("routes to a safe internal redirect target after sign-in", async () => {
-    routeQuery.redirect = "/workspace/p/acme/e/env_1";
+    routeQuery.redirect = "/projects/p/acme/e/env_1";
     vi.mocked(authApi.login).mockResolvedValueOnce({
       adminId: "usr_1",
       email: "a@b.c",
@@ -72,7 +72,7 @@ describe("useLoginController", () => {
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
-    expect(routerPush).toHaveBeenCalledWith("/workspace/p/acme/e/env_1");
+    expect(routerPush).toHaveBeenCalledWith("/projects/p/acme/e/env_1");
   });
 
   it("ignores cross-origin and protocol-relative redirect targets", async () => {
@@ -94,7 +94,7 @@ describe("useLoginController", () => {
       c.email.value = "a@b.c";
       c.password.value = "pw";
       await c.submit();
-      expect(routerPush).toHaveBeenCalledWith({ name: "workspace" });
+      expect(routerPush).toHaveBeenCalledWith({ name: "projects" });
     }
   });
 

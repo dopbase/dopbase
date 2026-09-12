@@ -21,7 +21,7 @@ export function installRouterGuards(router: Router): void {
     }
 
     if (to.meta.setupOnly && auth.bootstrapState !== "setupRequired") {
-      return { name: "workspace" };
+      return { name: "projects" };
     }
 
     if (!to.meta.public) {
@@ -38,12 +38,12 @@ export function installRouterGuards(router: Router): void {
           };
         }
       }
-      if (to.meta.rootOnly && !auth.isRoot) return { name: "workspace" };
-      if (to.meta.adminOnly && !auth.isAdmin) return { name: "workspace" };
+      if (to.meta.rootOnly && !auth.isRoot) return { name: "projects" };
+      if (to.meta.adminOnly && !auth.isAdmin) return { name: "projects" };
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {
-      return { name: "workspace" };
+      return { name: "projects" };
     }
     return true;
   };

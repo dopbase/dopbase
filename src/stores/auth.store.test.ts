@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { useAuthStore } from "./auth.store";
 import * as authApi from "~/services/auth.api";
 import * as bootstrapApi from "~/services/bootstrap.api";
-import { ApiError } from "~/services/http.client";
+import { ApiError, apiRequest } from "~/services/http.client";
 
 vi.mock("~/services/auth.api");
 vi.mock("~/services/bootstrap.api");
@@ -71,6 +71,39 @@ describe("auth store", () => {
     expect(store.session).toBeNull();
     expect(store.csrfToken).toBeNull();
     expect(sessionStorage.getItem("dopbase.csrf")).toBeNull();
+  });
+
+  it("expires the local session when the server rejects its CSRF token", async () => {
+    vi.mocked(authApi.login).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      sessionKind: "browser",
+      token: null,
+      csrfToken: "csrf_1",
+    });
+    const store = useAuthStore();
+    await store.login("a@b.c", "pw");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              AUTHORIZATION_DENIED: "A valid CSRF token is required.",
+            },
+          }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    await expect(
+      apiRequest("/api/v1/projects", { method: "POST" }),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(store.session).toBeNull();
+    expect(store.csrfToken).toBeNull();
+    expect(store.sessionExpired).toBe(true);
   });
 
   it("bootstrap stores the session and flips state to ready", async () => {

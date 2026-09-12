@@ -32,7 +32,7 @@ Open the Admin UI and you land on the setup page (`/setup`). The page provides t
 2. Provide an **email address** for the administrator account.
 3. Enter a secure **password** of at least 12 characters (128 at most).
 
-The setup token works once. Once claimed, the server is initialized and redirects to the workspace.
+The setup token works once. After setup, the server redirects to the projects screen.
 
 ### Option 2: Restore from an existing backup
 

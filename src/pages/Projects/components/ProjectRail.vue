@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import type { WorkspaceController } from "~/pages/Workspace/Workspace.controller";
+import type { ProjectsController } from "~/pages/Projects/Projects.controller";
 import NameDialog from "./NameDialog.vue";
 import { DbConfirmDialog, DbSkeleton } from "~/components/ui";
 import {
@@ -19,7 +19,7 @@ import type { Environment, Project } from "~/services";
  * create, rename, and delete interactions. Destructive dialogs require
  * typing the resource name. Environment deletion lists affected counts.
  */
-const props = defineProps<{ controller: WorkspaceController }>();
+const props = defineProps<{ controller: ProjectsController }>();
 
 // Destructure so refs auto-unwrap in the template.
 const {
@@ -67,7 +67,7 @@ async function confirmProjectDelete(): Promise<void> {
   deleteLoading.value = true;
   deleteError.value = null;
   try {
-    await props.controller.deleteProject();
+    await props.controller.deleteProject(projectDelete.value.id);
     projectDelete.value = null;
   } catch {
     deleteError.value = "The project could not be deleted.";
@@ -270,7 +270,7 @@ async function confirmEnvDelete(): Promise<void> {
       :action="
         (name: string) =>
           projectDialog?.mode === 'rename'
-            ? controller.renameProject(name)
+            ? controller.renameProject(projectDialog.project.id, name)
             : controller.createProject(name)
       "
       @close="projectDialog = null" />
