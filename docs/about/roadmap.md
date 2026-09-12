@@ -1,24 +1,25 @@
 ---
 title: "Roadmap"
-description: "The Dopbase roadmap: what ships in 0.1.3 and what is planned next."
+description: "The Dopbase roadmap: what ships and what is planned next."
 ---
 
 # Roadmap
 
 The roadmap describes intent, not a release commitment. Work may move as implementation and security review uncover new requirements.
 
-## Current release: v0.1.3
+## Current release: v0.1.x
 
-- Authentication
-- Projects and environments
-- Encrypted secrets
-- SQLite storage
-- Admin interface and REST API
-- CLI, `.env` import and export, and `dopbase run`
-- Service tokens and audit records
-- Root, admin, member, and AI agent roles
+- Authentication with root, admin, member, and AI agent roles
+- Projects, environments, and encrypted secrets stored in SQLite
+- Embedded Admin UI, REST API, OpenAPI specification, and Swagger UI
+- CLI support for dotenv, JSON, and YAML import and export
+- Secret injection with `dopbase run` and an encrypted runtime cache
+- Runtime cache inspection and cleanup
+- Environment-scoped runner tokens, AI service accounts, and audit records
 - User and AI account management
-- Instance status, factory reset, and encrypted full-instance backups
+- Instance status and server log management
+- Encrypted full-instance backups and recovery-aware factory reset
+- Self-hosted binaries for macOS and Linux on AMD64 and ARM64
 
 ## v0.2.0
 
