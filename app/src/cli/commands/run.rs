@@ -30,7 +30,7 @@ pub(super) async fn execute(
         && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
     {
       bail!(
-        "Saved default environment {} is unavailable. Set a new one with `dopbase env default <project/environment>` or clear it with `dopbase env default --clear`.",
+        "Saved default environment {} is unavailable. Set a new one with `dopbase env default <ENVIRONMENT_REF>` or clear it with `dopbase env default --clear`.",
         selection.reference
       )
     }
@@ -137,7 +137,7 @@ pub fn run_environment(
       source: RunEnvironmentSource::Default,
     });
   }
-  bail!("No default environment is set. Set one with: dopbase env default <project/environment>")
+  bail!("No default environment is set. Set one with: dopbase env default <ENVIRONMENT_REF>")
 }
 #[cfg(unix)]
 async fn terminate_signal() {

@@ -46,7 +46,7 @@ pub async fn list(
   path = crate::constants::api::environments::RESOLVE,
   tag = "environments",
   security(("bearerAuth" = [])),
-  params(("reference" = String, Query, description = "Environment id or project/name reference")),
+  params(("reference" = String, Query, description = "Environment ID or PROJECT_REF/ENVIRONMENT_NAME")),
   responses(
     (status = 200, description = "Environment resolved", body = inline(HttpResponseFormat<EnvironmentResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),

@@ -225,6 +225,121 @@ async fn environment_ids_are_six_digit() {
 }
 
 #[tokio::test]
+async fn environment_references_accept_project_names_and_ids() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  let (status, project, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&token),
+    Some(json!({"name":"payment-service"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let project_id = project["data"]["id"].as_str().unwrap();
+
+  let (status, environment, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/payment-service/environments",
+    Some(&token),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let environment_id = environment["data"]["id"].as_str().unwrap();
+
+  for reference in [
+    environment_id.to_owned(),
+    "payment-service/production".into(),
+    format!("{project_id}/production"),
+  ] {
+    let encoded: String = url::form_urlencoded::byte_serialize(reference.as_bytes()).collect();
+    let (status, resolved, _) = call(
+      &router,
+      "GET",
+      &format!("/api/v1/environments/resolve?reference={encoded}"),
+      Some(&token),
+      None,
+    )
+    .await;
+    assert_eq!(status, 200, "failed to resolve {reference}: {resolved}");
+    assert_eq!(resolved["data"]["id"], environment_id);
+  }
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn project_and_environment_conflicts_leave_existing_data_unchanged() {
+  let (_directory, state, router) = test_app().await;
+  let token = bootstrap_admin(&state, &router).await;
+  let (status, initialized, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/init",
+    Some(&token),
+    Some(json!({
+      "projectName":"conflict-test",
+      "environmentName":"production",
+      "entries":[{"key":"API_KEY","value":"original"}]
+    })),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let project_id = initialized["data"]["project"]["id"].as_str().unwrap();
+
+  let (status, conflict, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/init",
+    Some(&token),
+    Some(json!({
+      "projectName":"conflict-test",
+      "environmentName":"staging",
+      "entries":[{"key":"SHOULD_NOT_EXIST","value":"private"}]
+    })),
+  )
+  .await;
+  assert_eq!(status, 409);
+  assert_eq!(
+    conflict["error"]["PROJECT_ALREADY_EXISTS"],
+    "A project with this name already exists."
+  );
+
+  let (status, conflict, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/conflict-test/environments",
+    Some(&token),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 409);
+  assert_eq!(
+    conflict["error"]["ENVIRONMENT_ALREADY_EXISTS"],
+    "An environment with this name already exists in the project."
+  );
+
+  let environment_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM environments WHERE project_id=?")
+      .bind(project_id)
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  let secret_count: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM secrets WHERE environment_id IN (SELECT id FROM environments WHERE project_id=?)",
+  )
+  .bind(project_id)
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(environment_count, 1);
+  assert_eq!(secret_count, 1);
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn environment_id_creation_retries_insert_collisions() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;

@@ -79,7 +79,7 @@ Server source:   default
 Authentication:  none
 Identity:        none
 Email:           none
-Environment:     none (set with `dopbase env default <project/environment>`)
+Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```
 
 No repository or global config file is required for the implicit local server.
@@ -101,7 +101,7 @@ From an application directory with an existing `.env` file:
 
 ```bash
 cd my-project
-dopbase init my-project development --from .env
+dopbase init my-project/development --from .env
 ```
 
 Dopbase atomically creates the project and its `development` environment, then

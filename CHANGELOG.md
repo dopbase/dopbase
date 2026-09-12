@@ -2,6 +2,18 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+### Changed
+
+- `dopbase init` now accepts one `PROJECT_NAME/ENVIRONMENT_NAME` target.
+- `dopbase env create` now accepts one `PROJECT_REF/ENVIRONMENT_NAME` target.
+  The previous two-argument forms are no longer accepted.
+- Environment references can use an environment ID or an environment name
+  qualified by either a project name or project ID.
+- CLI usage and help now distinguish new resource names from references to
+  existing resources.
+
 ## 0.1.5 - 2026-09-11
 
 Dopbase now supports more self-hosted connection formats, creates a recovery

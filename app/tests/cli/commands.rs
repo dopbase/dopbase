@@ -234,7 +234,7 @@ fn run_environment_rejects_empty_variable_and_explains_how_to_set_a_default() {
     "{message}"
   );
   assert!(
-    message.contains("dopbase env default <project/environment>"),
+    message.contains("dopbase env default <ENVIRONMENT_REF>"),
     "{message}"
   );
 }

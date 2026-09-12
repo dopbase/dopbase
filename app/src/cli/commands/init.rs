@@ -1,6 +1,8 @@
 use super::output;
 use crate::{
-  cli::{client, local_config::ResolvedServer, secret_format},
+  cli::{
+    client, environment_target::EnvironmentTarget, local_config::ResolvedServer, secret_format,
+  },
   constants::api,
 };
 use anyhow::Result;
@@ -12,12 +14,12 @@ use secret_format::SecretFormat;
 
 pub(super) async fn execute(
   server: &ResolvedServer,
-  project: String,
-  environment: String,
+  target: EnvironmentTarget,
   from: &Path,
   format: Option<SecretFormat>,
   json_output: bool,
 ) -> Result<i32> {
+  let (project, environment) = target.into_parts();
   let format = SecretFormat::for_input(from, format)?;
   let api = client::human_client(server).await?;
   let entries = secret_format::read(from, Some(format))?;

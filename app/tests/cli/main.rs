@@ -2,6 +2,7 @@ mod args;
 mod client;
 mod commands;
 mod dotenv;
+mod environment_commands;
 mod local_config;
 mod output;
 mod runtime_cache;

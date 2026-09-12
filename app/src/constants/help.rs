@@ -15,7 +15,7 @@ Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server up                        # run the server in the background
   dopbase login                            # authenticate with the active server
-  dopbase init myapp dev --from .env       # create a project + environment from a secrets file
+  dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 
@@ -47,9 +47,9 @@ pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
 pub(crate) const STATUS_HELP: &str = "Examples:\n  dopbase status\n";
 pub(crate) const INIT_HELP: &str = "\
 Examples:
-  dopbase init payment-service development --from .env
-  dopbase init payment-service development --from secrets.json
-  cat secrets.yml | dopbase init payment-service development --from - --format yaml
+  dopbase init payment-service/development --from .env
+  dopbase init payment-service/development --from secrets.json
+  cat secrets.yml | dopbase init payment-service/development --from - --format yaml
 ";
 
 pub(crate) const PROJECT_HELP: &str = "\
@@ -75,7 +75,7 @@ Examples:
 
 pub(crate) const ENV_HELP: &str = "\
 Examples:
-  dopbase env create payment-service production
+  dopbase env create payment-service/production
   dopbase env list payment-service
   dopbase env show payment-service/production
   dopbase env default payment-service/development
@@ -89,7 +89,7 @@ Examples:
   dopbase env default --clear
 ";
 pub(crate) const ENV_CREATE_HELP: &str =
-  "Examples:\n  dopbase env create payment-service production\n";
+  "Examples:\n  dopbase env create payment-service/production\n";
 pub(crate) const ENV_LIST_HELP: &str = "\
 Examples:
   dopbase env list
@@ -116,8 +116,8 @@ Examples:
   dopbase secret get payment-service/production API_KEY --reveal
   dopbase secret delete payment-service/production API_KEY
 
-Use project/environment for readable references. Run `dopbase env list` to find
-an environment. Immutable IDs such as env_482731 are also accepted.
+Use PROJECT_REF/ENVIRONMENT_NAME for readable references. PROJECT_REF can be a
+project ID or name. Immutable environment IDs such as env_482731 also work.
 ";
 
 pub(crate) const SECRET_LIST_HELP: &str = "\
@@ -257,5 +257,5 @@ Examples:
   dopbase client status --json
 ";
 
-pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Environment ID or project/environment reference, for example \
-payment-service/production. Run `dopbase env list` to see available environments.";
+pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
+PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production.";

@@ -115,11 +115,12 @@ behavior.
 Every environment belongs to one project, so an environment reference contains
 all the context needed by secret, import, export, token, and run commands.
 
-Commands accept either form:
+Commands accept these forms:
 
 ```text
-env_482731                  # Immutable ID
-payment-service/production # Readable reference
+env_482731                       # Immutable environment ID
+payment-service/production      # Project name and environment name
+prj_01JABCDEF1234/production    # Project ID and environment name
 ```
 
 Use readable references interactively. Use immutable IDs in CI and deployment
@@ -136,9 +137,9 @@ them. An ID from one server cannot address a resource on another server.
 operation:
 
 ```bash
-dopbase init payment-service development --from .env
-dopbase init worker development --from secrets.json
-cat secrets.yml | dopbase init storefront development --from - --format yaml
+dopbase init payment-service/development --from .env
+dopbase init worker/development --from secrets.json
+cat secrets.yml | dopbase init storefront/development --from - --format yaml
 ```
 
 The command validates the complete file before changing server state. The
@@ -152,43 +153,43 @@ count, but never secret values.
 
 ## Project commands
 
-| Command                                       | Purpose                  |
-| --------------------------------------------- | ------------------------ |
-| `dopbase project create <name>`               | Create an empty project  |
-| `dopbase project list`                        | List accessible projects |
-| `dopbase project show <project>`              | Show project metadata    |
-| `dopbase project rename <project> <new-name>` | Rename a project         |
-| `dopbase project delete <project>`            | Delete a project         |
+| Command                                                          | Purpose                  |
+| ---------------------------------------------------------------- | ------------------------ |
+| `dopbase project create <PROJECT_NAME>`                          | Create an empty project  |
+| `dopbase project list`                                           | List accessible projects |
+| `dopbase project show <PROJECT_REF>`                             | Show project metadata    |
+| `dopbase project rename <PROJECT_REF> <NEW_PROJECT_NAME>`        | Rename a project         |
+| `dopbase project delete <PROJECT_REF>`                           | Delete a project         |
 
-`<project>` accepts an immutable project ID or project name. Deleting a project
+`<PROJECT_REF>` accepts an immutable project ID or project name. Deleting a project
 also deletes its environments, secrets, and scoped tokens. Dopbase shows the
 affected resource counts and requires confirmation. Automation must pass
 `--yes`.
 
 ## Environment commands
 
-| Command                                       | Purpose                   |
-| --------------------------------------------- | ------------------------- |
-| `dopbase env create <project> <name>`         | Create an environment     |
-| `dopbase env default <environment>`           | Set the run default       |
-| `dopbase env default --clear`                 | Clear the run default     |
-| `dopbase env list [<project>]`                | List environments         |
-| `dopbase env show <environment>`              | Show environment metadata |
-| `dopbase env rename <environment> <new-name>` | Rename an environment     |
-| `dopbase env delete <environment>`            | Delete an environment     |
+| Command                                                                      | Purpose                   |
+| ---------------------------------------------------------------------------- | ------------------------- |
+| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`                          | Create an environment     |
+| `dopbase env default <ENVIRONMENT_REF>`                                      | Set the run default       |
+| `dopbase env default --clear`                                                | Clear the run default     |
+| `dopbase env list [PROJECT_REF]`                                             | List environments         |
+| `dopbase env show <ENVIRONMENT_REF>`                                         | Show environment metadata |
+| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>`                | Rename an environment     |
+| `dopbase env delete <ENVIRONMENT_REF>`                                       | Delete an environment     |
 
 Deleting an environment also deletes its secrets and scoped tokens. The
 operation requires confirmation or `--yes` and is recorded in the audit log.
 
 ## Secret commands
 
-| Command                                           | Purpose                     |
-| ------------------------------------------------- | --------------------------- |
-| `dopbase secret list <environment>`               | List keys and safe metadata |
-| `dopbase secret set <environment> <key>`          | Create or update a value    |
-| `dopbase secret get <environment> <key>`          | Read safe metadata          |
-| `dopbase secret get <environment> <key> --reveal` | Explicitly reveal a value   |
-| `dopbase secret delete <environment> <key>`       | Delete one secret           |
+| Command                                                       | Purpose                     |
+| ------------------------------------------------------------- | --------------------------- |
+| `dopbase secret list <ENVIRONMENT_REF>`                       | List keys and safe metadata |
+| `dopbase secret set <ENVIRONMENT_REF> <KEY>`                  | Create or update a value    |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY>`                  | Read safe metadata          |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal`         | Explicitly reveal a value   |
+| `dopbase secret delete <ENVIRONMENT_REF> <KEY>`               | Delete one secret           |
 
 `secret set` securely prompts for a value when attached to a terminal. Use
 `--stdin` for automation:
@@ -269,8 +270,8 @@ dopbase token create payment-service/production \
 
 | Command                                                          | Purpose               |
 | ---------------------------------------------------------------- | --------------------- |
-| `dopbase token create <environment> --name <name> --role runner` | Create a runner token |
-| `dopbase token list <environment>`                               | List token metadata   |
+| `dopbase token create <ENVIRONMENT_REF> --name <NAME> --role runner` | Create a runner token |
+| `dopbase token list <ENVIRONMENT_REF>`                               | List token metadata   |
 | `dopbase token revoke <token-id>`                                | Revoke a token        |
 
 The plaintext token is displayed only once. Tokens can also be created and

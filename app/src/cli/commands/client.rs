@@ -212,7 +212,7 @@ pub(super) async fn show_status(
       _ => "none",
     };
     let environment = server.default_environment().map_or_else(
-      || "none (set with `dopbase env default <project/environment>`)".to_owned(),
+      || "none (set with `dopbase env default <ENVIRONMENT_REF>`)".to_owned(),
       |id| format!("{id} (default)"),
     );
     let server_status = if connected {

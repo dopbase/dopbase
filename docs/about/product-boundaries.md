@@ -27,5 +27,8 @@ Before adding a feature, the project should ask:
 3. Does it make the single-executable experience harder?
 4. Are users asking for it?
 5. Does it solve a user problem rather than copy a competitor?
+6. Does it duplicate a workflow that already has a clear command?
+7. Can it be documented, tested, secured, and maintained to the project's
+   quality standard?
 
 Dopbase should first deepen version history, CLI behavior, permissions, auditing, encryption, reliability, and developer workflows.

@@ -41,7 +41,8 @@ pub async fn resolve(
   let Some((project, environment)) = reference.split_once('/') else {
     return Ok(None);
   };
-  sqlx::query_as(&format!("{SELECT} WHERE p.name=? AND e.name=?"))
+  sqlx::query_as(&format!("{SELECT} WHERE (p.id=? OR p.name=?) AND e.name=?"))
+    .bind(project)
     .bind(project)
     .bind(environment)
     .fetch_optional(pool)

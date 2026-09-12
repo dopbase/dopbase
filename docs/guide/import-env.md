@@ -13,9 +13,9 @@ individual secret records instead of storing the file as one opaque object.
 Use `init` when the project does not exist yet:
 
 ```bash
-dopbase init payment-service development --from .env
-dopbase init another-service development --from secrets.json
-dopbase init worker development --from secrets.yml
+dopbase init payment-service/development --from .env
+dopbase init another-service/development --from secrets.json
+dopbase init worker/development --from secrets.yml
 ```
 
 The file is validated first. Dopbase then creates the project, environment, and
@@ -26,7 +26,7 @@ partially imported project remains.
 that project, create it explicitly and import into it:
 
 ```bash
-dopbase env create payment-service staging
+dopbase env create payment-service/staging
 dopbase import payment-service/staging .env.staging
 ```
 
@@ -62,7 +62,7 @@ filename or when reading from stdin:
 ```bash
 dopbase import payment-service/staging secrets.data --format json
 cat secrets.yml | dopbase import payment-service/staging - --format yaml
-cat .env | dopbase init worker development --from - --format dotenv
+cat .env | dopbase init worker/development --from - --format dotenv
 ```
 
 Stdin imports need an existing valid login or `DOPBASE_TOKEN`. The CLI cannot

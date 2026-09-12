@@ -74,7 +74,7 @@ The server and client are built into the same `dopbase` executable:
 ```bash
 dopbase server start
 dopbase login
-dopbase init payment-service development --from .env
+dopbase init payment-service/development --from .env
 dopbase run payment-service/development -- npm start
 ```
 

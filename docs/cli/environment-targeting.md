@@ -64,7 +64,7 @@ Connect and sign in, then bootstrap the project and first environment:
 ```bash
 dopbase client connect https://dopbase.example.com
 dopbase login
-dopbase init storefront development --from .env
+dopbase init storefront/development --from .env
 ```
 
 `init` validates the file and atomically creates the project, environment, and
@@ -74,10 +74,10 @@ repository.
 Add the other environments explicitly:
 
 ```bash
-dopbase env create storefront staging
+dopbase env create storefront/staging
 dopbase import storefront/staging .env.staging
 
-dopbase env create storefront production
+dopbase env create storefront/production
 dopbase import storefront/production .env.production
 ```
 
