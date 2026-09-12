@@ -6,20 +6,21 @@ use crate::{
 };
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
-use serde_json::{Value, json};
-use std::path::PathBuf;
-
 use secret_format::SecretFormat;
+use serde_json::{Value, json};
 
 pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
-  reference: &str,
-  output: Option<PathBuf>,
-  stdout: bool,
-  format: Option<SecretFormat>,
-  force: bool,
+  args: ExportArgs,
   json_output: bool,
 ) -> Result<i32> {
+  let ExportArgs {
+    environment,
+    output,
+    stdout,
+    format,
+    force,
+  } = args;
   if output.is_none() && !stdout {
     bail!("export requires --output <FILE> or --stdout");
   }
@@ -28,7 +29,7 @@ pub(crate) async fn execute(
   }
   let format = SecretFormat::for_output(output.as_deref(), format);
   let api = client::recently_authenticated_client(server).await?;
-  let env = environment::resolve_environment(&api, reference).await?;
+  let env = environment::resolve_environment(&api, &environment).await?;
   let data = api
     .request(
       Method::POST,
@@ -78,3 +79,4 @@ fn parse_entries(value: &Value) -> Result<Vec<SecretInput>> {
     })
     .collect()
 }
+use super::ExportArgs;

@@ -6,9 +6,8 @@ use std::{
 };
 
 use crate::{
-  cli::{
-    commands::{auth, client, environment, import, init, project, secret, server, token},
-    secret_format::SecretFormat,
+  cli::commands::{
+    auth, client, environment, export, import, init, project, secret, server, token,
   },
   constants::help::*,
 };
@@ -16,6 +15,7 @@ use crate::{
 pub use auth::LoginArgs;
 pub use client::ClientCommand;
 pub use environment::EnvCommand;
+pub use export::ExportArgs;
 pub use import::ImportArgs;
 pub use init::InitArgs;
 pub use project::ProjectCommand;
@@ -171,28 +171,8 @@ pub enum Command {
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing
   /// file. Every export requires interactive password confirmation.
-  #[command(after_help = EXPORT_HELP)]
-  Export {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// File to write. The format is inferred from its filename by default.
-    #[arg(
-      long,
-      value_name = "FILE",
-      conflicts_with = "stdout",
-      required_unless_present = "stdout"
-    )]
-    output: Option<PathBuf>,
-    /// Print plaintext secrets to stdout. Defaults to dotenv format.
-    #[arg(long, conflicts_with = "output", required_unless_present = "output")]
-    stdout: bool,
-    /// Output format. Overrides filename inference.
-    #[arg(long, value_enum)]
-    format: Option<SecretFormat>,
-    /// Overwrite the output file if it already exists.
-    #[arg(long)]
-    force: bool,
-  },
+  #[command(after_help = export::HELP)]
+  Export(ExportArgs),
   /// Manage CI/runner access tokens for an environment.
   #[command(after_help = token::HELP)]
   Token {

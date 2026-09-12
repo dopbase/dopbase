@@ -1,4 +1,4 @@
-use app::cli::args::{AdminCommand, Cli, Command, ImportArgs, InitArgs, ServerCommand};
+use app::cli::args::{AdminCommand, Cli, Command, ExportArgs, ImportArgs, InitArgs, ServerCommand};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   secret_format::SecretFormat,
@@ -450,10 +450,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     export.command,
-    Command::Export {
+    Command::Export(ExportArgs {
       format: Some(SecretFormat::Dotenv),
       ..
-    }
+    })
   ));
 
   assert!(

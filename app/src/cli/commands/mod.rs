@@ -3,7 +3,7 @@ pub mod auth;
 mod backup;
 pub mod client;
 pub mod environment;
-mod export;
+pub mod export;
 pub mod import;
 pub mod init;
 pub mod project;
@@ -90,24 +90,7 @@ async fn execute_client(
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,
     Command::Import(args) => import::execute(server, args, json_output).await,
-    Command::Export {
-      environment,
-      output,
-      stdout,
-      format,
-      force,
-    } => {
-      export::execute(
-        server,
-        &environment,
-        output,
-        stdout,
-        format,
-        force,
-        json_output,
-      )
-      .await
-    }
+    Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run {
       environment,

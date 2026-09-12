@@ -26,12 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const EXPORT_HELP: &str = "\
-Examples:
-  dopbase export payment-service/production --output .env.production
-  dopbase export payment-service/production --output secrets.json
-  dopbase export payment-service/production --stdout --format yaml
-";
 pub(crate) const RUN_HELP: &str = "\
 Examples:
   dopbase run -- npm run dev
