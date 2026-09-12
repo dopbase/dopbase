@@ -6,7 +6,7 @@ mod environment;
 mod export;
 mod import;
 pub mod init;
-mod project;
+pub mod project;
 mod restore;
 pub mod run;
 mod secret;

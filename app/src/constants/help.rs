@@ -26,27 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const PROJECT_HELP: &str = "\
-Examples:
-  dopbase project create payment-service
-  dopbase project list
-  dopbase project show payment-service
-  dopbase project rename payment-service payments
-  dopbase project delete payment-service
-";
-
-pub(crate) const PROJECT_CREATE_HELP: &str =
-  "Examples:\n  dopbase project create payment-service\n";
-pub(crate) const PROJECT_LIST_HELP: &str = "Examples:\n  dopbase project list\n";
-pub(crate) const PROJECT_SHOW_HELP: &str = "Examples:\n  dopbase project show payment-service\n";
-pub(crate) const PROJECT_RENAME_HELP: &str =
-  "Examples:\n  dopbase project rename payment-service payments\n";
-pub(crate) const PROJECT_DELETE_HELP: &str = "\
-Examples:
-  dopbase project delete payment-service
-  dopbase project delete payment-service --yes
-";
-
 pub(crate) const ENV_HELP: &str = "\
 Examples:
   dopbase env create payment-service/production

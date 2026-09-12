@@ -1,6 +1,7 @@
+use super::ProjectCommand;
 use crate::cli::{output, prompt};
 use crate::{
-  cli::{args::ProjectCommand, client, local_config},
+  cli::{client, local_config},
   constants::api as api_paths,
 };
 use anyhow::Result;

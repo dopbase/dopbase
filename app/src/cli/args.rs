@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{auth, client, init, server},
+    commands::{auth, client, init, project, server},
     environment_target,
     environment_target::EnvironmentTarget,
     secret_format::SecretFormat,
@@ -19,6 +19,7 @@ pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 pub use client::ClientCommand;
 pub use auth::LoginArgs;
 pub use init::InitArgs;
+pub use project::ProjectCommand;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -141,7 +142,7 @@ pub enum Command {
   #[command(after_help = init::HELP)]
   Init(InitArgs),
   /// Manage projects (create, list, show, rename, delete).
-  #[command(after_help = PROJECT_HELP)]
+  #[command(after_help = project::HELP)]
   Project {
     #[command(subcommand)]
     command: ProjectCommand,
@@ -277,48 +278,6 @@ pub enum Command {
   },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum ProjectCommand {
-  /// Create an empty project.
-  #[command(after_help = PROJECT_CREATE_HELP)]
-  Create {
-    /// Project name, unique on the server.
-    #[arg(value_name = "PROJECT_NAME")]
-    name: String,
-  },
-  /// List accessible projects.
-  #[command(after_help = PROJECT_LIST_HELP)]
-  List,
-  /// Show project metadata.
-  #[command(after_help = PROJECT_SHOW_HELP)]
-  Show {
-    /// Project ID or name.
-    #[arg(value_name = "PROJECT_REF")]
-    project: String,
-  },
-  /// Rename a project.
-  #[command(after_help = PROJECT_RENAME_HELP)]
-  Rename {
-    /// Project ID or name.
-    #[arg(value_name = "PROJECT_REF")]
-    project: String,
-    /// New project name.
-    #[arg(value_name = "NEW_PROJECT_NAME")]
-    new_name: String,
-  },
-  /// Delete a project with all its environments, secrets, and tokens.
-  ///
-  /// Asks for confirmation unless --yes is passed.
-  #[command(after_help = PROJECT_DELETE_HELP)]
-  Delete {
-    /// Project ID or name.
-    #[arg(value_name = "PROJECT_REF")]
-    project: String,
-    /// Skip the confirmation prompt (for automation).
-    #[arg(long)]
-    yes: bool,
-  },
-}
 #[derive(Subcommand, Debug)]
 pub enum EnvCommand {
   /// Set or clear the default environment used by `dopbase run`.
