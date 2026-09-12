@@ -11,7 +11,11 @@ pub(crate) async fn execute(
   args: super::InitArgs,
   json_output: bool,
 ) -> Result<i32> {
-  let super::InitArgs { target, from, format } = args;
+  let super::InitArgs {
+    target,
+    from,
+    format,
+  } = args;
   let (project, environment) = target.into_parts();
   let format = secret_format::SecretFormat::for_input(&from, format)?;
   let api = client::human_client(server).await?;

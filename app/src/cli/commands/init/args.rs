@@ -1,4 +1,6 @@
-use crate::cli::{environment_target, environment_target::EnvironmentTarget, secret_format::SecretFormat};
+use crate::cli::{
+  environment_target, environment_target::EnvironmentTarget, secret_format::SecretFormat,
+};
 use clap::Args;
 use std::path::PathBuf;
 

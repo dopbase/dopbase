@@ -1,7 +1,6 @@
 use super::{
   local_config::{ResolvedServer, normalize},
-  prompt,
-  session,
+  prompt, session,
 };
 use crate::constants::{api, config::ENV_TOKEN};
 use anyhow::{Context, Result, bail};

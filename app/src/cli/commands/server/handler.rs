@@ -1,5 +1,5 @@
-use crate::cli::output;
 use super::{ServerCommand, ServerLaunchArgs};
+use crate::cli::output;
 use crate::{
   config::{ServerConfig, ServerOverrides, resolve_data_dir, sqlite_url},
   constants::config::DATABASE_FILENAME,

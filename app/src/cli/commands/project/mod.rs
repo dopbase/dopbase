@@ -1,6 +1,6 @@
 mod args;
 mod handler;
 
-pub use args::ProjectCommand;
 pub(crate) use args::HELP;
+pub use args::ProjectCommand;
 pub(super) use handler::execute;

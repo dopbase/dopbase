@@ -1,6 +1,6 @@
 mod args;
 mod handler;
 
-pub use args::InitArgs;
 pub(crate) use args::HELP;
+pub use args::InitArgs;
 pub(super) use handler::execute;

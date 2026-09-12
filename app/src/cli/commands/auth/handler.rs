@@ -1,5 +1,5 @@
-use crate::cli::{output, prompt};
 use crate::cli::{client, local_config::ResolvedServer};
+use crate::cli::{output, prompt};
 use anyhow::{Result, bail};
 use serde_json::json;
 use std::io::{self, IsTerminal, Read};
