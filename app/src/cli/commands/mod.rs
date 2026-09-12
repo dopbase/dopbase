@@ -2,27 +2,27 @@ mod admin;
 pub mod auth;
 mod backup;
 pub mod client;
-mod environment;
+pub mod environment;
 mod export;
 mod import;
 pub mod init;
 pub mod project;
 mod restore;
 pub mod run;
-mod secret;
+pub mod secret;
 pub mod server;
 mod token;
 pub mod update;
 
+#[doc(hidden)]
+pub use super::output::{render_fields, render_table};
+#[doc(hidden)]
+pub use super::prompt::remove_one_line_ending;
 pub use admin::{
   complete_factory_reset, factory_reset_archive_path, factory_reset_confirmation_matches,
   factory_reset_quarantine_path, validate_factory_reset_target,
 };
 pub use client::{insecure_transport_warning, server_switch_confirmed, status_document};
-#[doc(hidden)]
-pub use super::output::{render_fields, render_table};
-#[doc(hidden)]
-pub use super::prompt::remove_one_line_ending;
 pub use run::{RunEnvironment, run_environment};
 
 use super::{args::*, local_config};

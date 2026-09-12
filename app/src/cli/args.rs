@@ -7,19 +7,19 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{auth, client, init, project, server},
-    environment_target,
-    environment_target::EnvironmentTarget,
+    commands::{auth, client, environment, init, project, secret, server},
     secret_format::SecretFormat,
   },
   constants::help::*,
 };
 
-pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
-pub use client::ClientCommand;
 pub use auth::LoginArgs;
+pub use client::ClientCommand;
+pub use environment::EnvCommand;
 pub use init::InitArgs;
 pub use project::ProjectCommand;
+pub use secret::SecretCommand;
+pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -148,13 +148,13 @@ pub enum Command {
     command: ProjectCommand,
   },
   /// Manage environments inside a project (create, list, rename, delete).
-  #[command(after_help = ENV_HELP)]
+  #[command(after_help = environment::HELP)]
   Env {
     #[command(subcommand)]
     command: EnvCommand,
   },
   /// Manage secrets in an environment (list, set, get, delete).
-  #[command(after_help = SECRET_HELP)]
+  #[command(after_help = secret::HELP)]
   Secret {
     #[command(subcommand)]
     command: SecretCommand,
@@ -278,109 +278,6 @@ pub enum Command {
   },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum EnvCommand {
-  /// Set or clear the default environment used by `dopbase run`.
-  #[command(after_help = ENV_DEFAULT_HELP)]
-  Default {
-    #[arg(
-      value_name = "ENVIRONMENT_REF",
-      required_unless_present = "clear",
-      help = ENVIRONMENT_ARG_HELP
-    )]
-    environment: Option<String>,
-    /// Clear the default environment for the active server.
-    #[arg(long, conflicts_with = "environment")]
-    clear: bool,
-  },
-  /// Create an environment inside a project.
-  #[command(after_help = ENV_CREATE_HELP)]
-  Create {
-    /// Existing project and new environment, written as PROJECT_REF/ENVIRONMENT_NAME.
-    #[arg(
-      value_name = "PROJECT_REF/ENVIRONMENT_NAME",
-      value_parser = environment_target::parse_create
-    )]
-    target: EnvironmentTarget,
-  },
-  /// List environments, either for one project or all accessible ones.
-  #[command(after_help = ENV_LIST_HELP)]
-  List {
-    /// Limit the listing to this project (ID or name).
-    #[arg(value_name = "PROJECT_REF")]
-    project: Option<String>,
-  },
-  /// Show environment metadata.
-  #[command(after_help = ENV_SHOW_HELP)]
-  Show {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-  },
-  /// Rename an environment.
-  #[command(after_help = ENV_RENAME_HELP)]
-  Rename {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// New environment name.
-    #[arg(value_name = "NEW_ENVIRONMENT_NAME")]
-    new_name: String,
-  },
-  /// Delete an environment with its secrets and tokens.
-  ///
-  /// Asks for confirmation unless --yes is passed.
-  #[command(after_help = ENV_DELETE_HELP)]
-  Delete {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Skip the confirmation prompt (for automation).
-    #[arg(long)]
-    yes: bool,
-  },
-}
-#[derive(Subcommand, Debug)]
-pub enum SecretCommand {
-  /// List secret keys in an environment (values are never shown).
-  #[command(after_help = SECRET_LIST_HELP)]
-  List {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-  },
-  /// Set a secret through a masked prompt or read it from standard input.
-  #[command(after_help = SECRET_SET_HELP)]
-  Set {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Secret key name.
-    key: String,
-    /// Read until EOF. In a terminal, finish with Ctrl+D (Ctrl+Z then Enter on Windows).
-    #[arg(long)]
-    stdin: bool,
-  },
-  /// Show secret metadata, or print its value with --reveal.
-  #[command(after_help = SECRET_GET_HELP)]
-  Get {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Secret key name.
-    key: String,
-    /// Print the actual value after interactive password confirmation.
-    #[arg(long)]
-    reveal: bool,
-  },
-  /// Delete a secret from an environment.
-  ///
-  /// Asks for confirmation unless --yes is passed.
-  #[command(after_help = SECRET_DELETE_HELP)]
-  Delete {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Secret key name.
-    key: String,
-    /// Skip the confirmation prompt (for automation).
-    #[arg(long)]
-    yes: bool,
-  },
-}
 #[derive(Subcommand, Debug)]
 pub enum TokenCommand {
   /// Create an access token for an environment (e.g. for CI/CD).

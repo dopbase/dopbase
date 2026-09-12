@@ -1,9 +1,7 @@
-use crate::cli::{
-  commands::environment,
-  output, prompt,
-};
+use super::SecretCommand;
+use crate::cli::{commands::environment, output, prompt};
 use crate::{
-  cli::{args::SecretCommand, client, local_config},
+  cli::{client, local_config},
   constants::api as api_paths,
 };
 use anyhow::{Result, bail};
