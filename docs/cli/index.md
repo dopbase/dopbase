@@ -17,8 +17,8 @@ dopbase server start
 # Client role
 dopbase client status
 dopbase login
-dopbase init payment-service development --from .env
-dopbase env create payment-service staging
+dopbase init payment-service/development --from .env
+dopbase env create payment-service/staging
 dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
 ```
@@ -30,10 +30,10 @@ to another endpoint saves only that server in the user's machine-global config.
 Dopbase does not write repository configuration and does not save an active
 project or environment.
 
-Commands accept an environment directly. Use a readable reference such as
-`payment-service/staging` in a terminal or an immutable `env_...` ID in a
-deployment. Because each environment belongs to one project, no separate
-project selection is required.
+Commands accept an environment directly. An environment reference can be an
+immutable `env_...` ID or `PROJECT_REF/ENVIRONMENT_NAME`, where `PROJECT_REF`
+is a project ID or name. Because each environment belongs to one project, no
+separate project selection is required.
 
 Read [target projects and environments](./environment-targeting) for the full
 development, staging, and production workflow.

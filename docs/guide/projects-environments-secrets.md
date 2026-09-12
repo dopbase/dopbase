@@ -45,7 +45,7 @@ same key can have a different encrypted value in each environment.
 Create and inspect environments with:
 
 ```bash
-dopbase env create payment-service staging
+dopbase env create payment-service/staging
 dopbase env list payment-service
 dopbase env show payment-service/staging
 ```

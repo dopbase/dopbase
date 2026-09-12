@@ -30,8 +30,9 @@ A named set of secrets for one application context, such as development, staging
 
 ## Environment reference
 
-An immutable environment ID such as `env_...` or a readable
-`project/environment` name accepted by environment-scoped CLI commands.
+An immutable environment ID such as `env_...` or a qualified
+`PROJECT_REF/ENVIRONMENT_NAME` value accepted by environment-scoped CLI
+commands. `PROJECT_REF` can be a project ID or name.
 
 ## Machine identity
 
@@ -44,6 +45,10 @@ Key material stored outside the Dopbase database and used to protect data encryp
 ## Project
 
 The Dopbase representation of an application or service. A project contains environments and their secrets.
+
+## Project reference
+
+An immutable project ID such as `prj_...` or the project's unique name.
 
 ## Secret
 
