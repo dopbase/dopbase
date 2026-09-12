@@ -1,15 +1,15 @@
-use super::{output, prompt};
+use super::EnvCommand;
 use crate::cli::{
-  args::EnvCommand,
   client::{self, ApiClient},
   local_config,
 };
+use crate::cli::{output, prompt};
 use crate::constants::api as api_paths;
 use anyhow::{Context, Result};
 use reqwest::Method;
 use serde_json::{Value, json};
 
-pub(super) async fn resolve_environment(
+pub(crate) async fn resolve_environment(
   api: &ApiClient,
   reference: &str,
 ) -> Result<Value> {
@@ -21,7 +21,7 @@ pub(super) async fn resolve_environment(
     )
     .await
 }
-pub(super) async fn execute(
+pub(crate) async fn execute(
   command: EnvCommand,
   server: &local_config::ResolvedServer,
   json_output: bool,
@@ -196,7 +196,7 @@ fn print_affected(value: &Value) {
   ]);
 }
 
-pub(super) fn env_id(value: &Value) -> Result<&str> {
+pub(crate) fn env_id(value: &Value) -> Result<&str> {
   value
     .get("id")
     .and_then(Value::as_str)

@@ -1,29 +1,34 @@
-mod admin;
-mod auth;
-mod backup;
-mod client;
-mod environment;
-mod export;
-mod import;
-mod init;
-mod output;
-mod project;
-pub(crate) mod prompt;
-mod restore;
-mod run;
-mod secret;
-mod server;
-mod token;
+//! Feature-owned CLI command modules.
+//!
+//! Each command keeps its Clap arguments, help text, handler, and private
+//! support code together. This file only routes parsed commands and re-exports
+//! the small set of helpers used outside their owning module.
 
+pub mod admin;
+pub mod auth;
+pub mod backup;
+pub mod client;
+pub mod environment;
+pub mod export;
+pub mod import;
+pub mod init;
+pub mod project;
+pub mod restore;
+pub mod run;
+pub mod secret;
+pub mod server;
+pub mod token;
+pub mod update;
+
+#[doc(hidden)]
+pub use super::output::{render_fields, render_table};
+#[doc(hidden)]
+pub use super::prompt::remove_one_line_ending;
 pub use admin::{
   complete_factory_reset, factory_reset_archive_path, factory_reset_confirmation_matches,
   factory_reset_quarantine_path, validate_factory_reset_target,
 };
 pub use client::{insecure_transport_warning, server_switch_confirmed, status_document};
-#[doc(hidden)]
-pub use output::{render_fields, render_table};
-#[doc(hidden)]
-pub use prompt::remove_one_line_ending;
 pub use run::{RunEnvironment, run_environment};
 
 use super::{args::*, local_config};
@@ -58,9 +63,9 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       client::show_status(server_argument.as_deref(), data_dir.as_deref(), json_output).await?;
       Ok(0)
     }
-    Command::Login { token } => {
+    Command::Login(args) => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
-      auth::login(&server, token, json_output).await
+      auth::login(&server, args, json_output).await
     }
     Command::Logout => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
@@ -72,7 +77,7 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       }
       admin::execute(command, data_dir, json_output).await
     }
-    Command::Update => super::update::run(json_output).await,
+    Command::Update => update::run(json_output).await,
     command => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
       execute_client(command, &server, json_output).await
@@ -86,67 +91,16 @@ async fn execute_client(
   json_output: bool,
 ) -> Result<i32> {
   match command {
-    Command::Init {
-      target,
-      from,
-      format,
-    } => init::execute(server, target, &from, format, json_output).await,
+    Command::Init(args) => init::execute(server, args, json_output).await,
     Command::Project { command } => project::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,
-    Command::Import {
-      environment,
-      path,
-      format,
-      dry_run,
-      replace,
-      yes,
-    } => {
-      import::execute(
-        server,
-        &environment,
-        import::ImportOptions {
-          path: &path,
-          format,
-          dry_run,
-          replace,
-          yes,
-          json_output,
-        },
-      )
-      .await
-    }
-    Command::Export {
-      environment,
-      output,
-      stdout,
-      format,
-      force,
-    } => {
-      export::execute(
-        server,
-        &environment,
-        output,
-        stdout,
-        format,
-        force,
-        json_output,
-      )
-      .await
-    }
+    Command::Import(args) => import::execute(server, args, json_output).await,
+    Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
-    Command::Run {
-      environment,
-      token,
-      command,
-    } => run::execute(server, environment, token, command).await,
-    Command::Backup { name, output } => backup::execute(server, name, output, json_output).await,
-    Command::Restore {
-      path,
-      key,
-      setup_token,
-      yes,
-    } => restore::execute(server, path, key, setup_token, yes, json_output).await,
+    Command::Run(args) => run::execute(server, args).await,
+    Command::Backup(args) => backup::execute(server, args, json_output).await,
+    Command::Restore(args) => restore::execute(server, args, json_output).await,
     _ => bail!("unsupported command"),
   }
 }

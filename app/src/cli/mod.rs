@@ -9,11 +9,15 @@ pub mod environment_target;
 #[doc(hidden)]
 pub mod local_config;
 #[doc(hidden)]
-pub mod runtime_cache;
+pub use commands::run::cache as runtime_cache;
+#[doc(hidden)]
+pub mod output;
+#[doc(hidden)]
+pub mod prompt;
 pub mod secret_format;
 #[doc(hidden)]
 pub mod session;
-pub mod update;
+pub use commands::update;
 
 pub use args::Cli;
 pub use client::CliCancelled;

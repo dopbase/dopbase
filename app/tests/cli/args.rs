@@ -1,4 +1,6 @@
-use app::cli::args::{AdminCommand, Cli, Command, ServerCommand};
+use app::cli::args::{
+  AdminCommand, Cli, Command, ExportArgs, ImportArgs, InitArgs, RunArgs, ServerCommand,
+};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   secret_format::SecretFormat,
@@ -205,7 +207,7 @@ fn run_token_must_appear_before_the_child_command_separator() {
     "child-value",
   ])
   .unwrap();
-  let Command::Run { token, command, .. } = cli.command else {
+  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
     panic!("expected run command");
   };
   assert_eq!(
@@ -229,7 +231,7 @@ fn run_accepts_the_short_token_flag() {
     "child-value",
   ])
   .unwrap();
-  let Command::Run { token, command, .. } = cli.command else {
+  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
     panic!("expected run command");
   };
   assert_eq!(
@@ -415,10 +417,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     init.command,
-    Command::Init {
+    Command::Init(InitArgs {
       format: Some(SecretFormat::Yaml),
       ..
-    }
+    })
   ));
 
   let import = Cli::try_parse_from([
@@ -432,10 +434,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     import.command,
-    Command::Import {
+    Command::Import(ImportArgs {
       format: Some(SecretFormat::Json),
       ..
-    }
+    })
   ));
 
   let export = Cli::try_parse_from([
@@ -450,10 +452,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     export.command,
-    Command::Export {
+    Command::Export(ExportArgs {
       format: Some(SecretFormat::Dotenv),
       ..
-    }
+    })
   ));
 
   assert!(

@@ -1,6 +1,6 @@
-use super::output;
+use super::{ServerCommand, ServerLaunchArgs};
+use crate::cli::output;
 use crate::{
-  cli::args::{ServerCommand, ServerLaunchArgs},
   config::{ServerConfig, ServerOverrides, resolve_data_dir, sqlite_url},
   constants::config::DATABASE_FILENAME,
   daemon::ManagedDaemonState,
@@ -12,7 +12,7 @@ use std::{
   time::Duration,
 };
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   command: ServerCommand,
   data_dir: Option<PathBuf>,
   json_output: bool,

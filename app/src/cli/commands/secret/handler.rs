@@ -1,6 +1,7 @@
-use super::{environment, output, prompt};
+use super::SecretCommand;
+use crate::cli::{commands::environment, output, prompt};
 use crate::{
-  cli::{args::SecretCommand, client, local_config},
+  cli::{client, local_config},
   constants::api as api_paths,
 };
 use anyhow::{Result, bail};
@@ -8,7 +9,7 @@ use reqwest::Method;
 use serde_json::{Value, json};
 use std::io::{self, IsTerminal};
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   command: SecretCommand,
   server: &local_config::ResolvedServer,
   json_output: bool,

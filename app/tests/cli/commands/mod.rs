@@ -456,3 +456,7 @@ async fn factory_reset_rejects_remote_and_json_modes_before_touching_local_state
     "--json cannot be used with `dopbase admin factory-reset`"
   );
 }
+mod environment;
+mod import;
+mod run;
+mod update;
