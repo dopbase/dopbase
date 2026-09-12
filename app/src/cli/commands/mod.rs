@@ -1,3 +1,9 @@
+//! Feature-owned CLI command modules.
+//!
+//! Each command keeps its Clap arguments, help text, handler, and private
+//! support code together. This file only routes parsed commands and re-exports
+//! the small set of helpers used outside their owning module.
+
 pub mod admin;
 pub mod auth;
 pub mod backup;

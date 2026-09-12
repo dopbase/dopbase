@@ -34,6 +34,62 @@ trap cleanup EXIT
 
 cp ./target/release/dopbase "${binary}"
 cd "${runtime_root}"
+
+# Exercise every public command path against the release binary. The Rust CLI
+# tests cover parsing and behavior in isolated temporary directories; this
+# matrix catches packaging or command-tree regressions in the Docker image.
+"${binary}" --help >/dev/null
+cli_command_paths=(
+  "server"
+  "server start"
+  "server up"
+  "server down"
+  "server status"
+  "server logs"
+  "client"
+  "client connect"
+  "client status"
+  "login"
+  "logout"
+  "status"
+  "init"
+  "project"
+  "project create"
+  "project list"
+  "project show"
+  "project rename"
+  "project delete"
+  "env"
+  "env default"
+  "env create"
+  "env list"
+  "env show"
+  "env rename"
+  "env delete"
+  "secret"
+  "secret list"
+  "secret set"
+  "secret get"
+  "secret delete"
+  "import"
+  "export"
+  "token"
+  "token create"
+  "token list"
+  "token revoke"
+  "run"
+  "admin"
+  "admin reset-password"
+  "admin factory-reset"
+  "update"
+  "backup"
+  "restore"
+)
+for command_path in "${cli_command_paths[@]}"; do
+  read -r -a command_parts <<<"${command_path}"
+  "${binary}" "${command_parts[@]}" --help >/dev/null
+done
+
 "${binary}" --data-dir "${data_dir}" server start \
   --docs \
   --host 127.0.0.1 \
