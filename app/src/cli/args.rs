@@ -137,7 +137,7 @@ pub enum Command {
   /// Create a project, its first environment, and import secrets.
   #[command(after_help = INIT_HELP)]
   Init {
-    /// New project and first environment, written as project/environment.
+    /// New project and first environment, written as PROJECT_NAME/ENVIRONMENT_NAME.
     #[arg(
       value_name = "PROJECT_NAME/ENVIRONMENT_NAME",
       value_parser = environment_target::parse_init
@@ -450,7 +450,7 @@ pub enum EnvCommand {
   /// Create an environment inside a project.
   #[command(after_help = ENV_CREATE_HELP)]
   Create {
-    /// Existing project and new environment, written as project/environment.
+    /// Existing project and new environment, written as PROJECT_REF/ENVIRONMENT_NAME.
     #[arg(
       value_name = "PROJECT_REF/ENVIRONMENT_NAME",
       value_parser = environment_target::parse_create
