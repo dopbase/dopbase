@@ -1,4 +1,4 @@
-use app::cli::args::{AdminCommand, Cli, Command, ServerCommand};
+use app::cli::args::{AdminCommand, Cli, Command, InitArgs, ServerCommand};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   secret_format::SecretFormat,
@@ -415,10 +415,10 @@ fn secret_commands_parse_format_options() {
   .unwrap();
   assert!(matches!(
     init.command,
-    Command::Init {
+    Command::Init(InitArgs {
       format: Some(SecretFormat::Yaml),
       ..
-    }
+    })
   ));
 
   let import = Cli::try_parse_from([

@@ -1,28 +1,21 @@
-use crate::cli::output;
 use crate::{
-  cli::{
-    client, environment_target::EnvironmentTarget, local_config::ResolvedServer, secret_format,
-  },
+  cli::{client, local_config::ResolvedServer, output, secret_format},
   constants::api,
 };
 use anyhow::Result;
 use reqwest::Method;
 use serde_json::json;
-use std::path::Path;
-
-use secret_format::SecretFormat;
 
 pub(crate) async fn execute(
   server: &ResolvedServer,
-  target: EnvironmentTarget,
-  from: &Path,
-  format: Option<SecretFormat>,
+  args: super::InitArgs,
   json_output: bool,
 ) -> Result<i32> {
+  let super::InitArgs { target, from, format } = args;
   let (project, environment) = target.into_parts();
-  let format = SecretFormat::for_input(from, format)?;
+  let format = secret_format::SecretFormat::for_input(&from, format)?;
   let api = client::human_client(server).await?;
-  let entries = secret_format::read(from, Some(format))?;
+  let entries = secret_format::read(&from, Some(format))?;
   let data = api
     .request(
       Method::POST,

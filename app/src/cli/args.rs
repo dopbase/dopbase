@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{auth, client, server},
+    commands::{auth, client, init, server},
     environment_target,
     environment_target::EnvironmentTarget,
     secret_format::SecretFormat,
@@ -18,6 +18,7 @@ use crate::{
 pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 pub use client::ClientCommand;
 pub use auth::LoginArgs;
+pub use init::InitArgs;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -137,21 +138,8 @@ pub enum Command {
   #[command(after_help = client::STATUS_ALIAS_HELP)]
   Status,
   /// Create a project, its first environment, and import secrets.
-  #[command(after_help = INIT_HELP)]
-  Init {
-    /// New project and first environment, written as PROJECT_NAME/ENVIRONMENT_NAME.
-    #[arg(
-      value_name = "PROJECT_NAME/ENVIRONMENT_NAME",
-      value_parser = environment_target::parse_init
-    )]
-    target: EnvironmentTarget,
-    /// Secret file to import, or - to read from stdin.
-    #[arg(long, value_name = "FILE")]
-    from: PathBuf,
-    /// Input format. Required for stdin; otherwise inferred from the filename.
-    #[arg(long, value_enum)]
-    format: Option<SecretFormat>,
-  },
+  #[command(after_help = init::HELP)]
+  Init(InitArgs),
   /// Manage projects (create, list, show, rename, delete).
   #[command(after_help = PROJECT_HELP)]
   Project {

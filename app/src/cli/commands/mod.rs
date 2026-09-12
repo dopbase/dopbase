@@ -5,7 +5,7 @@ pub mod client;
 mod environment;
 mod export;
 mod import;
-mod init;
+pub mod init;
 mod project;
 mod restore;
 pub mod run;
@@ -85,11 +85,7 @@ async fn execute_client(
   json_output: bool,
 ) -> Result<i32> {
   match command {
-    Command::Init {
-      target,
-      from,
-      format,
-    } => init::execute(server, target, &from, format, json_output).await,
+    Command::Init(args) => init::execute(server, args, json_output).await,
     Command::Project { command } => project::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,

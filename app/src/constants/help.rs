@@ -26,13 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const INIT_HELP: &str = "\
-Examples:
-  dopbase init payment-service/development --from .env
-  dopbase init payment-service/development --from secrets.json
-  cat secrets.yml | dopbase init payment-service/development --from - --format yaml
-";
-
 pub(crate) const PROJECT_HELP: &str = "\
 Examples:
   dopbase project create payment-service
