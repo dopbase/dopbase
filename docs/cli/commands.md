@@ -76,10 +76,15 @@ dopbase 0.1.3 is up to date (latest release 0.1.3).
 ```
 
 When a newer release exists, the command prints the current version, the latest
-version, the release URL, and a reminder that Dopbase does not self-update.
-Install the new release with `scripts/install.sh` or a macOS or Linux release
-archive. The command exits with status 0 whether or not an update is available,
-and with status 1 when the release cannot be queried. Run it with `--json` for
+version, and the release URL. Stop every running Dopbase server, then install
+the release with:
+
+```sh
+curl -fsSL https://dopbase.com/install.sh | sh
+```
+
+The command exits with status 0 whether or not an update is available, and with
+status 1 when the release cannot be queried. Run it with `--json` for
 automation. No other command contacts GitHub.
 
 The server resolution order is:
