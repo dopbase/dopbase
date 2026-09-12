@@ -1,6 +1,6 @@
 use super::output;
 use crate::{
-  cli::{client, dotenv, local_config::ResolvedServer},
+  cli::{client, local_config::ResolvedServer, secret_format},
   constants::api,
 };
 use anyhow::Result;
@@ -8,15 +8,19 @@ use reqwest::Method;
 use serde_json::json;
 use std::path::Path;
 
+use secret_format::SecretFormat;
+
 pub(super) async fn execute(
   server: &ResolvedServer,
   project: String,
   environment: String,
   from: &Path,
+  format: Option<SecretFormat>,
   json_output: bool,
 ) -> Result<i32> {
+  let format = SecretFormat::for_input(from, format)?;
   let api = client::human_client(server).await?;
-  let entries = dotenv::parse_file(from)?;
+  let entries = secret_format::read(from, Some(format))?;
   let data = api
     .request(
       Method::POST,

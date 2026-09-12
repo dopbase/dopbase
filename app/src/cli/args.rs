@@ -5,7 +5,7 @@ use std::{
   path::PathBuf,
 };
 
-use crate::constants::help::*;
+use crate::{cli::secret_format::SecretFormat, constants::help::*};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -132,17 +132,18 @@ pub enum Command {
   #[command(after_help = STATUS_HELP)]
   Status,
   /// Create a project, its first environment, and import secrets.
-  ///
-  /// Bootstraps a new project on the server from an existing dotenv file.
   #[command(after_help = INIT_HELP)]
   Init {
     /// Name of the project to create (unique on the server).
     project: String,
     /// Name of the first environment to create (e.g. development).
     environment: String,
-    /// Dotenv file to import the initial secrets from.
+    /// Secret file to import, or - to read from stdin.
     #[arg(long, value_name = "FILE")]
     from: PathBuf,
+    /// Input format. Required for stdin; otherwise inferred from the filename.
+    #[arg(long, value_enum)]
+    format: Option<SecretFormat>,
   },
   /// Manage projects (create, list, show, rename, delete).
   #[command(after_help = PROJECT_HELP)]
@@ -162,7 +163,7 @@ pub enum Command {
     #[command(subcommand)]
     command: SecretCommand,
   },
-  /// Bulk-import secrets into an environment from a dotenv file.
+  /// Bulk-import secrets into an environment from a dotenv, JSON, or YAML source.
   ///
   /// Existing keys are kept unless --replace is passed. Use --dry-run to
   /// preview the result without changing anything.
@@ -170,8 +171,11 @@ pub enum Command {
   Import {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
-    /// Dotenv file to read secrets from.
+    /// Secret file to import, or - to read from stdin.
     path: PathBuf,
+    /// Input format. Required for stdin; otherwise inferred from the filename.
+    #[arg(long, value_enum)]
+    format: Option<SecretFormat>,
     /// Preview what would change without applying it.
     #[arg(long)]
     dry_run: bool,
@@ -182,7 +186,7 @@ pub enum Command {
     #[arg(long)]
     yes: bool,
   },
-  /// Export an environment's secrets to a dotenv file or stdout.
+  /// Export an environment's secrets as dotenv, JSON, or YAML.
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing
   /// file. Every export requires interactive password confirmation.
@@ -190,7 +194,7 @@ pub enum Command {
   Export {
     #[arg(help = ENVIRONMENT_ARG_HELP)]
     environment: String,
-    /// File to write the dotenv output to.
+    /// File to write. The format is inferred from its filename by default.
     #[arg(
       long,
       value_name = "FILE",
@@ -198,9 +202,12 @@ pub enum Command {
       required_unless_present = "stdout"
     )]
     output: Option<PathBuf>,
-    /// Print the dotenv output to stdout instead of a file.
+    /// Print plaintext secrets to stdout. Defaults to dotenv format.
     #[arg(long, conflicts_with = "output", required_unless_present = "output")]
     stdout: bool,
+    /// Output format. Overrides filename inference.
+    #[arg(long, value_enum)]
+    format: Option<SecretFormat>,
     /// Overwrite the output file if it already exists.
     #[arg(long)]
     force: bool,

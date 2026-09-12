@@ -90,13 +90,15 @@ async fn execute_client(
       project,
       environment,
       from,
-    } => init::execute(server, project, environment, &from, json_output).await,
+      format,
+    } => init::execute(server, project, environment, &from, format, json_output).await,
     Command::Project { command } => project::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,
     Command::Import {
       environment,
       path,
+      format,
       dry_run,
       replace,
       yes,
@@ -105,6 +107,7 @@ async fn execute_client(
         server,
         &environment,
         &path,
+        format,
         dry_run,
         replace,
         yes,
@@ -116,8 +119,20 @@ async fn execute_client(
       environment,
       output,
       stdout,
+      format,
       force,
-    } => export::execute(server, &environment, output, stdout, force, json_output).await,
+    } => {
+      export::execute(
+        server,
+        &environment,
+        output,
+        stdout,
+        format,
+        force,
+        json_output,
+      )
+      .await
+    }
     Command::Token { command } => token::execute(command, server, json_output).await,
     Command::Run {
       environment,

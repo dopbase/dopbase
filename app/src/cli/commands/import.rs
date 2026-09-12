@@ -1,6 +1,6 @@
 use super::{environment, output, prompt};
 use crate::{
-  cli::{client, dotenv, local_config},
+  cli::{client, local_config, secret_format},
   constants::api,
 };
 use anyhow::Result;
@@ -8,19 +8,23 @@ use reqwest::Method;
 use serde_json::{Value, json};
 use std::path::Path;
 
+use secret_format::SecretFormat;
+
 pub(super) async fn execute(
   server: &local_config::ResolvedServer,
   reference: &str,
   path: &Path,
+  format: Option<SecretFormat>,
   dry_run: bool,
   replace: bool,
   yes: bool,
   json_output: bool,
 ) -> Result<i32> {
+  let format = SecretFormat::for_input(path, format)?;
   let api = client::human_client(server).await?;
   let env = environment::resolve_environment(&api, reference).await?;
   let id = environment::env_id(&env)?;
-  let entries = dotenv::parse_file(path)?;
+  let entries = secret_format::read(path, Some(format))?;
   let mode = if replace { "replace" } else { "merge" };
   let endpoint = api::secrets::import(id);
   let mut expected_revision = None;
