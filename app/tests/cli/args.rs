@@ -1,4 +1,6 @@
-use app::cli::args::{AdminCommand, Cli, Command, ExportArgs, ImportArgs, InitArgs, ServerCommand};
+use app::cli::args::{
+  AdminCommand, Cli, Command, ExportArgs, ImportArgs, InitArgs, RunArgs, ServerCommand,
+};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   secret_format::SecretFormat,
@@ -205,7 +207,7 @@ fn run_token_must_appear_before_the_child_command_separator() {
     "child-value",
   ])
   .unwrap();
-  let Command::Run { token, command, .. } = cli.command else {
+  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
     panic!("expected run command");
   };
   assert_eq!(
@@ -229,7 +231,7 @@ fn run_accepts_the_short_token_flag() {
     "child-value",
   ])
   .unwrap();
-  let Command::Run { token, command, .. } = cli.command else {
+  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
     panic!("expected run command");
   };
   assert_eq!(

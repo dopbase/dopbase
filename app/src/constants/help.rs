@@ -26,15 +26,6 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const RUN_HELP: &str = "\
-Examples:
-  dopbase run -- npm run dev
-  dopbase run env_482731 -- npm run dev
-  dopbase run payment-service/development -- npm run dev
-  dopbase run payment-service/production -t dbs_xxx -- npm start
-  dopbase run payment-service/production --token dbs_xxx -- npm start
-";
-
 pub(crate) const ADMIN_HELP: &str = "\
 Examples:
   dopbase admin reset-password admin@example.com

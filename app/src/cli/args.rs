@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::commands::{
-    auth, client, environment, export, import, init, project, secret, server, token,
+    auth, client, environment, export, import, init, project, run, secret, server, token,
   },
   constants::help::*,
 };
@@ -19,6 +19,7 @@ pub use export::ExportArgs;
 pub use import::ImportArgs;
 pub use init::InitArgs;
 pub use project::ProjectCommand;
+pub use run::RunArgs;
 pub use secret::SecretCommand;
 pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
 pub use token::TokenCommand;
@@ -187,17 +188,8 @@ pub enum Command {
   /// encrypted local cache. If the server is unavailable, the last cache for
   /// the same server, environment, and credential is used. Everything after
   /// `--` is the command to run.
-  #[command(after_help = RUN_HELP)]
-  Run {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: Option<String>,
-    /// Runner token for this invocation. Overrides DOPBASE_TOKEN and the saved credential.
-    #[arg(short = 't', long, value_name = "TOKEN")]
-    token: Option<String>,
-    /// Command to run with the injected secrets.
-    #[arg(last = true, required = true)]
-    command: Vec<String>,
-  },
+  #[command(after_help = run::HELP)]
+  Run(RunArgs),
   /// Offline server administration.
   #[command(after_help = ADMIN_HELP)]
   Admin {

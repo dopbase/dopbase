@@ -92,11 +92,7 @@ async fn execute_client(
     Command::Import(args) => import::execute(server, args, json_output).await,
     Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
-    Command::Run {
-      environment,
-      token,
-      command,
-    } => run::execute(server, environment, token, command).await,
+    Command::Run(args) => run::execute(server, args).await,
     Command::Backup { name, output } => backup::execute(server, name, output, json_output).await,
     Command::Restore {
       path,

@@ -1,3 +1,4 @@
+use super::RunArgs;
 use super::cache::{self as runtime_cache, RuntimeSource};
 use crate::cli::{client, local_config};
 use crate::constants::config::ENV_RUN_ENVIRONMENT;
@@ -6,10 +7,13 @@ use std::env;
 
 pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
-  environment: Option<String>,
-  token: Option<String>,
-  command: Vec<String>,
+  args: RunArgs,
 ) -> Result<i32> {
+  let RunArgs {
+    environment,
+    token,
+    command,
+  } = args;
   let api = client::any_authenticated_client(server, token).await?;
   let selection = run_environment(
     environment,
