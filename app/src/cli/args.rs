@@ -174,7 +174,7 @@ pub enum Command {
   /// preview the result without changing anything.
   #[command(after_help = IMPORT_HELP)]
   Import {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Secret file to import, or - to read from stdin.
     path: PathBuf,
@@ -197,7 +197,7 @@ pub enum Command {
   /// file. Every export requires interactive password confirmation.
   #[command(after_help = EXPORT_HELP)]
   Export {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// File to write. The format is inferred from its filename by default.
     #[arg(
@@ -233,7 +233,7 @@ pub enum Command {
   /// `--` is the command to run.
   #[command(after_help = RUN_HELP)]
   Run {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: Option<String>,
     /// Runner token for this invocation. Overrides DOPBASE_TOKEN and the saved credential.
     #[arg(short = 't', long, value_name = "TOKEN")]
@@ -396,6 +396,7 @@ pub enum ProjectCommand {
   #[command(after_help = PROJECT_CREATE_HELP)]
   Create {
     /// Project name, unique on the server.
+    #[arg(value_name = "PROJECT_NAME")]
     name: String,
   },
   /// List accessible projects.
@@ -405,14 +406,17 @@ pub enum ProjectCommand {
   #[command(after_help = PROJECT_SHOW_HELP)]
   Show {
     /// Project ID or name.
+    #[arg(value_name = "PROJECT_REF")]
     project: String,
   },
   /// Rename a project.
   #[command(after_help = PROJECT_RENAME_HELP)]
   Rename {
     /// Project ID or name.
+    #[arg(value_name = "PROJECT_REF")]
     project: String,
     /// New project name.
+    #[arg(value_name = "NEW_PROJECT_NAME")]
     new_name: String,
   },
   /// Delete a project with all its environments, secrets, and tokens.
@@ -421,6 +425,7 @@ pub enum ProjectCommand {
   #[command(after_help = PROJECT_DELETE_HELP)]
   Delete {
     /// Project ID or name.
+    #[arg(value_name = "PROJECT_REF")]
     project: String,
     /// Skip the confirmation prompt (for automation).
     #[arg(long)]
@@ -433,7 +438,7 @@ pub enum EnvCommand {
   #[command(after_help = ENV_DEFAULT_HELP)]
   Default {
     #[arg(
-      value_name = "ENVIRONMENT",
+      value_name = "ENVIRONMENT_REF",
       required_unless_present = "clear",
       help = ENVIRONMENT_ARG_HELP
     )]
@@ -456,20 +461,22 @@ pub enum EnvCommand {
   #[command(after_help = ENV_LIST_HELP)]
   List {
     /// Limit the listing to this project (ID or name).
+    #[arg(value_name = "PROJECT_REF")]
     project: Option<String>,
   },
   /// Show environment metadata.
   #[command(after_help = ENV_SHOW_HELP)]
   Show {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
   /// Rename an environment.
   #[command(after_help = ENV_RENAME_HELP)]
   Rename {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// New environment name.
+    #[arg(value_name = "NEW_ENVIRONMENT_NAME")]
     new_name: String,
   },
   /// Delete an environment with its secrets and tokens.
@@ -477,7 +484,7 @@ pub enum EnvCommand {
   /// Asks for confirmation unless --yes is passed.
   #[command(after_help = ENV_DELETE_HELP)]
   Delete {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Skip the confirmation prompt (for automation).
     #[arg(long)]
@@ -489,13 +496,13 @@ pub enum SecretCommand {
   /// List secret keys in an environment (values are never shown).
   #[command(after_help = SECRET_LIST_HELP)]
   List {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
   /// Set a secret through a masked prompt or read it from standard input.
   #[command(after_help = SECRET_SET_HELP)]
   Set {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Secret key name.
     key: String,
@@ -506,7 +513,7 @@ pub enum SecretCommand {
   /// Show secret metadata, or print its value with --reveal.
   #[command(after_help = SECRET_GET_HELP)]
   Get {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Secret key name.
     key: String,
@@ -519,7 +526,7 @@ pub enum SecretCommand {
   /// Asks for confirmation unless --yes is passed.
   #[command(after_help = SECRET_DELETE_HELP)]
   Delete {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Secret key name.
     key: String,
@@ -536,7 +543,7 @@ pub enum TokenCommand {
   /// via the DOPBASE_TOKEN environment variable.
   #[command(after_help = TOKEN_CREATE_HELP)]
   Create {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
     /// Display name for the token.
     #[arg(long)]
@@ -548,7 +555,7 @@ pub enum TokenCommand {
   /// List tokens for an environment.
   #[command(after_help = TOKEN_LIST_HELP)]
   List {
-    #[arg(help = ENVIRONMENT_ARG_HELP)]
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
     environment: String,
   },
   /// Revoke a token by ID.

@@ -674,12 +674,76 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
     let help = contextual_help(arguments);
     assert!(help.contains("Examples:"), "{arguments:?}: {help}");
     assert!(
-      help.contains("project/environment reference"),
+      help.contains("PROJECT_REF/ENVIRONMENT_NAME"),
       "{arguments:?}: {help}"
     );
     for text in *expected {
       assert!(help.contains(text), "{arguments:?}: {help}");
     }
+  }
+}
+
+#[test]
+fn resource_parameters_use_consistent_value_names() {
+  let cases: &[(&[&str], &str)] = &[
+    (
+      &["dopbase", "init", "--help"],
+      "<PROJECT_NAME/ENVIRONMENT_NAME>",
+    ),
+    (
+      &["dopbase", "project", "create", "--help"],
+      "<PROJECT_NAME>",
+    ),
+    (&["dopbase", "project", "show", "--help"], "<PROJECT_REF>"),
+    (
+      &["dopbase", "project", "rename", "--help"],
+      "<PROJECT_REF> <NEW_PROJECT_NAME>",
+    ),
+    (&["dopbase", "project", "delete", "--help"], "<PROJECT_REF>"),
+    (
+      &["dopbase", "env", "create", "--help"],
+      "<PROJECT_REF/ENVIRONMENT_NAME>",
+    ),
+    (&["dopbase", "env", "list", "--help"], "[PROJECT_REF]"),
+    (
+      &["dopbase", "env", "default", "--help"],
+      "[ENVIRONMENT_REF]",
+    ),
+    (&["dopbase", "env", "show", "--help"], "<ENVIRONMENT_REF>"),
+    (
+      &["dopbase", "env", "rename", "--help"],
+      "<ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>",
+    ),
+    (&["dopbase", "env", "delete", "--help"], "<ENVIRONMENT_REF>"),
+    (
+      &["dopbase", "secret", "list", "--help"],
+      "<ENVIRONMENT_REF>",
+    ),
+    (
+      &["dopbase", "secret", "set", "--help"],
+      "<ENVIRONMENT_REF> <KEY>",
+    ),
+    (
+      &["dopbase", "secret", "get", "--help"],
+      "<ENVIRONMENT_REF> <KEY>",
+    ),
+    (
+      &["dopbase", "secret", "delete", "--help"],
+      "<ENVIRONMENT_REF> <KEY>",
+    ),
+    (&["dopbase", "import", "--help"], "<ENVIRONMENT_REF> <PATH>"),
+    (&["dopbase", "export", "--help"], "<ENVIRONMENT_REF>"),
+    (
+      &["dopbase", "token", "create", "--help"],
+      "<ENVIRONMENT_REF>",
+    ),
+    (&["dopbase", "token", "list", "--help"], "<ENVIRONMENT_REF>"),
+    (&["dopbase", "run", "--help"], "[ENVIRONMENT_REF]"),
+  ];
+
+  for (arguments, expected) in cases {
+    let help = contextual_help(arguments);
+    assert!(help.contains(expected), "{arguments:?}: {help}");
   }
 }
 
