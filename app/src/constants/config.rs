@@ -3,6 +3,7 @@
 pub const DEFAULT_PORT: u16 = 8840;
 pub const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:8840";
 pub const DEFAULT_PUBLIC_URL: &str = "http://localhost:8840";
+pub const SERVER_HOST_PLACEHOLDER: &str = "SERVER_HOST";
 pub const DATA_DIRECTORY_NAME: &str = ".dopbase";
 pub const DATABASE_FILENAME: &str = "dopbase.db";
 pub const CLIENT_CONFIG_FILENAME: &str = "config.toml";

@@ -1,6 +1,6 @@
 use std::{
   env, fs,
-  net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+  net::{IpAddr, SocketAddr},
   path::{Path, PathBuf},
   str::FromStr,
 };
@@ -12,28 +12,13 @@ use url::{Host, Url};
 use crate::constants::config::{
   CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_DATA_DIR,
   ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT, ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS,
-  MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
+  MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
 pub fn validate_endpoint_transport(url: &Url) -> Result<()> {
-  if url.scheme() == "https" {
-    return Ok(());
-  }
-  if url.scheme() != "http" {
+  if !matches!(url.scheme(), "http" | "https") {
     bail!("URL must use HTTP or HTTPS");
-  }
-
-  let is_loopback = match url.host() {
-    Some(Host::Domain(host)) => host == "localhost",
-    Some(Host::Ipv4(host)) => host.is_loopback(),
-    Some(Host::Ipv6(host)) => host.is_loopback(),
-    None => false,
-  };
-  if !is_loopback {
-    bail!(
-      "remote URLs must use HTTPS. HTTP is only allowed for localhost or a loopback IP address"
-    );
   }
   Ok(())
 }
@@ -71,7 +56,7 @@ pub struct ServerConfig {
 pub enum PublicUrlSource {
   Explicit,
   LoopbackDefault,
-  NetworkInferred,
+  NetworkPlaceholder,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -327,24 +312,26 @@ impl ServerConfig {
       return Ok(());
     }
     let bind: SocketAddr = self.bind_address.parse().context("invalid bind_address")?;
-    let detected = if bind.ip().is_unspecified() {
-      Some(
-        detect_primary_ip(bind.ip())
-          .map_err(|error| missing_public_url_error(bind, Some(error)))?,
-      )
-    } else {
-      None
-    };
-    let (public_url, source) = resolve_implicit_public_url(bind, detected)?;
+    let (public_url, source) = resolve_implicit_public_url(bind);
     self.public_url = public_url;
     self.public_url_source = source;
     Ok(())
   }
 
-  pub fn inferred_public_url_warning(&self) -> Option<String> {
-    (self.public_url_source == PublicUrlSource::NetworkInferred).then(|| {
+  pub fn public_url_warning(&self) -> Option<String> {
+    if self.public_url_source == PublicUrlSource::NetworkPlaceholder {
+      return Some(
+        "Replace SERVER_HOST with this server's public IP address or domain.\n\
+         Set --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml to save the address.\n\
+         HTTP does not encrypt credentials, secrets, or setup tokens."
+          .into(),
+      );
+    }
+
+    let public = Url::parse(&self.public_url).ok()?;
+    (public.scheme() == "http" && !url_is_loopback(&public)).then(|| {
       format!(
-        "No public URL is configured. Using {}.\nSet --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml.\nThis HTTP URL does not encrypt credentials or secrets.",
+        "The public URL {} uses HTTP. Credentials, secrets, and setup tokens are not encrypted. Use HTTPS for deployments.",
         self.public_url
       )
     })
@@ -368,10 +355,15 @@ impl ServerConfig {
       }
       match self.public_url_source {
         PublicUrlSource::LoopbackDefault if !bind.ip().is_loopback() => {
-          return Err(missing_public_url_error(bind, None));
+          bail!("a non-loopback bind address cannot use the loopback public URL");
         }
-        PublicUrlSource::NetworkInferred if bind.ip().is_loopback() => {
-          bail!("a loopback bind address cannot use an inferred network public URL");
+        PublicUrlSource::NetworkPlaceholder if bind.ip().is_loopback() => {
+          bail!("a loopback bind address cannot use the SERVER_HOST placeholder");
+        }
+        PublicUrlSource::NetworkPlaceholder
+          if self.public_url != format!("http://{SERVER_HOST_PLACEHOLDER}:{}", bind.port()) =>
+        {
+          bail!("the network public URL must use the SERVER_HOST placeholder");
         }
         _ => {}
       }
@@ -392,77 +384,26 @@ impl ServerConfig {
   }
 }
 
+fn url_is_loopback(url: &Url) -> bool {
+  match url.host() {
+    Some(Host::Domain(host)) => host == "localhost",
+    Some(Host::Ipv4(host)) => host.is_loopback(),
+    Some(Host::Ipv6(host)) => host.is_loopback(),
+    None => false,
+  }
+}
+
 #[doc(hidden)]
-pub fn resolve_implicit_public_url(
-  bind: SocketAddr,
-  detected: Option<IpAddr>,
-) -> Result<(String, PublicUrlSource)> {
+pub fn resolve_implicit_public_url(bind: SocketAddr) -> (String, PublicUrlSource) {
   if bind.ip().is_loopback() {
-    return Ok((
+    return (
       format!("http://localhost:{}", bind.port()),
       PublicUrlSource::LoopbackDefault,
-    ));
+    );
   }
-  let ip = if bind.ip().is_unspecified() {
-    detected.ok_or_else(|| missing_public_url_error(bind, None))?
-  } else {
-    bind.ip()
-  };
-  if ip.is_loopback() || ip.is_unspecified() || !same_ip_family(bind.ip(), ip) {
-    return Err(missing_public_url_error(bind, None));
-  }
-  Ok((
-    format!("http://{}", SocketAddr::new(ip, bind.port())),
-    PublicUrlSource::NetworkInferred,
-  ))
-}
-
-fn same_ip_family(
-  first: IpAddr,
-  second: IpAddr,
-) -> bool {
-  matches!(
-    (first, second),
-    (IpAddr::V4(_), IpAddr::V4(_)) | (IpAddr::V6(_), IpAddr::V6(_))
-  )
-}
-
-fn detect_primary_ip(family: IpAddr) -> Result<IpAddr> {
-  let (local, probe) = match family {
-    IpAddr::V4(_) => (
-      SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
-      SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 80),
-    ),
-    IpAddr::V6(_) => (
-      SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
-      SocketAddr::new(
-        IpAddr::V6(
-          "2001:db8::1"
-            .parse()
-            .expect("valid IPv6 documentation address"),
-        ),
-        80,
-      ),
-    ),
-  };
-  let socket = UdpSocket::bind(local).context("failed to inspect local network routes")?;
-  socket
-    .connect(probe)
-    .context("no matching outbound network route was found")?;
-  Ok(socket.local_addr()?.ip())
-}
-
-fn missing_public_url_error(
-  bind: SocketAddr,
-  source: Option<anyhow::Error>,
-) -> anyhow::Error {
-  let reason = source
-    .map(|error| format!(" Could not detect a usable local IP address: {error}."))
-    .unwrap_or_default();
-  anyhow::anyhow!(
-    "Dopbase could not infer a public URL for {bind}.{reason}\n\
-     Set --public-url, DOPBASE_PUBLIC_URL, or public_url in server.toml,\n\
-     for example: --public-url https://dopbase.example.com"
+  (
+    format!("http://{SERVER_HOST_PLACEHOLDER}:{}", bind.port()),
+    PublicUrlSource::NetworkPlaceholder,
   )
 }
 

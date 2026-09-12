@@ -216,6 +216,8 @@ pub(crate) const SERVER_UP_HELP: &str = "\
 Examples:
   dopbase server up
   dopbase server up --port 9000
+  dopbase server up --host 0.0.0.0
+  dopbase server up --host 0.0.0.0 --public-url http://203.0.113.10:8840
   dopbase server up --docs
 ";
 pub(crate) const SERVER_DOWN_HELP: &str = "\

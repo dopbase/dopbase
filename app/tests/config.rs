@@ -1,5 +1,5 @@
 use std::fs;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use app::config::{
   EnvironmentOverrides, PublicUrlSource, ServerConfig, ServerOverrides, ensure_data_dir,
@@ -184,7 +184,7 @@ fn host_and_port_compose_bind_address() {
 }
 
 #[test]
-fn concrete_network_host_derives_an_http_public_url_with_a_warning() {
+fn concrete_network_host_uses_the_server_host_placeholder() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");
   fs::create_dir_all(&data_dir).unwrap();
@@ -198,47 +198,51 @@ fn concrete_network_host_derives_an_http_public_url_with_a_warning() {
     EnvironmentOverrides::default(),
   )
   .unwrap();
-  assert_eq!(config.public_url, "http://192.168.1.20:9000");
-  assert_eq!(config.public_url_source, PublicUrlSource::NetworkInferred);
-  let warning = config.inferred_public_url_warning().unwrap();
-  assert!(warning.contains("does not encrypt credentials or secrets"));
+  assert_eq!(config.public_url, "http://SERVER_HOST:9000");
+  assert_eq!(
+    config.public_url_source,
+    PublicUrlSource::NetworkPlaceholder
+  );
+  let warning = config.public_url_warning().unwrap();
+  assert!(warning.contains("Replace SERVER_HOST"));
+  assert!(warning.contains("does not encrypt credentials, secrets, or setup tokens"));
   assert!(warning.contains("DOPBASE_PUBLIC_URL"));
   assert!(warning.contains("server.toml"));
 }
 
 #[test]
-fn wildcard_network_hosts_use_the_detected_address() {
-  let (ipv4, source) = resolve_implicit_public_url(
-    "0.0.0.0:8840".parse().unwrap(),
-    Some(IpAddr::from([10, 20, 30, 40])),
-  )
-  .unwrap();
-  assert_eq!(ipv4, "http://10.20.30.40:8840");
-  assert_eq!(source, PublicUrlSource::NetworkInferred);
-
-  let (ipv6, source) = resolve_implicit_public_url(
-    "[::]:8840".parse().unwrap(),
-    Some("2001:db8::25".parse().unwrap()),
-  )
-  .unwrap();
-  assert_eq!(ipv6, "http://[2001:db8::25]:8840");
-  assert_eq!(source, PublicUrlSource::NetworkInferred);
+fn non_loopback_hosts_use_the_server_host_placeholder() {
+  for bind in ["0.0.0.0:8840", "[::]:9000", "192.168.1.20:9100"] {
+    let bind: SocketAddr = bind.parse().unwrap();
+    let (public_url, source) = resolve_implicit_public_url(bind);
+    assert_eq!(public_url, format!("http://SERVER_HOST:{}", bind.port()));
+    assert_eq!(source, PublicUrlSource::NetworkPlaceholder);
+  }
 }
 
 #[test]
-fn wildcard_network_host_without_a_detected_address_has_guidance() {
-  let error = resolve_implicit_public_url("0.0.0.0:8840".parse().unwrap(), None)
-    .unwrap_err()
-    .to_string();
-  assert!(error.contains("could not infer a public URL"), "{error}");
-  assert!(error.contains("--public-url"), "{error}");
-  assert!(error.contains("DOPBASE_PUBLIC_URL"), "{error}");
+fn wildcard_host_loads_without_network_detection() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(directory.path().join("data")),
+      host: Some("0.0.0.0".into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert_eq!(config.bind_address, "0.0.0.0:8840");
+  assert_eq!(config.public_url, "http://SERVER_HOST:8840");
 }
 
 #[test]
-fn explicit_public_urls_require_https_except_on_loopback() {
+fn explicit_public_urls_accept_http_and_https() {
   for public_url in [
     "https://dopbase.example.com",
+    "https://203.0.113.10:8840",
+    "http://dopbase.example.com",
+    "http://203.0.113.10:8840",
     "http://localhost:8840",
     "http://127.0.0.9:8840",
     "http://[::1]:8840",
@@ -254,14 +258,13 @@ fn explicit_public_urls_require_https_except_on_loopback() {
     );
     assert!(config.is_ok(), "expected {public_url} to be accepted");
   }
+}
 
-  for public_url in [
-    "http://dopbase.example.com",
-    "http://10.0.0.8:8840",
-    "http://localhost.example.com:8840",
-  ] {
+#[test]
+fn remote_http_public_urls_have_a_security_warning() {
+  for public_url in ["http://dopbase.example.com", "http://10.0.0.8:8840"] {
     let directory = tempfile::TempDir::new().unwrap();
-    let error = ServerConfig::load_with_environment(
+    let config = ServerConfig::load_with_environment(
       &ServerOverrides {
         data_dir: Some(directory.path().join("data")),
         public_url: Some(public_url.into()),
@@ -269,13 +272,33 @@ fn explicit_public_urls_require_https_except_on_loopback() {
       },
       EnvironmentOverrides::default(),
     )
-    .unwrap_err()
-    .to_string();
-    assert!(
-      error.contains("remote URLs must use HTTPS"),
-      "{public_url}: {error}"
-    );
+    .unwrap();
+    let warning = config.public_url_warning().unwrap();
+    assert!(warning.contains(public_url), "{warning}");
+    assert!(warning.contains("Use HTTPS for deployments"), "{warning}");
   }
+
+  let https = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(tempfile::TempDir::new().unwrap().path().join("data")),
+      public_url: Some("https://dopbase.example.com".into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert!(https.public_url_warning().is_none());
+
+  let loopback = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(tempfile::TempDir::new().unwrap().path().join("data")),
+      public_url: Some("http://localhost:8840".into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert!(loopback.public_url_warning().is_none());
 }
 
 #[test]
@@ -367,12 +390,14 @@ fn invalid_environment_port_is_rejected() {
 }
 
 #[test]
-fn rejects_remote_bind_without_public_url() {
+fn rejects_a_placeholder_source_with_a_loopback_bind() {
   let config = ServerConfig {
-    bind_address: "0.0.0.0:8840".into(),
+    public_url: "http://SERVER_HOST:8840".into(),
+    public_url_source: PublicUrlSource::NetworkPlaceholder,
     ..Default::default()
   };
-  assert!(config.validate().is_err());
+  let error = config.validate().unwrap_err().to_string();
+  assert!(error.contains("loopback bind address"), "{error}");
 }
 
 #[test]

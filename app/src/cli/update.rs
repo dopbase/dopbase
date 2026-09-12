@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use anstyle::{AnsiColor, Color, Effects, Style};
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use serde_json::Value;
@@ -7,6 +8,13 @@ use serde_json::Value;
 const RELEASE_API_URL: &str = "https://api.github.com/repos/dopbase/dopbase/releases/latest";
 const RELEASES_PAGE_URL: &str = "https://github.com/dopbase/dopbase/releases/latest";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const HEADING: Style = Style::new()
+  .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+  .effects(Effects::BOLD);
+const VERSION: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
+const COMMAND: Style = Style::new()
+  .fg_color(Some(Color::Ansi(AnsiColor::Green)))
+  .effects(Effects::BOLD);
 
 #[derive(Debug, Serialize)]
 pub struct UpdateStatus {
@@ -22,10 +30,7 @@ pub async fn run(json_output: bool) -> Result<i32> {
   if json_output {
     println!("{}", serde_json::to_string_pretty(&status)?);
   } else if status.update_available {
-    println!(
-      "A new Dopbase release is available.\nCurrent version: {}\nLatest version:  {}\nRelease notes:   {}\nDopbase does not self-update — install the new release with scripts/install.sh or the release archive.",
-      status.current_version, status.latest_version, status.release_url
-    );
+    anstream::println!("{}", update_message(&status));
   } else {
     println!(
       "dopbase {current} is up to date (latest release {}).",
@@ -33,6 +38,19 @@ pub async fn run(json_output: bool) -> Result<i32> {
     );
   }
   Ok(0)
+}
+
+#[doc(hidden)]
+pub fn update_message(status: &UpdateStatus) -> String {
+  format!(
+    "{HEADING}A new Dopbase release is available{HEADING:#}\n\n\
+     Current version  {VERSION}{}{VERSION:#}\n\
+     Latest version   {VERSION}{}{VERSION:#}\n\
+     Release notes    {}\n\n\
+     {HEADING}Stop every running Dopbase server before updating.{HEADING:#}\n\
+     Then run:\n\n  {COMMAND}curl -fsSL https://dopbase.com/install.sh | sh{COMMAND:#}",
+    status.current_version, status.latest_version, status.release_url
+  )
 }
 
 async fn check(current: &'static str) -> Result<UpdateStatus> {

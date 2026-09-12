@@ -1,17 +1,61 @@
 <p align="center">
-  <img src="./assets/banner.png" alt="Dopbase, a secrets manager in a single file" width="100%" />
+  <a href="https://dopbase.com">
+    <img src="./public/logo.svg" alt="Dopbase logo" width="96" />
+  </a>
 </p>
 
-# Dopbase
+<h1 align="center">Dopbase</h1>
 
-[Dopbase](https://dopbase.com) is an open-source secrets manager in a single file. One executable contains the server, Admin UI, REST API, migrations, and command-line client. It keeps application secrets organized by project and environment and runs on your own infrastructure.
+<p align="center">
+  Open-source, self-hosted secrets management in a single file.<br />
+  One binary contains the server, Admin UI, REST API, and command-line client.
+</p>
 
-The executable is a single download. Runtime data stays separate: Dopbase stores its SQLite database, configuration, and master key under `~/.dopbase` by default.
+<p align="center">
+  <a href="https://github.com/dopbase/dopbase/releases/latest"><img src="https://img.shields.io/github/v/release/dopbase/dopbase?style=flat-square&label=release&color=863BFF" alt="Latest release" /></a>
+  <a href="https://github.com/dopbase/dopbase/releases"><img src="https://img.shields.io/github/downloads/dopbase/dopbase/total?style=flat-square&color=863BFF" alt="Total release downloads" /></a>
+  <a href="https://github.com/dopbase/dopbase/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/dopbase/dopbase/release.yml?style=flat-square&label=release" alt="Release workflow status" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/dopbase/dopbase?style=flat-square&color=863BFF" alt="Apache 2.0 license" /></a>
+  <a href="https://dopbase.com"><img src="https://img.shields.io/badge/website-dopbase.com-863BFF?style=flat-square" alt="Dopbase website" /></a>
+  <a href="./docs/guide/quick-start.md"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-863BFF?style=flat-square" alt="Supported platforms: macOS and Linux" /></a>
+  <a href="./docs/guide/quick-start.md"><img src="https://img.shields.io/badge/arch-AMD64%20%7C%20ARM64-863BFF?style=flat-square" alt="Supported architectures: AMD64 and ARM64" /></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> |
+  <a href="#why-dopbase">Why Dopbase</a> |
+  <a href="https://dopbase.com/how-it-works">How it works</a> |
+  <a href="https://docs.dopbase.com">Documentation</a> |
+  <a href="./SECURITY.md">Security</a> |
+  <a href="./CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="./assets/product-of-the-day.svg" alt="Product of the Day: Secret Manager" width="260" />
+</p>
+
+<p align="center">
+  <img src="./assets/admin-ui-demo.png" alt="Dopbase Admin UI showing projects and environments with a secrets table and one temporarily revealed value" width="100%" />
+</p>
+
+<p align="center">
+  <sub>The Admin UI ships inside the Dopbase executable, so there is no separate frontend to deploy.</sub>
+</p>
+
+Dopbase keeps application secrets organized by project and environment on infrastructure you control. Runtime data stays separate from the executable: its SQLite database, configuration, and master key live under `~/.dopbase` by default.
+
+## Quick start
+
+Install the latest release on macOS or Linux, then start a local server:
+
+```bash
+curl -fsSL https://dopbase.com/install.sh | sh
+dopbase server start
+```
+
+Open `http://localhost:8840` to finish setup in the Admin UI. The [quick-start guide](./docs/guide/quick-start.md) covers sign-in, importing a `.env` file, and running an application with its secrets.
 
 Native release archives are available for macOS and Linux on AMD64 and ARM64.
-
-- Website: [http://dopbase.com](http://dopbase.com)
-- Documentation: [http://docs.dopbase.com](http://docs.dopbase.com)
 
 ## Why Dopbase
 
@@ -40,7 +84,7 @@ SQLite database, lock files, configuration, and local master key live under
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
-Dopbase 0.1.3 includes four roles, user management, read-only AI accounts, an
+Dopbase 0.1.5 includes four roles, user management, read-only AI accounts, an
 instance overview, and crash-safe factory reset. See [users and AI agents](./docs/ui/users.md)
 and [role permissions](./docs/reference/identity.md) for how access works.
 Version 0.1.0 starts with a fresh data directory. Databases and backups from
@@ -50,7 +94,7 @@ earlier releases are not supported.
 
 One executable carries the server and the client. The client authenticates,
 fetches one environment, and injects its secrets straight into your application
-process no shared `.env` file in the runtime.
+process without writing a shared `.env` file to the runtime.
 
 <p align="center">
   <img src="./assets/how-it-works.svg" alt="How Dopbase works: the client authenticates with the server, fetches one environment, and injects its secrets into an isolated application process, while the server keeps encrypted secrets and an audit history" width="100%" />
@@ -62,10 +106,10 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 | Path         | Purpose                                   | Current state                 |
 | ------------ | ----------------------------------------- | ----------------------------- |
-| `app/`       | Rust service and command-line application | v0.1.3 backend implementation |
-| `src/`       | Vue administration interface              | Initial scaffold              |
+| `app/`       | Rust service and command-line application | v0.1.5 backend implementation |
+| `src/`       | Vue administration interface              | Embedded Admin UI             |
 | `docs/`      | VitePress product documentation           | Active public specification   |
-| `tests/`     | Frontend tests and test setup             | Early test scaffold           |
+| `tests/`     | Frontend tests and test setup             | Admin UI test suite           |
 | `app/tests/` | Rust integration tests                    | Backend and CLI test suite    |
 
 ## Development

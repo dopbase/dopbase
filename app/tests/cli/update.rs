@@ -1,4 +1,4 @@
-use app::cli::update::{UpdateStatus, is_newer, parse_release, parse_version};
+use app::cli::update::{UpdateStatus, is_newer, parse_release, parse_version, update_message};
 use serde_json::{Value, json};
 
 #[test]
@@ -61,4 +61,23 @@ fn update_status_serializes_the_documented_shape() {
         "release_url": "https://github.com/dopbase/dopbase/releases/tag/0.1.0"
     })
   );
+}
+
+#[test]
+fn update_message_explains_how_to_install_safely() {
+  let status = UpdateStatus {
+    current_version: "0.0.12",
+    latest_version: "0.1.0".into(),
+    update_available: true,
+    release_url: "https://github.com/dopbase/dopbase/releases/tag/0.1.0".into(),
+  };
+
+  let message = update_message(&status);
+
+  assert!(message.contains("A new Dopbase release is available"));
+  assert!(message.contains("Current version  \u{1b}[36m0.0.12"));
+  assert!(message.contains("Latest version   \u{1b}[36m0.1.0"));
+  assert!(message.contains("Stop every running Dopbase server before updating."));
+  assert!(message.contains("curl -fsSL https://dopbase.com/install.sh | sh"));
+  assert!(message.contains("https://github.com/dopbase/dopbase/releases/tag/0.1.0"));
 }

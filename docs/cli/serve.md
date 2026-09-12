@@ -28,19 +28,26 @@ dopbase server start \
   --public-url https://dopbase.example.com
 ```
 
-Without a public URL, Dopbase uses the primary network IP and prints a warning.
-The inferred URL uses HTTP, so traffic is not encrypted. It may also be wrong
-when Dopbase runs behind NAT or a reverse proxy. Set the public URL explicitly
-for deployments:
+When the server binds to a non-loopback address without a public URL, Dopbase
+shows `http://SERVER_HOST:<port>`. Replace `SERVER_HOST` with the server's
+public IP address or domain. Dopbase does not inspect network routes or call an
+external service to discover the address.
+
+Set the public URL to make generated links ready to use:
 
 ```bash
+dopbase server start \
+  --host 0.0.0.0 \
+  --public-url http://203.0.113.10:8840
 dopbase server start --public-url https://dopbase.example.com
 export DOPBASE_PUBLIC_URL=https://dopbase.example.com
 ```
 
 You can also set `public_url = "https://dopbase.example.com"` in `server.toml`.
-Explicit remote URLs must use HTTPS. Dopbase never derives its public URL from
-request headers.
+Public URLs may use an IP address or domain. Dopbase warns when a remote URL
+uses HTTP because credentials, secrets, and setup tokens are not encrypted.
+Use HTTPS for deployments. Dopbase never derives its public URL from request
+headers.
 
 ## Run in the background
 

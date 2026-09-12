@@ -249,10 +249,15 @@ pub(crate) async fn start(
   if !json_output {
     anstream::eprintln!(
       "\n{}\n",
-      crate::server::startup_banner(&config.public_url, &data_dir, config.docs_enabled,)
+      crate::server::startup_banner(
+        &config.public_url,
+        &config.bind_address,
+        &data_dir,
+        config.docs_enabled,
+      )
     );
   }
-  if let Some(warning) = config.inferred_public_url_warning() {
+  if let Some(warning) = config.public_url_warning() {
     anstream::eprintln!("{}\n", crate::server::startup_warning(&warning));
   }
   if let Some(token) = &started.setup_token {
@@ -271,6 +276,8 @@ pub(crate) async fn start(
           "pid": started.pid,
           "log_file": started.log_path.display().to_string(),
           "pid_file": started.pid_file.display().to_string(),
+          "public_url": config.public_url,
+          "bind_address": config.bind_address,
           "stop_command": stop_command,
       }),
     );

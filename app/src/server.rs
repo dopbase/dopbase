@@ -204,6 +204,7 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
 
 pub fn startup_banner(
   public_url: &str,
+  bind_address: &str,
   data_dir: &std::path::Path,
   docs_enabled: bool,
 ) -> String {
@@ -214,6 +215,8 @@ pub fn startup_banner(
     "Secure, Simple and Private".to_string(),
     format!("Version {}", env!("CARGO_PKG_VERSION")),
     String::new(),
+    format!("Public URL: {public_url}"),
+    format!("Bind:       {bind_address}"),
     format!("Admin UI:   {public_url}"),
     format!("API:        {public_url}/api/v1"),
     format!("Config:     {}", data_dir.display()),
@@ -278,11 +281,12 @@ pub async fn serve_with_ready(
     "\n{}\n",
     startup_banner(
       public_url,
+      &state.config.bind_address,
       &state.config.data_dir,
       state.config.docs_enabled
     )
   );
-  if let Some(warning) = state.config.inferred_public_url_warning() {
+  if let Some(warning) = state.config.public_url_warning() {
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
   if let Some(setup) = setup_token.as_deref() {
