@@ -1,6 +1,7 @@
 use app::cli::args::{AdminCommand, Cli, Command, ServerCommand};
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
+  secret_format::SecretFormat,
   session,
 };
 use app::constants::config::executable_environment_names;
@@ -104,7 +105,23 @@ fn parses_every_v0_1_command_shape() {
       ".env",
       "--dry-run",
     ],
+    &[
+      "dopbase",
+      "import",
+      "billing/production",
+      "-",
+      "--format",
+      "json",
+    ],
     &["dopbase", "export", "billing/production", "--stdout"],
+    &[
+      "dopbase",
+      "export",
+      "billing/production",
+      "--stdout",
+      "--format",
+      "yaml",
+    ],
     &[
       "dopbase",
       "token",
@@ -382,6 +399,63 @@ fn rejects_conflicting_file_options() {
     ])
     .is_err()
   );
+}
+
+#[test]
+fn secret_commands_parse_format_options() {
+  let init = Cli::try_parse_from([
+    "dopbase",
+    "init",
+    "storefront",
+    "development",
+    "--from",
+    "-",
+    "--format",
+    "yaml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    init.command,
+    Command::Init {
+      format: Some(SecretFormat::Yaml),
+      ..
+    }
+  ));
+
+  let import = Cli::try_parse_from([
+    "dopbase",
+    "import",
+    "storefront/development",
+    "secrets.data",
+    "--format",
+    "json",
+  ])
+  .unwrap();
+  assert!(matches!(
+    import.command,
+    Command::Import {
+      format: Some(SecretFormat::Json),
+      ..
+    }
+  ));
+
+  let export = Cli::try_parse_from([
+    "dopbase",
+    "export",
+    "storefront/development",
+    "--output",
+    "secrets.yml",
+    "--format",
+    "dotenv",
+  ])
+  .unwrap();
+  assert!(matches!(
+    export.command,
+    Command::Export {
+      format: Some(SecretFormat::Dotenv),
+      ..
+    }
+  ));
 }
 
 #[test]

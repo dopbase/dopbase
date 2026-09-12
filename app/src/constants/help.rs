@@ -15,7 +15,7 @@ Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server up                        # run the server in the background
   dopbase login                            # authenticate with the active server
-  dopbase init myapp dev --from .env       # create a project + environment from a dotenv file
+  dopbase init myapp dev --from .env       # create a project + environment from a secrets file
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 
@@ -45,8 +45,12 @@ Examples:
 pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
 pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
 pub(crate) const STATUS_HELP: &str = "Examples:\n  dopbase status\n";
-pub(crate) const INIT_HELP: &str =
-  "Examples:\n  dopbase init payment-service development --from .env\n";
+pub(crate) const INIT_HELP: &str = "\
+Examples:
+  dopbase init payment-service development --from .env
+  dopbase init payment-service development --from secrets.json
+  cat secrets.yml | dopbase init payment-service development --from - --format yaml
+";
 
 pub(crate) const PROJECT_HELP: &str = "\
 Examples:
@@ -152,12 +156,14 @@ Examples:
 pub(crate) const IMPORT_HELP: &str = "\
 Examples:
   dopbase import payment-service/production .env.production
-  dopbase import payment-service/production .env.production --dry-run
+  dopbase import payment-service/production secrets.json --dry-run
+  cat secrets.yml | dopbase import payment-service/production - --format yaml
 ";
 pub(crate) const EXPORT_HELP: &str = "\
 Examples:
   dopbase export payment-service/production --output .env.production
-  dopbase export payment-service/production --stdout
+  dopbase export payment-service/production --output secrets.json
+  dopbase export payment-service/production --stdout --format yaml
 ";
 pub(crate) const RUN_HELP: &str = "\
 Examples:

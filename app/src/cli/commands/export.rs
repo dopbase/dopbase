@@ -1,6 +1,6 @@
 use super::{environment, output};
 use crate::{
-  cli::{client, dotenv, local_config},
+  cli::{client, local_config, secret_format},
   constants::api,
   models::SecretInput,
 };
@@ -9,11 +9,14 @@ use reqwest::Method;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
+use secret_format::SecretFormat;
+
 pub(super) async fn execute(
   server: &local_config::ResolvedServer,
   reference: &str,
   output: Option<PathBuf>,
   stdout: bool,
+  format: Option<SecretFormat>,
   force: bool,
   json_output: bool,
 ) -> Result<i32> {
@@ -23,6 +26,7 @@ pub(super) async fn execute(
   if stdout && json_output {
     bail!("--stdout and --json cannot be combined");
   }
+  let format = SecretFormat::for_output(output.as_deref(), format);
   let api = client::recently_authenticated_client(server).await?;
   let env = environment::resolve_environment(&api, reference).await?;
   let data = api
@@ -33,7 +37,7 @@ pub(super) async fn execute(
     )
     .await?;
   let entries = parse_entries(&data)?;
-  let rendered = dotenv::render(&entries);
+  let rendered = secret_format::render(&entries, format)?;
   if stdout {
     print!("{rendered}");
   } else if let Some(path) = output {

@@ -44,7 +44,7 @@ human users, service accounts, and tokens. Backups from earlier releases are
 not supported.
 
 Dopbase includes a comprehensive system snapshot and restoration engine. Unlike
-per-environment export and import (which only touch secret values in dotenv format),
+per-environment export and import (which only touch secret values),
 the backup system snapshots the entire database: projects, environments, secret
 histories, runner tokens, and administrator accounts.
 

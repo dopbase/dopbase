@@ -49,15 +49,16 @@ it belongs, then delete it.
 
 ## Which tool when
 
-The CLI does the same jobs from a terminal:
+The CLI does the same jobs from a terminal and also accepts JSON and YAML:
 
 ```bash
 dopbase import payment-service/staging .env.staging
-dopbase export payment-service/staging --output .env.staging
+dopbase import payment-service/staging secrets.json
+dopbase export payment-service/staging --output secrets.yml
 ```
 
 The command reference covers the CLI flags, including `--dry-run`,
-`--replace`, and `--stdout`. CLI export also requires interactive password
-confirmation for each invocation. See [CLI commands](/cli/commands). Choose
-the interface that fits the workflow. Both write the same records and create
-audit events.
+`--replace`, `--stdout`, and `--format`. CLI export also requires interactive
+password confirmation for each invocation. The browser remains dotenv-only.
+See [CLI commands](/cli/commands). Both interfaces write the same records and
+create audit events.
