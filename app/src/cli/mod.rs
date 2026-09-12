@@ -8,6 +8,7 @@ pub mod dotenv;
 pub mod local_config;
 #[doc(hidden)]
 pub mod runtime_cache;
+pub mod secret_format;
 #[doc(hidden)]
 pub mod session;
 pub mod update;
