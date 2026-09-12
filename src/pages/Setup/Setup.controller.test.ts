@@ -79,7 +79,7 @@ describe("useSetupController", () => {
     expect(c.passwordsMatch.value).toBe(false);
   });
 
-  it("claims the server and routes to the workspace", async () => {
+  it("claims the server and routes to projects", async () => {
     vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
       adminId: "usr_1",
       email: "a@b.c",
@@ -94,7 +94,7 @@ describe("useSetupController", () => {
       email: "a@b.c",
       password: VALID.password,
     });
-    expect(routerPush).toHaveBeenCalledWith({ name: "workspace" });
+    expect(routerPush).toHaveBeenCalledWith({ name: "projects" });
   });
 
   it("maps SETUP_TOKEN_INVALID to the token field", async () => {

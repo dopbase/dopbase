@@ -1,11 +1,11 @@
 ---
 title: "Projects and environments"
-description: "How the Admin UI Workspace organizes projects, environments, and secrets, and how to navigate between them."
+description: "How the Admin UI organizes projects, environments, and secrets, and how to navigate between them."
 ---
 
 # Projects and environments
 
-The Workspace is the main screen of the Admin UI. It shows the model described
+Projects is the main screen of the Admin UI. It shows the model described
 in [projects, environments, and secrets](/guide/projects-environments-secrets):
 a list of projects on the left, the selected project's environments, and the
 secrets of the selected environment.
@@ -41,7 +41,7 @@ different from `DATABASE_URL` in `production`.
 Selection lives in the URL, not in some hidden app state:
 
 ```text
-/workspace/p/payment-service/e/env_482731
+/projects/p/payment-service/e/env_482731
 ```
 
 The project part uses the name. The environment part uses its immutable ID.

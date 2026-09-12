@@ -36,10 +36,10 @@ const navItems = [
     match: (r: string) => r.startsWith("/users"),
   },
   {
-    name: "workspace",
+    name: "projects",
     label: "Projects",
     icon: FolderIcon,
-    match: (r: string) => r.startsWith("/workspace"),
+    match: (r: string) => r.startsWith("/projects"),
   },
   {
     name: "backups",

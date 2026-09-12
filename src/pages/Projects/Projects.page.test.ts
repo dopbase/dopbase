@@ -31,8 +31,8 @@ const { controller } = await vi.hoisted(async () => {
   };
 });
 
-vi.mock("./Workspace.controller", () => ({
-  useWorkspaceController: () => controller,
+vi.mock("./Projects.controller", () => ({
+  useProjectsController: () => controller,
 }));
 
 vi.mock("~/layouts", async () => {
@@ -63,7 +63,7 @@ vi.mock("./components/NameDialog.vue", async () => {
   return { default: defineComponent({ render: () => null }) };
 });
 
-import WorkspacePage from "./Workspace.page.vue";
+import ProjectsPage from "./Projects.page.vue";
 
 let app: ReturnType<typeof createApp> | null = null;
 
@@ -73,7 +73,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("WorkspacePage", () => {
+describe("ProjectsPage", () => {
   it("shows and copies the selected environment ID", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -82,7 +82,7 @@ describe("WorkspacePage", () => {
     });
     const host = document.createElement("div");
     document.body.append(host);
-    app = createApp({ render: () => h(WorkspacePage) });
+    app = createApp({ render: () => h(ProjectsPage) });
     app.mount(host);
 
     expect(

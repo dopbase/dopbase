@@ -120,7 +120,7 @@ export function useSetupController() {
         email: email.value.trim().toLowerCase(),
         password: password.value,
       });
-      router.push({ name: "workspace" });
+      router.push({ name: "projects" });
     } catch (error) {
       mapApiError(error);
     } finally {

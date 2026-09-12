@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useWorkspaceController } from "./Workspace.controller";
+import { useProjectsController } from "./Projects.controller";
 import ProjectRail from "./components/ProjectRail.vue";
 import SecretsPanel from "./components/SecretsPanel.vue";
 import TokensPanel from "./components/TokensPanel.vue";
@@ -16,13 +16,13 @@ import {
 import { BoxIcon, FolderIcon, LayersIcon } from "~/assets/icons";
 
 /**
- * Workspace — the authenticated landing workspace.
+ * Projects is the authenticated project and environment screen.
  *
  * Left: project/environment keyline rail. Right: the selected
  * environment's secrets or runner tokens. Empty states explain the
  * project/environment model and offer the primary actions.
  */
-const controller = useWorkspaceController();
+const controller = useProjectsController();
 const showCreateProject = ref(false);
 // Destructure so refs auto-unwrap in the template.
 const { projects, project, selectedEnvironment, activeTab, selectProject } =
@@ -55,7 +55,7 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
         <div
           v-else-if="!projects"
           class="flex flex-col"
-          data-testid="workspace-skeleton">
+          data-testid="projects-page-skeleton">
           <!-- Header skeleton -->
           <div
             class="flex items-center justify-between border-b border-line px-6 py-4">
@@ -183,7 +183,7 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
           </div>
         </template>
 
-        <!-- Workspace without project param (e.g. zero-state navigation) -->
+        <!-- Projects page without a selected project -->
         <div v-else class="p-10">
           <DbEmptyState
             title="Select a project"

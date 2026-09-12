@@ -7,7 +7,7 @@ import * as tokensApi from "~/services/tokens.api";
 import type { AffectedCounts, Environment, Project } from "~/services";
 
 /**
- * Workspace controller: projects/environments rail data, URL-derived
+ * Projects controller: project and environment rail data, URL-derived
  * selection, and project/environment CRUD.
  *
  * The selected project is addressed by its unique name and the selected
@@ -15,7 +15,7 @@ import type { AffectedCounts, Environment, Project } from "~/services";
  * Mutating actions throw on failure so calling dialogs can render errors.
  * navigation happens only after success.
  */
-export function useWorkspaceController() {
+export function useProjectsController() {
   const route = useRoute();
   const router = useRouter();
 
@@ -111,7 +111,7 @@ export function useWorkspaceController() {
     environmentsRequest?.abort();
   });
 
-  // Landing on /workspace with existing projects opens the first project.
+  // Landing on /projects with existing projects opens the first project.
   watch(projects, (list) => {
     if (list && list.length > 0 && !projectRef.value) {
       router.replace({
@@ -164,10 +164,11 @@ export function useWorkspaceController() {
     router.push({ name: "project", params: { projectRef: created.name } });
   }
 
-  async function renameProject(name: string): Promise<void> {
-    if (!projectRef.value) return;
-    const updated = await projectsApi.renameProject(projectRef.value, name);
+  async function renameProject(projectId: string, name: string): Promise<void> {
+    const renamingActiveProject = project.value?.id === projectId;
+    const updated = await projectsApi.renameProject(projectId, name);
     await loadProjects();
+    if (!renamingActiveProject) return;
     if (environmentId.value) {
       router.replace({
         name: "environment",
@@ -184,11 +185,11 @@ export function useWorkspaceController() {
     }
   }
 
-  async function deleteProject(): Promise<AffectedCounts> {
-    if (!projectRef.value) throw new Error("No project selected.");
-    const affected = await projectsApi.deleteProject(projectRef.value);
+  async function deleteProject(projectId: string): Promise<AffectedCounts> {
+    const deletingActiveProject = project.value?.id === projectId;
+    const affected = await projectsApi.deleteProject(projectId);
     await loadProjects();
-    router.replace({ name: "workspace" });
+    if (deletingActiveProject) router.replace({ name: "projects" });
     return affected;
   }
 
@@ -261,4 +262,4 @@ export function useWorkspaceController() {
   };
 }
 
-export type WorkspaceController = ReturnType<typeof useWorkspaceController>;
+export type ProjectsController = ReturnType<typeof useProjectsController>;

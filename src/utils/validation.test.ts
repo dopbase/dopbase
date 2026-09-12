@@ -13,8 +13,8 @@ describe("shared validation", () => {
   });
 
   it("accepts only same-origin paths as redirect targets", () => {
-    expect(isSafeRedirect("/workspace")).toBe(true);
-    expect(isSafeRedirect("/workspace/p/acme/e/env_1")).toBe(true);
+    expect(isSafeRedirect("/projects")).toBe(true);
+    expect(isSafeRedirect("/projects/p/acme/e/env_1")).toBe(true);
     expect(isSafeRedirect("https://evil.example.test/phish")).toBe(false);
     expect(isSafeRedirect("//evil.example.test/phish")).toBe(false);
     expect(isSafeRedirect("javascript:alert(1)")).toBe(false);
