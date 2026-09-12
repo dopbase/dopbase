@@ -117,8 +117,10 @@ fn rejects_duplicate_keys() {
 #[test]
 fn rejects_empty_keys_and_non_string_values_without_exposing_values() {
   for (text, format, key, kind) in [
+    ("=marker\n", SecretFormat::Dotenv, "", "empty"),
     (r#"{"":"marker"}"#, SecretFormat::Json, "", "empty"),
     (r#"{"PORT":8840}"#, SecretFormat::Json, "PORT", "number"),
+    ("PORT: 8840\n", SecretFormat::Yaml, "PORT", "number"),
     ("ENABLED: true\n", SecretFormat::Yaml, "ENABLED", "boolean"),
     (
       "NESTED:\n  TOKEN: marker\n",

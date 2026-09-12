@@ -94,6 +94,9 @@ pub fn parse(
   if entries.is_empty() {
     bail!("the input contains no secret entries");
   }
+  if entries.iter().any(|entry| entry.key.is_empty()) {
+    bail!("secret keys may not be empty");
+  }
   Ok(entries)
 }
 
