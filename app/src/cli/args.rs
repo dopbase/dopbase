@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   cli::{
-    commands::{auth, client, environment, init, project, secret, server},
+    commands::{auth, client, environment, init, project, secret, server, token},
     secret_format::SecretFormat,
   },
   constants::help::*,
@@ -20,6 +20,7 @@ pub use init::InitArgs;
 pub use project::ProjectCommand;
 pub use secret::SecretCommand;
 pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
+pub use token::TokenCommand;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -209,7 +210,7 @@ pub enum Command {
     force: bool,
   },
   /// Manage CI/runner access tokens for an environment.
-  #[command(after_help = TOKEN_HELP)]
+  #[command(after_help = token::HELP)]
   Token {
     #[command(subcommand)]
     command: TokenCommand,
@@ -278,36 +279,6 @@ pub enum Command {
   },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum TokenCommand {
-  /// Create an access token for an environment (e.g. for CI/CD).
-  ///
-  /// The token value is shown once at creation. Pass it to client commands
-  /// via the DOPBASE_TOKEN environment variable.
-  #[command(after_help = TOKEN_CREATE_HELP)]
-  Create {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-    /// Display name for the token.
-    #[arg(long)]
-    name: String,
-    /// Token role.
-    #[arg(long, default_value = "runner")]
-    role: String,
-  },
-  /// List tokens for an environment.
-  #[command(after_help = TOKEN_LIST_HELP)]
-  List {
-    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
-    environment: String,
-  },
-  /// Revoke a token by ID.
-  #[command(after_help = TOKEN_REVOKE_HELP)]
-  Revoke {
-    /// ID of the token to revoke.
-    token_id: String,
-  },
-}
 #[derive(Subcommand, Debug)]
 pub enum AdminCommand {
   /// Reset a user's password (offline recovery on the server machine).

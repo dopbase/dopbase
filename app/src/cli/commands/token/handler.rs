@@ -1,6 +1,7 @@
+use super::TokenCommand;
 use crate::cli::{commands::environment, output};
 use crate::{
-  cli::{args::TokenCommand, client, local_config},
+  cli::{client, local_config},
   constants::api as api_paths,
 };
 use anyhow::Result;

@@ -11,7 +11,7 @@ mod restore;
 pub mod run;
 pub mod secret;
 pub mod server;
-mod token;
+pub mod token;
 pub mod update;
 
 #[doc(hidden)]

@@ -47,18 +47,6 @@ Examples:
   dopbase run payment-service/production --token dbs_xxx -- npm start
 ";
 
-pub(crate) const TOKEN_HELP: &str = "\
-Examples:
-  dopbase token create payment-service/production --name deploy
-  dopbase token list payment-service/production
-  dopbase token revoke tok_01ABCDEF
-";
-pub(crate) const TOKEN_CREATE_HELP: &str =
-  "Examples:\n  dopbase token create payment-service/production --name deploy\n";
-pub(crate) const TOKEN_LIST_HELP: &str =
-  "Examples:\n  dopbase token list payment-service/production\n";
-pub(crate) const TOKEN_REVOKE_HELP: &str = "Examples:\n  dopbase token revoke tok_01ABCDEF\n";
-
 pub(crate) const ADMIN_HELP: &str = "\
 Examples:
   dopbase admin reset-password admin@example.com
