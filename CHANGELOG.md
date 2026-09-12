@@ -2,10 +2,16 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## Unreleased
+## 0.1.6 - 2026-09-12
+
+Dopbase 0.1.6 adds JSON and YAML secret files, runtime cache maintenance, and
+consistent project and environment references across the CLI and Admin UI.
 
 ### Added
 
+- `dopbase init`, `dopbase secret import`, and `dopbase secret export` support
+  dotenv, JSON, and YAML files. File extensions select the format automatically,
+  or `--format` can set it explicitly.
 - `dopbase cache list` shows safe metadata for the active server's encrypted
   runtime cache.
 - `dopbase cache clean` removes entries older than 14 days by default, with
@@ -20,6 +26,14 @@ All notable changes to Dopbase are documented in this file.
   qualified by either a project name or project ID.
 - CLI usage and help now distinguish new resource names from references to
   existing resources.
+- Server startup and update errors now give more specific recovery steps.
+
+### Fixed
+
+- The Admin UI now keeps project and environment selection in the URL, and row
+  actions no longer select the item underneath them.
+- Expired browser sessions now show a sign-in prompt instead of repeatedly
+  sending requests with an expired CSRF token.
 
 ## 0.1.5 - 2026-09-11
 
