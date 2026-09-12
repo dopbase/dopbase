@@ -1,7 +1,7 @@
 mod admin;
 mod auth;
 mod backup;
-mod client;
+pub mod client;
 mod environment;
 mod export;
 mod import;

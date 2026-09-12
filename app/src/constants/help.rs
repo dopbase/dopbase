@@ -26,16 +26,8 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const CLIENT_HELP: &str = "\
-Examples:
-  dopbase client connect https://dopbase.example.com
-  dopbase client connect local
-  dopbase client status
-";
-
 pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
 pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
-pub(crate) const STATUS_HELP: &str = "Examples:\n  dopbase status\n";
 pub(crate) const INIT_HELP: &str = "\
 Examples:
   dopbase init payment-service/development --from .env
@@ -201,19 +193,6 @@ pub(crate) const RESTORE_HELP: &str = "\
 Examples:
   dopbase restore ./backup.dop
   dopbase restore ./backup.dop --setup-token dbs_... --yes
-";
-
-pub(crate) const CLIENT_CONNECT_HELP: &str = "\
-Examples:
-  dopbase client connect https://dopbase.example.com
-  dopbase client connect http://dopbase.internal
-  dopbase client connect 192.168.1.20:8840
-  dopbase client connect local
-";
-pub(crate) const CLIENT_STATUS_HELP: &str = "\
-Examples:
-  dopbase client status
-  dopbase client status --json
 ";
 
 pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
