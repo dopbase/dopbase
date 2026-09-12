@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
+
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets
-cargo test --all-targets --all-features
+cargo test --all-targets -- --test-threads=1
+cargo test --all-targets --all-features -- --test-threads=1
 
 # Release builds embed ../dist/ at compile time (rust-embed).
 if [[ ! -f ../dist/index.html ]]; then
