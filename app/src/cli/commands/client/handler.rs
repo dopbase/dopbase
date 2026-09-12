@@ -1,4 +1,4 @@
-use super::{output, prompt};
+use crate::cli::{output, prompt};
 use crate::{
   cli::{
     client::{self, ApiClient, Credential, CredentialSource},
@@ -15,7 +15,7 @@ use anyhow::{Result, bail};
 use serde_json::{Value, json};
 use std::{env, path::Path, time::Duration};
 
-pub(super) async fn connect(
+pub(crate) async fn connect(
   value: &str,
   data_dir: Option<&Path>,
   json_output: bool,
@@ -191,7 +191,7 @@ fn yes_no(value: bool) -> &'static str {
   if value { "yes" } else { "no" }
 }
 
-pub(super) async fn show_status(
+pub(crate) async fn show_status(
   argument: Option<&str>,
   data_dir: Option<&Path>,
   json_output: bool,
@@ -244,7 +244,7 @@ async fn server_is_connected(server: &local_config::ResolvedServer) -> bool {
   )
 }
 
-pub(super) async fn ensure_server_is_connected(
+pub(crate) async fn ensure_server_is_connected(
   server: &local_config::ResolvedServer,
   operation: &str,
 ) -> Result<()> {

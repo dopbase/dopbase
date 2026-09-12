@@ -1,4 +1,7 @@
-use super::{environment, output, prompt};
+use crate::cli::{
+  commands::environment,
+  output, prompt,
+};
 use crate::{
   cli::{client, local_config, secret_format},
   constants::api,
@@ -10,7 +13,7 @@ use std::path::Path;
 
 use secret_format::SecretFormat;
 
-pub(super) struct ImportOptions<'a> {
+pub(crate) struct ImportOptions<'a> {
   pub path: &'a Path,
   pub format: Option<SecretFormat>,
   pub dry_run: bool,
@@ -19,7 +22,7 @@ pub(super) struct ImportOptions<'a> {
   pub json_output: bool,
 }
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   reference: &str,
   options: ImportOptions<'_>,

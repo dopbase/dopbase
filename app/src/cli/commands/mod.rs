@@ -6,14 +6,13 @@ mod environment;
 mod export;
 mod import;
 mod init;
-mod output;
 mod project;
-pub(crate) mod prompt;
 mod restore;
-mod run;
+pub mod run;
 mod secret;
 mod server;
 mod token;
+pub mod update;
 
 pub use admin::{
   complete_factory_reset, factory_reset_archive_path, factory_reset_confirmation_matches,
@@ -21,9 +20,9 @@ pub use admin::{
 };
 pub use client::{insecure_transport_warning, server_switch_confirmed, status_document};
 #[doc(hidden)]
-pub use output::{render_fields, render_table};
+pub use super::output::{render_fields, render_table};
 #[doc(hidden)]
-pub use prompt::remove_one_line_ending;
+pub use super::prompt::remove_one_line_ending;
 pub use run::{RunEnvironment, run_environment};
 
 use super::{args::*, local_config};
@@ -72,7 +71,7 @@ pub async fn execute(cli: Cli) -> Result<i32> {
       }
       admin::execute(command, data_dir, json_output).await
     }
-    Command::Update => super::update::run(json_output).await,
+    Command::Update => update::run(json_output).await,
     command => {
       let server = local_config::resolve(server_argument.as_deref(), data_dir.as_deref())?;
       execute_client(command, &server, json_output).await

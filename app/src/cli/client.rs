@@ -1,6 +1,6 @@
 use super::{
-  commands::prompt,
   local_config::{ResolvedServer, normalize},
+  prompt,
   session,
 };
 use crate::constants::{api, config::ENV_TOKEN};

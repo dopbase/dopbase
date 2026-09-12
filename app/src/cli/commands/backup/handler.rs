@@ -1,4 +1,4 @@
-use super::{client as command_client, output};
+use crate::cli::{commands::client as command_client, output};
 use crate::{
   cli::{client as api_client, local_config},
   constants::api,
@@ -24,7 +24,7 @@ fn format_bytes(bytes: u64) -> String {
   }
 }
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   name: Option<String>,
   output: Option<PathBuf>,

@@ -1,12 +1,10 @@
-use crate::cli::{
-  client, local_config,
-  runtime_cache::{self, RuntimeSource},
-};
+use super::cache::{self as runtime_cache, RuntimeSource};
+use crate::cli::{client, local_config};
 use crate::constants::config::ENV_RUN_ENVIRONMENT;
 use anyhow::{Context, Result, bail};
 use std::env;
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   environment: Option<String>,
   token: Option<String>,

@@ -1,4 +1,4 @@
-use super::{output, prompt};
+use crate::cli::{output, prompt};
 use crate::{
   cli::{args::ProjectCommand, client, local_config},
   constants::api as api_paths,
@@ -7,7 +7,7 @@ use anyhow::Result;
 use reqwest::Method;
 use serde_json::{Value, json};
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   command: ProjectCommand,
   server: &local_config::ResolvedServer,
   json_output: bool,

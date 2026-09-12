@@ -1,4 +1,4 @@
-use super::{environment, output};
+use crate::cli::{commands::environment, output};
 use crate::{
   cli::{args::TokenCommand, client, local_config},
   constants::api as api_paths,
@@ -7,7 +7,7 @@ use anyhow::Result;
 use reqwest::Method;
 use serde_json::json;
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   command: TokenCommand,
   server: &local_config::ResolvedServer,
   json_output: bool,

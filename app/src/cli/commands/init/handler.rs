@@ -1,4 +1,4 @@
-use super::output;
+use crate::cli::output;
 use crate::{
   cli::{
     client, environment_target::EnvironmentTarget, local_config::ResolvedServer, secret_format,
@@ -12,7 +12,7 @@ use std::path::Path;
 
 use secret_format::SecretFormat;
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &ResolvedServer,
   target: EnvironmentTarget,
   from: &Path,

@@ -1,4 +1,4 @@
-use super::{environment, output};
+use crate::cli::{commands::environment, output};
 use crate::{
   cli::{client, local_config, secret_format},
   constants::api,
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use secret_format::SecretFormat;
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   reference: &str,
   output: Option<PathBuf>,

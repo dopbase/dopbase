@@ -1,10 +1,10 @@
-use super::{output, prompt};
+use crate::cli::{output, prompt};
 use crate::cli::{client, local_config::ResolvedServer};
 use anyhow::{Result, bail};
 use serde_json::json;
 use std::io::{self, IsTerminal, Read};
 
-pub(super) async fn login(
+pub(crate) async fn login(
   server: &ResolvedServer,
   token: bool,
   json_output: bool,
@@ -44,7 +44,7 @@ fn read_runner_token() -> Result<String> {
   Ok(token)
 }
 
-pub(super) fn logout(
+pub(crate) fn logout(
   server: &ResolvedServer,
   json_output: bool,
 ) -> Result<i32> {

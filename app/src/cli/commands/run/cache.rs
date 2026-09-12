@@ -1,4 +1,4 @@
-use super::{
+use crate::cli::{
   client::{self, ApiClient},
   local_config::ResolvedServer,
 };

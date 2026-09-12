@@ -1,4 +1,7 @@
-use super::{client as command_client, output, prompt};
+use crate::cli::{
+  commands::client as command_client,
+  output, prompt,
+};
 use crate::cli::{
   client::{self as api_client, ApiClient},
   local_config,
@@ -9,7 +12,7 @@ use reqwest::Method;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-pub(super) async fn execute(
+pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   path: PathBuf,
   key_input: Option<String>,
