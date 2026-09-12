@@ -87,11 +87,10 @@ async fn execute_client(
 ) -> Result<i32> {
   match command {
     Command::Init {
-      project,
-      environment,
+      target,
       from,
       format,
-    } => init::execute(server, project, environment, &from, format, json_output).await,
+    } => init::execute(server, target, &from, format, json_output).await,
     Command::Project { command } => project::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,

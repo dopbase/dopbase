@@ -22,9 +22,7 @@ pub fn validate_slug(
   code: &str,
   label: &str,
 ) -> Result<(), HttpError> {
-  static SLUG: OnceLock<Regex> = OnceLock::new();
-  let valid = SLUG.get_or_init(|| Regex::new(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$").unwrap());
-  if value.len() > 63 || !valid.is_match(value) {
+  if !crate::utils::slug::is_valid(value) {
     return Err(HttpError::validation(BTreeMap::from([(
       code.into(),
       format!("{label} must be a lowercase slug of at most 63 characters."),

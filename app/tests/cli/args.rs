@@ -60,13 +60,13 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "logout"],
     &["dopbase", "status"],
     &["dopbase", "client", "status"],
-    &["dopbase", "init", "billing", "production", "--from", ".env"],
+    &["dopbase", "init", "billing/production", "--from", ".env"],
     &["dopbase", "project", "create", "billing"],
     &["dopbase", "project", "list"],
     &["dopbase", "project", "show", "billing"],
     &["dopbase", "project", "rename", "billing", "payments"],
     &["dopbase", "project", "delete", "billing", "--yes"],
-    &["dopbase", "env", "create", "billing", "production"],
+    &["dopbase", "env", "create", "billing/production"],
     &["dopbase", "env", "list", "billing"],
     &["dopbase", "env", "show", "billing/production"],
     &["dopbase", "env", "default", "billing/production"],
@@ -406,8 +406,7 @@ fn secret_commands_parse_format_options() {
   let init = Cli::try_parse_from([
     "dopbase",
     "init",
-    "storefront",
-    "development",
+    "storefront/development",
     "--from",
     "-",
     "--format",
@@ -456,6 +455,50 @@ fn secret_commands_parse_format_options() {
       ..
     }
   ));
+
+  assert!(
+    Cli::try_parse_from([
+      "dopbase",
+      "init",
+      "storefront",
+      "development",
+      "--from",
+      ".env",
+    ])
+    .is_err()
+  );
+  assert!(Cli::try_parse_from(["dopbase", "env", "create", "storefront", "development"]).is_err());
+}
+
+#[test]
+fn validates_qualified_environment_creation_targets() {
+  for target in ["storefront/development", "prj_01JTEST/development"] {
+    Cli::try_parse_from(["dopbase", "env", "create", target]).unwrap();
+  }
+
+  for target in [
+    "storefront",
+    "/development",
+    "storefront/",
+    "storefront/dev/extra",
+    "storefront/Development",
+  ] {
+    let error = Cli::try_parse_from(["dopbase", "env", "create", target]).unwrap_err();
+    assert_eq!(
+      error.kind(),
+      ErrorKind::ValueValidation,
+      "{target}: {error}"
+    );
+  }
+
+  for target in ["prj_01JTEST/development", "env_482731/development"] {
+    let error = Cli::try_parse_from(["dopbase", "init", target, "--from", ".env"]).unwrap_err();
+    assert_eq!(
+      error.kind(),
+      ErrorKind::ValueValidation,
+      "{target}: {error}"
+    );
+  }
 }
 
 #[test]

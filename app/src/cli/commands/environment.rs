@@ -58,7 +58,8 @@ pub(super) async fn execute(
   let api = client::human_client(server).await?;
   match command {
     EnvCommand::Default { .. } => unreachable!(),
-    EnvCommand::Create { project, name } => {
+    EnvCommand::Create { target } => {
+      let (project, name) = target.into_parts();
       let data = api
         .request(
           Method::POST,

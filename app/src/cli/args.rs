@@ -5,7 +5,10 @@ use std::{
   path::PathBuf,
 };
 
-use crate::{cli::secret_format::SecretFormat, constants::help::*};
+use crate::{
+  cli::{environment_target, environment_target::EnvironmentTarget, secret_format::SecretFormat},
+  constants::help::*,
+};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -134,10 +137,12 @@ pub enum Command {
   /// Create a project, its first environment, and import secrets.
   #[command(after_help = INIT_HELP)]
   Init {
-    /// Name of the project to create (unique on the server).
-    project: String,
-    /// Name of the first environment to create (e.g. development).
-    environment: String,
+    /// New project and first environment, written as project/environment.
+    #[arg(
+      value_name = "PROJECT_NAME/ENVIRONMENT_NAME",
+      value_parser = environment_target::parse_init
+    )]
+    target: EnvironmentTarget,
     /// Secret file to import, or - to read from stdin.
     #[arg(long, value_name = "FILE")]
     from: PathBuf,
@@ -440,10 +445,12 @@ pub enum EnvCommand {
   /// Create an environment inside a project.
   #[command(after_help = ENV_CREATE_HELP)]
   Create {
-    /// Project ID or name.
-    project: String,
-    /// Environment name, unique within the project.
-    name: String,
+    /// Existing project and new environment, written as project/environment.
+    #[arg(
+      value_name = "PROJECT_REF/ENVIRONMENT_NAME",
+      value_parser = environment_target::parse_create
+    )]
+    target: EnvironmentTarget,
   },
   /// List environments, either for one project or all accessible ones.
   #[command(after_help = ENV_LIST_HELP)]

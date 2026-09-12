@@ -5,6 +5,8 @@ pub mod client;
 pub mod commands;
 pub mod dotenv;
 #[doc(hidden)]
+pub mod environment_target;
+#[doc(hidden)]
 pub mod local_config;
 #[doc(hidden)]
 pub mod runtime_cache;
