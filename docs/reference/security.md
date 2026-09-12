@@ -64,6 +64,12 @@ credential that fetched the payload are both required to derive the decryption
 key. Cache files, metadata, key names, and values are encrypted. Logs expose
 only safe runtime metadata, cache source, fetch time, age, and key count.
 
+After unlocking the local document, `dopbase cache list` and `dopbase cache
+clean --dry-run` parse only the server, environment metadata, fetch time, age,
+and aliases. Their human and JSON output omits secret names, values, cache keys,
+nonces, and ciphertext. Cleanup holds the cache lock and replaces a partially
+retained document atomically.
+
 An unavailable server cannot confirm whether a credential or secret was later
 revoked. Offline fallback therefore deliberately favors availability and may
 inject stale values. It is limited to connection failures, timeouts, and server

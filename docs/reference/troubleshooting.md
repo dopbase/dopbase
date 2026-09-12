@@ -59,11 +59,20 @@ the cache was fetched and how old it is. If no usable cache exists, Dopbase does
 not inject variables or start the child.
 
 An old cache cannot be unlocked after logout or token rotation. A damaged cache
-or missing `run-cache-key` also fails closed. When the server is available, run
-the command successfully to replace that server's cache. To discard all cached
-runtime values, remove `run-cache/` and `run-cache-key` from the Dopbase data
-directory. Do not remove the separate `session-key` unless you also intend to
-invalidate the saved CLI login.
+or missing `run-cache-key` also fails closed. Start with:
+
+```bash
+dopbase cache list
+dopbase cache clean --dry-run
+```
+
+If Dopbase reports a damaged or unreadable cache, it leaves the file unchanged
+and prints its full path. First retry with the credential that created it. If
+the file is damaged or no longer needed, move that one cache document out of
+`run-cache/`, then run `dopbase run` while the server is available to create a
+fresh document. Do not remove `run-cache-key` unless every local runtime cache
+can be discarded. Do not remove the separate `session-key` unless you also
+intend to invalidate the saved CLI login.
 
 ## A secret appeared in logs
 

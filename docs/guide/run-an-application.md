@@ -143,6 +143,19 @@ token that populated it. A logout or token rotation therefore makes the old
 cache unavailable. Cache entries do not expire automatically. An offline run
 prints the original fetch time and age so operators can judge staleness.
 
+Inspect and maintain the cache without contacting the server:
+
+```bash
+dopbase cache list
+dopbase cache clean --dry-run
+dopbase cache clean --older-than 30d --yes
+```
+
+Cleanup targets entries older than 14 days unless `--older-than` or `--all` is
+passed. The listing and cleanup preview contain runtime metadata only, never
+secret names or values. See [client configuration](/cli/configuration#encrypted-run-cache)
+for cache storage and cleanup details.
+
 Managed values override same-named variables inherited from the parent process.
 Dopbase removes its own authentication variables before starting the child so
 the application does not receive the credential used to retrieve its secrets.
