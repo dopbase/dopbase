@@ -106,12 +106,14 @@ async fn execute_client(
       import::execute(
         server,
         &environment,
-        &path,
-        format,
-        dry_run,
-        replace,
-        yes,
-        json_output,
+        import::ImportOptions {
+          path: &path,
+          format,
+          dry_run,
+          replace,
+          yes,
+          json_output,
+        },
       )
       .await
     }

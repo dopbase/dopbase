@@ -10,16 +10,28 @@ use std::path::Path;
 
 use secret_format::SecretFormat;
 
+pub(super) struct ImportOptions<'a> {
+  pub path: &'a Path,
+  pub format: Option<SecretFormat>,
+  pub dry_run: bool,
+  pub replace: bool,
+  pub yes: bool,
+  pub json_output: bool,
+}
+
 pub(super) async fn execute(
   server: &local_config::ResolvedServer,
   reference: &str,
-  path: &Path,
-  format: Option<SecretFormat>,
-  dry_run: bool,
-  replace: bool,
-  yes: bool,
-  json_output: bool,
+  options: ImportOptions<'_>,
 ) -> Result<i32> {
+  let ImportOptions {
+    path,
+    format,
+    dry_run,
+    replace,
+    yes,
+    json_output,
+  } = options;
   let format = SecretFormat::for_input(path, format)?;
   let api = client::human_client(server).await?;
   let env = environment::resolve_environment(&api, reference).await?;
