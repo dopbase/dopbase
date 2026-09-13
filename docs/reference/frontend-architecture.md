@@ -66,7 +66,9 @@ mutation succeeds.
 Run these checks before submitting frontend changes:
 
 ```bash
-bun run typecheck
-bunx eslint src tests
-bunx vitest run --configLoader runner
+bun run format:repo:check
+bun run lint:ui
+bun run typecheck:ui
+bun run test:ui
+bun run build:ui
 ```

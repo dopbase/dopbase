@@ -9,8 +9,7 @@ COPY index.html vite.config.ts tsconfig*.json eslint.config.js ./
 COPY config ./config
 COPY public ./public
 COPY src ./src
-COPY tests ./tests
-RUN bun run build
+RUN bun run build:ui
 
 FROM rust:1.98-bookworm
 

@@ -80,16 +80,15 @@ jobs:
       - name: Test and build frontend
         run: |
           bun run test:github
-          bunx vitest run --passWithNoTests
+          bun run test:ui
           bun run test:installer
-          bun run build
+          bun run build:ui
 
       - name: Verify Rust application
         run: |
-          cargo fmt --manifest-path app/Cargo.toml -- --check
-          cargo clippy --manifest-path app/Cargo.toml --locked --all-targets --all-features -- -D warnings
-          cargo test --manifest-path app/Cargo.toml --locked --all-targets
-          cargo test --manifest-path app/Cargo.toml --locked --all-targets --all-features
+          bun run format:app:check
+          bun run lint:app
+          bun run test:app
 
       - name: Upload Admin UI
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

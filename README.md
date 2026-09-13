@@ -105,55 +105,46 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 ## Repository layout
 
-| Path         | Purpose                                   | Current state                 |
-| ------------ | ----------------------------------------- | ----------------------------- |
-| `app/`       | Rust service and command-line application | v0.1.6 backend implementation |
-| `src/`       | Vue administration interface              | Embedded Admin UI             |
-| `docs/`      | VitePress product documentation           | Active public specification   |
-| `tests/`     | Frontend tests and test setup             | Admin UI test suite           |
-| `app/tests/` | Rust integration tests                    | Backend and CLI test suite    |
+| Path         | Purpose                                         | Current state                 |
+| ------------ | ----------------------------------------------- | ----------------------------- |
+| `app/`       | Rust service and command-line application       | v0.1.6 backend implementation |
+| `app/tests/` | Rust integration tests                          | Backend and CLI test suite    |
+| `src/`       | Vue administration interface and frontend tests | Embedded Admin UI             |
+| `docs/`      | VitePress product documentation                 | Active public specification   |
 
 ## Development
 
 You need **Bun** and a Rust toolchain with Rust 2024 edition support.
 
-Install the JavaScript dependencies and start the Vue development server:
+Install the JavaScript dependencies:
 
 ```bash
 bun install
-bun run dev:ui
 ```
 
-Run the Rust backend without the long Cargo command:
+Scripts use the `action:target` pattern. The targets are `ui`, `app`, and
+`docs`. Run an action without a target for the usual combined workflow.
 
-```bash
-bun run app
-```
-
-Or start the Vue Admin UI and Rust backend together:
-
-```bash
-bun run dev
-```
+| Command              | Purpose                                     |
+| -------------------- | ------------------------------------------- |
+| `bun run dev`        | Start the Admin UI and Rust app together    |
+| `bun run dev:ui`     | Start only the Admin UI development server  |
+| `bun run dev:app`    | Start only the Rust API and CLI application |
+| `bun run dev:docs`   | Start the documentation site                |
+| `bun run build`      | Build the application and documentation     |
+| `bun run build:ui`   | Build only the Admin UI                     |
+| `bun run build:app`  | Build the release executable with its UI    |
+| `bun run build:docs` | Build only the documentation site           |
+| `bun run test`       | Run the Admin UI and Rust application tests |
+| `bun run test:ui`    | Run only the Admin UI tests                 |
+| `bun run test:app`   | Run only the Rust application and CLI tests |
 
 The combined command serves the UI at `http://localhost:9000`, proxies `/api`
 requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
-`bun run build:all` and then `./app/target/release/dopbase server start`.
-
-Start the documentation site:
-
-```bash
-bun run docs:dev
-```
-
-The repository defines these production build commands:
-
-```bash
-bun run build
-bun run build:all
-bun run docs:build
-```
+`bun run build:app` and then
+`./app/target/release/dopbase server start`. App commands build the Admin UI
+when the embedded assets are missing from a clean checkout.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full setup, checks, and pull-request expectations.
 
