@@ -879,35 +879,54 @@ fn server_status_reports_a_stopped_data_directory() {
   assert!(!directory.path().join("dopbase.db.lock").exists());
 }
 
-#[test]
-fn server_commands_reject_inapplicable_global_options() {
+#[tokio::test]
+async fn server_commands_reject_inapplicable_global_options() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().to_str().unwrap();
-  let cases: &[&[&str]] = &[
-    &[
-      "--data-dir",
-      data_dir,
-      "--server",
-      "http://localhost:8840",
-      "server",
-      "status",
-    ],
-    &["--data-dir", data_dir, "--json", "server", "start"],
-    &[
-      "--data-dir",
-      data_dir,
-      "--json",
-      "server",
-      "logs",
-      "--watch",
-    ],
+  let cases: &[(&[&str], &str)] = &[
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--server",
+        "http://localhost:8840",
+        "server",
+        "status",
+      ],
+      "--server cannot be used with local `dopbase server` commands",
+    ),
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--json",
+        "server",
+        "start",
+      ],
+      "--json cannot be used with `dopbase server start`",
+    ),
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--json",
+        "server",
+        "logs",
+        "--watch",
+      ],
+      "--json cannot be used with `dopbase server logs --watch`",
+    ),
   ];
 
-  for arguments in cases {
-    let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
-      .args(*arguments)
-      .output()
-      .unwrap();
-    assert!(!output.status.success(), "{arguments:?}");
+  for (arguments, expected) in cases {
+    let cli = Cli::try_parse_from(*arguments).unwrap();
+    let error = app::cli::commands::execute(cli)
+      .await
+      .unwrap_err()
+      .to_string();
+    assert_eq!(error, *expected, "{arguments:?}");
   }
 }

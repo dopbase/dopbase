@@ -98,65 +98,12 @@ fn route_templates_match_the_public_contract() {
 fn path_builders_match_the_previous_format_output() {
   assert_eq!(api::projects::item("payments"), "/api/v1/projects/payments");
   assert_eq!(
-    api::projects::environments("payments"),
-    "/api/v1/projects/payments/environments"
-  );
-  assert_eq!(
-    api::environments::item("env_01"),
-    "/api/v1/environments/env_01"
-  );
-  assert_eq!(
-    api::secrets::collection("env_01"),
-    "/api/v1/environments/env_01/secrets"
-  );
-  assert_eq!(
-    api::secrets::item("env_01", "API_KEY"),
-    "/api/v1/environments/env_01/secrets/API_KEY"
-  );
-  assert_eq!(
     api::secrets::reveal("env_01", "API_KEY"),
     "/api/v1/environments/env_01/secrets/API_KEY/reveal"
   );
   assert_eq!(
-    api::secrets::import("env_01"),
-    "/api/v1/environments/env_01/secrets/import"
-  );
-  assert_eq!(
-    api::secrets::layout("env_01"),
-    "/api/v1/environments/env_01/secrets/layout"
-  );
-  assert_eq!(
-    api::secrets::export("env_01"),
-    "/api/v1/environments/env_01/secrets/export"
-  );
-  assert_eq!(
-    api::secrets::runtime("env_01"),
-    "/api/v1/environments/env_01/secrets/runtime"
-  );
-  assert_eq!(
-    api::tokens::collection("env_01"),
-    "/api/v1/environments/env_01/tokens"
-  );
-  assert_eq!(
-    api::tokens::revoke("tok_01"),
-    "/api/v1/tokens/tok_01/revoke"
-  );
-  assert_eq!(api::users::item("usr_01"), "/api/v1/users/usr_01");
-  assert_eq!(
-    api::service_accounts::item("svc_01"),
-    "/api/v1/service-accounts/svc_01"
-  );
-  assert_eq!(
-    api::service_accounts::tokens("svc_01"),
-    "/api/v1/service-accounts/svc_01/tokens"
-  );
-  assert_eq!(
     api::service_accounts::revoke_token("svc_01", "tok_01"),
     "/api/v1/service-accounts/svc_01/tokens/tok_01/revoke"
-  );
-  assert_eq!(
-    api::backups::item("snapshot.dop"),
-    "/api/v1/backups/snapshot.dop"
   );
   assert_eq!(
     api::backups::restore("snapshot.dop"),

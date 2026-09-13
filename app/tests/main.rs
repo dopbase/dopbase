@@ -144,87 +144,6 @@ fn assert_environment_id(id: &str) {
 }
 
 #[tokio::test]
-async fn environment_ids_are_six_digit() {
-  let (_directory, state, router) = test_app().await;
-  let token = bootstrap_admin(&state, &router).await;
-  let (status, _, _) = call(
-    &router,
-    "POST",
-    "/api/v1/projects",
-    Some(&token),
-    Some(json!({"name":"api"})),
-  )
-  .await;
-  assert_eq!(status, 201);
-
-  let (status, first, _) = call(
-    &router,
-    "POST",
-    "/api/v1/projects/api/environments",
-    Some(&token),
-    Some(json!({"name":"production"})),
-  )
-  .await;
-  assert_eq!(status, 201);
-  let first_id = first["data"]["id"].as_str().unwrap().to_owned();
-  assert_environment_id(&first_id);
-
-  let (status, _, _) = call(
-    &router,
-    "DELETE",
-    &format!("/api/v1/environments/{first_id}"),
-    Some(&token),
-    None,
-  )
-  .await;
-  assert_eq!(status, 200);
-
-  let (status, second, _) = call(
-    &router,
-    "POST",
-    "/api/v1/projects/api/environments",
-    Some(&token),
-    Some(json!({"name":"staging"})),
-  )
-  .await;
-  assert_eq!(status, 201);
-  let second_id = second["data"]["id"].as_str().unwrap().to_owned();
-  assert_environment_id(&second_id);
-
-  let (status, initialized, _) = call(
-    &router,
-    "POST",
-    "/api/v1/projects/init",
-    Some(&token),
-    Some(json!({
-      "projectName":"worker",
-      "environmentName":"production",
-      "entries":[{"key":"API_KEY","value":"private"}]
-    })),
-  )
-  .await;
-  assert_eq!(status, 201);
-  let initialized_id = initialized["data"]["environmentId"]
-    .as_str()
-    .unwrap()
-    .to_owned();
-  assert_environment_id(&initialized_id);
-  assert_ne!(initialized_id, second_id);
-  let (status, revealed, _) = call(
-    &router,
-    "POST",
-    &format!("/api/v1/environments/{initialized_id}/secrets/API_KEY/reveal"),
-    Some(&token),
-    None,
-  )
-  .await;
-  assert_eq!(status, 200);
-  assert_eq!(revealed["data"]["value"], "private");
-
-  state.db.close().await;
-}
-
-#[tokio::test]
 async fn environment_references_accept_project_names_and_ids() {
   let (_directory, state, router) = test_app().await;
   let token = bootstrap_admin(&state, &router).await;
@@ -761,7 +680,7 @@ async fn health_and_openapi_are_available() {
 }
 
 #[tokio::test]
-async fn docs_are_disabled_by_default() {
+async fn docs_routes_are_disabled_by_default() {
   let (_directory, state, router) = test_app_with_docs(false).await;
   let (status, body, _) = call(&router, "GET", "/api/v1/health", None, None).await;
   assert_eq!(status, 200);

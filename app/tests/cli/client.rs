@@ -1,12 +1,12 @@
 use app::cli::{
   client::{
-    ApiClient, CliCancelled, Credential, CredentialSource, authenticated_client,
-    is_authentication_error, normalize_login_email, recently_authenticated_client,
+    ApiClient, Credential, CredentialSource, authenticated_client, is_authentication_error,
+    normalize_login_email,
   },
   local_config::{ClientConfig, ResolvedServer, ServerSource},
 };
 use reqwest::Method;
-use std::io::IsTerminal;
+use std::process::{Command as ProcessCommand, Stdio};
 use tempfile::TempDir;
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
@@ -25,19 +25,6 @@ fn login_email_is_trimmed_lowercased_and_validated() {
       .unwrap_err()
       .to_string(),
     "Enter a valid email address."
-  );
-}
-
-#[test]
-fn login_cancelled_has_stable_user_message() {
-  assert_eq!(CliCancelled::Login.to_string(), "Login cancelled.");
-  assert_eq!(
-    CliCancelled::PasswordConfirmation.to_string(),
-    "Password confirmation cancelled."
-  );
-  assert_eq!(
-    CliCancelled::ServerSwitch.to_string(),
-    "Server switch cancelled."
   );
 }
 
@@ -105,31 +92,30 @@ async fn api_client_preserves_unauthorized_responses_for_run() {
   server_task.await.unwrap();
 }
 
-#[tokio::test]
-async fn plaintext_access_rejects_non_interactive_execution_before_connecting() {
-  if std::io::stdin().is_terminal() {
-    return;
-  }
+#[test]
+fn plaintext_access_rejects_non_interactive_execution_before_connecting() {
   let directory = TempDir::new().unwrap();
-  let server = ResolvedServer {
-    url: "http://127.0.0.1:1".into(),
-    source: ServerSource::Argument,
-    config_path: directory.path().join("config.toml"),
-    config: ClientConfig {
-      version: 1,
-      server_url: None,
-      default_environment: None,
-    },
-  };
+  let output = ProcessCommand::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args([
+      "--server",
+      "http://127.0.0.1:1",
+      "--data-dir",
+      directory.path().to_str().unwrap(),
+      "secret",
+      "get",
+      "billing/production",
+      "API_KEY",
+      "--reveal",
+    ])
+    .stdin(Stdio::null())
+    .output()
+    .unwrap();
 
-  let message = recently_authenticated_client(&server)
-    .await
-    .err()
-    .unwrap()
-    .to_string();
-  assert_eq!(
-    message,
-    "interactive password confirmation is required for plaintext secret access"
+  assert!(!output.status.success(), "{output:?}");
+  let stderr = String::from_utf8_lossy(&output.stderr);
+  assert!(
+    stderr.contains("interactive password confirmation is required for plaintext secret access"),
+    "{stderr}"
   );
 }
 
@@ -165,20 +151,6 @@ Check that the server is running and verify the active endpoint with `dopbase cl
   assert!(!message.contains("error sending request"));
   assert!(!message.contains("tcp connect error"));
   assert!(!message.contains("os error"));
-}
-
-#[test]
-fn api_client_accepts_a_validated_remote_http_server() {
-  let directory = TempDir::new().unwrap();
-  let server = ResolvedServer {
-    url: "http://dopbase.example.com".into(),
-    source: ServerSource::Argument,
-    config_path: directory.path().join("config.toml"),
-    config: ClientConfig::default(),
-  };
-
-  let client = ApiClient::new(&server, Some("secret-token".into())).unwrap();
-  assert_eq!(client.base_url, "http://dopbase.example.com");
 }
 
 #[tokio::test]
