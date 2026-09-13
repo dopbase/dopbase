@@ -23,7 +23,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> |
-  <a href="./assets/demo-dopbase-1912.mp4">Demo</a> |
+  <a href="#demo">Demo</a> |
   <a href="#why-dopbase">Why Dopbase</a> |
   <a href="https://dopbase.com/how-it-works">How it works</a> |
   <a href="https://docs.dopbase.com">Documentation</a> |
@@ -104,6 +104,13 @@ process without writing a shared `.env` file to the runtime.
 </p>
 
 See [server and client](./docs/guide/server-client.md) for the full walkthrough.
+
+## Demo
+
+<video controls width="100%" preload="metadata">
+  <source src="./assets/demo-dopbase-1280.mp4" type="video/mp4" />
+  <a href="./assets/demo-dopbase-1280.mp4">Open the demo video.</a>
+</video>
 
 ## Repository layout
 
