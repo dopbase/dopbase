@@ -32,7 +32,8 @@
     "format:repo:check": "bunx prettier --check .",
     "format:app:check": "cargo fmt --manifest-path app/Cargo.toml -- --check",
     "preview:ui": "vite preview",
-    "preview:docs": "vitepress preview docs"
+    "preview:docs": "vitepress preview docs",
+    "docker:test": "docker build -f app/Dockerfile.test -t dopbase-backend-test ."
   },
   "dependencies": {
     "@fontsource-variable/fira-code": "^5.3.0",
