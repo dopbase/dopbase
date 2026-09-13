@@ -8,6 +8,10 @@ Search the existing issues before opening a new one. For a substantial feature, 
 
 Security vulnerabilities do not belong in public issues. Follow [SECURITY.md](./SECURITY.md) instead.
 
+All project interactions must follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Conduct concerns should be reported privately through the process described
+there.
+
 ## Repository layout
 
 | Path    | Purpose                                           |

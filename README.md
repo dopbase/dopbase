@@ -27,7 +27,8 @@
   <a href="https://dopbase.com/how-it-works">How it works</a> |
   <a href="https://docs.dopbase.com">Documentation</a> |
   <a href="./SECURITY.md">Security</a> |
-  <a href="./CONTRIBUTING.md">Contributing</a>
+  <a href="./CONTRIBUTING.md">Contributing</a> |
+  <a href="./CODE_OF_CONDUCT.md">Code of conduct</a>
 </p>
 
 <p align="center">
