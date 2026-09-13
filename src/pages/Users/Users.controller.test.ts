@@ -31,6 +31,20 @@ beforeEach(() => {
   vi.mocked(authApi.reauthenticate).mockReset();
 });
 
+function agentFixture(
+  overrides: Partial<serviceAccountsApi.ServiceAccount> & {
+    id: string;
+    name: string;
+  },
+): serviceAccountsApi.ServiceAccount {
+  return {
+    role: "ai_agent",
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
 describe("useUsersController", () => {
   it("computes canSave correctly for create and edit modes", () => {
     const c = useUsersController();
@@ -67,7 +81,9 @@ describe("useUsersController", () => {
 
     await c.save();
 
-    expect(c.fieldErrors.value.email).toBe("Please enter a valid email address.");
+    expect(c.fieldErrors.value.email).toBe(
+      "Please enter a valid email address.",
+    );
     expect(c.fieldErrors.value.password).toContain("at least 12 characters");
     expect(usersApi.createUser).not.toHaveBeenCalled();
     expect(c.error.value).toBeNull(); // Page error is untouched
@@ -82,12 +98,14 @@ describe("useUsersController", () => {
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(400, {
         EMAIL_INVAILD: "Please enter a valid email address.",
-      })
+      }),
     );
 
     await c.save();
 
-    expect(c.fieldErrors.value.email).toBe("Please enter a valid email address.");
+    expect(c.fieldErrors.value.email).toBe(
+      "Please enter a valid email address.",
+    );
     expect(c.error.value).toBeNull(); // Did not leak to background page
     expect(c.showCreate.value).toBe(true); // Modal stayed open
   });
@@ -101,12 +119,14 @@ describe("useUsersController", () => {
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(400, {
         PASSWORD_TOO_SHORT: "Password must contain at least 12 characters.",
-      })
+      }),
     );
 
     await c.save();
 
-    expect(c.fieldErrors.value.password).toBe("Password must contain at least 12 characters.");
+    expect(c.fieldErrors.value.password).toBe(
+      "Password must contain at least 12 characters.",
+    );
     expect(c.error.value).toBeNull();
   });
 
@@ -119,7 +139,7 @@ describe("useUsersController", () => {
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(500, {
         INTERNAL_ERROR: "Database write failed.",
-      })
+      }),
     );
 
     await c.save();
@@ -183,7 +203,7 @@ describe("useUsersController", () => {
 
     c.promptDelete(targetUser);
     vi.mocked(usersApi.deleteUser).mockRejectedValueOnce(
-      new ApiError(400, { ERROR: "Cannot delete user." })
+      new ApiError(400, { ERROR: "Cannot delete user." }),
     );
 
     await c.confirmDeleteUser();
@@ -215,11 +235,15 @@ describe("useUsersController", () => {
 
     // Prompt again and confirm
     c.promptDeleteAgent(targetAgent);
-    vi.mocked(serviceAccountsApi.deleteServiceAccount).mockResolvedValueOnce(undefined);
+    vi.mocked(serviceAccountsApi.deleteServiceAccount).mockResolvedValueOnce(
+      undefined,
+    );
 
     await c.confirmDeleteAgent();
 
-    expect(serviceAccountsApi.deleteServiceAccount).toHaveBeenCalledWith("sa_to_delete");
+    expect(serviceAccountsApi.deleteServiceAccount).toHaveBeenCalledWith(
+      "sa_to_delete",
+    );
     expect(c.agentToDelete.value).toBeNull();
     expect(window.confirm).not.toHaveBeenCalled();
   });
@@ -236,7 +260,7 @@ describe("useUsersController", () => {
 
     c.promptDeleteAgent(targetAgent);
     vi.mocked(serviceAccountsApi.deleteServiceAccount).mockRejectedValueOnce(
-      new ApiError(400, { ERROR: "Cannot delete AI agent." })
+      new ApiError(400, { ERROR: "Cannot delete AI agent." }),
     );
 
     await c.confirmDeleteAgent();
@@ -245,17 +269,13 @@ describe("useUsersController", () => {
     expect(c.agentToDelete.value).toEqual(targetAgent); // Dialog stays open
   });
 
-  it("handles AI agent token generation flow with reauth, refresh, and flash modal", async () => {
+  it("prompts for an agent token password and cancels without generating one", () => {
     const c = useUsersController();
-    const targetAgent: serviceAccountsApi.ServiceAccount = {
+    const targetAgent = agentFixture({
       id: "sa_agent_1",
       name: "indexer-agent",
-      role: "ai_agent",
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-    };
+    });
 
-    // 1. Prompt get token
     c.promptGetToken(targetAgent);
     expect(c.showTokenReauth.value).toBe(true);
     expect(c.agentForToken.value).toEqual(targetAgent);
@@ -263,27 +283,54 @@ describe("useUsersController", () => {
     expect(c.tokenPasswordError.value).toBeNull();
     expect(c.tokenReauthError.value).toBeNull();
 
-    // 2. Close cancels
     c.closeTokenReauth();
     expect(c.showTokenReauth.value).toBe(false);
     expect(c.agentForToken.value).toBeNull();
+  });
 
-    // 3. Prompt again and test validation when password is empty
+  it("requires a password before reauthenticating", async () => {
+    const c = useUsersController();
+    const targetAgent = agentFixture({
+      id: "sa_agent_1",
+      name: "indexer-agent",
+    });
+
     c.promptGetToken(targetAgent);
     await c.confirmTokenReauthAndGenerate();
-    expect(c.tokenPasswordError.value).toBe("Password is required.");
 
-    // 4. Test reauth failure with invalid password
+    expect(c.tokenPasswordError.value).toBe("Password is required.");
+    expect(authApi.reauthenticate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a failed reauthentication and keeps the dialog open", async () => {
+    const c = useUsersController();
+    const targetAgent = agentFixture({
+      id: "sa_agent_1",
+      name: "indexer-agent",
+    });
+
+    c.promptGetToken(targetAgent);
     c.tokenPassword.value = "wrong-password";
     vi.mocked(authApi.reauthenticate).mockRejectedValueOnce(
-      new ApiError(403, { ERROR: "Incorrect password." })
+      new ApiError(403, { ERROR: "Incorrect password." }),
     );
+
     await c.confirmTokenReauthAndGenerate();
+
     expect(c.tokenReauthError.value).toBe("Incorrect password.");
     expect(c.showTokenReauth.value).toBe(true);
     expect(c.createdAgentToken.value).toBeNull();
+    expect(serviceAccountsApi.createAgentToken).not.toHaveBeenCalled();
+  });
 
-    // 5. Test successful reauth, token refresh (revoke old active token), and creation
+  it("reauthenticates, revokes the active token, generates a new one, and acknowledges it", async () => {
+    const c = useUsersController();
+    const targetAgent = agentFixture({
+      id: "sa_agent_1",
+      name: "indexer-agent",
+    });
+
+    c.promptGetToken(targetAgent);
     c.tokenPassword.value = "correct-password";
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce(undefined);
     vi.mocked(serviceAccountsApi.fetchAgentTokens).mockResolvedValueOnce([
@@ -327,23 +374,29 @@ describe("useUsersController", () => {
       },
       plaintextToken: "dpa_abcdef1234567890",
     };
-    vi.mocked(serviceAccountsApi.createAgentToken).mockResolvedValueOnce(createdResult);
+    vi.mocked(serviceAccountsApi.createAgentToken).mockResolvedValueOnce(
+      createdResult,
+    );
 
     await c.confirmTokenReauthAndGenerate();
 
     expect(authApi.reauthenticate).toHaveBeenCalledWith("correct-password");
-    expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith("sa_agent_1");
-    // Only the unrevoked token should be revoked
+    expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith(
+      "sa_agent_1",
+    );
+    // Only the unrevoked token should be revoked.
     expect(serviceAccountsApi.revokeAgentToken).toHaveBeenCalledTimes(1);
-    expect(serviceAccountsApi.revokeAgentToken).toHaveBeenCalledWith("sa_agent_1", "ait_old_active");
+    expect(serviceAccountsApi.revokeAgentToken).toHaveBeenCalledWith(
+      "sa_agent_1",
+      "ait_old_active",
+    );
     expect(serviceAccountsApi.createAgentToken).toHaveBeenCalledWith(
       "sa_agent_1",
-      expect.stringMatching(/^token-\d+$/)
+      expect.stringMatching(/^token-\d+$/),
     );
     expect(c.showTokenReauth.value).toBe(false);
     expect(c.createdAgentToken.value).toEqual(createdResult);
 
-    // 6. Acknowledge created token
     c.acknowledgeCreatedToken();
     expect(c.createdAgentToken.value).toBeNull();
     expect(c.agentForToken.value).toBeNull();

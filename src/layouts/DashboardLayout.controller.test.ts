@@ -4,6 +4,7 @@ import { useDashboardLayoutController } from "./DashboardLayout.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
+import { browserSession } from "~/tests/browser-session";
 
 const { routerPush, routerReplace, route } = vi.hoisted(() => ({
   routerPush: vi.fn(),
@@ -26,13 +27,7 @@ beforeEach(() => {
 });
 
 async function loginAdmin(): Promise<void> {
-  vi.mocked(authApi.login).mockResolvedValueOnce({
-    adminId: "usr_1",
-    email: "a@b.c",
-    sessionKind: "browser",
-    token: null,
-    csrfToken: "csrf_1",
-  });
+  vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
   await useAuthStore().login("a@b.c", "pw");
 }
 

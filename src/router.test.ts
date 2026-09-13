@@ -8,11 +8,9 @@ describe("project routes", () => {
     ["/projects/p/billing/e/env_1", "environment"],
     ["/projects/p/billing/e/env_1/tokens", "environment-tokens"],
     ["/projects/p/billing/e/env_1/import", "environment-import"],
+    // Legacy workspace URLs fall through to the not-found page.
+    ["/workspace", "not-found"],
   ])("resolves %s", (path, routeName) => {
     expect(router.resolve(path).name).toBe(routeName);
-  });
-
-  it("does not retain the old workspace URL", () => {
-    expect(router.resolve("/workspace").name).toBe("not-found");
   });
 });

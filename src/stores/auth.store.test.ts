@@ -4,6 +4,7 @@ import { useAuthStore } from "./auth.store";
 import * as authApi from "~/services/auth.api";
 import * as bootstrapApi from "~/services/bootstrap.api";
 import { ApiError, apiRequest } from "~/services/http.client";
+import { browserSession, browserSessionInfo } from "~/tests/browser-session";
 
 vi.mock("~/services/auth.api");
 vi.mock("~/services/bootstrap.api");
@@ -15,13 +16,7 @@ beforeEach(() => {
 
 describe("auth store", () => {
   it("login sends a browser session kind", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     const store = useAuthStore();
     await store.login("a@b.c", "pw");
     expect(authApi.login).toHaveBeenCalledWith({
@@ -32,13 +27,7 @@ describe("auth store", () => {
   });
 
   it("login stores the session and persists the CSRF token", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     const store = useAuthStore();
     await store.login("a@b.c", "pw");
     expect(store.session).toEqual({
@@ -55,13 +44,7 @@ describe("auth store", () => {
   });
 
   it("logout clears session and CSRF even when the API fails", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     vi.mocked(authApi.logout).mockRejectedValueOnce(
       new ApiError(0, { NETWORK_ERROR: "down" }),
     );
@@ -74,13 +57,7 @@ describe("auth store", () => {
   });
 
   it("expires the local session when the server rejects its CSRF token", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     const store = useAuthStore();
     await store.login("a@b.c", "pw");
     vi.stubGlobal(
@@ -144,12 +121,7 @@ describe("auth store", () => {
   });
 
   it("fetchSession maps the server response", async () => {
-    vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      recentAuthentication: false,
-    });
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce(browserSessionInfo());
     const store = useAuthStore();
     await store.fetchSession();
     expect(store.session).toEqual({
@@ -163,12 +135,7 @@ describe("auth store", () => {
   });
 
   it("reauthenticate marks the session recent", async () => {
-    vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      recentAuthentication: false,
-    });
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce(browserSessionInfo());
     const store = useAuthStore();
     await store.fetchSession();
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce();
@@ -177,13 +144,7 @@ describe("auth store", () => {
   });
 
   it("changePassword clears session and CSRF", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     vi.mocked(authApi.changePassword).mockResolvedValueOnce();
     const store = useAuthStore();
     await store.login("a@b.c", "pw");

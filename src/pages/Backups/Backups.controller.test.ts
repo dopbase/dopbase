@@ -86,37 +86,56 @@ describe("useBackupsController", () => {
     expect(backupsApi.uploadBackup).not.toHaveBeenCalled();
   });
 
-  it("uploads a backup and adds it to list", async () => {
-    const uploaded = {
-      key: "uploaded.dop",
-      size: 4096,
-      createdAt: "2026-09-05T10:10:00Z",
-    };
-    vi.mocked(backupsApi.uploadBackup).mockResolvedValueOnce(uploaded);
+  it.each([{ withKey: false }, { withKey: true }])(
+    "uploads a backup and adds it to the list (master key file: $withKey)",
+    async ({ withKey }) => {
+      const uploaded = {
+        key: "uploaded.dop",
+        size: 4096,
+        createdAt: "2026-09-05T10:10:00Z",
+      };
+      vi.mocked(backupsApi.uploadBackup).mockResolvedValueOnce(uploaded);
 
-    const c = useBackupsController();
-    c.openUploadModal();
-    const fakeFile = new File(["test"], "uploaded.dop");
-    c.onFileSelected(fakeFile);
+      const c = useBackupsController();
+      c.openUploadModal();
+      const fakeFile = new File(["test"], "uploaded.dop");
+      const fakeKey = new File(["key-data"], "master.key");
+      c.onFileSelected(fakeFile);
+      if (withKey) c.onKeyFileSelected(fakeKey);
 
-    await c.submitUpload();
+      await c.submitUpload();
 
-    expect(backupsApi.uploadBackup).toHaveBeenCalledWith(fakeFile);
-    expect(c.backups.value[0]).toEqual(uploaded);
-    expect(c.uploadModalOpen.value).toBe(false);
-    expect(c.actionMessage.value?.tone).toBe("ok");
-  });
+      expect(backupsApi.uploadBackup).toHaveBeenCalledWith(
+        fakeFile,
+        ...(withKey ? [fakeKey] : []),
+      );
+      expect(c.backups.value[0]).toEqual(uploaded);
+      expect(c.uploadModalOpen.value).toBe(false);
+      expect(c.actionMessage.value?.tone).toBe("ok");
+    },
+  );
 
-  it("restores a backup and triggers refresh", async () => {
+  it.each([
+    { label: "without a master key", keyHex: undefined },
+    {
+      label: "with an explicit hex master key",
+      keyHex:
+        "  0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  ",
+    },
+  ])("restores a backup $label and triggers a refresh", async ({ keyHex }) => {
     vi.mocked(backupsApi.restoreBackup).mockResolvedValueOnce();
     vi.mocked(backupsApi.fetchBackups).mockResolvedValueOnce([sampleBackup]);
 
     const c = useBackupsController();
     c.openRestoreDialog(sampleBackup);
+    if (keyHex !== undefined) c.restoreKeyHex.value = keyHex;
 
     await c.submitRestore();
 
-    expect(backupsApi.restoreBackup).toHaveBeenCalledWith(sampleBackup.key);
+    expect(backupsApi.restoreBackup).toHaveBeenCalledWith(
+      sampleBackup.key,
+      ...(keyHex === undefined ? [] : [keyHex.trim()]),
+    );
     expect(c.restoreTarget.value).toBeNull();
     expect(c.actionMessage.value?.tone).toBe("ok");
     expect(backupsApi.fetchBackups).toHaveBeenCalled();
@@ -134,48 +153,6 @@ describe("useBackupsController", () => {
     expect(backupsApi.deleteBackup).toHaveBeenCalledWith(sampleBackup.key);
     expect(c.backups.value).toEqual([]);
     expect(c.deleteTarget.value).toBeNull();
-    expect(c.actionMessage.value?.tone).toBe("ok");
-  });
-
-  it("uploads a backup with a master key file", async () => {
-    const uploaded = {
-      key: "uploaded_with_key.dop",
-      size: 512,
-      createdAt: "2026-09-05T12:00:00Z",
-    };
-    vi.mocked(backupsApi.uploadBackup).mockResolvedValueOnce(uploaded);
-
-    const c = useBackupsController();
-    c.openUploadModal();
-    const fakeFile = new File(["test"], "uploaded.dop");
-    const fakeKey = new File(
-      ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"],
-      "master.key",
-    );
-    c.onFileSelected(fakeFile);
-    c.onKeyFileSelected(fakeKey);
-
-    await c.submitUpload();
-
-    expect(backupsApi.uploadBackup).toHaveBeenCalledWith(fakeFile, fakeKey);
-    expect(c.backups.value[0]).toEqual(uploaded);
-  });
-
-  it("restores a backup with an explicit hex master key", async () => {
-    vi.mocked(backupsApi.restoreBackup).mockResolvedValueOnce();
-    vi.mocked(backupsApi.fetchBackups).mockResolvedValueOnce([sampleBackup]);
-
-    const c = useBackupsController();
-    c.openRestoreDialog(sampleBackup);
-    c.restoreKeyHex.value =
-      "  0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  ";
-
-    await c.submitRestore();
-
-    expect(backupsApi.restoreBackup).toHaveBeenCalledWith(
-      sampleBackup.key,
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    );
     expect(c.actionMessage.value?.tone).toBe("ok");
   });
 });

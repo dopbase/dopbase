@@ -37,6 +37,21 @@ function makeController(environmentId = "env_1") {
   return useSecretsPanelController(ref(environmentId));
 }
 
+const storedLayout = "# app\nDATABASE_URL=\nAPI_KEY=\n";
+const exported = {
+  entries: [
+    { key: "DATABASE_URL", value: "postgres://secret" },
+    { key: "API_KEY", value: "k-123" },
+  ],
+};
+
+function mockEditorLoad(): void {
+  vi.mocked(secretsApi.getEnvLayout).mockResolvedValue({
+    layout: storedLayout,
+  });
+  vi.mocked(secretsApi.exportSecrets).mockResolvedValue(exported);
+}
+
 describe("useSecretsPanelController", () => {
   it("ignores an older environment response that resolves last", async () => {
     let resolveFirst!: (value: (typeof metadata)[]) => void;
@@ -174,21 +189,6 @@ describe("useSecretsPanelController", () => {
 });
 
 describe("useSecretsPanelController — .env editor", () => {
-  const storedLayout = "# app\nDATABASE_URL=\nAPI_KEY=\n";
-  const exported = {
-    entries: [
-      { key: "DATABASE_URL", value: "postgres://secret" },
-      { key: "API_KEY", value: "k-123" },
-    ],
-  };
-
-  function mockEditorLoad(): void {
-    vi.mocked(secretsApi.getEnvLayout).mockResolvedValue({
-      layout: storedLayout,
-    });
-    vi.mocked(secretsApi.exportSecrets).mockResolvedValue(exported);
-  }
-
   it("openEditor merges the stored layout with the revealed values", async () => {
     mockEditorLoad();
     const c = makeController();
@@ -280,21 +280,6 @@ describe("useSecretsPanelController — .env editor", () => {
 });
 
 describe("useSecretsPanelController — .env editor save flow", () => {
-  const storedLayout = "# app\nDATABASE_URL=\nAPI_KEY=\n";
-  const exported = {
-    entries: [
-      { key: "DATABASE_URL", value: "postgres://secret" },
-      { key: "API_KEY", value: "k-123" },
-    ],
-  };
-
-  function mockEditorLoad(): void {
-    vi.mocked(secretsApi.getEnvLayout).mockResolvedValue({
-      layout: storedLayout,
-    });
-    vi.mocked(secretsApi.exportSecrets).mockResolvedValue(exported);
-  }
-
   it("saveDraft is blocked while the buffer has issues", async () => {
     mockEditorLoad();
     const c = makeController();

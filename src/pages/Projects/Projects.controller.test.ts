@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useProjectsController } from "./Projects.controller";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { effectScope, type EffectScope } from "vue";
+import {
+  type ProjectsController,
+  useProjectsController,
+} from "./Projects.controller";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
@@ -50,10 +54,18 @@ const environment = (id: string, name: string, projectId = "prj_1") => ({
   updatedAt: "",
 });
 
+// Controllers register watchers on the shared reactive route mock. Each test
+// creates them inside its own detached effect scope so they are disposed
+// afterwards: a stale watcher can then never observe another test's route or
+// consume its queued mock responses.
+let scope: EffectScope;
+
+function createController(): ProjectsController {
+  return scope.run(() => useProjectsController())!;
+}
+
 beforeEach(() => {
-  // Reset call history and queued one-off implementations: controllers
-  // from earlier tests leak their watchers on the shared reactive route,
-  // so stale queues would otherwise be consumed by the wrong caller.
+  scope = effectScope(true);
   vi.mocked(projectsApi.listProjects).mockReset();
   vi.mocked(environmentsApi.listEnvironments).mockReset();
   vi.mocked(projectsApi.listProjects).mockResolvedValue([
@@ -68,12 +80,16 @@ beforeEach(() => {
   routerReplace.mockReset();
 });
 
+afterEach(() => {
+  scope.stop();
+});
+
 describe("useProjectsController", () => {
   it("surfaces project loading failures", async () => {
     vi.mocked(projectsApi.listProjects).mockRejectedValueOnce(
       new Error("down"),
     );
-    const c = useProjectsController();
+    const c = createController();
     await c.loadProjects();
     expect(c.projectsError.value).toBe("Could not load projects.");
     expect(c.projects.value).toBeNull();
@@ -84,8 +100,10 @@ describe("useProjectsController", () => {
       ...project,
       name: "fresh",
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.createProject("fresh");
+    // `createProject` itself never lists projects: the single call is the reload.
+    expect(projectsApi.listProjects).toHaveBeenCalledTimes(1);
     expect(routerPush).toHaveBeenCalledWith({
       name: "project",
       params: { projectRef: "fresh" },
@@ -100,7 +118,7 @@ describe("useProjectsController", () => {
       secrets: 5,
       tokens: 1,
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.loadProjects();
     const affected = await c.deleteProject("prj_1");
     expect(affected.secrets).toBe(5);
@@ -114,7 +132,7 @@ describe("useProjectsController", () => {
       ...otherProject,
       name: "payment-service",
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.loadProjects();
 
     await c.renameProject("prj_2", "payment-service");
@@ -133,7 +151,7 @@ describe("useProjectsController", () => {
       ...project,
       name: "billing",
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.loadProjects();
 
     await c.renameProject("prj_1", "billing");
@@ -153,7 +171,7 @@ describe("useProjectsController", () => {
       secrets: 5,
       tokens: 1,
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.loadProjects();
 
     await c.deleteProject("prj_2");
@@ -164,7 +182,7 @@ describe("useProjectsController", () => {
 
   it("selectEnvironment puts the environment in the URL", () => {
     route.params.projectRef = "app";
-    const c = useProjectsController();
+    const c = createController();
     c.selectEnvironment("env_1");
     expect(routerPush).toHaveBeenCalledWith({
       name: "environment",
@@ -182,7 +200,7 @@ describe("useProjectsController", () => {
       createdAt: "",
       updatedAt: "",
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.createEnvironment("staging");
     expect(routerPush).toHaveBeenCalledWith({
       name: "environment",
@@ -199,7 +217,7 @@ describe("useProjectsController", () => {
       secrets: 3,
       tokens: 0,
     });
-    const c = useProjectsController();
+    const c = createController();
     await c.deleteEnvironment("env_1");
     expect(routerReplace).toHaveBeenCalledWith({
       name: "project",
@@ -222,7 +240,7 @@ describe("useProjectsController", () => {
         revokedAt: null,
       },
     ]);
-    const c = useProjectsController();
+    const c = createController();
     await expect(c.describeEnvironmentDeletion("env_1")).resolves.toEqual([
       { label: "secrets", count: 2 },
       { label: "runner tokens", count: 1 },
@@ -233,8 +251,8 @@ describe("useProjectsController", () => {
     route.name = "project";
     route.params.projectRef = "app";
     route.params.environmentId = "env_1";
-    // Keyed by reference so leaked watchers from earlier tests (which
-    // share the reactive route mock) cannot consume the wrong response.
+    // Keyed by reference so each project's environments are answered
+    // deterministically while the switch is in flight.
     let resolveOther!: (value: ReturnType<typeof environment>[]) => void;
     vi.mocked(environmentsApi.listEnvironments).mockImplementation(
       (reference?: string) =>
@@ -244,7 +262,7 @@ describe("useProjectsController", () => {
               resolveOther = resolve;
             }),
     );
-    const c = useProjectsController();
+    const c = createController();
     await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
 
     // Switch to another project whose environments load slowly: while the

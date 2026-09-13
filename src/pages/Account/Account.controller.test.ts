@@ -4,6 +4,7 @@ import { useAccountController } from "./Account.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
+import { browserSession } from "~/tests/browser-session";
 
 const routerPush = vi.hoisted(() => vi.fn());
 
@@ -15,13 +16,7 @@ vi.mock("vue-router", () => ({
 vi.mock("~/services/auth.api");
 
 function signIn(store: ReturnType<typeof useAuthStore>): Promise<void> {
-  vi.mocked(authApi.login).mockResolvedValueOnce({
-    adminId: "usr_1",
-    email: "a@b.c",
-    sessionKind: "browser",
-    token: null,
-    csrfToken: "csrf_1",
-  });
+  vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
   return store.login("a@b.c", "oldpassword1");
 }
 
@@ -78,29 +73,27 @@ describe("useAccountController", () => {
     );
   });
 
-  it("exposes the signed-in email and role", async () => {
+  it("exposes the signed-in identity with a formatted role and last login", async () => {
     await signIn(useAuthStore());
     const c = useAccountController();
     expect(c.email.value).toBe("a@b.c");
     expect(c.role.value).toBe("admin");
     expect(c.formattedRole.value).toBe("Administrator");
-  });
 
-  it("formats role and last login when present", async () => {
-    const store = useAuthStore();
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_root",
-      email: "root@example.com",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_root",
-      role: "root",
-      lastLoginAt: new Date(Date.now() - 60000).toISOString(),
-    });
-    await store.login("root@example.com", "oldpassword1");
-    const c = useAccountController();
-    expect(c.role.value).toBe("root");
-    expect(c.formattedRole.value).toBe("Root Administrator");
-    expect(c.formattedLastLogin.value).toBe("1m ago");
+    vi.mocked(authApi.login).mockResolvedValueOnce(
+      browserSession({
+        adminId: "usr_root",
+        email: "root@example.com",
+        csrfToken: "csrf_root",
+        role: "root",
+        lastLoginAt: new Date(Date.now() - 60000).toISOString(),
+      }),
+    );
+    await useAuthStore().login("root@example.com", "oldpassword1");
+
+    const root = useAccountController();
+    expect(root.role.value).toBe("root");
+    expect(root.formattedRole.value).toBe("Root Administrator");
+    expect(root.formattedLastLogin.value).toBe("1m ago");
   });
 });

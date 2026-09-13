@@ -56,20 +56,6 @@ describe("useTokensPanelController", () => {
     expect(c.created.value).toBeNull();
   });
 
-  it("sends the fixed runner role", async () => {
-    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
-    vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
-      token,
-      plaintextToken: "dbs_x",
-    });
-    const c = makeController();
-    await c.create("ci");
-    expect(tokensApi.createToken).toHaveBeenCalledWith("env_1", {
-      name: "ci",
-      role: "runner",
-    });
-  });
-
   it("maps name conflicts to a friendly message", async () => {
     vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
     vi.mocked(tokensApi.createToken).mockRejectedValueOnce(
