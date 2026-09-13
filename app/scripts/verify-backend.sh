@@ -10,7 +10,7 @@ cargo test --all-targets --all-features -- --test-threads=1
 
 # Release builds embed ../dist/ at compile time (rust-embed).
 if [[ ! -f ../dist/index.html ]]; then
-  echo "error: dist/index.html not found — run 'bun run build' first" >&2
+  echo "error: dist/index.html not found. Run 'bun run build:ui' first." >&2
   exit 1
 fi
 cargo build --release
@@ -38,62 +38,49 @@ cp ./target/release/dopbase "${binary}"
 cd "${runtime_root}"
 
 # Exercise every public command path against the release binary. The Rust CLI
-# tests cover parsing and behavior in isolated temporary directories; this
-# matrix catches packaging or command-tree regressions in the Docker image.
-"${binary}" --help >/dev/null
-cli_command_paths=(
-  "server"
-  "server start"
-  "server up"
-  "server down"
-  "server status"
-  "server logs"
-  "client"
-  "client connect"
-  "client status"
-  "login"
-  "logout"
-  "status"
-  "init"
-  "project"
-  "project create"
-  "project list"
-  "project show"
-  "project rename"
-  "project delete"
-  "env"
-  "env default"
-  "env create"
-  "env list"
-  "env show"
-  "env rename"
-  "env delete"
-  "secret"
-  "secret list"
-  "secret set"
-  "secret get"
-  "secret delete"
-  "import"
-  "export"
-  "token"
-  "token create"
-  "token list"
-  "token revoke"
-  "run"
-  "cache"
-  "cache list"
-  "cache clean"
-  "admin"
-  "admin reset-password"
-  "admin factory-reset"
-  "update"
-  "backup"
-  "restore"
-)
-for command_path in "${cli_command_paths[@]}"; do
-  read -r -a command_parts <<<"${command_path}"
-  "${binary}" "${command_parts[@]}" --help >/dev/null
-done
+# tests cover parsing and behavior in isolated temporary directories. Walking
+# the generated help tree also covers commands added after this script.
+verified_command_paths=0
+verify_help_tree() {
+  local help_output=""
+  local in_commands=false
+  local line=""
+  local subcommand=""
+
+  help_output="$("${binary}" "$@" --help)"
+  if (( $# == 0 )); then
+    "${binary}" help >/dev/null
+  else
+    "${binary}" help "$@" >/dev/null
+  fi
+  verified_command_paths=$((verified_command_paths + 1))
+
+  while IFS= read -r line; do
+    if [[ "${line}" == "Commands:" ]]; then
+      in_commands=true
+      continue
+    fi
+    if [[ "${in_commands}" == true ]]; then
+      if [[ -z "${line}" ]]; then
+        break
+      fi
+      if [[ "${line}" =~ ^[[:space:]][[:space:]]([[:alnum:]][[:alnum:]-]*)[[:space:]] ]]; then
+        subcommand="${BASH_REMATCH[1]}"
+        if [[ "${subcommand}" == "help" ]]; then
+          "${binary}" help "$@" help >/dev/null
+          continue
+        fi
+        verify_help_tree "$@" "${subcommand}"
+      fi
+    fi
+  done <<<"${help_output}"
+}
+
+verify_help_tree
+if (( verified_command_paths < 2 )); then
+  echo "error: no public subcommands found in Dopbase help output" >&2
+  exit 1
+fi
 
 "${binary}" --data-dir "${data_dir}" server start \
   --docs \
