@@ -17,7 +17,9 @@ export function useImportSecretsController() {
       : null,
   );
   const projectRef = computed(() =>
-    typeof route.params.projectRef === "string" ? route.params.projectRef : null,
+    typeof route.params.projectRef === "string"
+      ? route.params.projectRef
+      : null,
   );
   const valid = computed(
     () =>
@@ -26,11 +28,14 @@ export function useImportSecretsController() {
       (importStore.pending?.entries.length ?? 0) > 0,
   );
 
-  if (!valid.value) void router.replace({ name: "environment", params: route.params });
+  if (!valid.value)
+    void router.replace({ name: "environment", params: route.params });
   onUnmounted(() => importStore.clear());
 
   const fileName = computed(() => importStore.pending?.fileName ?? "");
-  const keys = computed(() => importStore.pending?.entries.map((entry) => entry.key) ?? []);
+  const keys = computed(
+    () => importStore.pending?.entries.map((entry) => entry.key) ?? [],
+  );
   const parseErrors = computed(() => importStore.pending?.errors ?? []);
   const stage = ref<"review" | "dry">("review");
   const mode = ref<ImportMode>("merge");
@@ -129,4 +134,6 @@ export function useImportSecretsController() {
   };
 }
 
-export type ImportSecretsController = ReturnType<typeof useImportSecretsController>;
+export type ImportSecretsController = ReturnType<
+  typeof useImportSecretsController
+>;

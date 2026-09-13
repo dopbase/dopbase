@@ -77,7 +77,10 @@ function mountPanel() {
   return nextTick();
 }
 
-function inputValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
+function inputValue(
+  element: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+) {
   element.value = value;
   element.dispatchEvent(new Event("input", { bubbles: true }));
 }
@@ -92,7 +95,10 @@ afterEach(() => {
 describe("SecretsPanel create dialog", () => {
   it("requires a value unless empty value is selected", async () => {
     await mountPanel();
-    inputValue(document.querySelector<HTMLInputElement>('input[name="key"]')!, "EMPTY_OK");
+    inputValue(
+      document.querySelector<HTMLInputElement>('input[name="key"]')!,
+      "EMPTY_OK",
+    );
 
     document.querySelector<HTMLFormElement>("form")?.requestSubmit();
     await nextTick();
@@ -106,8 +112,12 @@ describe("SecretsPanel create dialog", () => {
   it("disables the field for an empty value and restores an earlier draft", async () => {
     await mountPanel();
     const key = document.querySelector<HTMLInputElement>('input[name="key"]')!;
-    const value = document.querySelector<HTMLTextAreaElement>('textarea[name="value"]')!;
-    const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const value = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="value"]',
+    )!;
+    const checkbox = document.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    )!;
     inputValue(key, "OPTIONAL_VALUE");
     inputValue(value, "draft-secret");
 
@@ -131,7 +141,10 @@ describe("SecretsPanel create dialog", () => {
 
   it("keeps whitespace secret values unchanged", async () => {
     await mountPanel();
-    inputValue(document.querySelector<HTMLInputElement>('input[name="key"]')!, "SPACES");
+    inputValue(
+      document.querySelector<HTMLInputElement>('input[name="key"]')!,
+      "SPACES",
+    );
     inputValue(
       document.querySelector<HTMLTextAreaElement>('textarea[name="value"]')!,
       "   ",

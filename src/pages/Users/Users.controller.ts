@@ -145,15 +145,23 @@ export function useUsersController() {
     if (!editing.value) {
       if (!password.value) {
         errors.password = "Password is required.";
-      } else if (validatePasswordLength(password.value).code === "PASSWORD_TOO_SHORT") {
+      } else if (
+        validatePasswordLength(password.value).code === "PASSWORD_TOO_SHORT"
+      ) {
         errors.password = `Password must contain at least ${MIN_PASSWORD_LENGTH} characters.`;
-      } else if (validatePasswordLength(password.value).code === "PASSWORD_TOO_LONG") {
+      } else if (
+        validatePasswordLength(password.value).code === "PASSWORD_TOO_LONG"
+      ) {
         errors.password = `Password must contain at most ${MAX_PASSWORD_LENGTH} characters.`;
       }
     } else if (password.value) {
-      if (validatePasswordLength(password.value).code === "PASSWORD_TOO_SHORT") {
+      if (
+        validatePasswordLength(password.value).code === "PASSWORD_TOO_SHORT"
+      ) {
         errors.password = `Password must contain at least ${MIN_PASSWORD_LENGTH} characters.`;
-      } else if (validatePasswordLength(password.value).code === "PASSWORD_TOO_LONG") {
+      } else if (
+        validatePasswordLength(password.value).code === "PASSWORD_TOO_LONG"
+      ) {
         errors.password = `Password must contain at most ${MAX_PASSWORD_LENGTH} characters.`;
       }
     }

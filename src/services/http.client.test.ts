@@ -163,7 +163,10 @@ describe("apiRequest", () => {
     const offReauth = onReauthenticationRequired(reauth);
     fetchMock
       .mockResolvedValueOnce(
-        jsonResponse({ success: false, error: { AUTHENTICATION_INVALID: "no" } }, 401),
+        jsonResponse(
+          { success: false, error: { AUTHENTICATION_INVALID: "no" } },
+          401,
+        ),
       )
       .mockResolvedValueOnce(
         jsonResponse(
@@ -172,8 +175,12 @@ describe("apiRequest", () => {
         ),
       );
 
-    await expect(apiRequest("/reauth", { notifyAuthEvents: false })).rejects.toBeInstanceOf(ApiError);
-    await expect(apiRequest("/reveal", { notifyAuthEvents: false })).rejects.toBeInstanceOf(ApiError);
+    await expect(
+      apiRequest("/reauth", { notifyAuthEvents: false }),
+    ).rejects.toBeInstanceOf(ApiError);
+    await expect(
+      apiRequest("/reveal", { notifyAuthEvents: false }),
+    ).rejects.toBeInstanceOf(ApiError);
     expect(unauthorized).not.toHaveBeenCalled();
     expect(reauth).not.toHaveBeenCalled();
     offUnauthorized();

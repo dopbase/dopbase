@@ -153,13 +153,13 @@ count, but never secret values.
 
 ## Project commands
 
-| Command                                                          | Purpose                  |
-| ---------------------------------------------------------------- | ------------------------ |
-| `dopbase project create <PROJECT_NAME>`                          | Create an empty project  |
-| `dopbase project list`                                           | List accessible projects |
-| `dopbase project show <PROJECT_REF>`                             | Show project metadata    |
-| `dopbase project rename <PROJECT_REF> <NEW_PROJECT_NAME>`        | Rename a project         |
-| `dopbase project delete <PROJECT_REF>`                           | Delete a project         |
+| Command                                                   | Purpose                  |
+| --------------------------------------------------------- | ------------------------ |
+| `dopbase project create <PROJECT_NAME>`                   | Create an empty project  |
+| `dopbase project list`                                    | List accessible projects |
+| `dopbase project show <PROJECT_REF>`                      | Show project metadata    |
+| `dopbase project rename <PROJECT_REF> <NEW_PROJECT_NAME>` | Rename a project         |
+| `dopbase project delete <PROJECT_REF>`                    | Delete a project         |
 
 `<PROJECT_REF>` accepts an immutable project ID or project name. Deleting a project
 also deletes its environments, secrets, and scoped tokens. Dopbase shows the
@@ -168,28 +168,28 @@ affected resource counts and requires confirmation. Automation must pass
 
 ## Environment commands
 
-| Command                                                                      | Purpose                   |
-| ---------------------------------------------------------------------------- | ------------------------- |
-| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`                          | Create an environment     |
-| `dopbase env default <ENVIRONMENT_REF>`                                      | Set the run default       |
-| `dopbase env default --clear`                                                | Clear the run default     |
-| `dopbase env list [PROJECT_REF]`                                             | List environments         |
-| `dopbase env show <ENVIRONMENT_REF>`                                         | Show environment metadata |
-| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>`                | Rename an environment     |
-| `dopbase env delete <ENVIRONMENT_REF>`                                       | Delete an environment     |
+| Command                                                       | Purpose                   |
+| ------------------------------------------------------------- | ------------------------- |
+| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`           | Create an environment     |
+| `dopbase env default <ENVIRONMENT_REF>`                       | Set the run default       |
+| `dopbase env default --clear`                                 | Clear the run default     |
+| `dopbase env list [PROJECT_REF]`                              | List environments         |
+| `dopbase env show <ENVIRONMENT_REF>`                          | Show environment metadata |
+| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>` | Rename an environment     |
+| `dopbase env delete <ENVIRONMENT_REF>`                        | Delete an environment     |
 
 Deleting an environment also deletes its secrets and scoped tokens. The
 operation requires confirmation or `--yes` and is recorded in the audit log.
 
 ## Secret commands
 
-| Command                                                       | Purpose                     |
-| ------------------------------------------------------------- | --------------------------- |
-| `dopbase secret list <ENVIRONMENT_REF>`                       | List keys and safe metadata |
-| `dopbase secret set <ENVIRONMENT_REF> <KEY>`                  | Create or update a value    |
-| `dopbase secret get <ENVIRONMENT_REF> <KEY>`                  | Read safe metadata          |
-| `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal`         | Explicitly reveal a value   |
-| `dopbase secret delete <ENVIRONMENT_REF> <KEY>`               | Delete one secret           |
+| Command                                               | Purpose                     |
+| ----------------------------------------------------- | --------------------------- |
+| `dopbase secret list <ENVIRONMENT_REF>`               | List keys and safe metadata |
+| `dopbase secret set <ENVIRONMENT_REF> <KEY>`          | Create or update a value    |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY>`          | Read safe metadata          |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal` | Explicitly reveal a value   |
+| `dopbase secret delete <ENVIRONMENT_REF> <KEY>`       | Delete one secret           |
 
 `secret set` securely prompts for a value when attached to a terminal. Use
 `--stdin` for automation:
@@ -268,11 +268,11 @@ dopbase token create payment-service/production \
   --name production-server --role runner
 ```
 
-| Command                                                          | Purpose               |
-| ---------------------------------------------------------------- | --------------------- |
+| Command                                                              | Purpose               |
+| -------------------------------------------------------------------- | --------------------- |
 | `dopbase token create <ENVIRONMENT_REF> --name <NAME> --role runner` | Create a runner token |
 | `dopbase token list <ENVIRONMENT_REF>`                               | List token metadata   |
-| `dopbase token revoke <token-id>`                                | Revoke a token        |
+| `dopbase token revoke <token-id>`                                    | Revoke a token        |
 
 The plaintext token is displayed only once. Tokens can also be created and
 revoked on an environment's Tokens tab in the [Admin UI](/ui/projects-environments).

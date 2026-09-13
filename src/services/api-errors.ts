@@ -1,7 +1,7 @@
 import { ApiError } from "./http.client";
 
 export function isAbortError(cause: unknown): boolean {
-  return (typeof DOMException !== "undefined" && cause instanceof DOMException)
+  return typeof DOMException !== "undefined" && cause instanceof DOMException
     ? cause.name === "AbortError"
     : cause instanceof Error && cause.name === "AbortError";
 }
