@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> |
+  <a href="./assets/demo-dopbase-1912.mp4">Demo</a> |
   <a href="#why-dopbase">Why Dopbase</a> |
   <a href="https://dopbase.com/how-it-works">How it works</a> |
   <a href="https://docs.dopbase.com">Documentation</a> |
