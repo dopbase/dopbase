@@ -107,10 +107,13 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 ## Demo
 
-<video controls width="100%" preload="metadata">
-  <source src="./assets/demo-dopbase-1280.mp4" type="video/mp4" />
-  <a href="./assets/demo-dopbase-1280.mp4">Open the demo video.</a>
-</video>
+<p align="center">
+  <img src="./assets/demo-dopbase-highlight.gif" alt="Dopbase demo showing the Admin UI workflow" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/dopbase/dopbase/raw/refs/heads/main/assets/demo-dopbase-1912.mp4">See full demo (MP4 download)</a>
+</p>
 
 ## Repository layout
 

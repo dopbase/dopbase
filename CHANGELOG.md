@@ -10,8 +10,8 @@ documented community conduct policy.
 ### Added
 
 - Added web-ready MP4 and GIF versions of the Dopbase demo, including three
-  video sizes, a short forum preview, and a README Demo section with the medium
-  video embedded.
+  video sizes, a short forum preview, and a README Demo section with a GIF
+  preview and full video download.
 - Added a Contributor Covenant 3.0 Code of Conduct with a private reporting
   process and enforcement guidelines.
 
