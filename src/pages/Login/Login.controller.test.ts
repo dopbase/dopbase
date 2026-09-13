@@ -4,6 +4,7 @@ import { useLoginController } from "./Login.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
+import { browserSession } from "~/tests/browser-session";
 
 const { routerPush, routeQuery } = vi.hoisted(() => ({
   routerPush: vi.fn(),
@@ -42,13 +43,7 @@ describe("useLoginController", () => {
   });
 
   it("signs in and routes to projects", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
     const c = useLoginController();
     c.email.value = "A@B.C";
     c.password.value = "pw";
@@ -59,30 +54,21 @@ describe("useLoginController", () => {
     expect(store.isAuthenticated).toBe(true);
   });
 
-  it("routes to a safe internal redirect target after sign-in", async () => {
-    routeQuery.redirect = "/projects/p/acme/e/env_1";
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
-    const c = useLoginController();
-    c.email.value = "a@b.c";
-    c.password.value = "pw";
-    await c.submit();
-    expect(routerPush).toHaveBeenCalledWith("/projects/p/acme/e/env_1");
-  });
+  it.each(["/projects/p/acme/e/env_1", "/audit"])(
+    "routes to the safe internal redirect target %s after sign-in",
+    async (redirect) => {
+      routeQuery.redirect = redirect;
+      vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
+      const c = useLoginController();
+      c.email.value = "a@b.c";
+      c.password.value = "pw";
+      await c.submit();
+      expect(routerPush).toHaveBeenCalledWith(redirect);
+    },
+  );
 
   it("ignores cross-origin and protocol-relative redirect targets", async () => {
-    vi.mocked(authApi.login).mockResolvedValue({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
+    vi.mocked(authApi.login).mockResolvedValue(browserSession());
     for (const redirect of [
       "https://evil.example.test/phish",
       "//evil.example.test/phish",
@@ -96,22 +82,6 @@ describe("useLoginController", () => {
       await c.submit();
       expect(routerPush).toHaveBeenCalledWith({ name: "projects" });
     }
-  });
-
-  it("honors the redirect query after login", async () => {
-    vi.mocked(authApi.login).mockResolvedValueOnce({
-      adminId: "usr_1",
-      email: "a@b.c",
-      sessionKind: "browser",
-      token: null,
-      csrfToken: "csrf_1",
-    });
-    routeQuery.redirect = "/audit";
-    const c = useLoginController();
-    c.email.value = "a@b.c";
-    c.password.value = "pw";
-    await c.submit();
-    expect(routerPush).toHaveBeenCalledWith("/audit");
   });
 
   it("maps EMAIL_INVAILD to the email field", async () => {

@@ -82,9 +82,9 @@ describe("ProjectRail", () => {
     if (!input) throw new Error("Rename input was not rendered.");
     input.value = "payment-service";
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.closest("form")?.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    );
+    input
+      .closest("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 
     await vi.waitFor(() =>
       expect(controller.renameProject).toHaveBeenCalledWith(

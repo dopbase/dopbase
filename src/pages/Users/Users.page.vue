@@ -150,7 +150,8 @@ const {
           <div>
             <h2 class="text-sm font-semibold text-ink-strong">AI agents</h2>
             <p class="text-xs text-ink-muted">
-              Metadata-only identities. Generate a 30-day bearer token with password confirmation.
+              Metadata-only identities. Generate a 30-day bearer token with
+              password confirmation.
             </p>
           </div>
           <DbButton size="sm" variant="secondary" @click="openAgentCreate">
@@ -330,8 +331,10 @@ const {
             </div>
             <p class="text-sm text-ink">
               Enter your password to generate a new token for
-              <span class="font-semibold text-ink-strong">{{ agentForToken?.name }}</span>.
-              Any existing active token for this agent will be revoked.
+              <span class="font-semibold text-ink-strong">{{
+                agentForToken?.name
+              }}</span
+              >. Any existing active token for this agent will be revoked.
             </p>
           </div>
 

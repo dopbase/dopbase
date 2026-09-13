@@ -2,6 +2,25 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+Dopbase now has consistent repository commands, leaner test suites, and a
+documented community conduct policy.
+
+### Added
+
+- Added a Contributor Covenant 3.0 Code of Conduct with a private reporting
+  process and enforcement guidelines.
+
+### Improvement
+
+- Bun scripts now use `action:target` names for development, builds, tests,
+  linting, type checks, formatting checks, and previews.
+- Backend release verification now discovers the CLI command tree from the
+  built binary and checks both supported help forms for every command.
+- Removed duplicate frontend and backend tests while preserving behavior
+  coverage.
+
 ## 0.1.6 - 2026-09-12
 
 Dopbase 0.1.6 adds JSON and YAML secret files, runtime cache maintenance, and

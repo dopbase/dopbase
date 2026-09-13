@@ -1,9 +1,17 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
-import { factoryReset, fetchFactoryResetPreview, fetchStatus } from "~/services/instance.api";
+import {
+  factoryReset,
+  fetchFactoryResetPreview,
+  fetchStatus,
+} from "~/services/instance.api";
 import type { StatusResponse } from "~/services/instance.api";
-import { formatDateTime, formatDuration, formatRelativeTime } from "~/utils/format";
+import {
+  formatDateTime,
+  formatDuration,
+  formatRelativeTime,
+} from "~/utils/format";
 
 /**
  * Instance screen controller: safe, read-only server status.
@@ -18,7 +26,9 @@ export function useInstanceController() {
   const status = ref<StatusResponse | null>(null);
   const loading = ref(false);
   const loadError = ref<string | null>(null);
-  const resetPreview = ref<Awaited<ReturnType<typeof fetchFactoryResetPreview>> | null>(null);
+  const resetPreview = ref<Awaited<
+    ReturnType<typeof fetchFactoryResetPreview>
+  > | null>(null);
   const resetPassword = ref("");
   const resetConfirmation = ref("");
   const resetAcknowledged = ref(false);
@@ -79,12 +89,17 @@ export function useInstanceController() {
     resetLoading.value = true;
     resetError.value = null;
     try {
-      await factoryReset(resetPassword.value, resetConfirmation.value, resetAcknowledged.value);
+      await factoryReset(
+        resetPassword.value,
+        resetConfirmation.value,
+        resetAcknowledged.value,
+      );
       resetComplete.value = true;
       auth.clearLocalSession();
       await router.push({ name: "setup" });
     } catch {
-      resetError.value = "Factory reset was not completed. Verify the password and confirmation.";
+      resetError.value =
+        "Factory reset was not completed. Verify the password and confirmation.";
     } finally {
       resetLoading.value = false;
     }

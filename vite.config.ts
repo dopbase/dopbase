@@ -42,7 +42,7 @@ export default defineConfig({
     // Enable global test APIs (describe, it, expect) without importing them in every file
     globals: true,
     // Install a working `localStorage` mock and reset it between tests.
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./src/tests/setup.ts"],
     // Exclude route definitions and story files from being collected as tests.
     // Routes are defined per-page in `*.route.ts` (or sometimes inline in the page),
     // and `*.story.vue` files are visual stories — neither are unit tests.
@@ -71,6 +71,7 @@ export default defineConfig({
         "src/router.ts",
         "src/main.ts",
         "src/**/index.ts",
+        "src/tests/**",
         // Route definitions (per-page `*.route.ts`) and visual stories are not unit-testable units
         "src/**/*.route.ts",
         "src/**/*.story.vue",

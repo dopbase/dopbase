@@ -11,7 +11,9 @@ export function isValidEmail(value: string): boolean {
   return email.length <= 254 && EMAIL_PATTERN.test(email);
 }
 
-export function validatePasswordLength(value: string):
+export function validatePasswordLength(
+  value: string,
+):
   | { valid: true; code: undefined }
   | { valid: false; code: "PASSWORD_TOO_SHORT" | "PASSWORD_TOO_LONG" } {
   const length = Array.from(value).length;

@@ -143,34 +143,46 @@ describe("useSetupController", () => {
       expect(bootstrapApi.bootstrapRestore).not.toHaveBeenCalled();
     });
 
-    it("restores backup successfully and routes to login with notice", async () => {
-      vi.mocked(bootstrapApi.bootstrapRestore).mockResolvedValueOnce({
-        message: "Backup restored successfully.",
-        restored: true,
-        key: "backup.dop",
-        size: 1024,
-      });
-      vi.mocked(bootstrapApi.fetchBootstrapStatus).mockResolvedValueOnce({
-        state: "ready",
-      });
+    it.each([
+      { label: "without a master key file", withKey: false },
+      { label: "with a master key file", withKey: true },
+    ])(
+      "restores a backup $label and routes to login with a notice",
+      async ({ withKey }) => {
+        vi.mocked(bootstrapApi.bootstrapRestore).mockResolvedValueOnce({
+          message: "Backup restored successfully.",
+          restored: true,
+          key: "backup.dop",
+          size: 1024,
+        });
+        vi.mocked(bootstrapApi.fetchBootstrapStatus).mockResolvedValueOnce({
+          state: "ready",
+        });
 
-      const c = useSetupController();
-      const file = new File(["dummy"], "backup.dop", {
-        type: "application/octet-stream",
-      });
-      c.onFileSelected(file);
-      c.setupToken.value = "dbs_test-token";
-      await c.submitRestore();
+        const c = useSetupController();
+        const file = new File(["dummy"], "backup.dop", {
+          type: "application/octet-stream",
+        });
+        const keyFile = new File(["keydata"], "master.key", {
+          type: "application/octet-stream",
+        });
+        c.onFileSelected(file);
+        c.setupToken.value = "dbs_test-token";
+        if (withKey) c.onMasterKeyFileSelected(keyFile);
 
-      expect(bootstrapApi.bootstrapRestore).toHaveBeenCalledWith(
-        file,
-        "dbs_test-token",
-      );
-      expect(routerPush).toHaveBeenCalledWith({
-        name: "login",
-        query: { notice: "backup-restored" },
-      });
-    });
+        await c.submitRestore();
+
+        expect(bootstrapApi.bootstrapRestore).toHaveBeenCalledWith(
+          file,
+          "dbs_test-token",
+          ...(withKey ? [keyFile] : []),
+        );
+        expect(routerPush).toHaveBeenCalledWith({
+          name: "login",
+          query: { notice: "backup-restored" },
+        });
+      },
+    );
 
     it("handles decryption failure with clear message", async () => {
       vi.mocked(bootstrapApi.bootstrapRestore).mockRejectedValueOnce(
@@ -186,40 +198,6 @@ describe("useSetupController", () => {
       await c.submitRestore();
 
       expect(c.restoreError.value).toContain("master key");
-    });
-
-    it("restores backup with master key file", async () => {
-      vi.mocked(bootstrapApi.bootstrapRestore).mockResolvedValueOnce({
-        message: "Restored",
-        restored: true,
-        key: "backup.dop",
-        size: 1024,
-      });
-      vi.mocked(bootstrapApi.fetchBootstrapStatus).mockResolvedValueOnce({
-        state: "ready",
-      });
-
-      const c = useSetupController();
-      const file = new File(["dummy"], "backup.dop", {
-        type: "application/octet-stream",
-      });
-      const keyFile = new File(["keydata"], "master.key", {
-        type: "application/octet-stream",
-      });
-      c.onFileSelected(file);
-      c.setupToken.value = "dbs_test-token";
-      c.onMasterKeyFileSelected(keyFile);
-      await c.submitRestore();
-
-      expect(bootstrapApi.bootstrapRestore).toHaveBeenCalledWith(
-        file,
-        "dbs_test-token",
-        keyFile,
-      );
-      expect(routerPush).toHaveBeenCalledWith({
-        name: "login",
-        query: { notice: "backup-restored" },
-      });
     });
   });
 });

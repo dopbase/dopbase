@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { useInstanceController } from "./Instance.controller";
 import { DashboardLayout } from "~/layouts";
-import {
-  DbAlert,
-  DbBadge,
-  DbButton,
-  DbSkeleton,
-} from "~/components/ui";
+import { DbAlert, DbBadge, DbButton, DbSkeleton } from "~/components/ui";
 import { RefreshIcon, ServerIcon } from "~/assets/icons";
 
 /**
@@ -62,7 +57,10 @@ const {
       <DbAlert v-if="loadError" class="mb-6">{{ loadError }}</DbAlert>
 
       <!-- Skeleton loading state -->
-      <div v-if="loading && !status" class="space-y-6" data-testid="instance-skeleton">
+      <div
+        v-if="loading && !status"
+        class="space-y-6"
+        data-testid="instance-skeleton">
         <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <div
             v-for="i in 4"
@@ -93,23 +91,33 @@ const {
       <!-- Loaded status content -->
       <div v-else-if="status" class="space-y-6" data-testid="instance-content">
         <!-- System Health 4-card grid -->
-        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4" data-testid="instance-cards">
+        <div
+          class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4"
+          data-testid="instance-cards">
           <!-- Version -->
-          <div class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+          <div
+            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
+            <p
+              class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
               Core Version
             </p>
             <p class="my-1 font-mono text-lg font-semibold text-ink-strong">
               v{{ status.version }}
             </p>
             <p class="text-xs text-ink-muted">
-              {{ status.initializationState === "initialized" ? "Setup complete" : status.initializationState }}
+              {{
+                status.initializationState === "initialized"
+                  ? "Setup complete"
+                  : status.initializationState
+              }}
             </p>
           </div>
 
           <!-- Database -->
-          <div class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+          <div
+            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
+            <p
+              class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
               Database
             </p>
             <div class="my-1 flex items-center">
@@ -121,8 +129,10 @@ const {
           </div>
 
           <!-- Master key -->
-          <div class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+          <div
+            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
+            <p
+              class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
               Master Key
             </p>
             <div class="my-1 flex items-center">
@@ -134,16 +144,16 @@ const {
           </div>
 
           <!-- Uptime -->
-          <div class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+          <div
+            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
+            <p
+              class="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
               Uptime
             </p>
             <p class="my-1 font-mono text-lg font-semibold text-ink-strong">
               {{ formattedUptime }}
             </p>
-            <p class="text-xs text-ink-muted">
-              Started {{ relativeBootTime }}
-            </p>
+            <p class="text-xs text-ink-muted">Started {{ relativeBootTime }}</p>
           </div>
         </div>
 
@@ -152,7 +162,11 @@ const {
           class="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line-soft bg-raised/40 px-4 py-2.5 text-xs text-ink-muted">
           <div class="flex items-center gap-2">
             <span class="inline-block h-2 w-2 rounded-full bg-ok" />
-            <span>Observed {{ formattedObservedAt }} ({{ relativeObservedAt }})</span>
+            <span
+              >Observed {{ formattedObservedAt }} ({{
+                relativeObservedAt
+              }})</span
+            >
           </div>
           <span>Configuration is restart-only</span>
         </div>
@@ -171,31 +185,64 @@ const {
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div
               v-for="item in [
-                { label: 'Projects', value: status.projects, hint: 'Active projects' },
-                { label: 'Environments', value: status.environments, hint: 'Project environments' },
-                { label: 'Secrets', value: status.secrets, hint: 'Encrypted items' },
-                { label: 'Backups', value: status.backups, hint: 'Database snapshots' },
-                { label: 'Users', value: status.humanUsers, hint: 'Human accounts' },
-                { label: 'AI agents', value: status.aiAgents, hint: 'Service identities' },
-                { label: 'Runner tokens', value: status.activeRunnerTokens, hint: 'CI/CD credentials' },
-                { label: 'Agent tokens', value: status.activeAgentTokens, hint: 'API credentials' },
+                {
+                  label: 'Projects',
+                  value: status.projects,
+                  hint: 'Active projects',
+                },
+                {
+                  label: 'Environments',
+                  value: status.environments,
+                  hint: 'Project environments',
+                },
+                {
+                  label: 'Secrets',
+                  value: status.secrets,
+                  hint: 'Encrypted items',
+                },
+                {
+                  label: 'Backups',
+                  value: status.backups,
+                  hint: 'Database snapshots',
+                },
+                {
+                  label: 'Users',
+                  value: status.humanUsers,
+                  hint: 'Human accounts',
+                },
+                {
+                  label: 'AI agents',
+                  value: status.aiAgents,
+                  hint: 'Service identities',
+                },
+                {
+                  label: 'Runner tokens',
+                  value: status.activeRunnerTokens,
+                  hint: 'CI/CD credentials',
+                },
+                {
+                  label: 'Agent tokens',
+                  value: status.activeAgentTokens,
+                  hint: 'API credentials',
+                },
               ]"
               :key="item.label"
               class="rounded-card border border-line bg-panel p-4 transition-colors hover:border-line-strong/60">
               <p class="text-xs text-ink-muted">{{ item.label }}</p>
-              <p class="mt-1 font-mono text-2xl font-semibold tracking-tight text-ink-strong">
+              <p
+                class="mt-1 font-mono text-2xl font-semibold tracking-tight text-ink-strong">
                 {{ item.value }}
               </p>
-              <p class="mt-0.5 text-[11px] text-ink-muted/80">{{ item.hint }}</p>
+              <p class="mt-0.5 text-[11px] text-ink-muted/80">
+                {{ item.hint }}
+              </p>
             </div>
           </div>
         </section>
       </div>
 
       <!-- Unavailable empty state -->
-      <div
-        v-else
-        class="flex flex-col items-center gap-3 py-16 text-ink-muted">
+      <div v-else class="flex flex-col items-center gap-3 py-16 text-ink-muted">
         <ServerIcon class="h-6 w-6" />
         <p class="text-sm">Status unavailable.</p>
       </div>
@@ -206,22 +253,25 @@ const {
         class="mt-10 rounded-card border border-crit/40 bg-crit/5 p-5">
         <h2 class="text-sm font-semibold text-crit">Danger Zone</h2>
         <p class="mt-2 text-sm text-ink-muted">
-          Factory reset permanently deletes all projects, secrets, users, sessions, audit history, and server backups. It also deletes the root account and returns this instance to first-install setup.
+          Factory reset permanently deletes all projects, secrets, users,
+          sessions, audit history, and server backups. It also deletes the root
+          account and returns this instance to first-install setup.
         </p>
         <p class="mt-2 text-xs text-ink-muted">
-          Server configuration and the master key remain. Downloaded backups are not affected.
+          Server configuration and the master key remain. Downloaded backups are
+          not affected.
         </p>
-        <DbButton
-          class="mt-4"
-          variant="danger"
-          @click="loadResetPreview">
+        <DbButton class="mt-4" variant="danger" @click="loadResetPreview">
           Review factory reset
         </DbButton>
         <div
           v-if="resetPreview"
           class="mt-4 space-y-3 border-t border-crit/20 pt-4">
           <p class="font-mono text-xs text-ink-muted">
-            Users {{ resetPreview.users }} · AI agents {{ resetPreview.aiAgents }} · Projects {{ resetPreview.projects }} · Environments {{ resetPreview.environments }} · Secrets {{ resetPreview.secrets }} · Backups {{ resetPreview.backups }}
+            Users {{ resetPreview.users }} · AI agents
+            {{ resetPreview.aiAgents }} · Projects {{ resetPreview.projects }} ·
+            Environments {{ resetPreview.environments }} · Secrets
+            {{ resetPreview.secrets }} · Backups {{ resetPreview.backups }}
           </p>
           <label class="flex items-center gap-2 text-sm">
             <input v-model="resetAcknowledged" type="checkbox" />

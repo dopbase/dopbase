@@ -6,7 +6,5 @@ defineOptions({ inheritAttrs: true });
 </script>
 
 <template>
-  <div
-    class="animate-pulse rounded bg-line-soft/80"
-    aria-hidden="true" />
+  <div class="animate-pulse rounded bg-line-soft/80" aria-hidden="true" />
 </template>

@@ -6,8 +6,7 @@ use app::config::{
   resolve_implicit_public_url, sqlite_url,
 };
 use app::constants::config::{
-  DATABASE_FILENAME, DEFAULT_BIND_ADDRESS, DEFAULT_PORT, DEFAULT_PUBLIC_URL, MASTER_KEY_FILENAME,
-  SERVER_CONFIG_FILENAME, daemon_environment_names,
+  DATABASE_FILENAME, DEFAULT_BIND_ADDRESS, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
 };
 
 #[test]
@@ -62,68 +61,70 @@ fn cli_overrides_environment_and_config_file() {
 }
 
 #[test]
-fn docs_are_disabled_by_default() {
-  let config = ServerConfig::default();
-  assert!(!config.docs_enabled);
-}
+fn docs_precedence_is_config_then_environment_then_cli() {
+  // Default: docs are disabled.
+  assert!(!ServerConfig::default().docs_enabled);
 
-#[test]
-fn config_file_enables_docs() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let data_dir = directory.path().join("data");
-  fs::create_dir_all(&data_dir).unwrap();
-  fs::write(data_dir.join(SERVER_CONFIG_FILENAME), "docs = true\n").unwrap();
-  let config = ServerConfig::load_with_environment(
-    &ServerOverrides {
-      data_dir: Some(data_dir),
-      ..Default::default()
+  struct Case {
+    config_file: Option<&'static str>,
+    environment: EnvironmentOverrides,
+    cli: Option<bool>,
+    expected: bool,
+  }
+
+  let cases = [
+    Case {
+      config_file: None,
+      environment: EnvironmentOverrides::default(),
+      cli: None,
+      expected: false,
     },
-    EnvironmentOverrides::default(),
-  )
-  .unwrap();
-  assert!(config.docs_enabled);
-}
-
-#[test]
-fn cli_overrides_docs_environment_and_config_file() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let data_dir = directory.path().join("data");
-  fs::create_dir_all(&data_dir).unwrap();
-  fs::write(data_dir.join(SERVER_CONFIG_FILENAME), "docs = true\n").unwrap();
-  let overrides = ServerOverrides {
-    data_dir: Some(data_dir),
-    docs: Some(false),
-    ..Default::default()
-  };
-  let environment = EnvironmentOverrides {
-    docs: Some("true".into()),
-    ..Default::default()
-  };
-  let config = ServerConfig::load_with_environment(&overrides, environment).unwrap();
-  assert!(!config.docs_enabled);
-}
-
-#[test]
-fn environment_overrides_docs_config_file() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let data_dir = directory.path().join("data");
-  fs::create_dir_all(&data_dir).unwrap();
-  let config = ServerConfig::load_with_environment(
-    &ServerOverrides {
-      data_dir: Some(data_dir),
-      ..Default::default()
+    Case {
+      config_file: Some("docs = true\n"),
+      environment: EnvironmentOverrides::default(),
+      cli: None,
+      expected: true,
     },
-    EnvironmentOverrides {
-      docs: Some("true".into()),
-      ..Default::default()
+    Case {
+      config_file: None,
+      environment: EnvironmentOverrides {
+        docs: Some("true".into()),
+        ..Default::default()
+      },
+      cli: None,
+      expected: true,
     },
-  )
-  .unwrap();
-  assert!(config.docs_enabled);
-}
+    Case {
+      config_file: Some("docs = true\n"),
+      environment: EnvironmentOverrides {
+        docs: Some("true".into()),
+        ..Default::default()
+      },
+      cli: Some(false),
+      expected: false,
+    },
+  ];
 
-#[test]
-fn invalid_docs_environment_is_rejected() {
+  for case in cases {
+    let directory = tempfile::TempDir::new().unwrap();
+    let data_dir = directory.path().join("data");
+    fs::create_dir_all(&data_dir).unwrap();
+    if let Some(contents) = case.config_file {
+      fs::write(data_dir.join(SERVER_CONFIG_FILENAME), contents).unwrap();
+    }
+    let config = ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(data_dir),
+        docs: case.cli,
+        ..Default::default()
+      },
+      case.environment,
+    )
+    .unwrap();
+    assert_eq!(config.docs_enabled, case.expected);
+  }
+
+  // An unparseable environment value is rejected.
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");
   fs::create_dir_all(&data_dir).unwrap();
@@ -398,26 +399,6 @@ fn rejects_a_placeholder_source_with_a_loopback_bind() {
   };
   let error = config.validate().unwrap_err().to_string();
   assert!(error.contains("loopback bind address"), "{error}");
-}
-
-#[test]
-fn default_constants_agree_on_the_default_port() {
-  let bind: SocketAddr = DEFAULT_BIND_ADDRESS.parse().unwrap();
-  assert_eq!(bind.port(), DEFAULT_PORT);
-  assert!(
-    DEFAULT_PUBLIC_URL.ends_with(&format!(":{DEFAULT_PORT}")),
-    "DEFAULT_PUBLIC_URL ({DEFAULT_PUBLIC_URL}) must use DEFAULT_PORT ({DEFAULT_PORT})"
-  );
-}
-
-#[test]
-fn daemon_environment_names_are_unique() {
-  let names = daemon_environment_names();
-  let mut sorted = names.to_vec();
-  sorted.sort_unstable();
-  let count = sorted.len();
-  sorted.dedup();
-  assert_eq!(sorted.len(), count, "duplicate environment variable names");
 }
 
 #[cfg(unix)]

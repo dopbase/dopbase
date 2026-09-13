@@ -8,14 +8,17 @@ Search the existing issues before opening a new one. For a substantial feature, 
 
 Security vulnerabilities do not belong in public issues. Follow [SECURITY.md](./SECURITY.md) instead.
 
+All project interactions must follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Conduct concerns should be reported privately through the process described
+there.
+
 ## Repository layout
 
-| Path     | Purpose                                   |
-| -------- | ----------------------------------------- |
-| `app/`   | Rust service and command-line application |
-| `src/`   | Vue application                           |
-| `docs/`  | Public VitePress documentation            |
-| `tests/` | Frontend tests and shared test setup      |
+| Path    | Purpose                                           |
+| ------- | ------------------------------------------------- |
+| `app/`  | Rust service, command-line application, and tests |
+| `src/`  | Vue application, frontend tests, and shared setup |
+| `docs/` | Public VitePress documentation                    |
 
 The Rust service and Vue application are still scaffolding. Product behavior should stay consistent with the public documentation, but implementation findings may require the documentation to change.
 
@@ -32,23 +35,17 @@ Install the JavaScript dependencies:
 bun install
 ```
 
-Start the Vue development server:
+Development scripts use `ui`, `app`, and `docs` as targets:
 
 ```bash
 bun run dev
+bun run dev:ui
+bun run dev:app
+bun run dev:docs
 ```
 
-Run the Rust application:
-
-```bash
-cargo run --manifest-path app/Cargo.toml
-```
-
-Start the documentation site:
-
-```bash
-bun run docs:dev
-```
+`bun run dev` starts the Admin UI and Rust app together. Use a targeted command
+when you need only one part of the repository.
 
 ## Make a change
 
@@ -71,30 +68,41 @@ Screenshots are useful for visible interface changes. Logs and screenshots must 
 
 ## Check your work
 
-Run the checks that apply to your change.
+Run the complete repository checks when your change crosses several targets:
+
+```bash
+bun run format:check
+bun run lint
+bun run typecheck
+bun run test
+bun run build
+```
+
+`test` covers the Admin UI and Rust app. Documentation, installer, and GitHub
+template tests have separate commands.
 
 Frontend:
 
 ```bash
-bun run typecheck
-bunx vitest run --passWithNoTests
-bun run build
-bunx prettier --check .
+bun run format:repo:check
+bun run lint:ui
+bun run typecheck:ui
+bun run test:ui
+bun run build:ui
 ```
 
 The frontend temporarily uses two TypeScript compilers. Native TypeScript 7
 checks the TypeScript project graph, while the TypeScript 6 compatibility
 package powers `vue-tsc` and ESLint until their Vue/compiler integrations
-support the TypeScript 7 API. Run `bun run typecheck` to execute both checks.
-
-The repository does not contain a discoverable frontend test file yet, so `--passWithNoTests` keeps the scaffold check explicit without treating the absence of tests as a failure. Vitest will run normally as soon as `*.test.*` or `*.spec.*` files are added.
+support the TypeScript 7 API. Run `bun run typecheck:ui` to execute both checks.
 
 Rust:
 
 ```bash
-cargo fmt --manifest-path app/Cargo.toml -- --check
-cargo clippy --manifest-path app/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path app/Cargo.toml
+bun run format:app:check
+bun run lint:app
+bun run typecheck:app
+bun run test:app
 ```
 
 Changes that affect migrations or multiple backend modules must also pass the
@@ -115,7 +123,15 @@ mounting or modifying a host database.
 Documentation:
 
 ```bash
-bun run docs:build
+bun run test:docs
+bun run build:docs
+```
+
+Repository utilities:
+
+```bash
+bun run test:github
+bun run test:installer
 ```
 
 If an existing unrelated failure prevents a check from passing, describe the failure and the command output in the pull request. Do not hide or silently skip it.

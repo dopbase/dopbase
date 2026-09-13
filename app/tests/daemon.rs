@@ -81,6 +81,7 @@ fn inspect_distinguishes_absent_running_and_stale_daemons() {
   let running = inspect(directory.path()).unwrap();
   assert!(matches!(running, ManagedDaemonState::Running(pid) if pid.pid == 4242));
 
+  lock.unlock().unwrap();
   drop(lock);
   assert!(matches!(
     inspect(directory.path()).unwrap(),

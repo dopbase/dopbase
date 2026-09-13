@@ -123,14 +123,13 @@ build:
 ```bash
 bun install --frozen-lockfile
 bun run test:github
-bunx vitest run --passWithNoTests
+bun run test:ui
 bun run test:installer
-bun run build
-bun run docs:build
-cargo fmt --manifest-path app/Cargo.toml -- --check
-cargo clippy --manifest-path app/Cargo.toml --locked --all-targets --all-features -- -D warnings
-cargo test --manifest-path app/Cargo.toml --locked --all-targets
-cargo test --manifest-path app/Cargo.toml --locked --all-targets --all-features
+bun run build:ui
+bun run build:docs
+bun run format:app:check
+bun run lint:app
+bun run test:app
 ```
 
 Also confirm the three release versions agree and the new changelog section

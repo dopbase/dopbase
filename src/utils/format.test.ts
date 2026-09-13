@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatDateTime, formatDuration, formatRelativeTime } from "./format";
+import {
+  formatBytes,
+  formatDateTime,
+  formatDuration,
+  formatRelativeTime,
+} from "./format";
 
 const NOW = new Date("2026-08-28T12:00:00Z");
 
@@ -25,10 +30,6 @@ describe("formatRelativeTime", () => {
 });
 
 describe("formatDateTime", () => {
-  it("returns a non-empty localized string for valid input", () => {
-    expect(formatDateTime("2026-08-28T12:00:00Z")).toMatch(/\d/);
-  });
-
   it("returns the raw input when unparseable", () => {
     expect(formatDateTime("not-a-date")).toBe("not-a-date");
   });

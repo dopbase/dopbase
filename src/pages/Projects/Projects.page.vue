@@ -141,9 +141,7 @@ const { projects, project, selectedEnvironment, activeTab, selectProject } =
               <DbBadge data-testid="environment-id">
                 {{ selectedEnvironment.id }}
               </DbBadge>
-              <DbCopyButton
-                :value="selectedEnvironment.id"
-                label="Copy ID" />
+              <DbCopyButton :value="selectedEnvironment.id" label="Copy ID" />
             </div>
 
             <div

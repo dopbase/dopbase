@@ -71,12 +71,13 @@ const navItems = [
 
 const isActive = (item: (typeof navItems)[number]): boolean =>
   item.match(route.path);
-const visibleNavItems = computed(() => navItems.filter(
-  (item) =>
+const visibleNavItems = computed(() =>
+  navItems.filter((item) =>
     item.name === "backups" || item.name === "users" || item.name === "audit"
       ? auth.isAdmin
       : true,
-));
+  ),
+);
 const consoleLabel = computed(() =>
   auth.session?.role === "member" ? "member console" : "admin console",
 );

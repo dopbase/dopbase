@@ -56,7 +56,9 @@ describe("useInstanceController", () => {
   });
 
   it("handles load error gracefully", async () => {
-    vi.mocked(instanceApi.fetchStatus).mockRejectedValueOnce(new Error("Network failed"));
+    vi.mocked(instanceApi.fetchStatus).mockRejectedValueOnce(
+      new Error("Network failed"),
+    );
     const c = useInstanceController();
     await c.load();
 

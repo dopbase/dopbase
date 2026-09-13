@@ -17,7 +17,10 @@ beforeEach(() => {
 
 describe("useImportSecretsDialogController", () => {
   it("stores a parsed file and navigates to its review route", async () => {
-    const controller = useImportSecretsDialogController(ref("env_1"), ref(true));
+    const controller = useImportSecretsDialogController(
+      ref("env_1"),
+      ref(true),
+    );
     const file = new File(["DATABASE_URL=postgres://db"], "production.env");
 
     await expect(controller.processFile(file)).resolves.toBe(true);
@@ -33,7 +36,10 @@ describe("useImportSecretsDialogController", () => {
   });
 
   it("keeps the dialog open when the file contains no valid entries", async () => {
-    const controller = useImportSecretsDialogController(ref("env_1"), ref(true));
+    const controller = useImportSecretsDialogController(
+      ref("env_1"),
+      ref(true),
+    );
     const file = new File(["not an assignment"], "broken.env");
 
     await expect(controller.processFile(file)).resolves.toBe(false);

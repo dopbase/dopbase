@@ -74,8 +74,6 @@ describe("OneTimeTokenDialog", () => {
     expect(document.activeElement).toBe(input);
     expect(input?.selectionStart).toBe(0);
     expect(input?.selectionEnd).toBe("dbs_secret".length);
-    expect(document.body.textContent).toContain(
-      "Press Ctrl+C or Command+C",
-    );
+    expect(document.body.textContent).toContain("Press Ctrl+C or Command+C");
   });
 });
