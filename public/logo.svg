@@ -1,3 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 48 48">
-  <path fill="#863BFF" fill-rule="evenodd" d="M24 2C11.85 2 2 11.85 2 24s9.85 22 22 22 22-9.85 22-22S36.15 2 24 2Zm0 4c9.94 0 18 8.06 18 18s-8.06 18-18 18S6 33.94 6 24 14.06 6 24 6Zm-7.5 6.75h8.05C32.1 12.75 36.5 16.95 36.5 24s-4.4 11.25-11.95 11.25H16.5v-22.5Zm5.25 4.5v13.5h2.6c4.6 0 6.9-2.25 6.9-6.75s-2.3-6.75-6.9-6.75h-2.6Z"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 1024 1024"
+  role="img"
+  aria-labelledby="dopbase-logo-title dopbase-logo-desc"
+>
+  <title id="dopbase-logo-title">Dopbase</title>
+  <desc id="dopbase-logo-desc">A bold purple letter D inside a circular ring.</desc>
+
+  <defs>
+    <linearGradient id="dopbase-violet" x1="170" y1="170" x2="854" y2="854" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#914BFF" />
+      <stop offset="0.52" stop-color="#7D35FF" />
+      <stop offset="1" stop-color="#7128F4" />
+    </linearGradient>
+  </defs>
+
+  <circle
+    cx="512"
+    cy="512"
+    r="397"
+    fill="none"
+    stroke="url(#dopbase-violet)"
+    stroke-width="96"
+  />
+
+  <path
+    fill="url(#dopbase-violet)"
+    fill-rule="evenodd"
+    d="
+      M 334 298
+      H 532
+      C 678 298 758 379 758 512
+      C 758 645 678 726 532 726
+      H 334
+      Z
+
+      M 456 400
+      V 624
+      H 526
+      C 598 624 636 585 636 512
+      C 636 439 598 400 526 400
+      Z
+    "
+  />
 </svg>

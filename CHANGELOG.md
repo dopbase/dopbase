@@ -17,6 +17,8 @@ documented community conduct policy.
 
 ### Improvement
 
+- The Admin UI now uses the updated Dopbase mark in authentication, navigation,
+  and not-found screens.
 - Bun scripts now use `action:target` names for development, builds, tests,
   linting, type checks, formatting checks, and previews.
 - Backend release verification now discovers the CLI command tree from the

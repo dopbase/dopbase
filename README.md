@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://dopbase.com">
-    <img src="./public/logo.svg" alt="Dopbase logo" width="96" />
+    <img src="./public/logo.svg" alt="Dopbase logo" width="180" />
   </a>
 </p>
 
