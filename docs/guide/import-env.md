@@ -1,6 +1,6 @@
 ---
 title: "Import and export secret files"
-description: "Move secrets between Dopbase and dotenv, JSON, or YAML files."
+description: "Import dotenv, JSON, or YAML files, and export secrets for files or Docker."
 ---
 
 # Import and export secret files
@@ -79,8 +79,30 @@ dopbase export payment-service/staging --stdout --format yaml
 ```
 
 File output uses the filename rules above. Stdout defaults to dotenv. Pass
-`--format` to choose another format. JSON and YAML keys are sorted so repeated
+`--format` to choose another format. Docker format is available only for export
+and must be selected explicitly. All export formats sort keys so repeated
 exports have stable output.
+
+Use Docker format to inject secrets into an existing container:
+
+```bash
+dopbase export payment-service/staging --stdout --format docker |
+  docker exec \
+    --env-file=/dev/stdin \
+    --user node \
+    -w /workspace \
+    container-name \
+    node script.js
+```
+
+Docker reads raw `KEY=value` lines. Spaces and extra `=` characters stay in the
+value, and quotes stay literal, so Docker export does not add quotes. It rejects
+line breaks and NUL bytes. Use a mounted secret file for multiline certificates
+or private keys.
+
+The example omits `-i` because Docker uses stdin for `--env-file`. A process
+that also needs stdin should use a temporary private env file and remove it
+afterward.
 
 Export refuses to overwrite an existing file without `--force` and uses
 restrictive permissions where supported. Export reveals plaintext values, so

@@ -243,11 +243,35 @@ dopbase export payment-service/staging --output secrets.json
 dopbase export payment-service/staging --stdout --format yaml
 ```
 
+To inject secrets into an existing container, use Docker format:
+
+```bash
+dopbase export payment-service/staging --stdout --format docker |
+  docker exec \
+    --env-file=/dev/stdin \
+    --user node \
+    -w /workspace \
+    container-name \
+    node script.js
+```
+
 `--output` and `--stdout` are mutually exclusive. File output infers its format
 from the filename, while stdout defaults to dotenv. `--format` overrides either
-default. JSON and YAML keys are sorted for stable output. Global `--json`
-controls command status output and cannot be combined with plaintext
-`--stdout`.
+default. Docker format is selected explicitly with `--format docker`; it is not
+available for import or init. All output formats sort keys for stable exports.
+Global `--json` controls command status output and cannot be combined with
+plaintext `--stdout`.
+
+Docker env files use raw `KEY=value` lines. Spaces and extra `=` characters are
+part of the value, while quotes are also literal characters. Docker format
+therefore does not quote or escape values. It rejects secrets containing line
+breaks or NUL bytes because Docker env files cannot represent them safely. Use
+a mounted secret file for multiline certificates and private keys.
+
+Place Docker's `--env-file` option before the container name. The example does
+not use `-i` because Docker consumes stdin as the env file. If the program also
+needs stdin, export to a temporary private file, pass its path to `--env-file`,
+and remove the file after the command exits.
 
 File export refuses to overwrite an existing path unless `--force` is passed
 and creates the file with restrictive permissions where the platform supports

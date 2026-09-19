@@ -9,6 +9,9 @@ documented community conduct policy.
 
 ### Added
 
+- Added an export multiple format for Docker, JSON, Yaml and Dotenv (default)
+- Added an export-only Docker format for passing secrets to `docker run` or
+  `docker exec` through `--env-file` without dotenv quotes changing values.
 - Added web-ready MP4 and GIF versions of the Dopbase demo, including three
   video sizes, a short forum preview, and a README Demo section with a GIF
   preview and full video download.
