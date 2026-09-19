@@ -173,7 +173,7 @@ pub enum Command {
   /// preview the result without changing anything.
   #[command(after_help = import::HELP)]
   Import(ImportArgs),
-  /// Export an environment's secrets as dotenv, JSON, or YAML.
+  /// Export an environment's secrets as dotenv, JSON, YAML, or a Docker env file.
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing
   /// file. Every export requires interactive password confirmation.

@@ -1,4 +1,7 @@
-use crate::{cli::dotenv, models::SecretInput};
+use crate::{
+  cli::{docker_env, dotenv},
+  models::SecretInput,
+};
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
 use serde::de::{self, DeserializeSeed, MapAccess, Visitor};
@@ -10,6 +13,14 @@ pub enum SecretFormat {
   Dotenv,
   Json,
   Yaml,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ExportFormat {
+  Dotenv,
+  Json,
+  Yaml,
+  Docker,
 }
 
 impl SecretFormat {
@@ -26,6 +37,21 @@ impl SecretFormat {
     Ok(Self::from_path(path))
   }
 
+  fn from_path(path: &Path) -> Self {
+    match path
+      .extension()
+      .and_then(|extension| extension.to_str())
+      .map(str::to_ascii_lowercase)
+      .as_deref()
+    {
+      Some("json") => Self::Json,
+      Some("yaml" | "yml") => Self::Yaml,
+      _ => Self::Dotenv,
+    }
+  }
+}
+
+impl ExportFormat {
   pub fn for_output(
     path: Option<&Path>,
     explicit: Option<Self>,
@@ -102,14 +128,14 @@ pub fn parse(
 
 pub fn render(
   entries: &[SecretInput],
-  format: SecretFormat,
+  format: ExportFormat,
 ) -> Result<String> {
   let sorted = entries
     .iter()
     .map(|entry| (entry.key.as_str(), entry.value.as_str()))
     .collect::<BTreeMap<_, _>>();
   match format {
-    SecretFormat::Dotenv => {
+    ExportFormat::Dotenv => {
       let entries = sorted
         .into_iter()
         .map(|(key, value)| SecretInput {
@@ -119,8 +145,18 @@ pub fn render(
         .collect::<Vec<_>>();
       Ok(dotenv::render(&entries))
     }
-    SecretFormat::Json => Ok(format!("{}\n", serde_json::to_string_pretty(&sorted)?)),
-    SecretFormat::Yaml => Ok(serde_saphyr::to_string(&sorted)?),
+    ExportFormat::Json => Ok(format!("{}\n", serde_json::to_string_pretty(&sorted)?)),
+    ExportFormat::Yaml => Ok(serde_saphyr::to_string(&sorted)?),
+    ExportFormat::Docker => {
+      let entries = sorted
+        .into_iter()
+        .map(|(key, value)| SecretInput {
+          key: key.into(),
+          value: value.into(),
+        })
+        .collect::<Vec<_>>();
+      docker_env::render(&entries)
+    }
   }
 }
 

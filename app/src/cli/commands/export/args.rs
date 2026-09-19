@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::cli::secret_format::SecretFormat;
+use crate::cli::secret_format::ExportFormat;
 use crate::constants::help::ENVIRONMENT_ARG_HELP;
 
 #[derive(Args, Debug)]
@@ -22,10 +22,10 @@ pub struct ExportArgs {
   pub stdout: bool,
   /// Output format. Overrides filename inference.
   #[arg(long, value_enum)]
-  pub format: Option<SecretFormat>,
+  pub format: Option<ExportFormat>,
   /// Overwrite the output file if it already exists.
   #[arg(long)]
   pub force: bool,
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase export payment-service/production --output .env.production\n  dopbase export payment-service/production --output secrets.json\n  dopbase export payment-service/production --stdout --format yaml\n";
+pub(crate) const HELP: &str = "Examples:\n  dopbase export payment-service/production --output .env.production\n  dopbase export payment-service/production --output secrets.json\n  dopbase export payment-service/production --stdout --format yaml\n  dopbase export payment-service/production --stdout --format docker\n";

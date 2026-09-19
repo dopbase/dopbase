@@ -3,7 +3,7 @@ use app::cli::args::{
 };
 use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
-  secret_format::SecretFormat,
+  secret_format::{ExportFormat, SecretFormat},
   session,
 };
 use app::constants::config::executable_environment_names;
@@ -458,10 +458,38 @@ fn secret_commands_parse_format_options() {
   assert!(matches!(
     export.command,
     Command::Export(ExportArgs {
-      format: Some(SecretFormat::Dotenv),
+      format: Some(ExportFormat::Dotenv),
       ..
     })
   ));
+
+  let docker_export = Cli::try_parse_from([
+    "dopbase",
+    "export",
+    "storefront/development",
+    "--stdout",
+    "--format",
+    "docker",
+  ])
+  .unwrap();
+  assert!(matches!(
+    docker_export.command,
+    Command::Export(ExportArgs {
+      format: Some(ExportFormat::Docker),
+      ..
+    })
+  ));
+
+  for command in ["init", "import"] {
+    let mut args = vec!["dopbase", command, "storefront/development"];
+    if command == "init" {
+      args.extend(["--from", ".env"]);
+    } else {
+      args.push(".env");
+    }
+    args.extend(["--format", "docker"]);
+    assert!(Cli::try_parse_from(args).is_err());
+  }
 
   assert!(
     Cli::try_parse_from([
