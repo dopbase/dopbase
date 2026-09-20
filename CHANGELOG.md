@@ -10,29 +10,39 @@ documentation.
 
 ### Added
 
-- Running `dopbase init` without arguments now guides users through importing
-  `./.env`, creating a project and environment, and optionally deleting the
-  source file if it has not changed during the import.
-- `dopbase init`, `dopbase import`, and `dopbase export` now support TOML,
-  including `.toml` filename detection and `--format toml`.
-- `dopbase export PROJECT/ENVIRONMENT --format docker` writes Docker env files
-  that preserve raw values for `docker run` and `docker exec --env-file`.
-- The README now includes web-ready MP4 and GIF demos, including a short
-  preview and a full-resolution download.
-- The project now uses the Contributor Covenant 3.0 Code of Conduct, with a
-  private reporting process and enforcement guidelines.
+- Added TOML support for `dopbase init`, `dopbase import`, and
+  `dopbase export`, including `.toml` filename detection and `--format toml`.
+- Added an interactive `dopbase init` flow that reads `./.env`, checks the
+  active server and login, summarizes detected variables, creates a new project
+  and environment, and asks whether to delete the imported file.
+- Added Docker, JSON, YAML, and dotenv export formats.
+- Added `dopbase export project/env --format docker --stdout` for explicit
+  output format selection.
+- Added an export-only Docker format for passing secrets to `docker run` or
+  `docker exec` through `--env-file` without dotenv quotes changing values.
+- Added web-ready MP4 and GIF versions of the Dopbase demo, including three
+  video sizes, a short forum preview, and a README Demo section with a GIF
+  preview and full video download.
+- Added a Contributor Covenant 3.0 Code of Conduct with a private reporting
+  process and enforcement guidelines.
 
 ### Improvement
 
-- Opening the secret editor now hides any value that is currently revealed.
-- Authentication, navigation, and not-found screens now use the updated Dopbase
-  mark and favicon.
-- The README now includes the complete top-level CLI reference, environment
-  variables, and common startup examples.
-- Repository scripts now use `action:target` names for development, builds,
-  tests, linting, type checks, formatting checks, and previews.
+- Reformatted CLI help constants as multiline strings so examples are easier to
+  edit.
+- Automatic hide when user want to update token while secrets revealed.
+- Removed third-party attribution from Admin UI source comments and design
+  token documentation so the interface is described as Dopbase's own system.
+- The Admin UI now uses the updated Dopbase mark in authentication, navigation,
+  and not-found screens.
+- Bun scripts now use `action:target` names for development, builds, tests,
+  linting, type checks, formatting checks, and previews.
 - Backend release verification now discovers the CLI command tree from the
   built binary and checks both supported help forms for every command.
+- The README now includes the complete top-level CLI reference, environment
+  variables, and common startup examples.
+- Removed duplicate frontend and backend tests while preserving behavior
+  coverage.
 
 ## 0.1.6 - 2026-09-12
 
