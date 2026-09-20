@@ -137,19 +137,27 @@ them. An ID from one server cannot address a resource on another server.
 operation:
 
 ```bash
+dopbase init
 dopbase init payment-service/development --from .env
 dopbase init worker/development --from secrets.json
 cat secrets.yml | dopbase init storefront/development --from - --format yaml
 ```
 
-The command validates the complete file before changing server state. The
-project, environment, and imported secrets are then created atomically. If the
-project name already exists or any entry is invalid, the command fails without
-leaving a partially created project.
+Run `dopbase init` without arguments from a directory that contains `.env`.
+The CLI checks the server and login, shows the number of variables it found,
+and asks for a new `project/environment` target. A key-name check estimates how
+many variables may be sensitive without using or printing their values. All
+variables are imported.
 
-`init` does not create or modify a file in the application repository. After a
-successful import it prints the new project ID, environment ID, and secret
-count, but never secret values.
+After a successful interactive import, Dopbase asks whether to delete `.env`.
+Yes is selected by default. The file is kept if it changed after Dopbase read
+it, and the command never edits `.gitignore`.
+
+Use the explicit form for scripts, stdin, JSON, YAML, or machine-readable
+output. Both modes validate the complete file before changing server state.
+The project, environment, and secrets are created atomically, so a failed
+request cannot leave a partial project. Terminal output never includes secret
+values.
 
 ## Project commands
 
