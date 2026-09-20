@@ -2,13 +2,11 @@
 @import "tailwindcss";
 
 /**
- * Dopbase Admin UI — dark-first design tokens.
+ * Dopbase Admin UI dark theme tokens.
  *
- * A neutral dark palette modeled on the latest PocketBase admin UI:
- * a #1c1c1c canvas, lighter surfaces stepped up with white via
- * color-mix() (sidebar, panels, hovers, keylines), text derived from
- * a single #ebebeb ramp, and one purple accent carried over from the
- * Dopbase brand for interactive elements.
+ * The neutral palette starts with a #1c1c1c canvas. Sidebar, panel,
+ * hover, and keyline colors mix in increasing amounts of white. Text
+ * uses a #ebebeb ramp, while interactive elements use Dopbase purple.
  */
 @theme {
   --font-sans:
@@ -16,36 +14,33 @@
   --font-mono:
     "Fira Code Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  /* Main content area — PocketBase's dark `--surfaceColor`. */
+  /* Main content area. */
   --color-canvas: #1c1c1c;
-  /* Sidebar, cards, and modal surfaces — one white step above the
-     canvas (PocketBase's `--surfaceAlt1Color`). */
+  /* Sidebar, card, and modal surfaces sit one white step above the canvas. */
   --color-panel: color-mix(in srgb, #1c1c1c, white 2%);
   /* Editor surfaces sit on the page canvas but must read as a distinct,
-     editable region — a white step between panel and raised. */
+     editable region, one white step between panel and raised. */
   --color-editor: color-mix(in srgb, #1c1c1c, white 4%);
-  /* Hover fills and quiet inputs (PocketBase's `--surfaceAlt2Color`). */
+  /* Hover fills and quiet inputs. */
   --color-raised: color-mix(in srgb, #1c1c1c, white 7%);
-  /* Keylines (PocketBase's `--surfaceAlt3Color` / `--surfaceAlt2Color`). */
+  /* Keylines. */
   --color-line: color-mix(in srgb, #1c1c1c, white 12%);
   --color-line-soft: color-mix(in srgb, #1c1c1c, white 7%);
-  /* Pressed-state surface step (PocketBase's `--surfaceAlt4Color`). */
+  /* Pressed-state surface step. */
   --color-line-strong: color-mix(in srgb, #1c1c1c, white 14%);
 
-  /* Text ramp derived from PocketBase's `--surfaceTxtColor` (#ebebeb):
-     strong is the base tone, then alpha steps for body, hints, and
-     disabled text. */
+  /* Text uses #ebebeb as the base tone, then alpha steps for body,
+     hints, and disabled text. */
   --color-ink-strong: #ebebeb;
   --color-ink: color-mix(in srgb, #ebebeb, transparent 15%);
   --color-ink-muted: color-mix(in srgb, #ebebeb, transparent 45%);
   --color-ink-faint: color-mix(in srgb, #ebebeb, transparent 65%);
 
-  /* Dopbase brand purple — carried over unchanged. */
+  /* Dopbase brand purple. */
   --color-accent: #aa3bff;
   --color-accent-strong: #c084fc;
   --color-accent-soft: color-mix(in srgb, #aa3bff, transparent 86%);
-  /* Solid-fill interactive steps (PocketBase's alt-color convention):
-     hover and active lighten the base by mixing white in. */
+  /* Hover and active states lighten solid fills by mixing in white. */
   --color-accent-alt1: color-mix(in srgb, #aa3bff, white 10%);
   --color-accent-alt2: color-mix(in srgb, #aa3bff, white 15%);
   --color-crit-alt1: color-mix(in srgb, #f26d6d, white 10%);
@@ -55,11 +50,11 @@
   --color-warn: #f5b74e;
   --color-crit: #f26d6d;
 
-  /* Text selection highlight (PocketBase's `--selectionColor`). */
+  /* Text selection highlight. */
   --color-selection: rgba(255, 255, 255, 0.22);
 
   --radius-card: 10px;
-  /* Form controls — buttons, fields, chips (PocketBase's 5px radius). */
+  /* Form controls, including buttons, fields, and chips. */
   --radius-control: 5px;
 
   /**
