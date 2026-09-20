@@ -77,8 +77,8 @@ Commands:
   project  Manage projects (create, list, show, rename, delete)
   env      Manage environments inside a project (create, list, rename, delete)
   secret   Manage secrets in an environment (list, set, get, delete)
-  import   Bulk-import secrets into an environment from a dotenv, JSON, or YAML source
-  export   Export an environment's secrets as dotenv, JSON, YAML, or a Docker env file
+  import   Bulk-import secrets into an environment from a dotenv, JSON, YAML, or TOML source
+  export   Export an environment's secrets as dotenv, JSON, YAML, TOML, or a Docker env file
   token    Manage CI/runner access tokens for an environment
   run      Run a command with an environment's secrets injected as env vars
   cache    Inspect and clean the encrypted runtime cache for the active server
@@ -161,8 +161,9 @@ SQLite database, lock files, configuration, and local master key live under
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
-Dopbase 0.1.6 includes four roles, user management, read-only AI accounts, an
-instance overview, and crash-safe factory reset.
+Dopbase 0.1.7 includes guided `.env` setup, four roles, user management,
+read-only AI accounts, an instance overview, encrypted backups, and crash-safe
+factory reset.
 
 See [users and AI agents](./docs/ui/users.md) and [role permissions](./docs/reference/identity.md) for how access works.
 Version 0.1.0 starts with a fresh data directory. Databases and backups from
@@ -194,7 +195,7 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 | Path         | Purpose                                         | Current state                 |
 | ------------ | ----------------------------------------------- | ----------------------------- |
-| `app/`       | Rust service and command-line application       | v0.1.6 backend implementation |
+| `app/`       | Rust service and command-line application       | v0.1.7 backend implementation |
 | `app/tests/` | Rust integration tests                          | Backend and CLI test suite    |
 | `src/`       | Vue administration interface and frontend tests | Embedded Admin UI             |
 | `docs/`      | VitePress product documentation                 | Active public specification   |
