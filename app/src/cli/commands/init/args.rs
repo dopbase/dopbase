@@ -8,6 +8,7 @@ pub(crate) const HELP: &str = "\
 Examples:
   dopbase init
   dopbase init payment-service/development --from .env
+  dopbase init payment-service/development --from secrets.toml
   dopbase init payment-service/development --from secrets.json
   cat secrets.yml | dopbase init payment-service/development --from - --format yaml
 ";

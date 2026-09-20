@@ -12,7 +12,7 @@ The roadmap describes intent, not a release commitment. Work may move as impleme
 - Authentication with root, admin, member, and AI agent roles
 - Projects, environments, and encrypted secrets stored in SQLite
 - Embedded Admin UI, REST API, OpenAPI specification, and Swagger UI
-- CLI support for dotenv, JSON, and YAML import and export
+- CLI support for dotenv, JSON, YAML, and TOML import and export
 - Secret injection with `dopbase run` and an encrypted runtime cache
 - Runtime cache inspection and cleanup
 - Environment-scoped runner tokens, AI service accounts, and audit records

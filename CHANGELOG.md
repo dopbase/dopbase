@@ -10,6 +10,8 @@ policy.
 
 ### Added
 
+- Added TOML support for `dopbase init`, `dopbase import`, and
+  `dopbase export`, including `.toml` filename detection and `--format toml`.
 - Added an interactive `dopbase init` flow that reads `./.env`, checks the
   active server and login, summarizes detected variables, creates a new project
   and environment, and asks whether to delete the imported file.

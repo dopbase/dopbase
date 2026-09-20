@@ -49,12 +49,13 @@ it belongs, then delete it.
 
 ## Which tool when
 
-The CLI does the same jobs from a terminal and also accepts JSON and YAML:
+The CLI does the same jobs from a terminal and also accepts JSON, YAML, and TOML:
 
 ```bash
 dopbase import payment-service/staging .env.staging
 dopbase import payment-service/staging secrets.json
 dopbase export payment-service/staging --output secrets.yml
+dopbase export payment-service/staging --output secrets.toml
 ```
 
 The command reference covers the CLI flags, including `--dry-run`,

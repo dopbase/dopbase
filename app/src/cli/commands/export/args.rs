@@ -31,6 +31,7 @@ pub struct ExportArgs {
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase export payment-service/production --output .env.production
+  dopbase export payment-service/production --output secrets.toml
   dopbase export payment-service/production --output secrets.json
   dopbase export payment-service/production --stdout --format yaml
   dopbase export payment-service/production --stdout --format docker

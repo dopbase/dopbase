@@ -167,13 +167,13 @@ pub enum Command {
     #[command(subcommand)]
     command: SecretCommand,
   },
-  /// Bulk-import secrets into an environment from a dotenv, JSON, or YAML source.
+  /// Bulk-import secrets into an environment from a dotenv, JSON, YAML, or TOML source.
   ///
   /// Existing keys are kept unless --replace is passed. Use --dry-run to
   /// preview the result without changing anything.
   #[command(after_help = import::HELP)]
   Import(ImportArgs),
-  /// Export an environment's secrets as dotenv, JSON, YAML, or a Docker env file.
+  /// Export secrets as dotenv, JSON, YAML, TOML, or a Docker env file.
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing
   /// file. Every export requires interactive password confirmation.

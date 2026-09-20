@@ -153,7 +153,7 @@ After a successful interactive import, Dopbase asks whether to delete `.env`.
 Yes is selected by default. The file is kept if it changed after Dopbase read
 it, and the command never edits `.gitignore`.
 
-Use the explicit form for scripts, stdin, JSON, YAML, or machine-readable
+Use the explicit form for scripts, stdin, JSON, YAML, TOML, or machine-readable
 output. Both modes validate the complete file before changing server state.
 The project, environment, and secrets are created atomically, so a failed
 request cannot leave a partial project. Terminal output never includes secret
@@ -220,6 +220,7 @@ Import into an existing environment with:
 ```bash
 dopbase import payment-service/staging .env.staging
 dopbase import payment-service/staging secrets.json
+dopbase import payment-service/staging secrets.toml
 cat secrets.yml | dopbase import payment-service/staging - --format yaml
 ```
 
@@ -232,22 +233,24 @@ Use `--replace` to make the remote environment match the file exactly. Replace
 shows the keys that would be deleted and requires confirmation. Non-interactive
 use also requires `--yes`.
 
-The CLI infers JSON from `.json`, YAML from `.yaml` or `.yml`, and dotenv from
-every other filename. This keeps names such as `.env.production` compatible.
-Pass `--format <dotenv|json|yaml>` to override inference. Stdin uses `-` and
-always requires `--format`.
+The CLI infers JSON from `.json`, YAML from `.yaml` or `.yml`, and TOML from
+`.toml`. Every other filename defaults to dotenv, which keeps names such as
+`.env.production` compatible. Pass `--format <dotenv|json|yaml|toml>` to
+override inference. Stdin uses `-` and always requires `--format`.
 
-JSON and YAML input must be one flat mapping of string keys to string values.
-Nested objects, arrays, numbers, booleans, null values, duplicate keys, and
-empty keys fail the complete import. Dotenv does not expand variables or run
-command substitutions. All formats allow empty string values but must contain
-at least one secret. Errors may name a key, but never print its value.
+JSON, YAML, and TOML input must be one flat mapping of string keys to string
+values. Nested objects or tables, arrays, numbers, booleans, dates, null
+values, duplicate keys, and empty keys fail the complete import. Dotenv does
+not expand variables or run command substitutions. All formats allow empty
+string values but must contain at least one secret. Errors may name a key, but
+never print its value.
 
 Export requires an explicit destination:
 
 ```bash
 dopbase export payment-service/staging --output .env.staging
 dopbase export payment-service/staging --output secrets.json
+dopbase export payment-service/staging --output secrets.toml
 dopbase export payment-service/staging --stdout --format yaml
 ```
 
