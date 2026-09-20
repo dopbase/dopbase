@@ -3,20 +3,26 @@ use std::{fmt, str::FromStr};
 
 pub const DEFAULT_MAX_AGE_SECONDS: i64 = 14 * 24 * 60 * 60;
 
-pub const HELP: &str = "Examples:
+pub const HELP: &str = "\
+Examples:
   dopbase cache list
   dopbase cache clean
   dopbase cache clean --older-than 30d
-  dopbase cache clean --all --yes";
+  dopbase cache clean --all --yes
+";
 
-pub const LIST_HELP: &str = "Examples:
+pub const LIST_HELP: &str = "\
+Examples:
   dopbase cache list
-  dopbase cache list --json";
+  dopbase cache list --json
+";
 
-pub const CLEAN_HELP: &str = "Examples:
+pub const CLEAN_HELP: &str = "\
+Examples:
   dopbase cache clean --dry-run
   dopbase cache clean --older-than 30d --yes
-  dopbase cache clean --all --yes";
+  dopbase cache clean --all --yes
+";
 
 #[derive(Debug, Subcommand)]
 pub enum CacheCommand {

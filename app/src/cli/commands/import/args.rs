@@ -25,4 +25,9 @@ pub struct ImportArgs {
   pub yes: bool,
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase import payment-service/production .env.production\n  dopbase import payment-service/production secrets.json --dry-run\n  cat secrets.yml | dopbase import payment-service/production - --format yaml\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase import payment-service/production .env.production
+  dopbase import payment-service/production secrets.json --dry-run
+  cat secrets.yml | dopbase import payment-service/production - --format yaml
+";

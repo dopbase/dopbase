@@ -177,6 +177,7 @@ function openCreate(): void {
 }
 
 function openEdit(secret: SecretMetadata): void {
+  hideRevealed();
   form.value = { mode: "edit", secret, value: "", error: null };
 }
 

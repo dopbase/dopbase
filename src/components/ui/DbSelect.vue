@@ -3,8 +3,8 @@ import { useId } from "vue";
 import { ChevronDownIcon } from "~/assets/icons";
 
 /**
- * DbSelect — labeled native select styled as a PocketBase field: the
- * label sits inside the filled control and a chevron hints at the menu.
+ * DbSelect is a labeled native select. The label sits inside the filled
+ * control, and a chevron indicates the menu.
  * Presentation-only.
  */
 defineProps<{
@@ -25,8 +25,8 @@ function onChange(event: Event): void {
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <!-- PocketBase-style field: label inside the filled select, custom
-         chevron, fill lightens on focus. -->
+    <!-- The label sits inside the filled select. A custom chevron marks
+         the menu, and the fill lightens on focus. -->
     <div
       class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
       :class="disabled ? 'opacity-50' : ''">

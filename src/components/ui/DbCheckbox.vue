@@ -2,9 +2,9 @@
 import { CheckIcon } from "~/assets/icons";
 
 /**
- * DbCheckbox — PocketBase-style checkbox (20px box, 2px keyline, check
- * mark + focus halo) with the Dopbase purple active state. A
- * visually-hidden native input keeps keyboard and a11y behavior.
+ * DbCheckbox is a 20px box with a 2px keyline, check mark, focus halo,
+ * and Dopbase purple active state. A visually hidden native input keeps
+ * keyboard and a11y behavior.
  * Presentation-only.
  */
 defineProps<{
@@ -31,7 +31,7 @@ function onChange(event: Event): void {
       :disabled="disabled"
       :aria-label="label ? undefined : label"
       @change="onChange" />
-    <!-- Box: 20×20px with a 2px keyline (PocketBase checkbox geometry). -->
+    <!-- Box: 20×20px with a 2px keyline. -->
     <span
       aria-hidden="true"
       class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border-2 transition-colors duration-150 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"

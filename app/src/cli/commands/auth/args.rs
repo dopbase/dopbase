@@ -1,7 +1,15 @@
 use clap::Args;
 
-pub(crate) const LOGIN_HELP: &str = "Examples:\n  dopbase login\n  dopbase login --token\n  printf '%s' \"$TOKEN\" | dopbase login --token\n";
-pub(crate) const LOGOUT_HELP: &str = "Examples:\n  dopbase logout\n";
+pub(crate) const LOGIN_HELP: &str = "\
+Examples:
+  dopbase login
+  dopbase login --token
+  printf '%s' \"$TOKEN\" | dopbase login --token
+";
+pub(crate) const LOGOUT_HELP: &str = "\
+Examples:
+  dopbase logout
+";
 
 #[derive(Args, Debug)]
 pub struct LoginArgs {

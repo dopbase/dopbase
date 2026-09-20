@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
-use secret_format::SecretFormat;
+use secret_format::ExportFormat;
 use serde_json::{Value, json};
 
 pub(crate) async fn execute(
@@ -27,7 +27,7 @@ pub(crate) async fn execute(
   if stdout && json_output {
     bail!("--stdout and --json cannot be combined");
   }
-  let format = SecretFormat::for_output(output.as_deref(), format);
+  let format = ExportFormat::for_output(output.as_deref(), format);
   let api = client::recently_authenticated_client(server).await?;
   let env = environment::resolve_environment(&api, &environment).await?;
   let data = api

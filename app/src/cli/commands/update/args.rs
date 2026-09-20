@@ -1,1 +1,4 @@
-pub(crate) const HELP: &str = "Examples:\n  dopbase update\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase update
+";

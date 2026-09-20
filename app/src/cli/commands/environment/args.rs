@@ -56,12 +56,40 @@ pub enum EnvCommand {
   },
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase env create payment-service/production\n  dopbase env list payment-service\n  dopbase env show payment-service/production\n  dopbase env default payment-service/development\n  dopbase env rename payment-service/production prod\n  dopbase env delete payment-service/staging\n";
-const DEFAULT_HELP: &str =
-  "Examples:\n  dopbase env default payment-service/development\n  dopbase env default --clear\n";
-const CREATE_HELP: &str = "Examples:\n  dopbase env create payment-service/production\n";
-const LIST_HELP: &str = "Examples:\n  dopbase env list\n  dopbase env list payment-service\n";
-const SHOW_HELP: &str =
-  "Examples:\n  dopbase env show payment-service/production\n  dopbase env show env_482731\n";
-const RENAME_HELP: &str = "Examples:\n  dopbase env rename payment-service/production prod\n";
-const DELETE_HELP: &str = "Examples:\n  dopbase env delete payment-service/staging\n  dopbase env delete payment-service/staging --yes\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase env create payment-service/production
+  dopbase env list payment-service
+  dopbase env show payment-service/production
+  dopbase env default payment-service/development
+  dopbase env rename payment-service/production prod
+  dopbase env delete payment-service/staging
+";
+const DEFAULT_HELP: &str = "\
+Examples:
+  dopbase env default payment-service/development
+  dopbase env default --clear
+";
+const CREATE_HELP: &str = "\
+Examples:
+  dopbase env create payment-service/production
+";
+const LIST_HELP: &str = "\
+Examples:
+  dopbase env list
+  dopbase env list payment-service
+";
+const SHOW_HELP: &str = "\
+Examples:
+  dopbase env show payment-service/production
+  dopbase env show env_482731
+";
+const RENAME_HELP: &str = "\
+Examples:
+  dopbase env rename payment-service/production prod
+";
+const DELETE_HELP: &str = "\
+Examples:
+  dopbase env delete payment-service/staging
+  dopbase env delete payment-service/staging --yes
+";
