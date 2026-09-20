@@ -1,6 +1,6 @@
 use crate::{constants::tokens::PROJECT_ID_PREFIX, utils::slug};
 
-const TARGET_EXAMPLE: &str = "storefront/development";
+const TARGET_EXAMPLE: &str = "payment-service/local";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EnvironmentTarget {
@@ -18,7 +18,7 @@ pub fn parse_init(value: &str) -> Result<EnvironmentTarget, String> {
   let target = parse(value)?;
   if !slug::is_valid(&target.project) {
     return Err(
-      "project name must be a lowercase slug of at most 63 characters; project IDs cannot be used with init"
+      "project name must be a lowercase slug of at most 63 characters, project IDs cannot be used with init"
         .into(),
     );
   }

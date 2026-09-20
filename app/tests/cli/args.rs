@@ -410,6 +410,16 @@ fn rejects_conflicting_file_options() {
 
 #[test]
 fn secret_commands_parse_format_options() {
+  let interactive_init = Cli::try_parse_from(["dopbase", "init"]).unwrap();
+  assert!(matches!(
+    interactive_init.command,
+    Command::Init(InitArgs {
+      target: None,
+      from: None,
+      format: None,
+    })
+  ));
+
   let init = Cli::try_parse_from([
     "dopbase",
     "init",
@@ -445,6 +455,41 @@ fn secret_commands_parse_format_options() {
     })
   ));
 
+  let toml_init = Cli::try_parse_from([
+    "dopbase",
+    "init",
+    "storefront/development",
+    "--from",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_init.command,
+    Command::Init(InitArgs {
+      format: Some(SecretFormat::Toml),
+      ..
+    })
+  ));
+
+  let toml_import = Cli::try_parse_from([
+    "dopbase",
+    "import",
+    "storefront/development",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_import.command,
+    Command::Import(ImportArgs {
+      format: Some(SecretFormat::Toml),
+      ..
+    })
+  ));
+
   let export = Cli::try_parse_from([
     "dopbase",
     "export",
@@ -459,6 +504,24 @@ fn secret_commands_parse_format_options() {
     export.command,
     Command::Export(ExportArgs {
       format: Some(ExportFormat::Dotenv),
+      ..
+    })
+  ));
+
+  let toml_export = Cli::try_parse_from([
+    "dopbase",
+    "export",
+    "storefront/development",
+    "--output",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_export.command,
+    Command::Export(ExportArgs {
+      format: Some(ExportFormat::Toml),
       ..
     })
   ));
@@ -503,6 +566,14 @@ fn secret_commands_parse_format_options() {
     .is_err()
   );
   assert!(Cli::try_parse_from(["dopbase", "env", "create", "storefront", "development"]).is_err());
+
+  for arguments in [
+    vec!["dopbase", "init", "storefront/development"],
+    vec!["dopbase", "init", "--from", ".env"],
+    vec!["dopbase", "init", "--format", "dotenv"],
+  ] {
+    assert!(Cli::try_parse_from(arguments).is_err());
+  }
 }
 
 #[test]
@@ -724,7 +795,7 @@ fn resource_parameters_use_consistent_value_names() {
   let cases: &[(&[&str], &str)] = &[
     (
       &["dopbase", "init", "--help"],
-      "<PROJECT_NAME/ENVIRONMENT_NAME>",
+      "[PROJECT_NAME/ENVIRONMENT_NAME]",
     ),
     (
       &["dopbase", "project", "create", "--help"],
@@ -787,7 +858,6 @@ fn resource_parameters_use_consistent_value_names() {
 fn other_incomplete_commands_show_full_help() {
   let cases: &[&[&str]] = &[
     &["dopbase", "client", "connect"],
-    &["dopbase", "init"],
     &["dopbase", "project", "rename", "payment-service"],
     &["dopbase", "env", "show"],
     &["dopbase", "import"],

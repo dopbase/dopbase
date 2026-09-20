@@ -15,6 +15,7 @@ Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server up                        # run the server in the background
   dopbase login                            # authenticate with the active server
+  dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars

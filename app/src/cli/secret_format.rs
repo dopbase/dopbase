@@ -13,6 +13,7 @@ pub enum SecretFormat {
   Dotenv,
   Json,
   Yaml,
+  Toml,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
@@ -20,6 +21,7 @@ pub enum ExportFormat {
   Dotenv,
   Json,
   Yaml,
+  Toml,
   Docker,
 }
 
@@ -46,6 +48,7 @@ impl SecretFormat {
     {
       Some("json") => Self::Json,
       Some("yaml" | "yml") => Self::Yaml,
+      Some("toml") => Self::Toml,
       _ => Self::Dotenv,
     }
   }
@@ -68,6 +71,7 @@ impl ExportFormat {
     {
       Some("json") => Self::Json,
       Some("yaml" | "yml") => Self::Yaml,
+      Some("toml") => Self::Toml,
       _ => Self::Dotenv,
     }
   }
@@ -116,6 +120,9 @@ pub fn parse(
         .context("invalid YAML input")?
         .into_entries()
     }
+    SecretFormat::Toml => toml::from_str::<StrictSecretMap>(text)
+      .map_err(|error| anyhow::anyhow!("invalid TOML input: {}", error.message()))?
+      .into_entries(),
   };
   if entries.is_empty() {
     bail!("the input contains no secret entries");
@@ -147,6 +154,13 @@ pub fn render(
     }
     ExportFormat::Json => Ok(format!("{}\n", serde_json::to_string_pretty(&sorted)?)),
     ExportFormat::Yaml => Ok(serde_saphyr::to_string(&sorted)?),
+    ExportFormat::Toml => {
+      let mut output = toml::to_string(&sorted)?;
+      if !output.ends_with('\n') {
+        output.push('\n');
+      }
+      Ok(output)
+    }
     ExportFormat::Docker => {
       let entries = sorted
         .into_iter()

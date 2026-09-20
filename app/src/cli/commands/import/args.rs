@@ -28,6 +28,7 @@ pub struct ImportArgs {
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase import payment-service/production .env.production
+  dopbase import payment-service/production secrets.toml --dry-run
   dopbase import payment-service/production secrets.json --dry-run
   cat secrets.yml | dopbase import payment-service/production - --format yaml
 ";

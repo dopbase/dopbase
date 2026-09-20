@@ -1,11 +1,11 @@
 ---
 title: "Import and export secret files"
-description: "Import dotenv, JSON, or YAML files, and export secrets for files or Docker."
+description: "Import dotenv, JSON, YAML, or TOML files, and export secrets for files or Docker."
 ---
 
 # Import and export secret files
 
-Dopbase accepts dotenv, JSON, and YAML files. It parses each file into
+Dopbase accepts dotenv, JSON, YAML, and TOML files. It parses each file into
 individual secret records instead of storing the file as one opaque object.
 
 ## Create a project from a secret file
@@ -13,14 +13,23 @@ individual secret records instead of storing the file as one opaque object.
 Use `init` when the project does not exist yet:
 
 ```bash
+dopbase init
 dopbase init payment-service/development --from .env
 dopbase init another-service/development --from secrets.json
-dopbase init worker/development --from secrets.yml
+dopbase init worker/development --from secrets.yaml
+dopbase init worker/development --from secrets.toml
 ```
 
-The file is validated first. Dopbase then creates the project, environment, and
-individual secret records atomically. If validation or creation fails, no
-partially imported project remains.
+With no arguments, `init` reads `./.env`, shows how many variables it found,
+and asks for a `project/environment` target. Its sensitive count is based only
+on variable names. Dopbase never prints the values, and it imports every
+variable regardless of that count.
+
+The file is validated first. Dopbase then creates the project, environment,
+and individual secret records atomically. If validation or creation fails, no
+partial project remains. After an interactive import, the command asks whether
+to delete `.env`, with Yes selected by default. It keeps the file if its
+contents changed during the import and does not edit `.gitignore`.
 
 `init` fails if the project name already exists. To add another environment to
 that project, create it explicitly and import into it:
@@ -49,19 +58,20 @@ Use `--replace` only when the environment should exactly match the file.
 Dopbase shows which keys would be deleted and requires confirmation or `--yes`.
 
 Dotenv input accepts blank lines, comments, quoted values, and empty values. It
-does not expand variables or execute substitutions. JSON and YAML must contain
-one flat object whose keys and values are strings. Nested objects, arrays,
-numbers, booleans, null values, duplicate keys, and empty keys are rejected.
-Every format must contain at least one secret. Dopbase validates the complete
-input before changing server state.
+does not expand variables or execute substitutions. JSON, YAML, and TOML must
+contain one flat object whose keys and values are strings. Nested objects or
+tables, arrays, numbers, booleans, dates, null values, duplicate keys, and
+empty keys are rejected. Every format must contain at least one secret.
+Dopbase validates the complete input before changing server state.
 
-The format is inferred from `.json`, `.yaml`, and `.yml`. Every other filename,
-including `.env.production`, defaults to dotenv. Use `--format` to override the
-filename or when reading from stdin:
+The format is inferred from `.json`, `.yaml`, `.yml`, and `.toml`. Every other
+filename, including `.env.production`, defaults to dotenv. Use `--format` to
+override the filename or when reading from stdin:
 
 ```bash
 dopbase import payment-service/staging secrets.data --format json
 cat secrets.yml | dopbase import payment-service/staging - --format yaml
+cat secrets.toml | dopbase import payment-service/staging - --format toml
 cat .env | dopbase init worker/development --from - --format dotenv
 ```
 
@@ -75,6 +85,7 @@ Export requires an explicit file or stdout destination:
 ```bash
 dopbase export payment-service/staging --output .env.staging
 dopbase export payment-service/staging --output secrets.json
+dopbase export payment-service/staging --output secrets.toml
 dopbase export payment-service/staging --stdout --format yaml
 ```
 

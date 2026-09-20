@@ -38,6 +38,12 @@ fn infers_formats_and_preserves_dotenv_fallbacks() {
       SecretFormat::Yaml
     );
   }
+  for path in ["secrets.toml", "SECRETS.TOML"] {
+    assert_eq!(
+      SecretFormat::for_input(Path::new(path), None).unwrap(),
+      SecretFormat::Toml
+    );
+  }
 }
 
 #[test]
@@ -69,6 +75,10 @@ fn explicit_format_overrides_the_extension() {
     ExportFormat::Json
   );
   assert_eq!(
+    ExportFormat::for_output(Some(Path::new("SECRETS.TOML")), None),
+    ExportFormat::Toml
+  );
+  assert_eq!(
     ExportFormat::for_output(Some(Path::new(".env.production")), None),
     ExportFormat::Dotenv
   );
@@ -95,6 +105,12 @@ fn parses_all_supported_formats() {
       .len(),
     2
   );
+  assert_eq!(
+    parse("A = \"one\"\nB = \"two three\"\n", SecretFormat::Toml)
+      .unwrap()
+      .len(),
+    2
+  );
 }
 
 #[test]
@@ -104,6 +120,7 @@ fn rejects_inputs_without_entries() {
     ("# comment\n", SecretFormat::Dotenv),
     ("{}", SecretFormat::Json),
     ("{}\n", SecretFormat::Yaml),
+    ("# comment\n", SecretFormat::Toml),
   ] {
     assert!(
       parse(text, format)
@@ -119,9 +136,13 @@ fn rejects_duplicate_keys() {
   for (text, format) in [
     (r#"{"A":"first","A":"second"}"#, SecretFormat::Json),
     ("A: first\nA: second\n", SecretFormat::Yaml),
+    ("A = \"first\"\nA = \"second\"\n", SecretFormat::Toml),
   ] {
     let message = format!("{:#}", parse(text, format).unwrap_err());
-    assert!(message.contains("A"), "{message}");
+    if format != SecretFormat::Toml {
+      assert!(message.contains("A"), "{message}");
+    }
+    assert!(message.contains("duplicate"), "{message}");
     assert!(!message.contains("first"), "{message}");
     assert!(!message.contains("second"), "{message}");
   }
@@ -143,6 +164,33 @@ fn rejects_empty_keys_and_non_string_values_without_exposing_values() {
     ),
     ("ITEMS:\n  - marker\n", SecretFormat::Yaml, "ITEMS", "array"),
     ("NOTHING: null\n", SecretFormat::Yaml, "NOTHING", "null"),
+    (r#""" = "marker""#, SecretFormat::Toml, "", "empty"),
+    ("PORT = 8840\n", SecretFormat::Toml, "PORT", "number"),
+    ("ENABLED = true\n", SecretFormat::Toml, "ENABLED", "boolean"),
+    (
+      "NESTED = { TOKEN = \"marker\" }\n",
+      SecretFormat::Toml,
+      "NESTED",
+      "object",
+    ),
+    (
+      "NESTED.TOKEN = \"marker\"\n",
+      SecretFormat::Toml,
+      "NESTED",
+      "object",
+    ),
+    (
+      "ITEMS = [\"marker\"]\n",
+      SecretFormat::Toml,
+      "ITEMS",
+      "array",
+    ),
+    (
+      "CREATED_AT = 1979-05-27T07:32:00Z\n",
+      SecretFormat::Toml,
+      "CREATED_AT",
+      "object",
+    ),
   ] {
     let message = format!("{:#}", parse(text, format).unwrap_err());
     if !key.is_empty() {
@@ -180,6 +228,41 @@ fn renders_sorted_deterministic_output() {
       .map(|entry| (entry.key.as_str(), entry.value.as_str()))
       .collect::<Vec<_>>(),
     [("A_KEY", "true"), ("M_KEY", "two words"), ("Z_KEY", "last")]
+  );
+  let toml = render(&values, ExportFormat::Toml).unwrap();
+  assert!(toml.ends_with('\n'));
+  assert!(toml.contains("A_KEY = \"true\""));
+  assert!(toml.find("A_KEY").unwrap() < toml.find("M_KEY").unwrap());
+  assert!(toml.find("M_KEY").unwrap() < toml.find("Z_KEY").unwrap());
+  let reparsed = parse(&toml, SecretFormat::Toml).unwrap();
+  assert_eq!(
+    reparsed
+      .iter()
+      .map(|entry| (entry.key.as_str(), entry.value.as_str()))
+      .collect::<Vec<_>>(),
+    [("A_KEY", "true"), ("M_KEY", "two words"), ("Z_KEY", "last")]
+  );
+}
+
+#[test]
+fn toml_round_trips_escaped_string_values() {
+  let values = entries(&[
+    ("BACKSLASH", r"C:\workspace"),
+    ("MULTILINE", "first\nsecond"),
+    ("QUOTED", "say \"hello\""),
+    ("UNICODE", "你好"),
+  ]);
+  let rendered = render(&values, ExportFormat::Toml).unwrap();
+  let reparsed = parse(&rendered, SecretFormat::Toml).unwrap();
+  assert_eq!(
+    reparsed
+      .iter()
+      .map(|entry| (entry.key.as_str(), entry.value.as_str()))
+      .collect::<Vec<_>>(),
+    values
+      .iter()
+      .map(|entry| (entry.key.as_str(), entry.value.as_str()))
+      .collect::<Vec<_>>()
   );
 }
 

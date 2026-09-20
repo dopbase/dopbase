@@ -101,12 +101,13 @@ From an application directory with an existing `.env` file:
 
 ```bash
 cd my-project
-dopbase init my-project/development --from .env
+dopbase init
 ```
 
-Dopbase atomically creates the project and its `development` environment, then
-stores every `.env` entry as an individual secret. It prints the immutable
-environment ID without writing Dopbase configuration into the repository.
+Dopbase shows the variable count and asks for a new target such as
+`my-project/development`. It then creates the project and environment in one
+transaction and stores every `.env` entry as an encrypted secret. After the
+import, it asks whether to delete `.env`, with Yes selected by default.
 
 ## 6. Run the application
 
