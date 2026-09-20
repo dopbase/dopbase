@@ -117,6 +117,20 @@ pub(crate) fn confirm_with_cancel(
   Ok(())
 }
 
+pub(crate) fn choice(
+  question: &str,
+  default: bool,
+  cancelled: CliCancelled,
+) -> Result<bool> {
+  if !io::stdin().is_terminal() {
+    bail!("interactive confirmation requires a terminal");
+  }
+  Confirm::new(question)
+    .with_default(default)
+    .prompt()
+    .map_err(|error| map_error(error, cancelled))
+}
+
 pub(crate) fn read_secret_stdin(key: &str) -> Result<String> {
   let interactive = io::stdin().is_terminal();
   if interactive {
