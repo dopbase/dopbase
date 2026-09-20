@@ -8,10 +8,22 @@ Examples:
   dopbase project rename payment-service payments
   dopbase project delete payment-service
 ";
-const CREATE_HELP: &str = "Examples:\n  dopbase project create payment-service\n";
-const LIST_HELP: &str = "Examples:\n  dopbase project list\n";
-const SHOW_HELP: &str = "Examples:\n  dopbase project show payment-service\n";
-const RENAME_HELP: &str = "Examples:\n  dopbase project rename payment-service payments\n";
+const CREATE_HELP: &str = "\
+Examples:
+  dopbase project create payment-service
+";
+const LIST_HELP: &str = "\
+Examples:
+  dopbase project list
+";
+const SHOW_HELP: &str = "\
+Examples:
+  dopbase project show payment-service
+";
+const RENAME_HELP: &str = "\
+Examples:
+  dopbase project rename payment-service payments
+";
 const DELETE_HELP: &str = "\
 Examples:
   dopbase project delete payment-service
