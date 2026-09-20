@@ -4,13 +4,18 @@ All notable changes to Dopbase are documented in this file.
 
 ## Unreleased
 
-Dopbase now has consistent repository commands, leaner test suites, and a
-documented community conduct policy.
+Dopbase now has guided project setup, more export formats, consistent
+repository commands, leaner test suites, and a documented community conduct
+policy.
 
 ### Added
 
-- Added an export multiple format for Docker, JSON, Yaml and Dotenv (default)
-- Added new format arguments `dopbase export project/env --format docker --stdout`
+- Added an interactive `dopbase init` flow that reads `./.env`, checks the
+  active server and login, summarizes detected variables, creates a new project
+  and environment, and asks whether to delete the imported file.
+- Added Docker, JSON, YAML, and dotenv export formats.
+- Added `dopbase export project/env --format docker --stdout` for explicit
+  output format selection.
 - Added an export-only Docker format for passing secrets to `docker run` or
   `docker exec` through `--env-file` without dotenv quotes changing values.
 - Added web-ready MP4 and GIF versions of the Dopbase demo, including three
@@ -32,6 +37,8 @@ documented community conduct policy.
   linting, type checks, formatting checks, and previews.
 - Backend release verification now discovers the CLI command tree from the
   built binary and checks both supported help forms for every command.
+- The README now includes the complete top-level CLI reference, environment
+  variables, and common startup examples.
 - Removed duplicate frontend and backend tests while preserving behavior
   coverage.
 
