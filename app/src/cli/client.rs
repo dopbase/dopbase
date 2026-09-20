@@ -92,6 +92,13 @@ pub fn is_authentication_error(error: &anyhow::Error) -> bool {
     .is_some_and(|error| error.status == reqwest::StatusCode::UNAUTHORIZED)
 }
 
+#[doc(hidden)]
+pub fn is_conflict_error(error: &anyhow::Error) -> bool {
+  error
+    .downcast_ref::<ResponseError>()
+    .is_some_and(|error| error.status == reqwest::StatusCode::CONFLICT)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
   Argument,
