@@ -36,8 +36,8 @@ function onInput(event: Event): void {
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <!-- PocketBase-style field: label inside the filled, borderless
-         textarea. The fill lightens on focus. -->
+    <!-- The label sits inside the filled, borderless textarea. The fill
+         lightens on focus. -->
     <div
       class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
       :class="[
@@ -76,7 +76,9 @@ function onInput(event: Event): void {
 </template>
 
 <style scoped>
-/* Match browser autofill to the field fill (mirrors PocketBase). */
+textarea {
+  font-variant-ligatures: none;
+}
 textarea:-webkit-autofill {
   box-shadow: 0 0 0 50px var(--color-raised) inset;
   -webkit-text-fill-color: var(--color-ink-strong);

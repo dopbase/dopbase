@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * DbSwitch — PocketBase-style toggle (41×24 rounded track, floating
- * white knob) with the Dopbase purple active state. A visually-hidden
+ * DbSwitch is a 41×24 toggle with a rounded track, floating white knob,
+ * and Dopbase purple active state. A visually hidden
  * native checkbox keeps keyboard, focus, and a11y behavior. The track
  * and knob are presentation bound to the model value.
  * Presentation-only.
@@ -31,7 +31,7 @@ function onChange(event: Event): void {
       :disabled="disabled"
       :aria-label="label ? undefined : label"
       @change="onChange" />
-    <!-- Track: 41×24px, 7px radius (PocketBase switch geometry). -->
+    <!-- Track: 41×24px with a 7px radius. -->
     <span
       aria-hidden="true"
       class="relative inline-flex h-6 w-[41px] shrink-0 rounded-[7px] transition-colors duration-150 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"

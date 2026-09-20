@@ -67,8 +67,8 @@ function toggleReveal(): void {
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <!-- PocketBase-style field: the label lives inside the filled,
-         borderless input and the fill lightens on focus. -->
+    <!-- The label sits inside the filled, borderless input. The fill
+         lightens on focus. -->
     <div
       class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
       :class="[
@@ -125,8 +125,7 @@ function toggleReveal(): void {
 </template>
 
 <style scoped>
-/* Match browser autofill to the field fill (mirrors PocketBase's inset
-   box-shadow workaround) so autofilled fields keep the editor look. */
+/* Use an inset shadow so browser autofill keeps the field fill. */
 input:-webkit-autofill {
   box-shadow: 0 0 0 50px var(--color-raised) inset;
   -webkit-text-fill-color: var(--color-ink-strong);

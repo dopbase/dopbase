@@ -20,16 +20,16 @@ const props = withDefaults(
 const variantClasses = computed(() => {
   switch (props.variant) {
     case "primary":
-      // Solid brand fill. Hover and active states lighten the base (PocketBase's
-      // alt-color convention) instead of swapping to a different hue.
+      // Solid brand fill. Hover and active states lighten the base instead of
+      // swapping to a different hue.
       return "bg-accent text-white hover:bg-accent-alt1 active:bg-accent-alt2";
     case "ghost":
       return "bg-transparent text-ink hover:bg-raised hover:text-ink-strong active:bg-line-strong";
     case "danger":
-      // Solid destructive fill (PocketBase's danger button).
+      // Solid destructive fill.
       return "bg-crit text-white hover:bg-crit-alt1 active:bg-crit-alt2";
     default:
-      // Secondary: filled surface, no border (PocketBase's secondary).
+      // Secondary: filled surface with no border.
       return "bg-raised text-ink-strong hover:bg-line active:bg-line-strong";
   }
 });
