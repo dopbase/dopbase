@@ -17,4 +17,8 @@ pub struct RestoreArgs {
   pub yes: bool,
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase restore ./backup.dop\n  dopbase restore ./backup.dop --setup-token dbs_... --yes\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase restore ./backup.dop
+  dopbase restore ./backup.dop --setup-token dbs_... --yes
+";

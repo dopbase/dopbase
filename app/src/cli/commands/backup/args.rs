@@ -11,5 +11,8 @@ pub struct BackupArgs {
   pub output: Option<PathBuf>,
 }
 
-pub(crate) const HELP: &str =
-  "Examples:\n  dopbase backup\n  dopbase backup pre-migration --output ./pre-migration.dop\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase backup
+  dopbase backup pre-migration --output ./pre-migration.dop
+";

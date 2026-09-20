@@ -36,7 +36,18 @@ pub enum AdminCommand {
   },
 }
 
-pub(crate) const HELP: &str =
-  "Examples:\n  dopbase admin reset-password admin@example.com\n  dopbase admin factory-reset\n";
-const RESET_PASSWORD_HELP: &str = "Examples:\n  dopbase admin reset-password admin@example.com\n";
-const FACTORY_RESET_HELP: &str = "Examples:\n  dopbase admin factory-reset\n  dopbase admin factory-reset --no-backup\n  dopbase --data-dir /srv/dopbase admin factory-reset\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase admin reset-password admin@example.com
+  dopbase admin factory-reset
+";
+const RESET_PASSWORD_HELP: &str = "\
+Examples:
+  dopbase admin reset-password admin@example.com
+";
+const FACTORY_RESET_HELP: &str = "\
+Examples:
+  dopbase admin factory-reset
+  dopbase admin factory-reset --no-backup
+  dopbase --data-dir /srv/dopbase admin factory-reset
+";
