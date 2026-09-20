@@ -1,7 +1,7 @@
 use app::cli::{
   client::{
     ApiClient, Credential, CredentialSource, authenticated_client, is_authentication_error,
-    normalize_login_email,
+    is_conflict_error, normalize_login_email,
   },
   local_config::{ClientConfig, ResolvedServer, ServerSource},
 };
@@ -54,19 +54,22 @@ fn run_client_requires_existing_authentication_without_prompting() {
   );
 }
 
-#[tokio::test]
-async fn api_client_preserves_unauthorized_responses_for_run() {
+async fn response_error(
+  status: &str,
+  body: &str,
+) -> anyhow::Error {
   let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
   let address = listener.local_addr().unwrap();
+  let status = status.to_owned();
+  let body = body.to_owned();
   let server_task = tokio::spawn(async move {
     let (mut stream, _) = listener.accept().await.unwrap();
     let mut request = [0_u8; 2048];
     let _ = stream.read(&mut request).await.unwrap();
-    let body = r#"{"error":{"AUTHENTICATION_INVALID":"The provided credential is invalid."}}"#;
     stream
       .write_all(
         format!(
-          "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+          "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
           body.len()
         )
         .as_bytes(),
@@ -82,14 +85,32 @@ async fn api_client_preserves_unauthorized_responses_for_run() {
     config: ClientConfig::default(),
   };
 
-  let error = ApiClient::new(&server, Some("invalid-token".into()))
+  let error = ApiClient::new(&server, Some("test-token".into()))
     .unwrap()
     .request(Method::GET, "/api/v1/environments/resolve", None)
     .await
     .unwrap_err();
+  server_task.await.unwrap();
+  error
+}
+
+#[tokio::test]
+async fn api_client_classifies_response_statuses() {
+  let error = response_error(
+    "401 Unauthorized",
+    r#"{"error":{"AUTHENTICATION_INVALID":"The provided credential is invalid."}}"#,
+  )
+  .await;
   assert!(is_authentication_error(&error));
   assert!(error.to_string().contains("AUTHENTICATION_INVALID"));
-  server_task.await.unwrap();
+
+  let error = response_error(
+    "409 Conflict",
+    r#"{"error":{"PROJECT_ALREADY_EXISTS":"A project with this name already exists."}}"#,
+  )
+  .await;
+  assert!(is_conflict_error(&error));
+  assert!(error.to_string().contains("PROJECT_ALREADY_EXISTS"));
 }
 
 #[test]
