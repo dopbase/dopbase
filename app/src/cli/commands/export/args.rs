@@ -28,4 +28,10 @@ pub struct ExportArgs {
   pub force: bool,
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase export payment-service/production --output .env.production\n  dopbase export payment-service/production --output secrets.json\n  dopbase export payment-service/production --stdout --format yaml\n  dopbase export payment-service/production --stdout --format docker\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase export payment-service/production --output .env.production
+  dopbase export payment-service/production --output secrets.json
+  dopbase export payment-service/production --stdout --format yaml
+  dopbase export payment-service/production --stdout --format docker
+";

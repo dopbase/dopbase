@@ -14,4 +14,11 @@ pub struct RunArgs {
   pub command: Vec<String>,
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase run -- npm run dev\n  dopbase run env_482731 -- npm run dev\n  dopbase run payment-service/development -- npm run dev\n  dopbase run payment-service/production -t dbs_xxx -- npm start\n  dopbase run payment-service/production --token dbs_xxx -- npm start\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase run -- npm run dev
+  dopbase run env_482731 -- npm run dev
+  dopbase run payment-service/development -- npm run dev
+  dopbase run payment-service/production -t dbs_xxx -- npm start
+  dopbase run payment-service/production --token dbs_xxx -- npm start
+";

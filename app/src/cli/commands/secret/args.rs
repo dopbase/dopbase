@@ -47,8 +47,43 @@ pub enum SecretCommand {
   },
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase secret list payment-service/production\n  dopbase secret set payment-service/production API_KEY\n  dopbase secret get payment-service/production API_KEY\n  dopbase secret get payment-service/production API_KEY --reveal\n  dopbase secret delete payment-service/production API_KEY\n\nUse PROJECT_REF/ENVIRONMENT_NAME for readable references. PROJECT_REF can be a\nproject ID or name. Immutable environment IDs such as env_482731 also work.\n";
-const LIST_HELP: &str = "Examples:\n  dopbase secret list payment-service/production\n  dopbase secret list env_482731\n\nRun `dopbase env list` to find an environment.\n";
-const SET_HELP: &str = "Examples:\n  dopbase secret set payment-service/production API_KEY\n  dopbase secret set payment-service/production API_KEY --stdin\n  printf '%s' \"$API_KEY\" | dopbase secret set payment-service/production API_KEY --stdin\n\nWithout --stdin, Dopbase uses a masked prompt and displays * for each character.\n\nWith --stdin, Dopbase reads the value until EOF. In a terminal, paste or type\nthe value, then press Ctrl+D. On Windows, press Ctrl+Z, then Enter. Piped input\nis read exactly as supplied.\n";
-const GET_HELP: &str = "Examples:\n  dopbase secret get payment-service/production API_KEY\n  dopbase secret get payment-service/production API_KEY --reveal\n";
-const DELETE_HELP: &str = "Examples:\n  dopbase secret delete payment-service/production API_KEY\n  dopbase secret delete payment-service/production API_KEY --yes\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase secret list payment-service/production
+  dopbase secret set payment-service/production API_KEY
+  dopbase secret get payment-service/production API_KEY
+  dopbase secret get payment-service/production API_KEY --reveal
+  dopbase secret delete payment-service/production API_KEY
+
+Use PROJECT_REF/ENVIRONMENT_NAME for readable references. PROJECT_REF can be a
+project ID or name. Immutable environment IDs such as env_482731 also work.
+";
+const LIST_HELP: &str = "\
+Examples:
+  dopbase secret list payment-service/production
+  dopbase secret list env_482731
+
+Run `dopbase env list` to find an environment.
+";
+const SET_HELP: &str = "\
+Examples:
+  dopbase secret set payment-service/production API_KEY
+  dopbase secret set payment-service/production API_KEY --stdin
+  printf '%s' \"$API_KEY\" | dopbase secret set payment-service/production API_KEY --stdin
+
+Without --stdin, Dopbase uses a masked prompt and displays * for each character.
+
+With --stdin, Dopbase reads the value until EOF. In a terminal, paste or type
+the value, then press Ctrl+D. On Windows, press Ctrl+Z, then Enter. Piped input
+is read exactly as supplied.
+";
+const GET_HELP: &str = "\
+Examples:
+  dopbase secret get payment-service/production API_KEY
+  dopbase secret get payment-service/production API_KEY --reveal
+";
+const DELETE_HELP: &str = "\
+Examples:
+  dopbase secret delete payment-service/production API_KEY
+  dopbase secret delete payment-service/production API_KEY --yes
+";

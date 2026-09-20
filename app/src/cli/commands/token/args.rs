@@ -33,8 +33,21 @@ pub enum TokenCommand {
   },
 }
 
-pub(crate) const HELP: &str = "Examples:\n  dopbase token create payment-service/production --name deploy\n  dopbase token list payment-service/production\n  dopbase token revoke tok_01ABCDEF\n";
-const CREATE_HELP: &str =
-  "Examples:\n  dopbase token create payment-service/production --name deploy\n";
-const LIST_HELP: &str = "Examples:\n  dopbase token list payment-service/production\n";
-const REVOKE_HELP: &str = "Examples:\n  dopbase token revoke tok_01ABCDEF\n";
+pub(crate) const HELP: &str = "\
+Examples:
+  dopbase token create payment-service/production --name deploy
+  dopbase token list payment-service/production
+  dopbase token revoke tok_01ABCDEF
+";
+const CREATE_HELP: &str = "\
+Examples:
+  dopbase token create payment-service/production --name deploy
+";
+const LIST_HELP: &str = "\
+Examples:
+  dopbase token list payment-service/production
+";
+const REVOKE_HELP: &str = "\
+Examples:
+  dopbase token revoke tok_01ABCDEF
+";
