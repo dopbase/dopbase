@@ -6,7 +6,10 @@ Examples:
   dopbase client connect local
   dopbase client status
 ";
-pub(crate) const STATUS_ALIAS_HELP: &str = "Examples:\n  dopbase status\n";
+pub(crate) const STATUS_ALIAS_HELP: &str = "\
+Examples:
+  dopbase status
+";
 
 const CONNECT_HELP: &str = "\
 Examples:
