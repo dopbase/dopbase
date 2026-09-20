@@ -21,6 +21,8 @@ documented community conduct policy.
 
 ### Improvement
 
+- Reformatted CLI help constants as multiline strings so examples are easier to
+  edit.
 - Automatic hide when user want to update token while secrets revealed.
 - Removed third-party attribution from Admin UI source comments and design
   token documentation so the interface is described as Dopbase's own system.
