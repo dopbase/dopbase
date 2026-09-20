@@ -10,6 +10,7 @@ documented community conduct policy.
 ### Added
 
 - Added an export multiple format for Docker, JSON, Yaml and Dotenv (default)
+- Added new format arguments `dopbase export project/env --format docker --stdout`
 - Added an export-only Docker format for passing secrets to `docker run` or
   `docker exec` through `--env-file` without dotenv quotes changing values.
 - Added web-ready MP4 and GIF versions of the Dopbase demo, including three
@@ -20,6 +21,9 @@ documented community conduct policy.
 
 ### Improvement
 
+- Automatic hide when user want to update token while secrets revealed.
+- Removed third-party attribution from Admin UI source comments and design
+  token documentation so the interface is described as Dopbase's own system.
 - The Admin UI now uses the updated Dopbase mark in authentication, navigation,
   and not-found screens.
 - Bun scripts now use `action:target` names for development, builds, tests,
@@ -203,9 +207,9 @@ standardizes pull request and release notes.
 
 ### Added
 
-- PocketBase-inspired component system for the Admin UI: solid borderless
-  buttons, filled fields with inline labels, borderless badges, and new
-  toggle and checkbox primitives, all carrying the Dopbase purple accent.
+- Admin UI component system with solid borderless buttons, filled fields with
+  inline labels, borderless badges, and new toggle and checkbox primitives,
+  all using the Dopbase purple accent.
 - The "Edit as .env" view is now a full editor shell with a filename tab and
   unsaved-changes dot, active-line gutter highlight, a status bar with cursor
   position and problem counts, a problems strip, and Cmd/Ctrl+S to save.
