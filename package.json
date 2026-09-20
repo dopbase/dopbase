@@ -20,6 +20,7 @@
     "test:docs": "bun scripts/check-mermaid-viewer.mjs",
     "test:github": "node --test scripts/github-templates.test.mjs",
     "test:installer": "sh scripts/install.test.sh",
+    "clean": "cargo clean --manifest-path app/Cargo.toml",
     "lint": "bun run lint:ui && bun run lint:app",
     "lint:ui": "bunx eslint src",
     "lint:app": "bun run prepare:app && cargo clippy --manifest-path app/Cargo.toml --locked --all-targets --all-features -- -D warnings",

@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> |
+  <a href="#cli-reference">CLI reference</a> |
   <a href="#demo">Demo</a> |
   <a href="#why-dopbase">Why Dopbase</a> |
   <a href="https://dopbase.com/how-it-works">How it works</a> |
@@ -58,6 +59,80 @@ dopbase server start
 Open `http://localhost:8840` to finish setup in the Admin UI. The [quick-start guide](./docs/guide/quick-start.md) covers sign-in, importing a `.env` file, and running an application with its secrets.
 
 Native release archives are available for macOS and Linux on AMD64 and ARM64.
+
+## CLI reference
+
+```text
+Dopbase keeps application secrets in one binary: run a server, store secrets per project and environment, and inject them into any command with `run`.
+
+Usage: dopbase [OPTIONS] <COMMAND>
+
+Commands:
+  server   Start, stop, inspect, and read logs from a local Dopbase server
+  client   Connect the CLI to a Dopbase server (`client connect <url>`)
+  login    Authenticate with the active server
+  logout   Remove the saved credential for the active server
+  status   Alias for `dopbase client status`
+  init     Create a project, its first environment, and import secrets
+  project  Manage projects (create, list, show, rename, delete)
+  env      Manage environments inside a project (create, list, rename, delete)
+  secret   Manage secrets in an environment (list, set, get, delete)
+  import   Bulk-import secrets into an environment from a dotenv, JSON, or YAML source
+  export   Export an environment's secrets as dotenv, JSON, YAML, or a Docker env file
+  token    Manage CI/runner access tokens for an environment
+  run      Run a command with an environment's secrets injected as env vars
+  cache    Inspect and clean the encrypted runtime cache for the active server
+  admin    Offline server administration
+  update   Check GitHub for a newer Dopbase release (informational only)
+  backup   Create an encrypted backup snapshot of the Dopbase instance
+  restore  Restore the instance from an encrypted .dop backup file
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --version
+          Print the installed Dopbase version
+
+          [alias: -V]
+
+      --server <URL>
+          Client endpoint for this invocation, overriding the saved server and DOPBASE_URL. This does not apply to local server commands
+
+      --data-dir <DIR>
+          Directory for Dopbase state and configuration
+
+      --json
+          Print machine-readable JSON instead of human-readable output, where supported
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Environment variables:
+  DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
+  DOPBASE_URL                     Server URL for client commands when --server is not set
+  DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
+  DOPBASE_HOST                    Server bind host
+  DOPBASE_PORT                    Server port (default: 8840)
+  DOPBASE_PUBLIC_URL              Public URL
+  DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
+  DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
+  DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
+
+Quickstart:
+  dopbase server start                     # run a server on http://localhost:8840
+  dopbase server up                        # run the server in the background
+  dopbase login                            # authenticate with the active server
+  dopbase init                             # create a project + environment from ./.env
+  dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
+  dopbase secret set myapp/dev API_KEY --stdin
+  dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
+
+Common server options:
+  --host <HOST>    Bind host (default: 127.0.0.1)
+  --port <PORT>    Listen port (default: 8840)
+
+Run 'dopbase help <command>' for details on any command.
+```
 
 ## Why Dopbase
 
