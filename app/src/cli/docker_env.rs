@@ -1,7 +1,13 @@
 use crate::models::SecretInput;
 use anyhow::{Result, bail};
 
-const MAX_LINE_CONTENT_BYTES: usize = 65_535;
+// Docker env-file entries are single-line KEY=VALUE pairs. Keep each rendered
+// line below 65535 bytes, which matches Docker's single-line env-file parser
+// safety limit. Larger values are rejected before export so the file remains
+// parseable by `docker run --env-file` / `docker exec --env-file`.
+// This is separate from the OS-level total environment size limit enforced by
+// execve() on Linux.
+const MAX_DOCKER_ENV_LINE_BYTES: usize = 65_535;
 
 pub fn render(entries: &[SecretInput]) -> Result<String> {
   let mut output = String::new();
@@ -18,7 +24,7 @@ pub fn render(entries: &[SecretInput]) -> Result<String> {
         entry.key
       );
     }
-    if entry.key.len() + 1 + entry.value.len() > MAX_LINE_CONTENT_BYTES {
+    if entry.key.len() + 1 + entry.value.len() > MAX_DOCKER_ENV_LINE_BYTES {
       bail!(
         "secret {:?} exceeds Docker's maximum env-file line length",
         entry.key
