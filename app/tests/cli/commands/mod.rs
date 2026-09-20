@@ -9,6 +9,7 @@ use app::cli::{
 };
 
 mod cache;
+mod init;
 
 #[test]
 fn factory_reset_requires_the_exact_confirmation_phrase() {
