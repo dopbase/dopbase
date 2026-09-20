@@ -2,11 +2,11 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## Unreleased
+## 0.1.7 - 2026-09-20
 
-Dopbase now has guided project setup, more export formats, consistent
-repository commands, leaner test suites, and a documented community conduct
-policy.
+Dopbase 0.1.7 adds guided `.env` setup, TOML secret files, and Docker-ready
+exports. It also refreshes the Admin UI branding, demo assets, and contributor
+documentation.
 
 ### Added
 
