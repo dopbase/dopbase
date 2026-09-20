@@ -13,14 +13,22 @@ individual secret records instead of storing the file as one opaque object.
 Use `init` when the project does not exist yet:
 
 ```bash
+dopbase init
 dopbase init payment-service/development --from .env
 dopbase init another-service/development --from secrets.json
 dopbase init worker/development --from secrets.yml
 ```
 
-The file is validated first. Dopbase then creates the project, environment, and
-individual secret records atomically. If validation or creation fails, no
-partially imported project remains.
+With no arguments, `init` reads `./.env`, shows how many variables it found,
+and asks for a `project/environment` target. Its sensitive count is based only
+on variable names. Dopbase never prints the values, and it imports every
+variable regardless of that count.
+
+The file is validated first. Dopbase then creates the project, environment,
+and individual secret records atomically. If validation or creation fails, no
+partial project remains. After an interactive import, the command asks whether
+to delete `.env`, with Yes selected by default. It keeps the file if its
+contents changed during the import and does not edit `.gitignore`.
 
 `init` fails if the project name already exists. To add another environment to
 that project, create it explicitly and import into it:
