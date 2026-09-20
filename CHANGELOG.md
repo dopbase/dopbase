@@ -2,6 +2,14 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## 0.1.8 - Unrelease
+
+[Dopbase](https://dopbase.com) 0.1.8
+
+### Added
+
+### Improvement
+
 ## 0.1.7 - 2026-09-20
 
 Dopbase 0.1.7 adds guided `.env` setup, TOML secret files, and Docker-ready
