@@ -138,14 +138,14 @@ async fn init_reads_yaml_from_stdin_and_sends_string_entries() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn import_infers_json_from_the_filename_and_preserves_dry_run() {
+async fn import_infers_toml_from_the_filename_and_preserves_dry_run() {
   let (requests, url, server) = start_server().await;
   let directory = TempDir::new().unwrap();
   save_session(&directory, &url);
-  let source = directory.path().join("secrets.json");
+  let source = directory.path().join("secrets.toml");
   std::fs::write(
     &source,
-    format!(r#"{{"DATABASE_URL":"{SECRET_MARKER}","API_KEY":"token"}}"#),
+    format!("DATABASE_URL = \"{SECRET_MARKER}\"\nAPI_KEY = \"token\"\n"),
   )
   .unwrap();
   let output = Command::new(env!("CARGO_BIN_EXE_dopbase"))

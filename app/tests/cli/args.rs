@@ -455,6 +455,41 @@ fn secret_commands_parse_format_options() {
     })
   ));
 
+  let toml_init = Cli::try_parse_from([
+    "dopbase",
+    "init",
+    "storefront/development",
+    "--from",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_init.command,
+    Command::Init(InitArgs {
+      format: Some(SecretFormat::Toml),
+      ..
+    })
+  ));
+
+  let toml_import = Cli::try_parse_from([
+    "dopbase",
+    "import",
+    "storefront/development",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_import.command,
+    Command::Import(ImportArgs {
+      format: Some(SecretFormat::Toml),
+      ..
+    })
+  ));
+
   let export = Cli::try_parse_from([
     "dopbase",
     "export",
@@ -469,6 +504,24 @@ fn secret_commands_parse_format_options() {
     export.command,
     Command::Export(ExportArgs {
       format: Some(ExportFormat::Dotenv),
+      ..
+    })
+  ));
+
+  let toml_export = Cli::try_parse_from([
+    "dopbase",
+    "export",
+    "storefront/development",
+    "--output",
+    "secrets.toml",
+    "--format",
+    "toml",
+  ])
+  .unwrap();
+  assert!(matches!(
+    toml_export.command,
+    Command::Export(ExportArgs {
+      format: Some(ExportFormat::Toml),
       ..
     })
   ));
