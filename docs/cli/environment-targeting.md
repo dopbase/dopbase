@@ -64,12 +64,13 @@ Connect and sign in, then bootstrap the project and first environment:
 ```bash
 dopbase client connect https://dopbase.example.com
 dopbase login
-dopbase init storefront/development --from .env
+dopbase init
 ```
 
 `init` validates the file and atomically creates the project, environment, and
-individual secrets. It does not write a Dopbase configuration file into the
-repository.
+individual secrets. The interactive command asks for `storefront/development`
+and offers to delete `.env` after the import. It does not write a Dopbase
+configuration file into the repository.
 
 Add the other environments explicitly:
 

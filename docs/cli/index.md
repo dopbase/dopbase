@@ -17,7 +17,7 @@ dopbase server start
 # Client role
 dopbase client status
 dopbase login
-dopbase init payment-service/development --from .env
+dopbase init
 dopbase env create payment-service/staging
 dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
@@ -46,7 +46,7 @@ See [environment variables](./environment-variables) for every supported
 1. Start the default local server, or obtain another Dopbase endpoint.
 2. Use implicit localhost or select another server with `dopbase client connect`.
 3. Authenticate with `dopbase login` or a scoped runner token.
-4. Bootstrap a project with `init`, or create project and environment resources.
+4. Run `dopbase init` from a directory with a `.env`, or pass a target and file explicitly.
 5. Pass an environment reference to secret, import, export, or run commands.
 
 ## Output and secrets
