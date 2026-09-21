@@ -10,6 +10,11 @@ All notable changes to Dopbase are documented in this file.
 
 ### Improvement
 
+### Fixed
+
+- `dopbase run` now keeps interactive commands attached to the terminal, so
+  tools such as Codex and Claude accept input instead of stopping at startup.
+
 ## 0.1.7 - 2026-09-20
 
 Dopbase 0.1.7 adds guided `.env` setup, TOML secret files, and Docker-ready
