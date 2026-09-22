@@ -72,19 +72,23 @@ individual secrets. The interactive command asks for `storefront/development`
 and offers to delete `.env` after the import. It does not write a Dopbase
 configuration file into the repository.
 
-Add the other environments explicitly:
+Clone the first environment when another environment should start with the
+same secrets:
 
 ```bash
-dopbase env create storefront/staging
-dopbase import storefront/staging .env.staging
-
-dopbase env create storefront/production
-dopbase import storefront/production .env.production
+dopbase env clone storefront/development staging
+dopbase env clone storefront/staging production
 ```
 
-The create and import commands print each environment's immutable ID. Keep the
-production and staging IDs in the corresponding deployment configuration, not
-in the application repository.
+The clone command confirms the source, destination, and secret count before it
+creates anything. It copies current secret values in memory without creating a
+temporary file. A successful clone prints all environments in the project,
+including each immutable ID. Keep the production and staging IDs in the
+corresponding deployment configuration, not in the application repository.
+
+Cloning creates a snapshot. Later changes to one environment do not update the
+other. Use `dopbase import` when an environment needs values from a different
+file instead.
 
 ## Run the same project on two servers
 

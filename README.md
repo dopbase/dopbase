@@ -75,7 +75,7 @@ Commands:
   status   Alias for `dopbase client status`
   init     Create a project, its first environment, and import secrets
   project  Manage projects (create, list, show, rename, delete)
-  env      Manage environments inside a project (create, list, rename, delete)
+  env      Manage environments inside a project (create, clone, list, rename, delete)
   secret   Manage secrets in an environment (list, set, get, delete)
   import   Bulk-import secrets into an environment from a dotenv, JSON, YAML, or TOML source
   export   Export an environment's secrets as dotenv, JSON, YAML, TOML, or a Docker env file
@@ -124,6 +124,7 @@ Quickstart:
   dopbase login                            # authenticate with the active server
   dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
+  dopbase env clone myapp/dev staging      # copy secrets into a new environment
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 

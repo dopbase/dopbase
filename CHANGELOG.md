@@ -8,6 +8,10 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- Added `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` to create another
+  environment in the same project and copy its current secrets without a
+  temporary plaintext file.
+
 ### Improvement
 
 ### Fixed
