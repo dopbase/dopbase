@@ -155,7 +155,7 @@ pub enum Command {
     #[command(subcommand)]
     command: ProjectCommand,
   },
-  /// Manage environments inside a project (create, list, rename, delete).
+  /// Manage environments inside a project (create, clone, list, rename, delete).
   #[command(after_help = environment::HELP)]
   Env {
     #[command(subcommand)]
