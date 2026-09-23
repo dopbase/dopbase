@@ -14,6 +14,7 @@ All notable changes to Dopbase are documented in this file.
 
 ### Improvement
 
+- Added fix inconsistent width layout on frontend.
 - Documentation now reads the current version from `package.json` during builds
   instead of keeping release numbers in individual pages.
 - Documentation checks now run from one script and validate every Mermaid

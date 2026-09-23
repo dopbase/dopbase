@@ -33,7 +33,7 @@ const {
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-4xl p-8">
+    <div class="mx-auto max-w-5xl p-8">
       <header class="mb-6 flex items-center justify-between">
         <div>
           <div class="flex items-center gap-2.5">
