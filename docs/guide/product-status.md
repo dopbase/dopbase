@@ -1,15 +1,15 @@
 ---
 title: "Product status"
-description: "What ships in Dopbase 0.1.7: the Rust server, CLI, Admin UI, REST API, and SQLite storage in one executable, plus current operational boundaries."
+description: "What ships in Dopbase: the Rust server, CLI, Admin UI, REST API, and SQLite storage in one executable, plus current operational boundaries."
 ---
 
 # Product status
 
-Dopbase 0.1.7 is the current release. It includes the Rust server and
+Dopbase {{version}} is the current release. It includes the Rust server and
 CLI, the embedded Vue Admin UI, the REST API, generated OpenAPI and Swagger
 documentation, and SQLite storage in one executable.
 
-## Available in 0.1.7
+## Available in {{version}}
 
 - Projects, environments, and individually managed secrets
 - Encryption before persistence with separate master-key material
@@ -30,7 +30,7 @@ documentation, and SQLite storage in one executable.
 
 ## Current boundaries
 
-Version 0.1.0 requires a fresh data directory. Databases and `.dop` backups
+Version {{version}} requires a fresh data directory. Databases and `.dop` backups
 created by earlier releases are not supported. Keep the matching master key
 with every backup, and test restores before relying on them for recovery.
 

@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { documentationVersion } from "../../version";
+</script>
+
 <template>
   <div class="dopbase-terminal" aria-label="Dopbase server and client example">
     <div class="dopbase-terminal__bar">
@@ -7,7 +11,7 @@
     <pre><span class="prompt">$</span> dopbase server start
 <span class="success">Dopbase</span>
 Secure, Simple and Private
-Version 0.0.14
+Version {{ documentationVersion }}
 
 <span class="quiet">Admin UI:</span>   http://localhost:8840
 <span class="quiet">API:</span>        http://localhost:8840/api/v1

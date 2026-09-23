@@ -6,7 +6,7 @@ description: "Complete guide to Dopbase full-system encrypted snapshots (.dop), 
 # Backup and restore
 
 ::: warning Fresh install and matching key
-Dopbase 0.1.0 accepts backups created by 0.1.0 only. A restore also needs the
+Dopbase {{version}} accepts backups created by {{version}} only. A restore also needs the
 matching source `master.key` when moving between servers. Test recovery before
 relying on it for production data.
 :::
