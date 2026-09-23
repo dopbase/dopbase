@@ -99,7 +99,7 @@ Add a new section at the top of `CHANGELOG.md` in this form:
 ```markdown
 ## <version> - YYYY-MM-DD
 
-One short summary paragraph, no more than 1000 characters.
+One short summary paragraph, no more than 500 characters.
 
 ### Added
 
