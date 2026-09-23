@@ -14,6 +14,11 @@ All notable changes to Dopbase are documented in this file.
 
 ### Improvement
 
+- Documentation now reads the current version from `package.json` during builds
+  instead of keeping release numbers in individual pages.
+- Documentation checks now run from one script and validate every Mermaid
+  diagram under `docs`.
+
 ### Fixed
 
 - `dopbase run` now keeps interactive commands attached to the terminal, so
