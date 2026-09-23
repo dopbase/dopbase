@@ -99,7 +99,7 @@ Add a new section at the top of `CHANGELOG.md` in this form:
 ```markdown
 ## <version> - YYYY-MM-DD
 
-One short summary paragraph, no more than 500 characters.
+One short summary paragraph, no more than 1000 characters.
 
 ### Added
 
@@ -115,21 +115,22 @@ This step is complete when every user-visible change in the comparison is
 represented once, the summary and headings satisfy the release-note format,
 and historical changelog sections remain unchanged.
 
+If the changelog has an unreleased section, check it against the release diff.
+Keep accurate entries and correct any that do not match the code.
+
 ## 4. Verify the release preparation
 
 Run the same checks used by the GitHub release workflow, plus the documentation
 build:
 
 ```bash
-bun install --frozen-lockfile
-bun run test:github
-bun run test:ui
-bun run test:installer
-bun run build:ui
-bun run build:docs
 bun run format:app:check
 bun run lint:app
-bun run test:app
+bun run clean
+bun install --frozen-lockfile
+bun run test:github
+bun run test
+bun run build
 ```
 
 Also confirm the three release versions agree and the new changelog section
@@ -202,7 +203,7 @@ git push origin <version>
 Watch the `Release` GitHub Actions workflow triggered by the tag. It must:
 
 - verify the tag, package versions, and changelog;
-- pass the frontend, installer, Rust, and release-binary checks;
+- pass the frontend, documentation, Rust, and release-binary checks;
 - build macOS and Linux archives for AMD64 and ARM64;
 - generate `checksums.txt`;
 - generate notes from `CHANGELOG.md` and `.github/RELEASE_TEMPLATE.md`; and
