@@ -69,6 +69,14 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "project", "rename", "billing", "payments"],
     &["dopbase", "project", "delete", "billing", "--yes"],
     &["dopbase", "env", "create", "billing/production"],
+    &[
+      "dopbase",
+      "env",
+      "clone",
+      "billing/local",
+      "production",
+      "--yes",
+    ],
     &["dopbase", "env", "list", "billing"],
     &["dopbase", "env", "show", "billing/production"],
     &["dopbase", "env", "default", "billing/production"],
@@ -811,6 +819,10 @@ fn resource_parameters_use_consistent_value_names() {
       &["dopbase", "env", "create", "--help"],
       "<PROJECT_REF/ENVIRONMENT_NAME>",
     ),
+    (
+      &["dopbase", "env", "clone", "--help"],
+      "<PROJECT_REF/SOURCE_ENVIRONMENT_NAME> <NEW_ENVIRONMENT_NAME>",
+    ),
     (&["dopbase", "env", "list", "--help"], "[PROJECT_REF]"),
     (
       &["dopbase", "env", "default", "--help"],
@@ -860,6 +872,7 @@ fn other_incomplete_commands_show_full_help() {
     &["dopbase", "client", "connect"],
     &["dopbase", "project", "rename", "payment-service"],
     &["dopbase", "env", "show"],
+    &["dopbase", "env", "clone", "payment-service/local"],
     &["dopbase", "import"],
     &["dopbase", "export", "payment-service/production"],
     &["dopbase", "token", "create", "payment-service/production"],
@@ -873,6 +886,43 @@ fn other_incomplete_commands_show_full_help() {
     let help = contextual_help(arguments);
     assert!(help.contains("Usage:"), "{arguments:?}: {help}");
     assert!(help.contains("Example"), "{arguments:?}: {help}");
+  }
+}
+
+#[test]
+fn env_clone_requires_a_qualified_source_and_one_new_name() {
+  assert!(
+    Cli::try_parse_from([
+      "dopbase",
+      "env",
+      "clone",
+      "payment-service/local",
+      "production"
+    ])
+    .is_ok()
+  );
+  assert!(
+    Cli::try_parse_from(["dopbase", "env", "clone", "prj_01JTEST/local", "preview-42"]).is_ok()
+  );
+  for arguments in [
+    vec!["dopbase", "env", "clone", "env_482731", "production"],
+    vec![
+      "dopbase",
+      "env",
+      "clone",
+      "payment-service/local",
+      "payment-service",
+      "production",
+    ],
+    vec![
+      "dopbase",
+      "env",
+      "clone",
+      "payment-service/local",
+      "Production",
+    ],
+  ] {
+    assert!(Cli::try_parse_from(arguments).is_err());
   }
 }
 

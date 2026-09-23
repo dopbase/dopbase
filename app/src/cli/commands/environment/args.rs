@@ -21,6 +21,27 @@ pub enum EnvCommand {
     #[arg(value_name = "PROJECT_REF/ENVIRONMENT_NAME", value_parser = environment_target::parse_create)]
     target: EnvironmentTarget,
   },
+  /// Clone an environment's secrets into a new environment in the same project.
+  ///
+  /// Asks for confirmation unless --yes is passed.
+  #[command(after_help = CLONE_HELP)]
+  Clone {
+    /// Existing source, written as PROJECT_REF/SOURCE_ENVIRONMENT_NAME.
+    #[arg(
+      value_name = "PROJECT_REF/SOURCE_ENVIRONMENT_NAME",
+      value_parser = environment_target::parse_create
+    )]
+    source: EnvironmentTarget,
+    /// Name for the new environment.
+    #[arg(
+      value_name = "NEW_ENVIRONMENT_NAME",
+      value_parser = environment_target::parse_name
+    )]
+    new_name: String,
+    /// Skip the clone confirmation. Recent human authentication is still required.
+    #[arg(long)]
+    yes: bool,
+  },
   /// List environments, either for one project or all accessible ones.
   #[command(after_help = LIST_HELP)]
   List {
@@ -59,6 +80,7 @@ pub enum EnvCommand {
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase env create payment-service/production
+  dopbase env clone payment-service/local production
   dopbase env list payment-service
   dopbase env show payment-service/production
   dopbase env default payment-service/development
@@ -73,6 +95,11 @@ Examples:
 const CREATE_HELP: &str = "\
 Examples:
   dopbase env create payment-service/production
+";
+const CLONE_HELP: &str = "\
+Examples:
+  dopbase env clone payment-service/local production
+  dopbase env clone storefront/staging preview-42 --yes
 ";
 const LIST_HELP: &str = "\
 Examples:

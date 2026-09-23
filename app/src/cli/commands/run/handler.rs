@@ -73,28 +73,15 @@ pub(crate) async fn execute(
   #[cfg(unix)]
   {
     use std::os::unix::process::CommandExt;
-    child_command.as_std_mut().process_group(0);
-  }
-  let mut child = child_command
-    .spawn()
-    .with_context(|| format!("failed to start {program}"))?;
-  #[cfg(unix)]
-  {
-    use nix::{
-      sys::signal::{Signal, killpg},
-      unistd::Pid,
-    };
-    let pid = child.id().context("child process has no process ID")? as i32;
-    let status = tokio::select! {status=child.wait()=>status?,_=tokio::signal::ctrl_c()=>{let _=killpg(Pid::from_raw(pid),Signal::SIGINT);child.wait().await?},_=terminate_signal()=>{let _=killpg(Pid::from_raw(pid),Signal::SIGTERM);child.wait().await?}};
-    use std::os::unix::process::ExitStatusExt;
-    Ok(
-      status
-        .code()
-        .unwrap_or_else(|| 128 + status.signal().unwrap_or(1)),
-    )
+
+    let error = child_command.as_std_mut().exec();
+    Err(error).with_context(|| format!("failed to start {program}"))
   }
   #[cfg(not(unix))]
   {
+    let mut child = child_command
+      .spawn()
+      .with_context(|| format!("failed to start {program}"))?;
     Ok(child.wait().await?.code().unwrap_or(1))
   }
 }
@@ -140,13 +127,4 @@ pub fn run_environment(
     });
   }
   bail!("No default environment is set. Set one with: dopbase env default <ENVIRONMENT_REF>")
-}
-#[cfg(unix)]
-async fn terminate_signal() {
-  if let Ok(mut signal) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-  {
-    signal.recv().await;
-  } else {
-    std::future::pending::<()>().await;
-  }
 }

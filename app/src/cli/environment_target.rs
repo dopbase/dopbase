@@ -35,6 +35,13 @@ pub fn parse_create(value: &str) -> Result<EnvironmentTarget, String> {
   Ok(target)
 }
 
+pub fn parse_name(value: &str) -> Result<String, String> {
+  if !slug::is_valid(value) {
+    return Err("environment name must be a lowercase slug of at most 63 characters".into());
+  }
+  Ok(value.into())
+}
+
 fn parse(value: &str) -> Result<EnvironmentTarget, String> {
   let mut parts = value.split('/');
   let project = parts.next().unwrap_or_default();

@@ -5,6 +5,7 @@ use super::{
 use crate::constants::{api, config::ENV_TOKEN};
 use anyhow::{Context, Result, bail};
 use reqwest::Method;
+use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
   env, fmt,
@@ -158,6 +159,19 @@ impl ApiClient {
     self.request_inner(method, path, body, false).await
   }
 
+  pub(crate) async fn request_json<T>(
+    &self,
+    method: Method,
+    path: &str,
+    body: &T,
+  ) -> Result<Value>
+  where
+    T: Serialize + ?Sized,
+  {
+    let request = self.request_builder(method, path).json(body);
+    self.send_request(request, false).await
+  }
+
   pub(crate) async fn request_runtime(
     &self,
     method: Method,
@@ -174,15 +188,33 @@ impl ApiClient {
     body: Option<Value>,
     classify_availability: bool,
   ) -> Result<Value> {
-    let mut request = self
-      .client
-      .request(method, format!("{}{}", self.base_url, path));
-    if let Some(token) = &self.token {
-      request = request.bearer_auth(token);
-    }
+    let mut request = self.request_builder(method, path);
     if let Some(body) = body {
       request = request.json(&body);
     }
+    self.send_request(request, classify_availability).await
+  }
+
+  fn request_builder(
+    &self,
+    method: Method,
+    path: &str,
+  ) -> reqwest::RequestBuilder {
+    let request = self
+      .client
+      .request(method, format!("{}{}", self.base_url, path));
+    if let Some(token) = &self.token {
+      request.bearer_auth(token)
+    } else {
+      request
+    }
+  }
+
+  async fn send_request(
+    &self,
+    request: reqwest::RequestBuilder,
+    classify_availability: bool,
+  ) -> Result<Value> {
     let response = request
       .send()
       .await
@@ -613,6 +645,33 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
       Ok(client)
     }
   }
+}
+
+pub(crate) async fn ensure_recent_authentication(client: &ApiClient) -> Result<()> {
+  let session = client
+    .request(Method::GET, api::auth::SESSION, None)
+    .await?;
+  let recent = session
+    .get("recentAuthentication")
+    .and_then(Value::as_bool)
+    .context("session response did not contain recent-authentication status")?;
+  if recent {
+    return Ok(());
+  }
+  if !io::stdin().is_terminal() {
+    bail!(
+      "recent human authentication is required. Run this command in a terminal to confirm your password"
+    );
+  }
+  let password = prompt_password_confirmation().await?;
+  client
+    .request(
+      Method::POST,
+      api::auth::REAUTHENTICATE,
+      Some(json!({"password":password})),
+    )
+    .await?;
+  Ok(())
 }
 
 async fn prompt_password_confirmation() -> Result<String> {

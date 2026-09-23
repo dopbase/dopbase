@@ -39,7 +39,7 @@ back up the key through a separately protected process.
 
 ## Built-in backup and restore system
 
-Full-instance backups are available only to root in version 0.1.0. They include
+Full-instance backups are available only to root in version {{version}}. They include
 human users, service accounts, and tokens. Backups from earlier releases are
 not supported.
 

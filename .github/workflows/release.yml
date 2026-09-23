@@ -81,7 +81,7 @@ jobs:
         run: |
           bun run test:github
           bun run test:ui
-          bun run test:installer
+          bun run test:docs
           bun run build:ui
 
       - name: Verify Rust application

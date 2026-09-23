@@ -3,12 +3,14 @@ import { join } from "node:path";
 import { defineConfig, type HeadConfig } from "vitepress";
 import { withMermaid } from "vitepress-mermaid-viewer";
 import { assetFileNames } from "../../config/asset-file-names.ts";
-import pkg from "../../package.json" with { type: "json" };
+import {
+  documentationVersionLabel,
+  documentationVersionPlugin,
+} from "./version.ts";
 
 const siteUrl = "https://docs.dopbase.com";
 const siteName = "Dopbase";
 const projectUrl = "https://github.com/dopbase/dopbase";
-const currentVersion = `v${pkg.version}`;
 const siteDescription =
   "Dopbase is an open-source secrets manager for developers. Self-host one executable, organize secrets by environment, and inject them into applications.";
 const ogImage = `${siteUrl}/og-image.jpg`;
@@ -165,6 +167,7 @@ const config = defineConfig({
   },
   vite: {
     publicDir: "../public",
+    plugins: [documentationVersionPlugin()],
     optimizeDeps: {
       include: ["mermaid", "fastdom"],
     },
@@ -199,7 +202,7 @@ const config = defineConfig({
       { text: "Reference", link: "/reference/", activeMatch: "^/reference/" },
       { text: "About", link: "/about/", activeMatch: "^/about/" },
       {
-        text: currentVersion,
+        text: documentationVersionLabel,
         items: [
           { text: "Roadmap", link: "/about/roadmap" },
           { text: "Releases", link: `${projectUrl}/releases` },

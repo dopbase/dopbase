@@ -1,11 +1,11 @@
 ---
 title: "Command reference"
-description: "Reference for every Dopbase CLI command in v0.1.3: connections, authentication, projects, environments, and secret operations."
+description: "Reference for every Dopbase CLI command: connections, authentication, projects, environments, and secret operations."
 ---
 
 # Command reference
 
-This page defines the implemented v0.1.3 command surface. Dopbase does not infer a
+This page defines the implemented v{{version}} command surface. Dopbase does not infer a
 project or environment from the current directory. Management commands receive
 an environment reference directly. `run` may use a server-scoped default from
 the user configuration.
@@ -72,7 +72,7 @@ Use `server start`, `server up`, and `server down` respectively.
 GitHub. It is informational only and never modifies the binary:
 
 ```text
-dopbase 0.1.3 is up to date (latest release 0.1.3).
+dopbase {{version}} is up to date (latest release {{version}}).
 ```
 
 When a newer release exists, the command prints the current version, the latest
@@ -176,18 +176,46 @@ affected resource counts and requires confirmation. Automation must pass
 
 ## Environment commands
 
-| Command                                                       | Purpose                   |
-| ------------------------------------------------------------- | ------------------------- |
-| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`           | Create an environment     |
-| `dopbase env default <ENVIRONMENT_REF>`                       | Set the run default       |
-| `dopbase env default --clear`                                 | Clear the run default     |
-| `dopbase env list [PROJECT_REF]`                              | List environments         |
-| `dopbase env show <ENVIRONMENT_REF>`                          | Show environment metadata |
-| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>` | Rename an environment     |
-| `dopbase env delete <ENVIRONMENT_REF>`                        | Delete an environment     |
+| Command                                                                          | Purpose                            |
+| -------------------------------------------------------------------------------- | ---------------------------------- |
+| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`                              | Create an environment              |
+| `dopbase env clone <PROJECT_REF/SOURCE_ENVIRONMENT_NAME> <NEW_ENVIRONMENT_NAME>` | Clone secrets to a new environment |
+| `dopbase env default <ENVIRONMENT_REF>`                                          | Set the run default                |
+| `dopbase env default --clear`                                                    | Clear the run default              |
+| `dopbase env list [PROJECT_REF]`                                                 | List environments                  |
+| `dopbase env show <ENVIRONMENT_REF>`                                             | Show environment metadata          |
+| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>`                    | Rename an environment              |
+| `dopbase env delete <ENVIRONMENT_REF>`                                           | Delete an environment              |
 
 Deleting an environment also deletes its secrets and scoped tokens. The
 operation requires confirmation or `--yes` and is recorded in the audit log.
+
+Clone an environment when a local, preview, or production environment should
+start with the same secrets as an existing environment:
+
+```bash
+dopbase env clone payment-service/local production
+dopbase env clone storefront/staging preview-42 --yes
+```
+
+The source must use `PROJECT_REF/ENVIRONMENT_NAME`. The new environment is
+created in that project, so cloning across projects or servers is not
+supported. Dopbase resolves the source, checks that the new name is available,
+shows the source, destination, and secret count, then asks for confirmation.
+`--yes` skips this confirmation but still requires a recently authenticated
+human account. Runner tokens and service accounts cannot clone environments.
+
+Dopbase creates the destination before reading plaintext secrets. This closes
+a name-conflict race without exposing source values. If export or import
+fails, the CLI tries to remove the new environment and reports whether cleanup
+succeeded. Secret values remain in memory and are not written to a temporary
+file.
+
+A successful clone prints every environment in the project. With `--json`, it
+returns the same environment array as `dopbase env list <PROJECT_REF> --json`.
+The clone copies current secret key/value pairs only. It does not copy editor
+layout, tokens, audit history, IDs, or timestamps, and it does not keep the two
+environments synchronized.
 
 ## Secret commands
 

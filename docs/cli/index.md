@@ -19,6 +19,7 @@ dopbase client status
 dopbase login
 dopbase init
 dopbase env create payment-service/staging
+dopbase env clone payment-service/staging preview-42
 dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
 ```

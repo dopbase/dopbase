@@ -34,7 +34,7 @@ const {
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-4xl p-8">
+    <div class="mx-auto max-w-5xl p-8">
       <!-- Header -->
       <header class="mb-6 flex items-center justify-between">
         <div>

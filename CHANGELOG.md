@@ -8,7 +8,22 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- Added `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` to create another
+  environment in the same project and copy its current secrets without a
+  temporary plaintext file.
+
 ### Improvement
+
+- Added fix inconsistent width layout on frontend.
+- Documentation now reads the current version from `package.json` during builds
+  instead of keeping release numbers in individual pages.
+- Documentation checks now run from one script and validate every Mermaid
+  diagram under `docs`.
+
+### Fixed
+
+- `dopbase run` now keeps interactive commands attached to the terminal, so
+  tools such as Codex and Claude accept input instead of stopping at startup.
 
 ## 0.1.7 - 2026-09-20
 

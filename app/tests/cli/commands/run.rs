@@ -13,6 +13,14 @@ use std::sync::{
 use std::{fs, path::PathBuf};
 use tempfile::TempDir;
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::{
+  io::Write,
+  process::{Command, Stdio},
+  thread,
+  time::{Duration, Instant},
+};
+
 const TOKEN: &str = "dbt_cache_credential_marker";
 const SECRET: &str = "cached-secret-marker";
 
@@ -273,4 +281,73 @@ async fn unavailable_server_without_cache_does_not_provide_runtime_values() {
     .to_string();
   assert!(error.contains("Environment variables were not injected"));
   assert!(error.contains("child was not started"));
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interactive_child_reads_from_the_terminal_and_returns_its_exit_status() {
+  let (_mode, url, task) = start_server().await;
+  let directory = TempDir::new().unwrap();
+  let child_pid_path = directory.path().join("child.pid");
+  let launcher_path = directory.path().join("interactive-child.sh");
+  fs::write(
+    &launcher_path,
+    "exec \"$DOPBASE_BIN\" --server \"$DOPBASE_SERVER\" --data-dir \"$DOPBASE_DATA_DIR\" run env_01CACHE -- sh -c 'echo \"$$\" > \"$CHILD_PID_PATH\"; IFS= read -r line; [ \"$line\" = ping ] && [ \"$API_TOKEN\" = \"$EXPECTED_SECRET\" ]; exit 23'\n",
+  )
+  .unwrap();
+  let mut command = Command::new("script");
+  #[cfg(target_os = "macos")]
+  command
+    .args(["-q", "-e", "/dev/null", "sh"])
+    .arg(&launcher_path);
+  #[cfg(not(target_os = "macos"))]
+  command.args([
+    "-q",
+    "-e",
+    "-f",
+    "-c",
+    "sh \"$DOPBASE_TEST_SCRIPT\"",
+    "/dev/null",
+  ]);
+  command
+    .env("DOPBASE_BIN", env!("CARGO_BIN_EXE_dopbase"))
+    .env("DOPBASE_SERVER", &url)
+    .env("DOPBASE_DATA_DIR", directory.path())
+    .env("DOPBASE_TEST_SCRIPT", &launcher_path)
+    .env("DOPBASE_TOKEN", TOKEN)
+    .env("CHILD_PID_PATH", &child_pid_path)
+    .env("EXPECTED_SECRET", SECRET)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
+
+  let mut child = command.spawn().unwrap();
+  child.stdin.take().unwrap().write_all(b"ping\n").unwrap();
+
+  let deadline = Instant::now() + Duration::from_secs(3);
+  let status = loop {
+    if let Some(status) = child.try_wait().unwrap() {
+      break status;
+    }
+    if Instant::now() >= deadline {
+      if let Ok(pid) = fs::read_to_string(&child_pid_path)
+        && let Ok(pid) = pid.trim().parse::<i32>()
+      {
+        use nix::{
+          sys::signal::{Signal, killpg},
+          unistd::Pid,
+        };
+
+        let _ = killpg(Pid::from_raw(pid), Signal::SIGCONT);
+        let _ = killpg(Pid::from_raw(pid), Signal::SIGKILL);
+      }
+      let _ = child.kill();
+      let _ = child.wait();
+      panic!("interactive child did not finish after receiving terminal input");
+    }
+    thread::sleep(Duration::from_millis(10));
+  };
+
+  task.abort();
+  assert_eq!(status.code(), Some(23));
 }
