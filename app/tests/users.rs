@@ -78,7 +78,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     Some(json!({"setupToken": setup, "email":"root@example.com", "password":"correct-horse-123"})),
   )
   .await;
-  assert_eq!(status, 201, "bootstrap body: {bootstrap:?}");
+  assert_eq!(status, 201);
   let cookie = headers
     .get(header::SET_COOKIE)
     .unwrap()
@@ -98,7 +98,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     Some(json!({"email":"admin@example.com","password":"correct-horse-456"})),
   )
   .await;
-  assert_eq!(status, 201, "create body: {created:?}");
+  assert_eq!(status, 201);
   assert_eq!(created["data"]["role"], "admin");
   let (status, _, admin_headers) = call(
     &router,
@@ -130,7 +130,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     None,
   )
   .await;
-  assert_eq!(status, 200, "admin user-list body: {body:?}");
+  assert_eq!(status, 200);
   assert_eq!(body["data"].as_array().unwrap().len(), 2);
   let (status, listed, _) = call(&router, "GET", "/api/v1/users", Some(&cookie), None, None).await;
   assert_eq!(status, 200);
@@ -215,7 +215,7 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
     .unwrap()
     .to_string();
   let member_csrf = login["data"]["csrfToken"].as_str().unwrap().to_string();
-  let (status, project, _) = call(
+  let (status, _, _) = call(
     &router,
     "POST",
     "/api/v1/projects",
@@ -224,7 +224,7 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
     Some(json!({"name":"member-project"})),
   )
   .await;
-  assert_eq!(status, 201, "member project body: {project:?}");
+  assert_eq!(status, 201);
   let (status, _, _) = call(
     &router,
     "GET",
@@ -244,7 +244,7 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
     Some(json!({"name":"build-agent"})),
   )
   .await;
-  assert_eq!(status, 201, "agent body: {agent:?}");
+  assert_eq!(status, 201);
   let agent_id = agent["data"]["id"].as_str().unwrap();
   let (status, token, _) = call(
     &router,
@@ -255,7 +255,7 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
     Some(json!({"name":"default"})),
   )
   .await;
-  assert_eq!(status, 201, "token body: {token:?}");
+  assert_eq!(status, 201);
   let bearer = token["data"]["plaintextToken"].as_str().unwrap();
   let (status, _, _) = call(
     &router,
@@ -313,7 +313,7 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     Some(json!({"name":"build-agent"})),
   )
   .await;
-  assert_eq!(status, 201, "{account:?}");
+  assert_eq!(status, 201);
   let id = account["data"]["id"].as_str().unwrap();
   let path = format!("/api/v1/service-accounts/{id}/tokens");
   let (status, never, _) = call(
@@ -325,7 +325,7 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     Some(json!({"name":"never","expiresIn":"never"})),
   )
   .await;
-  assert_eq!(status, 201, "{never:?}");
+  assert_eq!(status, 201);
   assert!(never["data"]["token"]["expiresAt"].is_null());
   let bearer = never["data"]["plaintextToken"].as_str().unwrap();
   let token_id = never["data"]["token"]["id"].as_str().unwrap();
@@ -355,7 +355,7 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
   )
   .await;
   assert_eq!(status, 401);
-  let (status, limit, _) = call(
+  let (status, _, _) = call(
     &router,
     "POST",
     &path,
@@ -364,8 +364,8 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     Some(json!({"name":"limit","expiresIn":"1095d"})),
   )
   .await;
-  assert_eq!(status, 201, "{limit:?}");
-  let (status, invalid, _) = call(
+  assert_eq!(status, 201);
+  let (status, _, _) = call(
     &router,
     "POST",
     &path,
@@ -374,8 +374,8 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     Some(json!({"name":"invalid","expiresIn":"1096d"})),
   )
   .await;
-  assert_eq!(status, 400, "{invalid:?}");
-  let (status, both, _) = call(
+  assert_eq!(status, 400);
+  let (status, _, _) = call(
     &router,
     "POST",
     &path,
@@ -384,6 +384,6 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     Some(json!({"name":"both","expiresIn":"1h","expiresAt":"2026-12-01T00:00:00Z"})),
   )
   .await;
-  assert_eq!(status, 400, "{both:?}");
+  assert_eq!(status, 400);
   state.db.close().await;
 }

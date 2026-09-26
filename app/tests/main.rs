@@ -1092,7 +1092,7 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
     Some(json!({"name":"short","role":"runner","expiresIn":"1h"})),
   )
   .await;
-  assert_eq!(status, 201, "{created:?}");
+  assert_eq!(status, 201);
   assert!(created["data"]["token"]["expiresAt"].is_string());
   let runner = created["data"]["plaintextToken"].as_str().unwrap();
   let token_id = created["data"]["token"]["id"].as_str().unwrap();
@@ -1119,9 +1119,9 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
     Some(json!({"name":"unlimited","role":"runner"})),
   )
   .await;
-  assert_eq!(status, 201, "{default:?}");
+  assert_eq!(status, 201);
   assert!(default["data"]["token"]["expiresAt"].is_null());
-  let (status, limit, _) = call(
+  let (status, _, _) = call(
     &router,
     "POST",
     &path,
@@ -1129,8 +1129,8 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
     Some(json!({"name":"limit","role":"runner","expiresIn":"1095d"})),
   )
   .await;
-  assert_eq!(status, 201, "{limit:?}");
-  let (status, invalid, _) = call(
+  assert_eq!(status, 201);
+  let (status, _, _) = call(
     &router,
     "POST",
     &path,
@@ -1138,6 +1138,6 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
     Some(json!({"name":"too-long","role":"runner","expiresIn":"1096d"})),
   )
   .await;
-  assert_eq!(status, 400, "{invalid:?}");
+  assert_eq!(status, 400);
   state.db.close().await;
 }

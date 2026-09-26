@@ -27,6 +27,7 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
+- Token tests no longer print credential-bearing API responses on assertion failures.
 - The AI agents list now shows each token's expiry date or "No expiry".
 - `dopbase run` now keeps interactive commands attached to the terminal, so
   tools such as Codex and Claude accept input instead of stopping at startup.
