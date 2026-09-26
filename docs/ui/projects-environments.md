@@ -57,9 +57,12 @@ deployment configuration.
 Each environment has a **Tokens** tab next to its secrets. This is where
 machine identities come from:
 
-- **Create** a token with a name such as `production-server`. Dopbase shows
+- **Create** a token with a name such as `production-server`. Choose no expiry,
+  a preset lifetime, or a custom number of hours or days up to three years. Dopbase shows
   the plaintext token once. Copy it before closing the dialog because Dopbase
   cannot display it again.
+- **Check expiry** in the token list. Expired tokens cannot authenticate. Create
+  a replacement if you need a different lifetime.
 - **Revoke** a token when a server is decommissioned or a token may have
   leaked. Revocation is immediate.
 

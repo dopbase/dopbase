@@ -48,7 +48,9 @@ tokens instead of an email and password.
 
 Choose **Get token** beside an agent to generate a credential. This prompts for
 your administrator password to confirm your identity. Each confirmation issues
-a fresh 30-day token and revokes any prior active token for that agent. The
+a fresh token and revokes any prior active token for that agent. Choose no
+expiry, a preset lifetime, or a custom number of hours or days up to three
+years. The default is 30 days. The
 plaintext token is shown once: copy and store it immediately, as it cannot be
 recovered later.
 

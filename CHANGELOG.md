@@ -8,12 +8,17 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- Runner and AI agent tokens can now be created with an expiry in hours or days,
+  up to three years, or without an expiry. The Admin UI offers presets and a
+  custom duration; `dopbase token create` accepts `--expires-in`.
 - Added `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` to create another
   environment in the same project and copy its current secrets without a
   temporary plaintext file.
 
 ### Improvement
 
+- Grouped the Users page controller's values and functions into `state` and
+  `actions` to simplify its page setup.
 - Added fix inconsistent width layout on frontend.
 - Documentation now reads the current version from `package.json` during builds
   instead of keeping release numbers in individual pages.
@@ -22,6 +27,7 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
+- The AI agents list now shows each token's expiry date or "No expiry".
 - `dopbase run` now keeps interactive commands attached to the terminal, so
   tools such as Codex and Claude accept input instead of stopping at startup.
 
