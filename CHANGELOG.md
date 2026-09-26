@@ -17,6 +17,7 @@ All notable changes to Dopbase are documented in this file.
 
 ### Improvement
 
+- Secrets table rows now brighten on hover, and expanded audit events show their raw timestamp.
 - Grouped the Users page controller's values and functions into `state` and
   `actions` to simplify its page setup.
 - Added fix inconsistent width layout on frontend.

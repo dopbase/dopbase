@@ -210,6 +210,10 @@ function toggle(event: AuditEvent): void {
                 <td colspan="4" class="px-4 py-3">
                   <div class="flex flex-col gap-2 font-mono text-xs text-ink">
                     <p>
+                      <span class="text-ink-muted">timestamp:</span>
+                      {{ event.createdAt }}
+                    </p>
+                    <p>
                       <span class="text-ink-muted">event:</span>
                       {{ event.id }}
                     </p>
