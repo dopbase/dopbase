@@ -42,18 +42,24 @@ pub async fn create(
     )])));
   }
   let env = crate::modules::environments::service::show(state, id).await?;
+  let now = Utc::now();
+  let expires_at = request.expires_in.as_deref().unwrap_or("never");
+  let expires_at = token::expiry_duration(expires_at)
+    .map_err(|message| HttpError::bad_request("EXPIRY_INVALID", message))?
+    .map(|duration| (now + duration).to_rfc3339());
   let token_id = token::public_id(RUNNER_TOKEN_ID_PREFIX);
   let raw = token::generate(RUNNER_TOKEN_PREFIX).map_err(|_| HttpError::internal())?;
-  let now = Utc::now().to_rfc3339();
+  let now = now.to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
   let result = sqlx::query(
-    "INSERT INTO runner_tokens(id,environment_id,name,token_hash,created_at)VALUES(?,?,?,?,?)",
+    "INSERT INTO runner_tokens(id,environment_id,name,token_hash,created_at,expires_at)VALUES(?,?,?,?,?,?)",
   )
   .bind(&token_id)
   .bind(id)
   .bind(name)
   .bind(token::hash(&raw))
   .bind(&now)
+  .bind(&expires_at)
   .execute(&mut *tx)
   .await;
   if let Err(error) = result {
@@ -85,6 +91,7 @@ pub async fn create(
       environment_id: id.into(),
       name: name.into(),
       created_at: now,
+      expires_at,
       last_used_at: None,
       revoked_at: None,
     },

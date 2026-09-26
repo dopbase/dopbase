@@ -279,3 +279,111 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
   assert_eq!(status, 403);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
+  let (_dir, state, router) = fixture().await;
+  let setup = state.setup.read().await.token.clone().unwrap();
+  let (status, bootstrap, headers) = call(
+    &router,
+    "POST",
+    "/api/v1/bootstrap/admin",
+    None,
+    None,
+    Some(json!({"setupToken":setup,"email":"root@example.com","password":"correct-horse-123"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let cookie = headers
+    .get(header::SET_COOKIE)
+    .unwrap()
+    .to_str()
+    .unwrap()
+    .split(';')
+    .next()
+    .unwrap()
+    .to_string();
+  let csrf = bootstrap["data"]["csrfToken"].as_str().unwrap();
+  let (status, account, _) = call(
+    &router,
+    "POST",
+    "/api/v1/service-accounts",
+    Some(&cookie),
+    Some(csrf),
+    Some(json!({"name":"build-agent"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{account:?}");
+  let id = account["data"]["id"].as_str().unwrap();
+  let path = format!("/api/v1/service-accounts/{id}/tokens");
+  let (status, never, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&cookie),
+    Some(csrf),
+    Some(json!({"name":"never","expiresIn":"never"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{never:?}");
+  assert!(never["data"]["token"]["expiresAt"].is_null());
+  let bearer = never["data"]["plaintextToken"].as_str().unwrap();
+  let token_id = never["data"]["token"]["id"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "GET",
+    "/api/v1/status",
+    Some(&format!("Bearer {bearer}")),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  sqlx::query("UPDATE agent_tokens SET expires_at=? WHERE id=?")
+    .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
+    .bind(token_id)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let (status, _, _) = call(
+    &router,
+    "GET",
+    "/api/v1/status",
+    Some(&format!("Bearer {bearer}")),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 401);
+  let (status, limit, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&cookie),
+    Some(csrf),
+    Some(json!({"name":"limit","expiresIn":"1095d"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{limit:?}");
+  let (status, invalid, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&cookie),
+    Some(csrf),
+    Some(json!({"name":"invalid","expiresIn":"1096d"})),
+  )
+  .await;
+  assert_eq!(status, 400, "{invalid:?}");
+  let (status, both, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&cookie),
+    Some(csrf),
+    Some(json!({"name":"both","expiresIn":"1h","expiresAt":"2026-12-01T00:00:00Z"})),
+  )
+  .await;
+  assert_eq!(status, 400, "{both:?}");
+  state.db.close().await;
+}

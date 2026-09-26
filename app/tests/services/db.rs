@@ -94,6 +94,13 @@ async fn migrations_apply_rollback_and_reapply() {
   MIGRATOR.run(db.pool()).await.unwrap();
   assert_schema_objects(&db, "table", &TABLES, true).await;
   assert_schema_objects(&db, "index", &INDEXES, true).await;
+  let expiry_column: String = sqlx::query_scalar(
+    "SELECT name FROM pragma_table_info('runner_tokens') WHERE name='expires_at'",
+  )
+  .fetch_one(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(expiry_column, "expires_at");
 
   MIGRATOR.undo(db.pool(), 0).await.unwrap();
   assert_schema_objects(&db, "table", &TABLES, false).await;
@@ -125,6 +132,12 @@ async fn foreign_keys_cascade_dependent_records() {
   sqlx::query("INSERT INTO environments(id,project_id,name,created_at,updated_at) VALUES('env_test','prj_test','production','now','now')").execute(db.pool()).await.unwrap();
   sqlx::query("INSERT INTO secrets(environment_id,key,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at) VALUES('env_test','API_KEY',X'01',X'02',X'03',X'04','now','now')").execute(db.pool()).await.unwrap();
   sqlx::query("INSERT INTO runner_tokens(id,environment_id,name,token_hash,created_at) VALUES('tok_test','env_test','runner',X'05','now')").execute(db.pool()).await.unwrap();
+  let expiry: Option<String> =
+    sqlx::query_scalar("SELECT expires_at FROM runner_tokens WHERE id='tok_test'")
+      .fetch_one(db.pool())
+      .await
+      .unwrap();
+  assert!(expiry.is_none());
 
   sqlx::query("DELETE FROM admins WHERE id = 'usr_test'")
     .execute(db.pool())

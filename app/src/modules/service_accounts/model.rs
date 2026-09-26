@@ -61,6 +61,8 @@ pub struct CreateServiceAccountRequest {
 pub struct CreateAgentTokenRequest {
   /// Name or label for the token.
   pub name: String,
-  /// Optional ISO 8601 expiration timestamp (must expire within 90 days). Defaults to 30 days.
+  /// Optional ISO 8601 expiration timestamp (within 3 years). Defaults to 30 days.
   pub expires_at: Option<String>,
+  /// Relative expiry such as 12h, 7d, or never. Cannot be combined with expiresAt.
+  pub expires_in: Option<String>,
 }

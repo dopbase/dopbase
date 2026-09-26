@@ -138,9 +138,10 @@ impl FromRequestParts<AppState> for AuthIdentity {
     }
 
     let runner: Option<(String, String)> = sqlx::query_as(
-      "SELECT id, environment_id FROM runner_tokens WHERE token_hash = ? AND revoked_at IS NULL",
+      "SELECT id, environment_id FROM runner_tokens WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
     )
     .bind(&hash)
+    .bind(now.to_rfc3339())
     .fetch_optional(state.db.pool())
     .await
     .map_err(HttpError::from)?;
