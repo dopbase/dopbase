@@ -27,6 +27,8 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
+- UI controller tests now run unmount hooks inside component setup, removing
+  lifecycle warnings from the test run.
 - Token tests no longer print credential-bearing API responses on assertion failures.
 - The AI agents list now shows each token's expiry date or "No expiry".
 - `dopbase run` now keeps interactive commands attached to the terminal, so
