@@ -1,5 +1,4 @@
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref } from "vue";
 import { ApiError } from "~/services/http.client";
 import {
   createUser,
@@ -18,6 +17,7 @@ import {
   revokeAgentToken,
 } from "~/services/service-accounts.api";
 import type {
+  AgentToken,
   CreatedAgentToken,
   ServiceAccount,
 } from "~/services/service-accounts.api";
@@ -27,6 +27,11 @@ import {
   MIN_PASSWORD_LENGTH,
   validatePasswordLength,
 } from "~/utils/validation";
+import {
+  tokenExpiresIn,
+  tokenExpiryOptions,
+  tokenExpiryUnits,
+} from "~/utils/token-expiry";
 
 export const roleOptions = [
   { value: "member", label: "Member - project management" },
@@ -34,10 +39,10 @@ export const roleOptions = [
 ];
 
 export function useUsersController() {
-  const router = useRouter();
   const authStore = useAuthStore();
   const users = ref<User[]>([]);
   const serviceAccounts = ref<ServiceAccount[]>([]);
+  const agentTokens = ref<Record<string, AgentToken[] | null>>({});
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -68,6 +73,10 @@ export function useUsersController() {
   const tokenPassword = ref("");
   const tokenPasswordError = ref<string | null>(null);
   const tokenReauthError = ref<string | null>(null);
+  const tokenExpiryError = ref<string | null>(null);
+  const tokenExpiryChoice = ref("30d");
+  const tokenCustomAmount = ref("");
+  const tokenCustomUnit = ref("h");
   const generatingToken = ref(false);
   const createdAgentToken = ref<CreatedAgentToken | null>(null);
 
@@ -95,8 +104,22 @@ export function useUsersController() {
     error.value = null;
     try {
       const [u, sa] = await Promise.all([fetchUsers(), fetchServiceAccounts()]);
+      const tokenLists = await Promise.allSettled(
+        sa.map((account) => fetchAgentTokens(account.id)),
+      );
       users.value = u;
       serviceAccounts.value = sa;
+      agentTokens.value = Object.fromEntries(
+        sa.map((account, index) => {
+          const result = tokenLists[index];
+          return [
+            account.id,
+            result?.status === "fulfilled"
+              ? result.value.filter((token) => !token.revokedAt)
+              : null,
+          ];
+        }),
+      );
     } catch {
       error.value = "Could not load accounts.";
     } finally {
@@ -331,6 +354,10 @@ export function useUsersController() {
     tokenPassword.value = "";
     tokenPasswordError.value = null;
     tokenReauthError.value = null;
+    tokenExpiryError.value = null;
+    tokenExpiryChoice.value = "30d";
+    tokenCustomAmount.value = "";
+    tokenCustomUnit.value = "h";
     showTokenReauth.value = true;
   }
 
@@ -347,6 +374,20 @@ export function useUsersController() {
     if (!agentForToken.value) return;
     tokenPasswordError.value = null;
     tokenReauthError.value = null;
+    tokenExpiryError.value = null;
+
+    let expiresIn: string;
+    try {
+      expiresIn = tokenExpiresIn(
+        tokenExpiryChoice.value,
+        tokenCustomAmount.value,
+        tokenCustomUnit.value,
+      );
+    } catch (error) {
+      tokenExpiryError.value =
+        error instanceof Error ? error.message : "Enter a valid expiry.";
+      return;
+    }
 
     if (!tokenPassword.value) {
       tokenPasswordError.value = "Password is required.";
@@ -371,12 +412,19 @@ export function useUsersController() {
       for (const t of activeTokens) {
         await revokeAgentToken(agentId, t.id);
       }
+      agentTokens.value[agentId] = [];
 
-      // Generate a new 30-day token
+      // Generate the replacement token with the selected lifetime.
       const tokenName = `token-${Date.now()}`;
-      const created = await createAgentToken(agentId, tokenName);
+      const created = await createAgentToken(
+        agentId,
+        tokenName,
+        undefined,
+        expiresIn,
+      );
 
       createdAgentToken.value = created;
+      agentTokens.value[agentId] = [created.token];
       tokenPassword.value = "";
       showTokenReauth.value = false;
     } catch (err) {
@@ -396,9 +444,10 @@ export function useUsersController() {
 
   onMounted(load);
 
-  return {
+  const state = reactive({
     users,
     serviceAccounts,
+    agentTokens,
     loading,
     error,
     editing,
@@ -411,44 +460,53 @@ export function useUsersController() {
     formError,
     fieldErrors,
     canSave,
-    openCreate,
-    openEdit,
-    save,
-    remove: promptDelete,
-    promptDelete,
     userToDelete,
     deletingUser,
     deleteUserError,
-    closeDeleteUser,
-    confirmDeleteUser,
-    close,
-    router,
     showAgentCreate,
     agentName,
     savingAgent,
     agentFormError,
     agentFieldError,
     canSaveAgent,
-    openAgentCreate,
-    closeAgentCreate,
-    saveAgent,
-    removeAgent: promptDeleteAgent,
-    promptDeleteAgent,
     agentToDelete,
     deletingAgent,
     deleteAgentError,
-    closeDeleteAgent,
-    confirmDeleteAgent,
     agentForToken,
     showTokenReauth,
     tokenPassword,
     tokenPasswordError,
     tokenReauthError,
+    tokenExpiryError,
+    tokenExpiryChoice,
+    tokenCustomAmount,
+    tokenCustomUnit,
+    tokenExpiryOptions,
+    tokenExpiryUnits,
     generatingToken,
     createdAgentToken,
+  });
+
+  const actions = {
+    load,
+    openCreate,
+    openEdit,
+    save,
+    promptDelete,
+    closeDeleteUser,
+    confirmDeleteUser,
+    close,
+    openAgentCreate,
+    closeAgentCreate,
+    saveAgent,
+    promptDeleteAgent,
+    closeDeleteAgent,
+    confirmDeleteAgent,
     promptGetToken,
     closeTokenReauth,
     confirmTokenReauthAndGenerate,
     acknowledgeCreatedToken,
   };
+
+  return { state, actions };
 }

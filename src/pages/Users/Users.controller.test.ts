@@ -46,54 +46,99 @@ function agentFixture(
 }
 
 describe("useUsersController", () => {
+  it("loads non-revoked agent tokens for the agents list", async () => {
+    const agent = agentFixture({ id: "sa_agent_1", name: "indexer-agent" });
+    const unavailableAgent = agentFixture({
+      id: "sa_agent_2",
+      name: "sync-agent",
+    });
+    vi.mocked(serviceAccountsApi.fetchServiceAccounts).mockResolvedValueOnce([
+      agent,
+      unavailableAgent,
+    ]);
+    vi.mocked(serviceAccountsApi.fetchAgentTokens).mockResolvedValueOnce([
+      {
+        id: "ait_active",
+        serviceAccountId: agent.id,
+        name: "active-token",
+        createdAt: "2026-08-01T00:00:00Z",
+        expiresAt: "2026-09-01T00:00:00Z",
+        lastUsedAt: null,
+        revokedAt: null,
+      },
+      {
+        id: "ait_revoked",
+        serviceAccountId: agent.id,
+        name: "revoked-token",
+        createdAt: "2026-07-01T00:00:00Z",
+        expiresAt: null,
+        lastUsedAt: null,
+        revokedAt: "2026-07-15T00:00:00Z",
+      },
+    ]);
+    vi.mocked(serviceAccountsApi.fetchAgentTokens).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
+
+    const c = useUsersController();
+    await c.actions.load();
+
+    expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith(agent.id);
+    expect(c.state.agentTokens[agent.id]?.map((token) => token.id)).toEqual([
+      "ait_active",
+    ]);
+    expect(c.state.serviceAccounts).toEqual([agent, unavailableAgent]);
+    expect(c.state.agentTokens[unavailableAgent.id]).toBeNull();
+  });
+
   it("computes canSave correctly for create and edit modes", () => {
     const c = useUsersController();
 
     // Create mode: initially empty email and password
-    c.openCreate();
-    expect(c.canSave.value).toBe(false);
+    c.actions.openCreate();
+    expect(c.state.canSave).toBe(false);
 
-    c.email.value = "admin@example.com";
-    expect(c.canSave.value).toBe(false);
+    c.state.email = "admin@example.com";
+    expect(c.state.canSave).toBe(false);
 
-    c.password.value = "securepassword123";
-    expect(c.canSave.value).toBe(true);
+    c.state.password = "securepassword123";
+    expect(c.state.canSave).toBe(true);
 
     // Edit mode: password is optional
-    c.openEdit({
+    c.actions.openEdit({
       id: "usr_2",
       email: "member@example.com",
       role: "member",
       createdAt: "",
       updatedAt: "",
     });
-    expect(c.canSave.value).toBe(true);
+    expect(c.state.canSave).toBe(true);
 
-    c.email.value = "   ";
-    expect(c.canSave.value).toBe(false);
+    c.state.email = "   ";
+    expect(c.state.canSave).toBe(false);
   });
 
   it("validates email format and password length client-side", async () => {
     const c = useUsersController();
-    c.openCreate();
-    c.email.value = "invalid-email";
-    c.password.value = "short";
+    c.actions.openCreate();
+    c.state.email = "invalid-email";
+    c.state.password = "short";
 
-    await c.save();
+    await c.actions.save();
 
-    expect(c.fieldErrors.value.email).toBe(
+    expect(c.state.fieldErrors.email).toBe(
       "Please enter a valid email address.",
     );
-    expect(c.fieldErrors.value.password).toContain("at least 12 characters");
+    expect(c.state.fieldErrors.password).toContain("at least 12 characters");
     expect(usersApi.createUser).not.toHaveBeenCalled();
-    expect(c.error.value).toBeNull(); // Page error is untouched
+    expect(c.state.error).toBeNull(); // Page error is untouched
   });
 
   it("maps server ApiError validation to fieldErrors without polluting page error", async () => {
     const c = useUsersController();
-    c.openCreate();
-    c.email.value = "valid@example.com";
-    c.password.value = "validpassword123";
+    c.actions.openCreate();
+    c.state.email = "valid@example.com";
+    c.state.password = "validpassword123";
 
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(400, {
@@ -101,20 +146,20 @@ describe("useUsersController", () => {
       }),
     );
 
-    await c.save();
+    await c.actions.save();
 
-    expect(c.fieldErrors.value.email).toBe(
+    expect(c.state.fieldErrors.email).toBe(
       "Please enter a valid email address.",
     );
-    expect(c.error.value).toBeNull(); // Did not leak to background page
-    expect(c.showCreate.value).toBe(true); // Modal stayed open
+    expect(c.state.error).toBeNull(); // Did not leak to background page
+    expect(c.state.showCreate).toBe(true); // Modal stayed open
   });
 
   it("maps password errors to fieldErrors.password", async () => {
     const c = useUsersController();
-    c.openCreate();
-    c.email.value = "valid@example.com";
-    c.password.value = "validpassword123";
+    c.actions.openCreate();
+    c.state.email = "valid@example.com";
+    c.state.password = "validpassword123";
 
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(400, {
@@ -122,19 +167,19 @@ describe("useUsersController", () => {
       }),
     );
 
-    await c.save();
+    await c.actions.save();
 
-    expect(c.fieldErrors.value.password).toBe(
+    expect(c.state.fieldErrors.password).toBe(
       "Password must contain at least 12 characters.",
     );
-    expect(c.error.value).toBeNull();
+    expect(c.state.error).toBeNull();
   });
 
   it("maps unhandled server errors to formError inside the modal", async () => {
     const c = useUsersController();
-    c.openCreate();
-    c.email.value = "valid@example.com";
-    c.password.value = "validpassword123";
+    c.actions.openCreate();
+    c.state.email = "valid@example.com";
+    c.state.password = "validpassword123";
 
     vi.mocked(usersApi.createUser).mockRejectedValueOnce(
       new ApiError(500, {
@@ -142,21 +187,21 @@ describe("useUsersController", () => {
       }),
     );
 
-    await c.save();
+    await c.actions.save();
 
-    expect(c.formError.value).toBe("Database write failed.");
-    expect(c.error.value).toBeNull();
+    expect(c.state.formError).toBe("Database write failed.");
+    expect(c.state.error).toBeNull();
   });
 
   it("resets form errors on close and openCreate", () => {
     const c = useUsersController();
-    c.openCreate();
-    c.fieldErrors.value = { email: "Error" };
-    c.formError.value = "Form error";
+    c.actions.openCreate();
+    c.state.fieldErrors = { email: "Error" };
+    c.state.formError = "Form error";
 
-    c.close();
-    expect(c.fieldErrors.value).toEqual({});
-    expect(c.formError.value).toBeNull();
+    c.actions.close();
+    expect(c.state.fieldErrors).toEqual({});
+    expect(c.state.formError).toBeNull();
   });
 
   it("handles user delete flow via confirmation dialog without browser dialog", async () => {
@@ -172,22 +217,22 @@ describe("useUsersController", () => {
     };
 
     // Prompt sets target
-    c.promptDelete(targetUser);
-    expect(c.userToDelete.value).toEqual(targetUser);
-    expect(c.deleteUserError.value).toBeNull();
+    c.actions.promptDelete(targetUser);
+    expect(c.state.userToDelete).toEqual(targetUser);
+    expect(c.state.deleteUserError).toBeNull();
 
     // Close cancels
-    c.closeDeleteUser();
-    expect(c.userToDelete.value).toBeNull();
+    c.actions.closeDeleteUser();
+    expect(c.state.userToDelete).toBeNull();
 
     // Prompt again and confirm
-    c.promptDelete(targetUser);
+    c.actions.promptDelete(targetUser);
     vi.mocked(usersApi.deleteUser).mockResolvedValueOnce(undefined);
 
-    await c.confirmDeleteUser();
+    await c.actions.confirmDeleteUser();
 
     expect(usersApi.deleteUser).toHaveBeenCalledWith("usr_to_delete");
-    expect(c.userToDelete.value).toBeNull();
+    expect(c.state.userToDelete).toBeNull();
     expect(window.confirm).not.toHaveBeenCalled();
   });
 
@@ -201,15 +246,15 @@ describe("useUsersController", () => {
       updatedAt: "",
     };
 
-    c.promptDelete(targetUser);
+    c.actions.promptDelete(targetUser);
     vi.mocked(usersApi.deleteUser).mockRejectedValueOnce(
       new ApiError(400, { ERROR: "Cannot delete user." }),
     );
 
-    await c.confirmDeleteUser();
+    await c.actions.confirmDeleteUser();
 
-    expect(c.deleteUserError.value).toBe("Cannot delete user.");
-    expect(c.userToDelete.value).toEqual(targetUser); // Dialog stays open
+    expect(c.state.deleteUserError).toBe("Cannot delete user.");
+    expect(c.state.userToDelete).toEqual(targetUser); // Dialog stays open
   });
 
   it("handles AI agent delete flow via confirmation dialog without browser dialog", async () => {
@@ -225,26 +270,26 @@ describe("useUsersController", () => {
     };
 
     // Prompt sets target
-    c.promptDeleteAgent(targetAgent);
-    expect(c.agentToDelete.value).toEqual(targetAgent);
-    expect(c.deleteAgentError.value).toBeNull();
+    c.actions.promptDeleteAgent(targetAgent);
+    expect(c.state.agentToDelete).toEqual(targetAgent);
+    expect(c.state.deleteAgentError).toBeNull();
 
     // Close cancels
-    c.closeDeleteAgent();
-    expect(c.agentToDelete.value).toBeNull();
+    c.actions.closeDeleteAgent();
+    expect(c.state.agentToDelete).toBeNull();
 
     // Prompt again and confirm
-    c.promptDeleteAgent(targetAgent);
+    c.actions.promptDeleteAgent(targetAgent);
     vi.mocked(serviceAccountsApi.deleteServiceAccount).mockResolvedValueOnce(
       undefined,
     );
 
-    await c.confirmDeleteAgent();
+    await c.actions.confirmDeleteAgent();
 
     expect(serviceAccountsApi.deleteServiceAccount).toHaveBeenCalledWith(
       "sa_to_delete",
     );
-    expect(c.agentToDelete.value).toBeNull();
+    expect(c.state.agentToDelete).toBeNull();
     expect(window.confirm).not.toHaveBeenCalled();
   });
 
@@ -258,15 +303,15 @@ describe("useUsersController", () => {
       updatedAt: "",
     };
 
-    c.promptDeleteAgent(targetAgent);
+    c.actions.promptDeleteAgent(targetAgent);
     vi.mocked(serviceAccountsApi.deleteServiceAccount).mockRejectedValueOnce(
       new ApiError(400, { ERROR: "Cannot delete AI agent." }),
     );
 
-    await c.confirmDeleteAgent();
+    await c.actions.confirmDeleteAgent();
 
-    expect(c.deleteAgentError.value).toBe("Cannot delete AI agent.");
-    expect(c.agentToDelete.value).toEqual(targetAgent); // Dialog stays open
+    expect(c.state.deleteAgentError).toBe("Cannot delete AI agent.");
+    expect(c.state.agentToDelete).toEqual(targetAgent); // Dialog stays open
   });
 
   it("prompts for an agent token password and cancels without generating one", () => {
@@ -276,16 +321,16 @@ describe("useUsersController", () => {
       name: "indexer-agent",
     });
 
-    c.promptGetToken(targetAgent);
-    expect(c.showTokenReauth.value).toBe(true);
-    expect(c.agentForToken.value).toEqual(targetAgent);
-    expect(c.tokenPassword.value).toBe("");
-    expect(c.tokenPasswordError.value).toBeNull();
-    expect(c.tokenReauthError.value).toBeNull();
+    c.actions.promptGetToken(targetAgent);
+    expect(c.state.showTokenReauth).toBe(true);
+    expect(c.state.agentForToken).toEqual(targetAgent);
+    expect(c.state.tokenPassword).toBe("");
+    expect(c.state.tokenPasswordError).toBeNull();
+    expect(c.state.tokenReauthError).toBeNull();
 
-    c.closeTokenReauth();
-    expect(c.showTokenReauth.value).toBe(false);
-    expect(c.agentForToken.value).toBeNull();
+    c.actions.closeTokenReauth();
+    expect(c.state.showTokenReauth).toBe(false);
+    expect(c.state.agentForToken).toBeNull();
   });
 
   it("requires a password before reauthenticating", async () => {
@@ -295,10 +340,10 @@ describe("useUsersController", () => {
       name: "indexer-agent",
     });
 
-    c.promptGetToken(targetAgent);
-    await c.confirmTokenReauthAndGenerate();
+    c.actions.promptGetToken(targetAgent);
+    await c.actions.confirmTokenReauthAndGenerate();
 
-    expect(c.tokenPasswordError.value).toBe("Password is required.");
+    expect(c.state.tokenPasswordError).toBe("Password is required.");
     expect(authApi.reauthenticate).not.toHaveBeenCalled();
   });
 
@@ -309,17 +354,17 @@ describe("useUsersController", () => {
       name: "indexer-agent",
     });
 
-    c.promptGetToken(targetAgent);
-    c.tokenPassword.value = "wrong-password";
+    c.actions.promptGetToken(targetAgent);
+    c.state.tokenPassword = "wrong-password";
     vi.mocked(authApi.reauthenticate).mockRejectedValueOnce(
       new ApiError(403, { ERROR: "Incorrect password." }),
     );
 
-    await c.confirmTokenReauthAndGenerate();
+    await c.actions.confirmTokenReauthAndGenerate();
 
-    expect(c.tokenReauthError.value).toBe("Incorrect password.");
-    expect(c.showTokenReauth.value).toBe(true);
-    expect(c.createdAgentToken.value).toBeNull();
+    expect(c.state.tokenReauthError).toBe("Incorrect password.");
+    expect(c.state.showTokenReauth).toBe(true);
+    expect(c.state.createdAgentToken).toBeNull();
     expect(serviceAccountsApi.createAgentToken).not.toHaveBeenCalled();
   });
 
@@ -330,8 +375,8 @@ describe("useUsersController", () => {
       name: "indexer-agent",
     });
 
-    c.promptGetToken(targetAgent);
-    c.tokenPassword.value = "correct-password";
+    c.actions.promptGetToken(targetAgent);
+    c.state.tokenPassword = "correct-password";
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce(undefined);
     vi.mocked(serviceAccountsApi.fetchAgentTokens).mockResolvedValueOnce([
       {
@@ -378,7 +423,7 @@ describe("useUsersController", () => {
       createdResult,
     );
 
-    await c.confirmTokenReauthAndGenerate();
+    await c.actions.confirmTokenReauthAndGenerate();
 
     expect(authApi.reauthenticate).toHaveBeenCalledWith("correct-password");
     expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith(
@@ -393,12 +438,30 @@ describe("useUsersController", () => {
     expect(serviceAccountsApi.createAgentToken).toHaveBeenCalledWith(
       "sa_agent_1",
       expect.stringMatching(/^token-\d+$/),
+      undefined,
+      "30d",
     );
-    expect(c.showTokenReauth.value).toBe(false);
-    expect(c.createdAgentToken.value).toEqual(createdResult);
+    expect(c.state.showTokenReauth).toBe(false);
+    expect(c.state.createdAgentToken).toEqual(createdResult);
+    expect(c.state.agentTokens.sa_agent_1).toEqual([createdResult.token]);
 
-    c.acknowledgeCreatedToken();
-    expect(c.createdAgentToken.value).toBeNull();
-    expect(c.agentForToken.value).toBeNull();
+    c.actions.acknowledgeCreatedToken();
+    expect(c.state.createdAgentToken).toBeNull();
+    expect(c.state.agentForToken).toBeNull();
+  });
+
+  it("checks custom expiry before revoking an agent token", async () => {
+    const c = useUsersController();
+    c.actions.promptGetToken(
+      agentFixture({ id: "sa_agent_1", name: "indexer-agent" }),
+    );
+    c.state.tokenPassword = "correct-password";
+    c.state.tokenExpiryChoice = "custom";
+    c.state.tokenCustomAmount = "1096";
+    c.state.tokenCustomUnit = "d";
+    await c.actions.confirmTokenReauthAndGenerate();
+    expect(c.state.tokenExpiryError).toContain("1095");
+    expect(authApi.reauthenticate).not.toHaveBeenCalled();
+    expect(serviceAccountsApi.revokeAgentToken).not.toHaveBeenCalled();
   });
 });
