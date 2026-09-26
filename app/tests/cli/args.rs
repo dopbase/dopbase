@@ -743,6 +743,42 @@ fn missing_subcommands_show_contextual_help() {
 }
 
 #[test]
+fn token_create_expiry_flag_accepts_hours_days_and_never() {
+  for value in ["1h", "26280h", "1d", "1095d", "never"] {
+    assert!(
+      Cli::try_parse_from([
+        "dopbase",
+        "token",
+        "create",
+        "env_123456",
+        "--name",
+        "deploy",
+        "--expires-in",
+        value
+      ])
+      .is_ok(),
+      "rejected {value}"
+    );
+  }
+  for value in ["30m", "0h", "1096d", "26281h", "1.5d"] {
+    assert!(
+      Cli::try_parse_from([
+        "dopbase",
+        "token",
+        "create",
+        "env_123456",
+        "--name",
+        "deploy",
+        "--expires-in",
+        value
+      ])
+      .is_err(),
+      "accepted {value}"
+    );
+  }
+}
+
+#[test]
 fn incomplete_secret_commands_show_examples_and_environment_help() {
   let cases: &[(&[&str], &[&str])] = &[
     (

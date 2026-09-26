@@ -1,6 +1,13 @@
 use clap::Subcommand;
 
 use crate::constants::help::ENVIRONMENT_ARG_HELP;
+use crate::services::token;
+
+fn parse_expiry(value: &str) -> Result<String, String> {
+  token::expiry_duration(value)
+    .map(|_| value.to_owned())
+    .map_err(str::to_owned)
+}
 
 #[derive(Subcommand, Debug)]
 pub enum TokenCommand {
@@ -18,6 +25,9 @@ pub enum TokenCommand {
     /// Token role.
     #[arg(long, default_value = "runner")]
     role: String,
+    /// Token lifetime: never or a whole number followed by h or d (maximum 3 years).
+    #[arg(long, value_name = "DURATION", value_parser = parse_expiry)]
+    expires_in: Option<String>,
   },
   /// List tokens for an environment.
   #[command(after_help = LIST_HELP)]
@@ -36,12 +46,15 @@ pub enum TokenCommand {
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase token create payment-service/production --name deploy
+  dopbase token create payment-service/production --name deploy --expires-in 12h
   dopbase token list payment-service/production
   dopbase token revoke tok_01ABCDEF
 ";
 const CREATE_HELP: &str = "\
 Examples:
   dopbase token create payment-service/production --name deploy
+  dopbase token create payment-service/production --name deploy --expires-in 45d
+  dopbase token create payment-service/production --name deploy --expires-in never
 ";
 const LIST_HELP: &str = "\
 Examples:
