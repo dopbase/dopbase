@@ -30,7 +30,7 @@ documentation, and SQLite storage in one executable.
 
 ## Current boundaries
 
-Version {{version}} requires a fresh data directory. Databases and `.dop` backups
+Version 0.1.0 requires a fresh data directory. Databases and `.dop` backups
 created by earlier releases are not supported. Keep the matching master key
 with every backup, and test restores before relying on them for recovery.
 

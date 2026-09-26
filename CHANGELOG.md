@@ -2,18 +2,20 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## 0.1.8 - Unrelease
+## 0.1.8 - 2026-09-26
 
-[Dopbase](https://dopbase.com) 0.1.8
+[Dopbase](https://dopbase.com) 0.1.8 adds configurable expiry for runner and AI agent tokens and a CLI
+command to clone an environment's secrets. Interactive `dopbase run` commands
+now keep terminal input, and the Admin UI shows token expiry and clearer audit
+details.
 
 ### Added
 
-- Runner and AI agent tokens can now be created with an expiry in hours or days,
-  up to three years, or without an expiry. The Admin UI offers presets and a
-  custom duration; `dopbase token create` accepts `--expires-in`.
-- Added `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` to create another
-  environment in the same project and copy its current secrets without a
-  temporary plaintext file.
+- Runner and AI agent tokens can now expire after a chosen number of hours or
+  days, up to three years, or have no expiry. The Admin UI offers preset and
+  custom durations; `dopbase token create` accepts `--expires-in`.
+- `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` creates an environment in
+  the same project and copies its current secrets without a temporary file.
 
 ### Improvement
 
@@ -35,9 +37,16 @@ All notable changes to Dopbase are documented in this file.
 - `dopbase run` now keeps interactive commands attached to the terminal, so
   tools such as Codex and Claude accept input instead of stopping at startup.
 
+### Note
+
+- Existing runner tokens remain without expiry. New runner tokens also have no
+  expiry unless one is set. AI agent tokens still default to 30 days.
+- The repository's `scripts/install.sh` helper was removed. Use the installer
+  at `https://dopbase.com/install.sh`.
+
 ## 0.1.7 - 2026-09-20
 
-Dopbase 0.1.7 adds guided `.env` setup, TOML secret files, and Docker-ready
+[Dopbase](https://dopbase.com) 0.1.7 adds guided `.env` setup, TOML secret files, and Docker-ready
 exports. It also refreshes the Admin UI branding, demo assets, and contributor
 documentation.
 
@@ -79,7 +88,7 @@ documentation.
 
 ## 0.1.6 - 2026-09-12
 
-Dopbase 0.1.6 adds JSON and YAML secret files, runtime cache maintenance, and
+[Dopbase](https://dopbase.com) 0.1.6 adds JSON and YAML secret files, runtime cache maintenance, and
 consistent project and environment references across the CLI and Admin UI.
 
 ### Added
@@ -169,7 +178,7 @@ dependencies.
 
 ## 0.1.2 - 2026-09-09
 
-Dopbase 0.1.2 adds an offline, root-authorized factory reset, switches new
+[Dopbase](https://dopbase.com) 0.1.2 adds an offline, root-authorized factory reset, switches new
 environments to short random IDs, removes native Windows packaging, and
 standardizes pull request and release notes.
 
