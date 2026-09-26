@@ -11,6 +11,7 @@ const token = {
   environmentId: "env_1",
   name: "deploy",
   createdAt: "2026-08-28T00:00:00Z",
+  expiresAt: null,
   lastUsedAt: null,
   revokedAt: null,
 };
@@ -50,6 +51,7 @@ describe("useTokensPanelController", () => {
     expect(tokensApi.createToken).toHaveBeenCalledWith("env_1", {
       name: "deploy",
       role: "runner",
+      expiresIn: "never",
     });
     expect(c.created.value?.plaintextToken).toBe("dbs_secret");
     c.acknowledgeCreated();
@@ -64,6 +66,21 @@ describe("useTokensPanelController", () => {
     const c = makeController();
     await expect(c.create("deploy")).rejects.toBeDefined();
     expect(c.actionError.value).toBe("A token with this name already exists.");
+  });
+
+  it("passes a selected custom expiry to the API", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+    vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
+      token,
+      plaintextToken: "dbs_secret",
+    });
+    const c = makeController();
+    await c.create("deploy", "12h");
+    expect(tokensApi.createToken).toHaveBeenCalledWith("env_1", {
+      name: "deploy",
+      role: "runner",
+      expiresIn: "12h",
+    });
   });
 
   it("revokes and reloads", async () => {

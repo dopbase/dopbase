@@ -236,6 +236,7 @@ describe("useProjectsController", () => {
         environmentId: "env_1",
         name: "t",
         createdAt: "",
+        expiresAt: null,
         lastUsedAt: null,
         revokedAt: null,
       },

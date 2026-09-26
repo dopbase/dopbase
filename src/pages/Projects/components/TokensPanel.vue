@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useTokensPanelController } from "./TokensPanel.controller";
 import {
   DbAlert,
@@ -9,12 +9,20 @@ import {
   DbEmptyState,
   DbInput,
   DbModal,
+  DbSelect,
   DbSkeleton,
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon } from "~/assets/icons";
 import { formatRelativeTime, formatDateTime } from "~/utils/format";
 import type { RunnerToken } from "~/services";
+import {
+  MAX_TOKEN_EXPIRY_DAYS,
+  MAX_TOKEN_EXPIRY_HOURS,
+  tokenExpiresIn,
+  tokenExpiryOptions,
+  tokenExpiryUnits,
+} from "~/utils/token-expiry";
 
 /**
  * TokensPanel — runner-token management for one environment.
@@ -41,14 +49,42 @@ const {
 
 const showCreate = ref(false);
 const newName = ref("");
+const expiryChoice = ref("never");
+const customAmount = ref("");
+const customUnit = ref("h");
 const createError = ref<string | null>(null);
+const expiryError = ref<string | null>(null);
 const revokeTarget = ref<RunnerToken | null>(null);
 const revokeLoading = ref(false);
 const revokeError = ref<string | null>(null);
+const now = ref(Date.now());
+let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleExpiry(): void {
+  clearTimeout(expiryTimer);
+  now.value = Date.now();
+  const futureExpiries = tokens.value
+    ?.filter((token) => !token.revokedAt && token.expiresAt)
+    .map((token) => new Date(token.expiresAt!).getTime())
+    .filter((expiry) => expiry > now.value);
+  if (!futureExpiries?.length) return;
+  const nextExpiry = Math.min(...futureExpiries);
+  expiryTimer = setTimeout(
+    scheduleExpiry,
+    Math.min(nextExpiry - now.value + 1, 2_147_483_647),
+  );
+}
+
+watch(tokens, scheduleExpiry, { immediate: true });
+onUnmounted(() => clearTimeout(expiryTimer));
 
 function openCreate(): void {
   newName.value = "";
+  expiryChoice.value = "never";
+  customAmount.value = "";
+  customUnit.value = "h";
   createError.value = null;
+  expiryError.value = null;
   showCreate.value = true;
 }
 
@@ -58,8 +94,21 @@ async function submitCreate(): Promise<void> {
     return;
   }
   createError.value = null;
+  expiryError.value = null;
+  let expiresIn: string;
   try {
-    await create(newName.value.trim());
+    expiresIn = tokenExpiresIn(
+      expiryChoice.value,
+      customAmount.value,
+      customUnit.value,
+    );
+  } catch (error) {
+    expiryError.value =
+      error instanceof Error ? error.message : "Enter a valid expiry.";
+    return;
+  }
+  try {
+    await create(newName.value.trim(), expiresIn);
     showCreate.value = false;
   } catch {
     // Keep the dialog open because controller.actionError shows the error.
@@ -85,6 +134,8 @@ function tokenStatus(token: RunnerToken): {
   tone: "ok" | "crit" | "neutral";
 } {
   if (token.revokedAt) return { label: "revoked", tone: "crit" };
+  if (token.expiresAt && new Date(token.expiresAt).getTime() <= now.value)
+    return { label: "expired", tone: "crit" };
   return { label: "active", tone: "ok" };
 }
 </script>
@@ -197,6 +248,10 @@ function tokenStatus(token: RunnerToken): {
             </th>
             <th
               class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Expires
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Last used
             </th>
             <th
@@ -219,6 +274,9 @@ function tokenStatus(token: RunnerToken): {
             </td>
             <td class="px-4 py-2.5 text-sm text-ink-muted">
               {{ formatRelativeTime(token.createdAt) }}
+            </td>
+            <td class="px-4 py-2.5 text-sm text-ink-muted">
+              {{ token.expiresAt ? formatDateTime(token.expiresAt) : "never" }}
             </td>
             <td class="px-4 py-2.5 text-sm text-ink-muted">
               {{
@@ -265,6 +323,29 @@ function tokenStatus(token: RunnerToken): {
           placeholder="deploy-worker"
           mono
           hint="A readable label, e.g. the deployment target's name." />
+        <DbSelect
+          v-model="expiryChoice"
+          label="Expires"
+          :options="tokenExpiryOptions" />
+        <div v-if="expiryChoice === 'custom'" class="grid grid-cols-2 gap-2">
+          <DbInput
+            v-model="customAmount"
+            label="Duration"
+            type="number"
+            :min="1"
+            :max="
+              customUnit === 'h'
+                ? MAX_TOKEN_EXPIRY_HOURS
+                : MAX_TOKEN_EXPIRY_DAYS
+            "
+            :step="1"
+            :error="expiryError"
+            @input="expiryError = null" />
+          <DbSelect
+            v-model="customUnit"
+            label="Unit"
+            :options="tokenExpiryUnits" />
+        </div>
         <p class="text-sm text-ink-muted">
           Role: <DbBadge tone="accent">runner</DbBadge>
           - the token can read this environment's runtime values but cannot list
@@ -296,6 +377,11 @@ function tokenStatus(token: RunnerToken): {
       title="Runner token created"
       :name="created?.token.name ?? ''"
       :token="created?.plaintextToken ?? ''"
+      :detail="
+        created?.token.expiresAt
+          ? `Expires ${formatDateTime(created.token.expiresAt)}.`
+          : 'This token does not expire.'
+      "
       @acknowledge="acknowledgeCreated" />
 
     <!-- Revoke token -->

@@ -21,6 +21,9 @@ const props = withDefaults(
     disabled?: boolean;
     required?: boolean;
     autofocus?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
   }>(),
   {
     type: "text",
@@ -31,6 +34,9 @@ const props = withDefaults(
     error: undefined,
     hint: undefined,
     autofocus: false,
+    min: undefined,
+    max: undefined,
+    step: undefined,
   },
 );
 
@@ -96,6 +102,9 @@ function toggleReveal(): void {
           :disabled="disabled"
           :required="required"
           :autofocus="autofocus"
+          :min="min"
+          :max="max"
+          :step="step"
           :aria-invalid="error ? true : undefined"
           :aria-describedby="error ? `${id}-error` : undefined"
           class="h-full w-full bg-transparent pl-3.5 pr-3.5 text-sm text-ink-strong outline-none placeholder:text-ink-faint disabled:cursor-default"
