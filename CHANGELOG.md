@@ -2,38 +2,41 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## 0.1.8 - Unrelease
+## 0.1.8 - 2026-09-26
 
-[Dopbase](https://dopbase.com) 0.1.8
+Dopbase 0.1.8 adds configurable expiry for runner and AI agent tokens and a CLI
+command to clone an environment's secrets. Interactive `dopbase run` commands
+now keep terminal input, and the Admin UI shows token expiry and clearer audit
+details.
 
 ### Added
 
-- Runner and AI agent tokens can now be created with an expiry in hours or days,
-  up to three years, or without an expiry. The Admin UI offers presets and a
-  custom duration; `dopbase token create` accepts `--expires-in`.
-- Added `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` to create another
-  environment in the same project and copy its current secrets without a
-  temporary plaintext file.
+- Runner and AI agent tokens can now expire after a chosen number of hours or
+  days, up to three years, or have no expiry. The Admin UI offers preset and
+  custom durations; `dopbase token create` accepts `--expires-in`.
+- `dopbase env clone PROJECT/ENVIRONMENT NEW_NAME` creates an environment in
+  the same project and copies its current secrets without a temporary file.
 
 ### Improvement
 
-- Secrets table rows now brighten on hover, and expanded audit events show their raw timestamp.
-- Grouped the Users page controller's values and functions into `state` and
-  `actions` to simplify its page setup.
-- Added fix inconsistent width layout on frontend.
-- Documentation now reads the current version from `package.json` during builds
-  instead of keeping release numbers in individual pages.
-- Documentation checks now run from one script and validate every Mermaid
-  diagram under `docs`.
+- Secrets table rows brighten on hover, and expanded audit events show the
+  original timestamp.
+- Account and Instance pages use the same content width as the rest of the
+  Admin UI.
+- Documentation reads the current version from `package.json` during builds.
 
 ### Fixed
 
-- UI controller tests now run unmount hooks inside component setup, removing
-  lifecycle warnings from the test run.
-- Token tests no longer print credential-bearing API responses on assertion failures.
-- The AI agents list now shows each token's expiry date or "No expiry".
+- The AI agents list shows each token's expiry date or "No expiry".
 - `dopbase run` now keeps interactive commands attached to the terminal, so
   tools such as Codex and Claude accept input instead of stopping at startup.
+
+### Note
+
+- Existing runner tokens remain without expiry. New runner tokens also have no
+  expiry unless one is set. AI agent tokens still default to 30 days.
+- The repository's `scripts/install.sh` helper was removed. Use the installer
+  at `https://dopbase.com/install.sh`.
 
 ## 0.1.7 - 2026-09-20
 
