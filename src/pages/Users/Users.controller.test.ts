@@ -6,6 +6,11 @@ import * as serviceAccountsApi from "~/services/service-accounts.api";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 
+vi.mock("vue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue")>()),
+  onMounted: vi.fn(),
+}));
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ query: {} }),
