@@ -49,7 +49,7 @@ export function useTokensPanelController(environmentId: Ref<string>) {
     created.value = null;
   });
 
-  async function create(name: string): Promise<void> {
+  async function create(name: string, expiresIn = "never"): Promise<void> {
     const target = environmentId.value;
     creating.value = true;
     actionError.value = null;
@@ -57,6 +57,7 @@ export function useTokensPanelController(environmentId: Ref<string>) {
       const result = await tokensApi.createToken(target, {
         name,
         role: "runner",
+        expiresIn,
       });
       if (environmentId.value !== target) return;
       created.value = result;

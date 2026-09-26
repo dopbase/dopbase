@@ -17,12 +17,13 @@ version. The current pre-release schema is assembled in this order:
 0010_session_retention.up.sql
 0011_service_accounts.up.sql
 0012_agent_tokens.up.sql
+0013_runner_token_expiry.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
-change and must be safe when versions are reverted in reverse order. No
-existing table is rebuilt or altered by these migrations. Runtime
-startup applies up migrations only. Rollback is a maintenance and test
+change and must be safe when versions are reverted in reverse order. Version
+0013 adds a nullable runner-token expiry column; existing tokens keep no
+expiry. Runtime startup applies up migrations only. Rollback is a maintenance and test
 operation, not a public Dopbase CLI command.
 
 The database test suite applies all migrations, rolls back to version zero,

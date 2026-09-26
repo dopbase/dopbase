@@ -13,59 +13,13 @@ import {
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon, LockIcon, PlusIcon } from "~/assets/icons";
+import { formatDateTime } from "~/utils/format";
+import {
+  MAX_TOKEN_EXPIRY_DAYS,
+  MAX_TOKEN_EXPIRY_HOURS,
+} from "~/utils/token-expiry";
 
-const {
-  users,
-  serviceAccounts,
-  loading,
-  error,
-  editing,
-  email,
-  password,
-  role,
-  roleOptions,
-  showCreate,
-  saving,
-  formError,
-  fieldErrors,
-  canSave,
-  openCreate,
-  openEdit,
-  save,
-  promptDelete,
-  userToDelete,
-  deletingUser,
-  deleteUserError,
-  closeDeleteUser,
-  confirmDeleteUser,
-  close,
-  showAgentCreate,
-  agentName,
-  savingAgent,
-  agentFormError,
-  agentFieldError,
-  canSaveAgent,
-  openAgentCreate,
-  closeAgentCreate,
-  saveAgent,
-  promptDeleteAgent,
-  agentToDelete,
-  deletingAgent,
-  deleteAgentError,
-  closeDeleteAgent,
-  confirmDeleteAgent,
-  agentForToken,
-  showTokenReauth,
-  tokenPassword,
-  tokenPasswordError,
-  tokenReauthError,
-  generatingToken,
-  createdAgentToken,
-  promptGetToken,
-  closeTokenReauth,
-  confirmTokenReauthAndGenerate,
-  acknowledgeCreatedToken,
-} = useUsersController();
+const { state, actions } = useUsersController();
 </script>
 
 <template>
@@ -78,17 +32,17 @@ const {
             Manage human access to this instance. The root account is protected.
           </p>
         </div>
-        <DbButton size="sm" variant="primary" @click="openCreate">
+        <DbButton size="sm" variant="primary" @click="actions.openCreate">
           <PlusIcon class="h-3.5 w-3.5" />
           Add User
         </DbButton>
       </header>
 
-      <DbAlert v-if="error" class="mb-4">{{ error }}</DbAlert>
+      <DbAlert v-if="state.error" class="mb-4">{{ state.error }}</DbAlert>
 
       <!-- Users list loading skeleton -->
       <div
-        v-if="loading && !users.length"
+        v-if="state.loading && !state.users.length"
         class="overflow-hidden rounded-card border border-line bg-panel"
         data-testid="users-skeleton">
         <div
@@ -110,7 +64,7 @@ const {
         class="overflow-hidden rounded-card border border-line bg-panel"
         data-testid="users-list">
         <div
-          v-for="user in users"
+          v-for="user in state.users"
           :key="user.id"
           class="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0">
           <div class="min-w-0 flex-1">
@@ -131,14 +85,14 @@ const {
             v-if="user.role !== 'root'"
             size="sm"
             variant="secondary"
-            @click="openEdit(user)">
+            @click="actions.openEdit(user)">
             Edit
           </DbButton>
           <DbButton
             v-if="user.role !== 'root'"
             size="sm"
             variant="danger"
-            @click="promptDelete(user)">
+            @click="actions.promptDelete(user)">
             Delete
           </DbButton>
         </div>
@@ -150,18 +104,20 @@ const {
           <div>
             <h2 class="text-sm font-semibold text-ink-strong">AI agents</h2>
             <p class="text-xs text-ink-muted">
-              Metadata-only identities. Generate a 30-day bearer token with
-              password confirmation.
+              Generate agent tokens with password confirmation.
             </p>
           </div>
-          <DbButton size="sm" variant="secondary" @click="openAgentCreate">
+          <DbButton
+            size="sm"
+            variant="secondary"
+            @click="actions.openAgentCreate">
             Add AI agent
           </DbButton>
         </header>
 
         <!-- AI agents loading skeleton -->
         <div
-          v-if="loading && !serviceAccounts.length"
+          v-if="state.loading && !state.serviceAccounts.length"
           class="overflow-hidden rounded-card border border-line bg-panel"
           data-testid="agents-skeleton">
           <div
@@ -182,7 +138,7 @@ const {
           class="overflow-hidden rounded-card border border-line bg-panel"
           data-testid="agents-list">
           <div
-            v-for="account in serviceAccounts"
+            v-for="account in state.serviceAccounts"
             :key="account.id"
             class="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0">
             <div class="min-w-0 flex-1">
@@ -190,25 +146,43 @@ const {
                 {{ account.name }}
               </p>
               <DbBadge tone="neutral">AI agent</DbBadge>
+              <div class="mt-1 space-y-0.5 text-xs text-ink-muted">
+                <p v-if="state.agentTokens[account.id] === null">
+                  Could not load token details.
+                </p>
+                <p v-else-if="!state.agentTokens[account.id]?.length">
+                  No active tokens
+                </p>
+                <p
+                  v-for="token in state.agentTokens[account.id] ?? []"
+                  :key="token.id">
+                  {{ token.name }} ·
+                  {{
+                    token.expiresAt
+                      ? `Expiry: ${formatDateTime(token.expiresAt)}`
+                      : "No expiry"
+                  }}
+                </p>
+              </div>
             </div>
             <div class="flex items-center gap-2">
               <DbButton
                 size="sm"
                 variant="secondary"
-                @click="promptGetToken(account)">
+                @click="actions.promptGetToken(account)">
                 <KeyIcon class="h-3.5 w-3.5" />
                 Get token
               </DbButton>
               <DbButton
                 size="sm"
                 variant="danger"
-                @click="promptDeleteAgent(account)">
+                @click="actions.promptDeleteAgent(account)">
                 Delete
               </DbButton>
             </div>
           </div>
           <p
-            v-if="!serviceAccounts.length"
+            v-if="!state.serviceAccounts.length"
             class="px-4 py-5 text-sm text-ink-muted">
             No AI agents configured.
           </p>
@@ -217,41 +191,44 @@ const {
 
       <!-- Add / Edit User Modal -->
       <DbModal
-        :open="showCreate"
-        :title="editing ? 'Edit user' : 'Add User'"
-        @close="close">
+        :open="state.showCreate"
+        :title="state.editing ? 'Edit user' : 'Add User'"
+        @close="actions.close">
         <div class="flex flex-col gap-3">
-          <DbSelect v-model="role" label="Role" :options="roleOptions" />
-          <DbAlert v-if="formError">{{ formError }}</DbAlert>
+          <DbSelect
+            v-model="state.role"
+            label="Role"
+            :options="state.roleOptions" />
+          <DbAlert v-if="state.formError">{{ state.formError }}</DbAlert>
           <DbInput
-            v-model="email"
+            v-model="state.email"
             label="Email"
             type="email"
             autocomplete="email"
             placeholder="admin@example.com"
-            :error="fieldErrors.email"
+            :error="state.fieldErrors.email"
             required
-            @input="fieldErrors.email = undefined" />
+            @input="state.fieldErrors.email = undefined" />
           <DbInput
-            v-model="password"
-            :label="editing ? 'New password (optional)' : 'Password'"
+            v-model="state.password"
+            :label="state.editing ? 'New password (optional)' : 'Password'"
             type="password"
             autocomplete="new-password"
-            :error="fieldErrors.password"
-            :required="!editing"
+            :error="state.fieldErrors.password"
+            :required="!state.editing"
             :hint="
-              editing
+              state.editing
                 ? 'Leave blank to keep existing password.'
                 : 'At least 12 characters.'
             "
-            @input="fieldErrors.password = undefined" />
+            @input="state.fieldErrors.password = undefined" />
         </div>
         <template #footer>
-          <DbButton variant="ghost" @click="close">Cancel</DbButton>
+          <DbButton variant="ghost" @click="actions.close">Cancel</DbButton>
           <DbButton
-            :loading="saving"
-            :disabled="!canSave || saving"
-            @click="save">
+            :loading="state.saving"
+            :disabled="!state.canSave || state.saving"
+            @click="actions.save">
             Save
           </DbButton>
         </template>
@@ -259,29 +236,33 @@ const {
 
       <!-- Add AI Agent Modal -->
       <DbModal
-        :open="showAgentCreate"
+        :open="state.showAgentCreate"
         title="Add AI agent"
-        @close="closeAgentCreate">
+        @close="actions.closeAgentCreate">
         <div class="flex flex-col gap-3">
-          <DbAlert v-if="agentFormError">{{ agentFormError }}</DbAlert>
+          <DbAlert v-if="state.agentFormError">{{
+            state.agentFormError
+          }}</DbAlert>
           <DbInput
-            v-model="agentName"
+            v-model="state.agentName"
             label="Name"
             placeholder="build-agent"
-            :error="agentFieldError"
+            :error="state.agentFieldError"
             required
-            @input="agentFieldError = null" />
+            @input="state.agentFieldError = null" />
           <p class="text-xs text-ink-muted">
             The agent can read project metadata and secret names, but never
             secret values.
           </p>
         </div>
         <template #footer>
-          <DbButton variant="ghost" @click="closeAgentCreate">Cancel</DbButton>
+          <DbButton variant="ghost" @click="actions.closeAgentCreate"
+            >Cancel</DbButton
+          >
           <DbButton
-            :loading="savingAgent"
-            :disabled="!canSaveAgent || savingAgent"
-            @click="saveAgent">
+            :loading="state.savingAgent"
+            :disabled="!state.canSaveAgent || state.savingAgent"
+            @click="actions.saveAgent">
             Create
           </DbButton>
         </template>
@@ -289,41 +270,41 @@ const {
 
       <!-- Delete User Confirmation Dialog -->
       <DbConfirmDialog
-        :open="userToDelete !== null"
+        :open="state.userToDelete !== null"
         title="Delete user"
-        :description="`Deleting '${userToDelete?.email}' permanently removes their access to this instance.`"
-        :confirm-word="userToDelete?.email"
+        :description="`Deleting '${state.userToDelete?.email}' permanently removes their access to this instance.`"
+        :confirm-word="state.userToDelete?.email"
         confirm-label="Delete user"
         tone="danger"
-        :loading="deletingUser"
-        :error="deleteUserError"
-        @confirm="confirmDeleteUser"
-        @close="closeDeleteUser" />
+        :loading="state.deletingUser"
+        :error="state.deleteUserError"
+        @confirm="actions.confirmDeleteUser"
+        @close="actions.closeDeleteUser" />
 
       <!-- Delete AI Agent Confirmation Dialog -->
       <DbConfirmDialog
-        :open="agentToDelete !== null"
+        :open="state.agentToDelete !== null"
         title="Delete AI agent"
-        :description="`Deleting '${agentToDelete?.name}' permanently removes it. Its tokens stop working immediately.`"
-        :confirm-word="agentToDelete?.name"
+        :description="`Deleting '${state.agentToDelete?.name}' permanently removes it. Its tokens stop working immediately.`"
+        :confirm-word="state.agentToDelete?.name"
         confirm-label="Delete AI agent"
         tone="danger"
-        :loading="deletingAgent"
-        :error="deleteAgentError"
-        @confirm="confirmDeleteAgent"
-        @close="closeDeleteAgent" />
+        :loading="state.deletingAgent"
+        :error="state.deleteAgentError"
+        @confirm="actions.confirmDeleteAgent"
+        @close="actions.closeDeleteAgent" />
 
       <!-- AI Agent Token Re-authentication Modal -->
       <DbModal
-        :open="showTokenReauth"
+        :open="state.showTokenReauth"
         title="Authenticate to generate token"
         size="sm"
         persistent
-        @close="closeTokenReauth">
+        @close="actions.closeTokenReauth">
         <form
           class="flex flex-col gap-4"
           novalidate
-          @submit.prevent="confirmTokenReauthAndGenerate">
+          @submit.prevent="actions.confirmTokenReauthAndGenerate">
           <div class="flex items-start gap-3">
             <div
               class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-warn/30 bg-warn/10 text-warn">
@@ -332,37 +313,67 @@ const {
             <p class="text-sm text-ink">
               Enter your password to generate a new token for
               <span class="font-semibold text-ink-strong">{{
-                agentForToken?.name
+                state.agentForToken?.name
               }}</span
               >. Any existing active token for this agent will be revoked.
             </p>
           </div>
 
+          <DbSelect
+            v-model="state.tokenExpiryChoice"
+            label="Expires"
+            :options="state.tokenExpiryOptions" />
+          <div
+            v-if="state.tokenExpiryChoice === 'custom'"
+            class="grid grid-cols-2 gap-2">
+            <DbInput
+              v-model="state.tokenCustomAmount"
+              label="Duration"
+              type="number"
+              :min="1"
+              :max="
+                state.tokenCustomUnit === 'h'
+                  ? MAX_TOKEN_EXPIRY_HOURS
+                  : MAX_TOKEN_EXPIRY_DAYS
+              "
+              :step="1"
+              :error="state.tokenExpiryError"
+              @input="state.tokenExpiryError = null" />
+            <DbSelect
+              v-model="state.tokenCustomUnit"
+              label="Unit"
+              :options="state.tokenExpiryUnits" />
+          </div>
+
           <DbInput
-            v-model="tokenPassword"
+            v-model="state.tokenPassword"
             label="Password"
             type="password"
             autocomplete="current-password"
             name="token-password"
-            :error="tokenPasswordError"
+            :error="state.tokenPasswordError"
             required
             autofocus
-            @input="tokenPasswordError = null" />
+            @input="state.tokenPasswordError = null" />
 
-          <DbAlert v-if="tokenReauthError">{{ tokenReauthError }}</DbAlert>
+          <DbAlert v-if="state.tokenReauthError">{{
+            state.tokenReauthError
+          }}</DbAlert>
 
           <div class="flex items-center justify-end gap-2">
             <DbButton
               variant="ghost"
-              :disabled="generatingToken"
-              @click="closeTokenReauth">
+              :disabled="state.generatingToken"
+              @click="actions.closeTokenReauth">
               Cancel
             </DbButton>
             <DbButton
               variant="primary"
               type="submit"
-              :loading="generatingToken"
-              :disabled="tokenPassword.length === 0 || generatingToken">
+              :loading="state.generatingToken"
+              :disabled="
+                state.tokenPassword.length === 0 || state.generatingToken
+              ">
               Generate token
             </DbButton>
           </div>
@@ -370,13 +381,17 @@ const {
       </DbModal>
 
       <OneTimeTokenDialog
-        :id="createdAgentToken?.token.id ?? ''"
-        :open="createdAgentToken !== null"
+        :id="state.createdAgentToken?.token.id ?? ''"
+        :open="state.createdAgentToken !== null"
         title="AI agent token generated"
-        :name="createdAgentToken?.token.name ?? ''"
-        :token="createdAgentToken?.plaintextToken ?? ''"
-        detail="This token expires in 30 days."
-        @acknowledge="acknowledgeCreatedToken" />
+        :name="state.createdAgentToken?.token.name ?? ''"
+        :token="state.createdAgentToken?.plaintextToken ?? ''"
+        :detail="
+          state.createdAgentToken?.token.expiresAt
+            ? `Expires ${formatDateTime(state.createdAgentToken.token.expiresAt)}.`
+            : 'This token does not expire.'
+        "
+        @acknowledge="actions.acknowledgeCreatedToken" />
     </div>
   </DashboardLayout>
 </template>

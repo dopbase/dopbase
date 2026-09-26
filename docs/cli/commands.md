@@ -329,16 +329,22 @@ Create a different token for each deployed environment:
 ```bash
 dopbase token create payment-service/production \
   --name production-server --role runner
+dopbase token create payment-service/production \
+  --name deploy-job --expires-in 12h
 ```
 
-| Command                                                              | Purpose               |
-| -------------------------------------------------------------------- | --------------------- |
-| `dopbase token create <ENVIRONMENT_REF> --name <NAME> --role runner` | Create a runner token |
-| `dopbase token list <ENVIRONMENT_REF>`                               | List token metadata   |
-| `dopbase token revoke <token-id>`                                    | Revoke a token        |
+| Command                                                                                        | Purpose               |
+| ---------------------------------------------------------------------------------------------- | --------------------- |
+| `dopbase token create <ENVIRONMENT_REF> --name <NAME> --role runner [--expires-in <DURATION>]` | Create a runner token |
+| `dopbase token list <ENVIRONMENT_REF>`                                                         | List token metadata   |
+| `dopbase token revoke <token-id>`                                                              | Revoke a token        |
 
 The plaintext token is displayed only once. Tokens can also be created and
 revoked on an environment's Tokens tab in the [Admin UI](/ui/projects-environments).
+Without `--expires-in`, a runner token does not expire. Use `never` or a whole
+number followed by `h` or `d`, up to `26280h` or `1095d`. The server rejects
+expired tokens even if the client's clock is wrong. The list shows each token's
+expiry and status.
 A runner token can retrieve values
 for its assigned environment so `dopbase run` can inject them, but it cannot
 modify, export, or access another environment.

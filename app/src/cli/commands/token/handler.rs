@@ -19,13 +19,14 @@ pub(crate) async fn execute(
       environment,
       name,
       role,
+      expires_in,
     } => {
       let env = environment::resolve_environment(&api, &environment).await?;
       let data = api
         .request(
           Method::POST,
           &api_paths::tokens::collection(environment::env_id(&env)?),
-          Some(json!({"name":name,"role":role})),
+          Some(json!({"name":name,"role":role,"expiresIn":expires_in})),
         )
         .await?;
       if json_output {
@@ -35,6 +36,13 @@ pub(crate) async fn execute(
         output::print_success(&format!("Created token {name} for {environment}."));
         output::print_fields(&[
           ("ID:", output::string(token, "id")),
+          (
+            "Expires:",
+            token
+              .get("expiresAt")
+              .and_then(|value| value.as_str())
+              .map_or_else(|| "never".into(), str::to_owned),
+          ),
           ("Token:", output::string(&data, "plaintextToken")),
         ]);
         output::print_warning("Store this token now. Dopbase will not show it again.");
@@ -60,16 +68,29 @@ pub(crate) async fn execute(
               output::string(token, "id"),
               if token.get("revokedAt").is_some_and(|value| !value.is_null()) {
                 "revoked".into()
+              } else if token
+                .get("expiresAt")
+                .and_then(|value| value.as_str())
+                .is_some_and(|expiry| {
+                  chrono::DateTime::parse_from_rfc3339(expiry)
+                    .is_ok_and(|date| date <= chrono::Utc::now())
+                })
+              {
+                "expired".into()
               } else {
                 "active".into()
               },
+              token
+                .get("expiresAt")
+                .and_then(|value| value.as_str())
+                .map_or_else(|| "never".into(), str::to_owned),
               output::timestamp(token, "lastUsedAt"),
               output::timestamp(token, "createdAt"),
             ]
           })
           .collect::<Vec<_>>();
         output::print_table(
-          &["NAME", "ID", "STATUS", "LAST USED", "CREATED"],
+          &["NAME", "ID", "STATUS", "EXPIRES", "LAST USED", "CREATED"],
           &rows,
           &format!("No tokens found for {environment}."),
           &format!("{} token(s)", rows.len()),

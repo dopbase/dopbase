@@ -3,6 +3,11 @@ import { createPinia, setActivePinia } from "pinia";
 import { useInstanceController } from "./Instance.controller";
 import * as instanceApi from "~/services/instance.api";
 
+vi.mock("vue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue")>()),
+  onMounted: vi.fn(),
+}));
+
 const routerPush = vi.hoisted(() => vi.fn());
 
 vi.mock("vue-router", () => ({

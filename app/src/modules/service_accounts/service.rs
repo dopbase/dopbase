@@ -29,20 +29,34 @@ fn validate_name(name: &str) -> Result<String, HttpError> {
   }
   Ok(value.to_owned())
 }
-fn parse_expiry(value: Option<String>) -> Result<Option<String>, HttpError> {
-  let Some(value) = value else {
-    return Ok(Some((Utc::now() + Duration::days(30)).to_rfc3339()));
+fn parse_expiry(
+  expires_at: Option<String>,
+  expires_in: Option<String>,
+  now: DateTime<Utc>,
+) -> Result<Option<String>, HttpError> {
+  if expires_at.is_some() && expires_in.is_some() {
+    return Err(HttpError::bad_request(
+      "EXPIRY_INVALID",
+      "Choose expiresAt or expiresIn, not both.",
+    ));
+  }
+  if let Some(value) = expires_in {
+    return token::expiry_duration(&value)
+      .map_err(|message| HttpError::bad_request("EXPIRY_INVALID", message))
+      .map(|duration| duration.map(|duration| (now + duration).to_rfc3339()));
+  }
+  let Some(value) = expires_at else {
+    return Ok(Some((now + Duration::days(30)).to_rfc3339()));
   };
   let parsed = DateTime::parse_from_rfc3339(value.trim())
     .map_err(|_| {
       HttpError::bad_request("EXPIRY_INVALID", "expiresAt must be an RFC3339 timestamp.")
     })?
     .with_timezone(&Utc);
-  let now = Utc::now();
-  if parsed <= now || parsed > now + Duration::days(90) {
+  if parsed <= now || parsed > now + Duration::days(token::MAX_EXPIRY_DAYS) {
     return Err(HttpError::bad_request(
       "EXPIRY_INVALID",
-      "Agent tokens must expire within 90 days.",
+      "Agent tokens must expire within 3 years.",
     ));
   }
   Ok(Some(parsed.to_rfc3339()))
@@ -234,10 +248,11 @@ pub async fn create_token(
   require_admin_browser(identity)?;
   let _ = account(state, id).await?;
   let name = validate_name(&request.name)?;
-  let expires = parse_expiry(request.expires_at)?;
+  let now = Utc::now();
+  let expires = parse_expiry(request.expires_at, request.expires_in, now)?;
   let token_id = token::public_id(AGENT_TOKEN_ID_PREFIX);
   let raw = token::generate(AGENT_TOKEN_PREFIX).map_err(|_| HttpError::internal())?;
-  let now = Utc::now().to_rfc3339();
+  let now = now.to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
   let result=sqlx::query("INSERT INTO agent_tokens(id,service_account_id,name,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)").bind(&token_id).bind(id).bind(&name).bind(token::hash(&raw)).bind(&now).bind(&expires).execute(&mut *tx).await;
   if let Err(error) = result {

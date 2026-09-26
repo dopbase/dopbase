@@ -3,6 +3,7 @@ import { nextTick, ref } from "vue";
 import { useTokensPanelController } from "./TokensPanel.controller";
 import * as tokensApi from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
+import { mountController } from "~/tests/mount-controller";
 
 vi.mock("~/services/tokens.api");
 
@@ -11,12 +12,14 @@ const token = {
   environmentId: "env_1",
   name: "deploy",
   createdAt: "2026-08-28T00:00:00Z",
+  expiresAt: null,
   lastUsedAt: null,
   revokedAt: null,
 };
 
 function makeController() {
-  return useTokensPanelController(ref("env_1"));
+  return mountController(() => useTokensPanelController(ref("env_1")))
+    .controller;
 }
 
 describe("useTokensPanelController", () => {
@@ -27,7 +30,9 @@ describe("useTokensPanelController", () => {
       .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
       .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
     const environmentId = ref("env_1");
-    const c = useTokensPanelController(environmentId);
+    const c = mountController(() =>
+      useTokensPanelController(environmentId),
+    ).controller;
     environmentId.value = "env_2";
     await nextTick();
     const current = { ...token, id: "tok_current", environmentId: "env_2" };
@@ -50,10 +55,28 @@ describe("useTokensPanelController", () => {
     expect(tokensApi.createToken).toHaveBeenCalledWith("env_1", {
       name: "deploy",
       role: "runner",
+      expiresIn: "never",
     });
     expect(c.created.value?.plaintextToken).toBe("dbs_secret");
     c.acknowledgeCreated();
     expect(c.created.value).toBeNull();
+  });
+
+  it("discards the plaintext when the panel unmounts", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+    vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
+      token,
+      plaintextToken: "dbs_secret",
+    });
+    const { controller, unmount } = mountController(() =>
+      useTokensPanelController(ref("env_1")),
+    );
+    await controller.create("deploy");
+    expect(controller.created.value?.plaintextToken).toBe("dbs_secret");
+
+    unmount();
+
+    expect(controller.created.value).toBeNull();
   });
 
   it("maps name conflicts to a friendly message", async () => {
@@ -64,6 +87,21 @@ describe("useTokensPanelController", () => {
     const c = makeController();
     await expect(c.create("deploy")).rejects.toBeDefined();
     expect(c.actionError.value).toBe("A token with this name already exists.");
+  });
+
+  it("passes a selected custom expiry to the API", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+    vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
+      token,
+      plaintextToken: "dbs_secret",
+    });
+    const c = makeController();
+    await c.create("deploy", "12h");
+    expect(tokensApi.createToken).toHaveBeenCalledWith("env_1", {
+      name: "deploy",
+      role: "runner",
+      expiresIn: "12h",
+    });
   });
 
   it("revokes and reloads", async () => {

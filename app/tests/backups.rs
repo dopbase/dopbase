@@ -851,7 +851,7 @@ async fn test_dashboard_upload_cross_key_rekeys_cleanly() {
 }
 
 #[tokio::test]
-async fn restore_recovers_service_accounts_and_agent_tokens() {
+async fn restore_recovers_agent_and_expiring_runner_tokens() {
   let (_dir, state, router, token) = admin_setup().await;
   let now = Utc::now().to_rfc3339();
   sqlx::query("INSERT INTO service_accounts(id,name,role,created_at,updated_at) VALUES(?,?,?,?,?)")
@@ -875,6 +875,15 @@ async fn restore_recovers_service_accounts_and_agent_tokens() {
   .await
   .unwrap();
 
+  sqlx::query("INSERT INTO projects(id,name,created_at,updated_at) VALUES('prj_backup_test','backup-project',?,?)")
+    .bind(&now).bind(&now).execute(state.db.pool()).await.unwrap();
+  sqlx::query("INSERT INTO environments(id,project_id,name,created_at,updated_at) VALUES('env_backup_test','prj_backup_test','production',?,?)")
+    .bind(&now).bind(&now).execute(state.db.pool()).await.unwrap();
+  let runner_expiry = (Utc::now() + chrono::Duration::days(7)).to_rfc3339();
+  sqlx::query("INSERT INTO runner_tokens(id,environment_id,name,token_hash,created_at,expires_at) VALUES('tok_backup_test','env_backup_test','restore-runner',?,?,?)")
+    .bind(app::services::token::hash("dbs_restore_test"))
+    .bind(&now).bind(&runner_expiry).execute(state.db.pool()).await.unwrap();
+
   let (status, backup, _) = call(
     &router,
     "POST",
@@ -887,6 +896,10 @@ async fn restore_recovers_service_accounts_and_agent_tokens() {
   let key = backup["data"]["key"].as_str().unwrap();
 
   sqlx::query("DELETE FROM agent_tokens")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  sqlx::query("DELETE FROM runner_tokens")
     .execute(state.db.pool())
     .await
     .unwrap();
@@ -915,6 +928,12 @@ async fn restore_recovers_service_accounts_and_agent_tokens() {
     .unwrap();
   assert_eq!(account_count, 1);
   assert_eq!(token_count, 1);
+  let restored_expiry: String =
+    sqlx::query_scalar("SELECT expires_at FROM runner_tokens WHERE id='tok_backup_test'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(restored_expiry, runner_expiry);
 }
 
 #[test]

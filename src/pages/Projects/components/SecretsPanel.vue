@@ -414,7 +414,8 @@ async function confirmDelete(): Promise<void> {
           </thead>
           <tbody>
             <template v-for="secret in secrets" :key="secret.key">
-              <tr class="border-b border-line-soft last:border-b-0">
+              <tr
+                class="border-b border-line-soft transition-colors last:border-b-0 hover:bg-raised/60">
                 <td class="px-4 py-2.5 font-mono text-sm text-ink-strong">
                   {{ secret.key }}
                 </td>

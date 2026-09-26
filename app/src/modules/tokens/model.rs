@@ -7,6 +7,7 @@ pub struct TokenMetadata {
   pub environment_id: String,
   pub name: String,
   pub created_at: String,
+  pub expires_at: Option<String>,
   pub last_used_at: Option<String>,
   pub revoked_at: Option<String>,
 }
@@ -14,6 +15,8 @@ pub struct TokenMetadata {
 pub struct CreateTokenRequest {
   pub name: String,
   pub role: String,
+  #[serde(rename = "expiresIn")]
+  pub expires_in: Option<String>,
 }
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

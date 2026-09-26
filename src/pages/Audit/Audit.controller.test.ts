@@ -4,6 +4,11 @@ import * as auditApi from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 
+vi.mock("vue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue")>()),
+  onMounted: vi.fn(),
+}));
+
 vi.mock("~/services/audit.api");
 vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");

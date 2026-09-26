@@ -9,6 +9,7 @@ import { useReauthentication } from "~/composable";
 import * as secretsApi from "~/services/secrets.api";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
+import { mountController } from "~/tests/mount-controller";
 
 vi.mock("~/services/secrets.api");
 vi.mock("~/services/auth.api");
@@ -34,7 +35,8 @@ const metadata = {
 };
 
 function makeController(environmentId = "env_1") {
-  return useSecretsPanelController(ref(environmentId));
+  return mountController(() => useSecretsPanelController(ref(environmentId)))
+    .controller;
 }
 
 const storedLayout = "# app\nDATABASE_URL=\nAPI_KEY=\n";
@@ -60,7 +62,9 @@ describe("useSecretsPanelController", () => {
       .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
       .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
     const environmentId = ref("env_1");
-    const c = useSecretsPanelController(environmentId);
+    const c = mountController(() =>
+      useSecretsPanelController(environmentId),
+    ).controller;
     environmentId.value = "env_2";
     await nextTick();
     const current = { ...metadata, key: "CURRENT" };
@@ -126,6 +130,24 @@ describe("useSecretsPanelController", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("drops revealed plaintext when the panel unmounts", async () => {
+    vi.mocked(secretsApi.revealSecret).mockResolvedValueOnce({
+      key: "DATABASE_URL",
+      value: "postgres://secret",
+      version: 2,
+    });
+    const { controller, unmount } = mountController(() =>
+      useSecretsPanelController(ref("env_1")),
+    );
+    await controller.reveal("DATABASE_URL");
+    expect(controller.revealedValue.value).toBe("postgres://secret");
+
+    unmount();
+
+    expect(controller.revealedKey.value).toBeNull();
+    expect(controller.revealedValue.value).toBeNull();
   });
 
   it("parks reveal behind reauthentication and completes after confirming", async () => {
@@ -269,7 +291,9 @@ describe("useSecretsPanelController — .env editor", () => {
 
   it("changing the environment wipes the editor buffer", async () => {
     const environmentId = ref("env_1");
-    const c = useSecretsPanelController(environmentId);
+    const c = mountController(() =>
+      useSecretsPanelController(environmentId),
+    ).controller;
     mockEditorLoad();
     await c.openEditor();
     expect(c.editorContent.value).not.toBeNull();

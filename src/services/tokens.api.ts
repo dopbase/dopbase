@@ -5,6 +5,7 @@ export interface RunnerToken {
   environmentId: string;
   name: string;
   createdAt: string;
+  expiresAt: string | null;
   lastUsedAt: string | null;
   revokedAt: string | null;
 }
@@ -12,6 +13,7 @@ export interface RunnerToken {
 export interface CreateTokenRequest {
   name: string;
   role: string;
+  expiresIn?: string;
 }
 
 export interface CreatedTokenResponse {

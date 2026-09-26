@@ -44,8 +44,9 @@ Root and admin users create AI accounts from the Admin UI:
 3. Choose **Get token** beside the new account.
 4. Confirm your password and copy the token when it appears.
 
-Agent tokens start with `dpa_`. The Admin UI creates a token that expires after
-30 days and revokes any previous active token for that account. Dopbase shows
+Agent tokens start with `dpa_`. The Admin UI defaults to 30 days and lets you
+choose no expiry or a lifetime up to three years in whole hours or days. It
+revokes any previous active token for that account. Dopbase shows
 the plaintext token once, so put it in a password manager, CI secret store, or
 another protected credential store.
 

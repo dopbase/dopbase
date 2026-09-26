@@ -65,7 +65,9 @@ dopbase token create payment-service/production \
 The plaintext token is displayed only once. A runner can retrieve and inject
 values from its assigned environment, but cannot change secrets, export them,
 or access another environment. Production and staging servers should always
-use different runner tokens.
+use different runner tokens. Runner tokens have no expiry by default. Use
+`--expires-in 12h` or `--expires-in 7d` when creating one for a short job.
+Durations must be whole hours or days, up to 1,095 days.
 
 ## AI agents
 
@@ -75,9 +77,9 @@ secret names, versions, timestamps, editor layouts, and instance counts. They
 cannot reveal, export, or retrieve runtime secret values, mutate projects,
 manage accounts, list runner tokens, or read audit history.
 
-Agent tokens are displayed only once when created. They expire
-after 30 days by default, a supplied expiry must be in the future and within
-90 days. Revoking a token or deleting its account prevents subsequent access.
+Agent tokens are displayed only once when created. They expire after 30 days
+by default. The Admin UI also offers no expiry and custom durations of up to
+three years. Revoking a token or deleting its account prevents subsequent access.
 Pass an agent token to the CLI through `DOPBASE_TOKEN`, just like a runner
 token. `dopbase client status` identifies it as `ai_agent` without displaying
 the token. Use this role when an agent needs configuration context for tasks

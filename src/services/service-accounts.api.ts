@@ -55,10 +55,11 @@ export async function createAgentToken(
   id: string,
   name: string,
   expiresAt?: string,
+  expiresIn?: string,
 ): Promise<CreatedAgentToken> {
   const { data } = await apiRequest<CreatedAgentToken>(
     `${BASE}/${encodeURIComponent(id)}/tokens`,
-    { method: "POST", body: { name, expiresAt } },
+    { method: "POST", body: { name, expiresAt, expiresIn } },
   );
   return data;
 }

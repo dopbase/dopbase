@@ -3,6 +3,11 @@ import { createPinia, setActivePinia } from "pinia";
 import { useBackupsController } from "./Backups.controller";
 import * as backupsApi from "~/services/backups.api";
 
+vi.mock("vue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue")>()),
+  onMounted: vi.fn(),
+}));
+
 vi.mock("~/services/backups.api");
 
 const sampleBackup: backupsApi.BackupItem = {

@@ -9,6 +9,12 @@ import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
 
+vi.mock("vue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue")>()),
+  onMounted: vi.fn(),
+  onUnmounted: vi.fn(),
+}));
+
 const { routerPush, routerReplace, route } = await vi.hoisted(async () => {
   const { reactive } = await import("vue");
   return {
@@ -236,6 +242,7 @@ describe("useProjectsController", () => {
         environmentId: "env_1",
         name: "t",
         createdAt: "",
+        expiresAt: null,
         lastUsedAt: null,
         revokedAt: null,
       },

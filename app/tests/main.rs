@@ -1079,3 +1079,65 @@ async fn security_headers_are_applied_to_every_response() {
   assert_eq!(headers.get("cache-control").unwrap(), "no-cache");
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
+  let (_directory, state, router, admin, environment_id) = admin_environment().await;
+  let path = format!("/api/v1/environments/{environment_id}/tokens");
+  let (status, created, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&admin),
+    Some(json!({"name":"short","role":"runner","expiresIn":"1h"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert!(created["data"]["token"]["expiresAt"].is_string());
+  let runner = created["data"]["plaintextToken"].as_str().unwrap();
+  let token_id = created["data"]["token"]["id"].as_str().unwrap();
+  let runtime = format!("/api/v1/environments/{environment_id}/secrets/runtime");
+  let (status, _, _) = call(&router, "GET", &runtime, Some(runner), None).await;
+  assert_eq!(status, 200);
+  sqlx::query("UPDATE runner_tokens SET expires_at=? WHERE id=?")
+    .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
+    .bind(token_id)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let (status, _, _) = call(&router, "GET", &runtime, Some(runner), None).await;
+  assert_eq!(status, 401);
+  let (status, counts, _) = call(&router, "GET", "/api/v1/status", Some(&admin), None).await;
+  assert_eq!(status, 200);
+  assert_eq!(counts["data"]["activeRunnerTokens"], 0);
+
+  let (status, default, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&admin),
+    Some(json!({"name":"unlimited","role":"runner"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  assert!(default["data"]["token"]["expiresAt"].is_null());
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&admin),
+    Some(json!({"name":"limit","role":"runner","expiresIn":"1095d"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    &path,
+    Some(&admin),
+    Some(json!({"name":"too-long","role":"runner","expiresIn":"1096d"})),
+  )
+  .await;
+  assert_eq!(status, 400);
+  state.db.close().await;
+}

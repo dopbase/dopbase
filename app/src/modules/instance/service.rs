@@ -48,7 +48,8 @@ pub async fn public_status(
   let human_users = count(state.db.pool(), "SELECT COUNT(*) FROM admins").await?;
   let ai_agents = count(state.db.pool(), "SELECT COUNT(*) FROM service_accounts").await?;
   let active_runner_tokens =
-    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM runner_tokens WHERE revoked_at IS NULL")
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM runner_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)")
+      .bind(chrono::Utc::now().to_rfc3339())
       .fetch_one(state.db.pool())
       .await?;
   let active_agent_tokens = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)").bind(chrono::Utc::now().to_rfc3339()).fetch_one(state.db.pool()).await?;
