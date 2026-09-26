@@ -3,6 +3,7 @@ import { nextTick, ref } from "vue";
 import { useTokensPanelController } from "./TokensPanel.controller";
 import * as tokensApi from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
+import { mountController } from "~/tests/mount-controller";
 
 vi.mock("~/services/tokens.api");
 
@@ -17,7 +18,8 @@ const token = {
 };
 
 function makeController() {
-  return useTokensPanelController(ref("env_1"));
+  return mountController(() => useTokensPanelController(ref("env_1")))
+    .controller;
 }
 
 describe("useTokensPanelController", () => {
@@ -28,7 +30,9 @@ describe("useTokensPanelController", () => {
       .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
       .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
     const environmentId = ref("env_1");
-    const c = useTokensPanelController(environmentId);
+    const c = mountController(() =>
+      useTokensPanelController(environmentId),
+    ).controller;
     environmentId.value = "env_2";
     await nextTick();
     const current = { ...token, id: "tok_current", environmentId: "env_2" };
@@ -56,6 +60,23 @@ describe("useTokensPanelController", () => {
     expect(c.created.value?.plaintextToken).toBe("dbs_secret");
     c.acknowledgeCreated();
     expect(c.created.value).toBeNull();
+  });
+
+  it("discards the plaintext when the panel unmounts", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+    vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
+      token,
+      plaintextToken: "dbs_secret",
+    });
+    const { controller, unmount } = mountController(() =>
+      useTokensPanelController(ref("env_1")),
+    );
+    await controller.create("deploy");
+    expect(controller.created.value?.plaintextToken).toBe("dbs_secret");
+
+    unmount();
+
+    expect(controller.created.value).toBeNull();
   });
 
   it("maps name conflicts to a friendly message", async () => {
