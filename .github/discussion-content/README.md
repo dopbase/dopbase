@@ -84,7 +84,8 @@ files to update post bodies. The manifest records desired and actual categories.
 
 ## Pins and form checks
 
-Globally pin the welcome, installation tutorial, and feature-request starter.
+The welcome is already globally pinned. Also globally pin the installation
+tutorial and feature-request starter.
 Within Tutorials, pin the configuration tutorial. Within Feedback, pin its
 starter prompt. Set each post's `pin_verified` value in the manifest only after
 checking the web interface.
