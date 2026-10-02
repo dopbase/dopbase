@@ -25,3 +25,9 @@ Have you considered any alternative solutions or workarounds?
 ## Additional Context
 
 Add any other context, screenshots, mockups, or examples here.
+
+## Related discussion (optional)
+
+Link the GitHub Discussion where this idea was discussed, if there is one.
+You can also start with [Feature requests](https://github.com/dopbase/dopbase/discussions/categories/ideas)
+when you want feedback before proposing implementation work.

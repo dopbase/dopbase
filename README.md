@@ -29,6 +29,7 @@
   <a href="https://dopbase.com/how-it-works">How it works</a> |
   <a href="https://docs.dopbase.com">Documentation</a> |
   <a href="./SECURITY.md">Security</a> |
+  <a href="https://github.com/dopbase/dopbase/discussions">Discussions</a> |
   <a href="./CONTRIBUTING.md">Contributing</a> |
   <a href="./CODE_OF_CONDUCT.md">Code of conduct</a>
 </p>
@@ -253,3 +254,13 @@ Do not report vulnerabilities in a public issue. Follow [SECURITY.md](./SECURITY
 ## License
 
 Dopbase is licensed under the [Apache License 2.0](./LICENSE). Attribution information is available in [NOTICE](./NOTICE).
+
+## Community
+
+[GitHub Discussions](https://github.com/dopbase/dopbase/discussions) is the place
+to ask setup questions, share workflows, give feedback, and discuss feature ideas.
+The welcome post links to tutorials with commands and terminal output.
+
+Use [Issues](https://github.com/dopbase/dopbase/issues/new/choose) for reproducible
+bugs and agreed implementation work. Report vulnerabilities privately through
+[the security policy](./SECURITY.md).

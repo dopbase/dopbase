@@ -1,0 +1,170 @@
+{
+  "repository": "dopbase/dopbase",
+  "version": 1,
+  "publication_status": "published-awaiting-category-and-pin-setup",
+  "categories": [
+    {
+      "name": "Announcements",
+      "existing_slug": "announcements",
+      "desired_slug": "announcements",
+      "format": "announcement",
+      "section": "Project updates"
+    },
+    {
+      "name": "Help & questions",
+      "existing_slug": "q-a",
+      "desired_slug": "help-questions",
+      "format": "question-and-answer",
+      "section": "Learn and get help"
+    },
+    {
+      "name": "Tutorials",
+      "existing_slug": null,
+      "desired_slug": "tutorials",
+      "format": "open",
+      "section": "Learn and get help"
+    },
+    {
+      "name": "Feature requests",
+      "existing_slug": "ideas",
+      "desired_slug": "feature-requests",
+      "format": "open",
+      "section": "Share and shape Dopbase"
+    },
+    {
+      "name": "Feedback",
+      "existing_slug": null,
+      "desired_slug": "feedback",
+      "format": "open",
+      "section": "Share and shape Dopbase"
+    },
+    {
+      "name": "Showcase",
+      "existing_slug": "show-and-tell",
+      "desired_slug": "showcase",
+      "format": "open",
+      "section": "Share and shape Dopbase"
+    },
+    {
+      "name": "General",
+      "existing_slug": "general",
+      "desired_slug": "general",
+      "format": "open",
+      "section": "Share and shape Dopbase"
+    }
+  ],
+  "posts": [
+    {
+      "key": "welcome",
+      "file": "01-welcome.md",
+      "title": "Start here: welcome to Dopbase Discussions",
+      "desired_category": "Announcements",
+      "fallback_category": "Announcements",
+      "number": 59,
+      "url": "https://github.com/dopbase/dopbase/discussions/59",
+      "pin_requested": "global",
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Apqme",
+      "actual_category": "Announcements",
+      "actual_category_slug": "announcements"
+    },
+    {
+      "key": "install",
+      "file": "02-install.md",
+      "title": "Install Dopbase and claim your local server",
+      "desired_category": "Tutorials",
+      "fallback_category": "General",
+      "number": 61,
+      "url": "https://github.com/dopbase/dopbase/discussions/61",
+      "pin_requested": "global",
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9p",
+      "actual_category": "General",
+      "actual_category_slug": "general"
+    },
+    {
+      "key": "config",
+      "file": "03-config.md",
+      "title": "Configure Dopbase: servers, CLI connections, and defaults",
+      "desired_category": "Tutorials",
+      "fallback_category": "General",
+      "number": 63,
+      "url": "https://github.com/dopbase/dopbase/discussions/63",
+      "pin_requested": "category",
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9r",
+      "actual_category": "General",
+      "actual_category_slug": "general"
+    },
+    {
+      "key": "import",
+      "file": "04-import.md",
+      "title": "Import a .env file and run your app",
+      "desired_category": "Tutorials",
+      "fallback_category": "General",
+      "number": 62,
+      "url": "https://github.com/dopbase/dopbase/discussions/62",
+      "pin_requested": null,
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9q",
+      "actual_category": "General",
+      "actual_category_slug": "general"
+    },
+    {
+      "key": "feedback",
+      "file": "05-feedback.md",
+      "title": "Where did your first Dopbase setup feel confusing?",
+      "desired_category": "Feedback",
+      "fallback_category": "General",
+      "number": 64,
+      "url": "https://github.com/dopbase/dopbase/discussions/64",
+      "pin_requested": "category",
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9s",
+      "actual_category": "General",
+      "actual_category_slug": "general"
+    },
+    {
+      "key": "features",
+      "file": "06-features.md",
+      "title": "What would make Dopbase more useful for your workflow?",
+      "desired_category": "Feature requests",
+      "fallback_category": "Ideas",
+      "number": 65,
+      "url": "https://github.com/dopbase/dopbase/discussions/65",
+      "pin_requested": "global",
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9t",
+      "actual_category": "Ideas",
+      "actual_category_slug": "ideas"
+    },
+    {
+      "key": "showcase",
+      "file": "07-showcase.md",
+      "title": "A look at Dopbase's built-in Admin UI",
+      "desired_category": "Showcase",
+      "fallback_category": "Show and tell",
+      "number": 66,
+      "url": "https://github.com/dopbase/dopbase/discussions/66",
+      "pin_requested": null,
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9u",
+      "actual_category": "Show and tell",
+      "actual_category_slug": "show-and-tell"
+    },
+    {
+      "key": "general",
+      "file": "08-general.md",
+      "title": "What are you building with Dopbase?",
+      "desired_category": "General",
+      "fallback_category": "General",
+      "number": 67,
+      "url": "https://github.com/dopbase/dopbase/discussions/67",
+      "pin_requested": null,
+      "pin_verified": false,
+      "id": "D_kwDOUGFL984Aps9v",
+      "actual_category": "General",
+      "actual_category_slug": "general"
+    }
+  ]
+}

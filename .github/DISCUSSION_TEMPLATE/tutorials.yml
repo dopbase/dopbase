@@ -1,0 +1,51 @@
+body:
+  - type: markdown
+    attributes:
+      value:
+        Keep credentials, secret values, and private service details out of public posts.
+        Report vulnerabilities through [the private security process](https://github.com/dopbase/dopbase/security/policy).
+  - type: textarea
+    id: goal
+    attributes:
+      label: What will readers achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: prerequisites
+    attributes:
+      label: Prerequisites and starting state
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Dopbase version and OS tested
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps, commands, and terminal output
+      description:
+        Pair each command with its output. Include prompts and selected answers.
+        Say when a command is silent. Mark redactions, variable fields, and untested examples.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: How can readers verify the result?
+    validations:
+      required: true
+  - type: textarea
+    id: cleanup
+    attributes:
+      label: Cleanup and limitations
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: A question for readers
+    validations:
+      required: false

@@ -201,6 +201,7 @@ const config = defineConfig({
       { text: "Cloud", link: "/cloud/", activeMatch: "^/cloud/" },
       { text: "Reference", link: "/reference/", activeMatch: "^/reference/" },
       { text: "About", link: "/about/", activeMatch: "^/about/" },
+      { text: "Discussions", link: `${projectUrl}/discussions` },
       {
         text: documentationVersionLabel,
         items: [

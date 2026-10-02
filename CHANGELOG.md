@@ -2,6 +2,15 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Community discussion forms, starter tutorials with verified CLI output, and
+  links from the README, documentation, and issue chooser.
+- A discussion publication manifest and a maintainer checklist for categories,
+  pins, and the first month of community follow-up.
+
 ## 0.1.8 - 2026-09-26
 
 [Dopbase](https://dopbase.com) 0.1.8 adds configurable expiry for runner and AI agent tokens and a CLI

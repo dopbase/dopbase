@@ -4,7 +4,21 @@ Thanks for taking the time to work on Dopbase. Check the code, tests, and curren
 
 ## Before you start
 
-Search the existing issues before opening a new one. For a substantial feature, architecture change, or new dependency, open an issue first and describe the problem you want to solve. Early discussion can prevent a large pull request from heading in a direction the project cannot use.
+Search existing issues and [discussions](https://github.com/dopbase/dopbase/discussions)
+before opening a new thread. Ask setup questions in Help & questions and discuss
+new capabilities in Feature requests. Use Feedback for your experience with
+existing behavior, Tutorials for tested walkthroughs, and Showcase for working
+examples.
+
+Report reproducible bugs in Issues. For a substantial feature, architecture
+change, or new dependency, discuss the problem before starting a large pull
+request. Accepted work gets an issue linked to its discussion. Existing feature
+issues remain valid; a discussion is not required for every change.
+
+Community tutorials should include the Dopbase version and OS tested,
+prerequisites, commands paired with output, verification steps, and cleanup.
+Explain variable IDs and timestamps, redact credentials, and label examples
+that were not executed.
 
 Security vulnerabilities do not belong in public issues. Follow [SECURITY.md](./SECURITY.md) instead.
 

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and troubleshooting
+    url: https://github.com/dopbase/dopbase/discussions/categories/q-a
+    about: Ask for help with installation, configuration, or using Dopbase.
+  - name: Discuss a feature idea
+    url: https://github.com/dopbase/dopbase/discussions/categories/ideas
+    about: Describe the problem and get feedback before opening an implementation issue.
+  - name: Report a vulnerability privately
+    url: https://github.com/dopbase/dopbase/security/policy
+    about: Use the private reporting process for security-sensitive problems.

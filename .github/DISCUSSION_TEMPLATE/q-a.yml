@@ -1,0 +1,37 @@
+body:
+  - type: markdown
+    attributes:
+      value:
+        Keep credentials, secret values, and private service details out of public posts.
+        Report vulnerabilities through [the private security process](https://github.com/dopbase/dopbase/security/policy).
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Dopbase version
+      description: Run dopbase -v.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+    validations:
+      required: true
+  - type: textarea
+    id: attempts
+    attributes:
+      label: What have you tried?
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Redacted error output
+    validations:
+      required: false

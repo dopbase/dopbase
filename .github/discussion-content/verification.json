@@ -1,0 +1,338 @@
+{
+  "version": "0.1.8",
+  "platform": "macOS ARM64",
+  "workspace": "<LAB_DIR>",
+  "steps": {
+    "version": {
+      "args": ["-v"],
+      "stdout": "v0.1.8\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "server_startup": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/server",
+        "server",
+        "start",
+        "--port",
+        "18840"
+      ],
+      "stdout": "\nDopbase\nSecure, Simple and Private\nVersion 0.1.8\n\nPublic URL: http://localhost:18840\nBind:       127.0.0.1:18840\nAdmin UI:   http://localhost:18840\nAPI:        http://localhost:18840/api/v1\nConfig:     <LAB_DIR>/server\n\n\nDopbase setup token (shown once):\n<SETUP_TOKEN>\n\nOr open this link to fill it in automatically:\nhttp://localhost:18840/setup?token=<SETUP_TOKEN>\n\n2026-10-02T01:57:17.006828Z  INFO app::server: Dopbase server started address=127.0.0.1:18840\n"
+    },
+    "connect": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "client",
+        "connect",
+        "http://localhost:18840"
+      ],
+      "transcript": "Warning: Plain HTTP does not encrypt traffic to http://localhost:18840. Credentials and secrets could be exposed. Use HTTPS whenever possible.\nChange active Dopbase server?\nCurrent: http://localhost:8840\nNew:     http://localhost:18840\n\nThis will:\n- delete the saved CLI session and session key\n- clear the saved default environment\n? Continue? (y/N)  ? Continue? (y/N) y ? Continue? Yes\nConnected to http://localhost:18840.\nPrevious server:              http://localhost:8840\nBackground server stopped:    no\nCLI session removed:          no\nDefault environment cleared:  no\nRun `dopbase login` to authenticate with the new server.\n",
+      "exit_code": 0,
+      "answers_sent": 1
+    },
+    "before_login": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:18840\nServer status:   connected (live)\nServer source:   config\nAuthentication:  none\nIdentity:        none\nEmail:           none\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "login": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "login"],
+      "transcript": "Dopbase login\nServer: http://localhost:18840\n\n? Email:  ? Email: t ? Email: tu ? Email: tut ? Email: tuto ? Email: tutor ? Email: tutori ? Email: tutoria ? Email: tutorial ? Email: tutorial@ ? Email: tutorial@e ? Email: tutorial@ex ? Email: tutorial@exa ? Email: tutorial@exam ? Email: tutorial@examp ? Email: tutorial@exampl ? Email: tutorial@example ? Email: tutorial@example. ? Email: tutorial@example.c ? Email: tutorial@example.co ? Email: tutorial@example.com ? Email: tutorial@example.com\n? Password:  ? Password: * ? Password: ** ? Password: *** ? Password: **** ? Password: ***** ? Password: ****** ? Password: ******* ? Password: ******** ? Password: ********* ? Password: ********** ? Password: *********** ? Password: ************ ? Password: ************* ? Password: ************** ? Password: *************** ? Password: **************** ? Password: ***************** ? Password: ****************** ? Password: ******************* ? Password: ******************** ? Password: ********************* ? Password: ********************** ? Password: *********************** ? Password: ************************ ? Password: ************************* ? Password: ************************** ? Password: ********\nLogged in to http://localhost:18840.\n",
+      "exit_code": 0,
+      "answers_sent": 2
+    },
+    "after_login": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:18840\nServer status:   connected (live)\nServer source:   config\nAuthentication:  encrypted_session\nIdentity:        admin\nEmail:           tutorial@example.com\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "init": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "init",
+        "discussion-demo/development",
+        "--from",
+        ".env"
+      ],
+      "stdout": "Initialized discussion-demo/development.\nProject ID:      <PROJECT_ID>\nEnvironment ID:  env_856343\nSecrets:         2\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "secret_list": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "secret",
+        "list",
+        "discussion-demo/development"
+      ],
+      "stdout": "KEY            VERSION   UPDATED\nAPP_NAME       1         2026-10-02 01:57 UTC\nDEMO_API_KEY   1         2026-10-02 01:57 UTC\n\n2 secret(s)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "run": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "run",
+        "discussion-demo/development",
+        "--",
+        "sh",
+        "-c",
+        "test \"$APP_NAME\" = \"discussion-demo\" && echo \"Environment loaded\""
+      ],
+      "stdout": "Environment loaded\n",
+      "stderr": "Dopbase: discussion-demo/development (env_856343), 2 key(s), source=live\n",
+      "exit_code": 0
+    },
+    "dry_run": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "import",
+        "discussion-demo/development",
+        "update.env",
+        "--dry-run"
+      ],
+      "stdout": "Dry run complete. No changes were applied.\nMode:       merge\nAdded:      1\nUpdated:    1\nUnchanged:  0\nDeleted:    0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "unchanged_after_dry_run": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "run",
+        "discussion-demo/development",
+        "--",
+        "sh",
+        "-c",
+        "test \"$APP_NAME\" = \"discussion-demo\" && echo \"Environment loaded\""
+      ],
+      "stdout": "Environment loaded\n",
+      "stderr": "Dopbase: discussion-demo/development (env_856343), 2 key(s), source=live\n",
+      "exit_code": 0
+    },
+    "import": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "import",
+        "discussion-demo/development",
+        "update.env"
+      ],
+      "stdout": "Imported secrets into discussion-demo/development.\nMode:       merge\nAdded:      1\nUpdated:    1\nUnchanged:  0\nDeleted:    0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "updated_values": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "run",
+        "discussion-demo/development",
+        "--",
+        "sh",
+        "-c",
+        "test \"$APP_NAME\" = \"discussion-demo-updated\" && test \"$NEW_FEATURE_FLAG\" = \"true\" && test \"$DEMO_API_KEY\" = \"demo-only-not-a-real-key\" && echo \"Update verified; existing key preserved\""
+      ],
+      "stdout": "Update verified; existing key preserved\n",
+      "stderr": "Dopbase: discussion-demo/development (env_856343), 3 key(s), source=live\n",
+      "exit_code": 0
+    },
+    "updated_secret_list": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "secret",
+        "list",
+        "discussion-demo/development"
+      ],
+      "stdout": "KEY                VERSION   UPDATED\nAPP_NAME           2         2026-10-02 01:57 UTC\nDEMO_API_KEY       1         2026-10-02 01:57 UTC\nNEW_FEATURE_FLAG   1         2026-10-02 01:57 UTC\n\n3 secret(s)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "set_default": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "env",
+        "default",
+        "discussion-demo/development"
+      ],
+      "stdout": "Set discussion-demo/development as the default environment.\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "default_status": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:18840\nServer status:   connected (live)\nServer source:   config\nAuthentication:  encrypted_session\nIdentity:        admin\nEmail:           tutorial@example.com\nEnvironment:     env_856343 (default)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "run_default": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "run",
+        "--",
+        "sh",
+        "-c",
+        "test \"$APP_NAME\" = \"discussion-demo-updated\" && echo \"Environment loaded\""
+      ],
+      "stdout": "Environment loaded\n",
+      "stderr": "Dopbase: discussion-demo/development (env_856343), 3 key(s), source=live\n",
+      "exit_code": 0
+    },
+    "env_create": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "env",
+        "create",
+        "discussion-demo/staging"
+      ],
+      "stdout": "Created environment discussion-demo/staging (env_955793).\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "staging_set": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "secret",
+        "set",
+        "discussion-demo/staging",
+        "APP_NAME",
+        "--stdin"
+      ],
+      "stdout": "Saved APP_NAME in discussion-demo/staging.\nVersion:  1\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "override_default": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "run",
+        "discussion-demo/staging",
+        "--",
+        "sh",
+        "-c",
+        "test \"$APP_NAME\" = \"discussion-staging\" && echo \"Staging selected\""
+      ],
+      "stdout": "Staging selected\n",
+      "stderr": "Dopbase: discussion-demo/staging (env_955793), 1 key(s), source=live\n",
+      "exit_code": 0
+    },
+    "clear_default": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "env", "default", "--clear"],
+      "stdout": "Cleared the default environment.\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "cleared_status": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:18840\nServer status:   connected (live)\nServer source:   config\nAuthentication:  encrypted_session\nIdentity:        admin\nEmail:           tutorial@example.com\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "failed_connect": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "client",
+        "connect",
+        "http://localhost:19999"
+      ],
+      "stdout": "",
+      "stderr": "Warning: Plain HTTP does not encrypt traffic to http://localhost:19999. Credentials and secrets could be exposed. Use HTTPS whenever possible.\nError: Could not connect to Dopbase at http://localhost:19999.\nCheck that the server is running and verify the active endpoint with `dopbase client status`.\n",
+      "exit_code": 1
+    },
+    "after_failed_connect": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:18840\nServer status:   connected (live)\nServer source:   config\nAuthentication:  encrypted_session\nIdentity:        admin\nEmail:           tutorial@example.com\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "guided_init": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "init"],
+      "transcript": ".env found\n\n2 variables detected\n1 appears sensitive\n1 appears non-sensitive\n\n? Import into Dopbase? (y/N)  ? Import into Dopbase? (y/N) y ? Import into Dopbase? Yes\n? Project/environment (for example payment-service/local):  ? Project/environment (for example payment-service/local): g ? Project/environment (for example payment-service/local): gu ? Project/environment (for example payment-service/local): gui ? Project/environment (for example payment-service/local): guid ? Project/environment (for example payment-service/local): guide ? Project/environment (for example payment-service/local): guided ? Project/environment (for example payment-service/local): guided- ? Project/environment (for example payment-service/local): guided-d ? Project/environment (for example payment-service/local): guided-de ? Project/environment (for example payment-service/local): guided-dem ? Project/environment (for example payment-service/local): guided-demo ? Project/environment (for example payment-service/local): guided-demo/ ? Project/environment (for example payment-service/local): guided-demo/d ? Project/environment (for example payment-service/local): guided-demo/de ? Project/environment (for example payment-service/local): guided-demo/dev ? Project/environment (for example payment-service/local): guided-demo/deve ? Project/environment (for example payment-service/local): guided-demo/devel ? Project/environment (for example payment-service/local): guided-demo/develo ? Project/environment (for example payment-service/local): guided-demo/develop ? Project/environment (for example payment-service/local): guided-demo/developm ? Project/environment (for example payment-service/local): guided-demo/developme\n ? Project/environment (for example payment-service/local): guided-demo/developme\nn \nnt \nnt\n\u2713 Imported 2 variables into guided-demo/development.\n\u2713 Secrets encrypted.\n? Delete .env now? (Y/n)  ? Delete .env now? (Y/n) n ? Delete .env now? No\nWarning: .env was kept. Do not commit it.\n\nRun your application with:\n\n  dopbase run guided-demo/development -- <your-command>\n",
+      "exit_code": 0,
+      "answers_sent": 3
+    },
+    "duplicate_project": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "init",
+        "discussion-demo/development",
+        "--from",
+        ".env"
+      ],
+      "stdout": "",
+      "stderr": "Error: PROJECT_ALREADY_EXISTS: A project with this name already exists.\n",
+      "exit_code": 1
+    },
+    "server-custom_startup": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/server-custom",
+        "server",
+        "start",
+        "--port",
+        "19000"
+      ],
+      "stdout": "\nDopbase\nSecure, Simple and Private\nVersion 0.1.8\n\nPublic URL: http://localhost:19000\nBind:       127.0.0.1:19000\nAdmin UI:   http://localhost:19000\nAPI:        http://localhost:19000/api/v1\nConfig:     <LAB_DIR>/server-custom\n\n\nDopbase setup token (shown once):\n<SETUP_TOKEN>\n\nOr open this link to fill it in automatically:\nhttp://localhost:19000/setup?token=<SETUP_TOKEN>\n\n2026-10-02T01:57:19.833162Z  INFO app::server: Dopbase server started address=127.0.0.1:19000\n"
+    },
+    "connect_custom": {
+      "args": [
+        "--data-dir",
+        "<LAB_DIR>/client",
+        "client",
+        "connect",
+        "http://localhost:19000"
+      ],
+      "transcript": "Warning: Plain HTTP does not encrypt traffic to http://localhost:19000. Credentials and secrets could be exposed. Use HTTPS whenever possible.\nChange active Dopbase server?\nCurrent: http://localhost:18840\nNew:     http://localhost:19000\n\nThis will:\n- delete the saved CLI session and session key\n- clear the saved default environment\n? Continue? (y/N)  ? Continue? (y/N) y ? Continue? Yes\nConnected to http://localhost:19000.\nPrevious server:              http://localhost:18840\nBackground server stopped:    no\nCLI session removed:          yes\nDefault environment cleared:  no\nRun `dopbase login` to authenticate with the new server.\n",
+      "exit_code": 0,
+      "answers_sent": 1
+    },
+    "custom_status": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:19000\nServer status:   connected (live)\nServer source:   config\nAuthentication:  none\nIdentity:        none\nEmail:           none\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    "custom_login": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "login"],
+      "transcript": "Dopbase login\nServer: http://localhost:19000\n\n? Email:  ? Email: t ? Email: tu ? Email: tut ? Email: tuto ? Email: tutor ? Email: tutori ? Email: tutoria ? Email: tutorial ? Email: tutorial@ ? Email: tutorial@e ? Email: tutorial@ex ? Email: tutorial@exa ? Email: tutorial@exam ? Email: tutorial@examp ? Email: tutorial@exampl ? Email: tutorial@example ? Email: tutorial@example. ? Email: tutorial@example.c ? Email: tutorial@example.co ? Email: tutorial@example.com ? Email: tutorial@example.com\n? Password:  ? Password: * ? Password: ** ? Password: *** ? Password: **** ? Password: ***** ? Password: ****** ? Password: ******* ? Password: ******** ? Password: ********* ? Password: ********** ? Password: *********** ? Password: ************ ? Password: ************* ? Password: ************** ? Password: *************** ? Password: **************** ? Password: ***************** ? Password: ****************** ? Password: ******************* ? Password: ******************** ? Password: ********************* ? Password: ********************** ? Password: *********************** ? Password: ************************ ? Password: ************************* ? Password: ************************** ? Password: ********\nLogged in to http://localhost:19000.\n",
+      "exit_code": 0,
+      "answers_sent": 2
+    },
+    "custom_logged_in_status": {
+      "args": ["--data-dir", "<LAB_DIR>/client", "client", "status"],
+      "stdout": "Config file:     <LAB_DIR>/client/config.toml\nServer:          http://localhost:19000\nServer status:   connected (live)\nServer source:   config\nAuthentication:  encrypted_session\nIdentity:        admin\nEmail:           tutorial@example.com\nEnvironment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  },
+  "admin_ui_http": {
+    "status": 200,
+    "embedded_ui": true
+  },
+  "result": "passed",
+  "servers_stopped": true,
+  "installer": {
+    "executed": false,
+    "reason": "Remote installer execution was rejected by automatic approval review. Expected installation output was checked against the public installer source."
+  },
+  "browser_setup": {
+    "executed": false,
+    "verification": "The embedded Admin UI returned HTTP 200; first-account bootstrap was performed through the released API in the isolated lab. Browser instructions follow the versioned setup guide."
+  }
+}
