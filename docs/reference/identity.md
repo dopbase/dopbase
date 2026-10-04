@@ -123,7 +123,8 @@ root password, an explicit acknowledgment, and `FACTORY RESET`. The offline
 `dopbase admin factory-reset` command requires the server to be stopped, the
 root password, and `please-wipe-out-system`. It saves the whole data directory
 as a timestamped ZIP before removing it. Pass `--no-backup` to remove the data
-without creating the ZIP. The next start creates a fresh instance.
+without creating the ZIP. Run `dopbase server setup` before starting the fresh
+instance. For browser setup or backup restore, use `dopbase server setup --web`.
 See
 [factory reset](/self-hosting/factory-reset) for the confirmation steps and deletion scope.
 

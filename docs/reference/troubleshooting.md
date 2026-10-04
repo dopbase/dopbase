@@ -5,6 +5,18 @@ description: "Fix common Dopbase problems: client connection failures, authentic
 
 # Troubleshooting
 
+## Startup requires setup
+
+Fresh or reset storage cannot run until initialized. Run `dopbase server setup`
+using the same `--data-dir`, `--config`, and master-key settings as startup.
+Then run `dopbase server start`. For existing browser setup or first-run restore,
+use `dopbase server setup --web`.
+
+If setup says the instance is already initialized, do not reset it to recover a
+password. Stop its server and use `dopbase admin reset-password EMAIL` with the
+matching master key. If generated-password output was lost after setup committed,
+this is also the recovery path. See [server setup](/cli/setup).
+
 ## The client cannot connect
 
 1. Run `dopbase client status` and confirm the effective server and its source.
