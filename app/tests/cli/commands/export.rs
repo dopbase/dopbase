@@ -195,3 +195,46 @@ async fn run_interactive_export(
     assert!(terminal_output.contains("Password confirmation cancelled."));
   }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn file_export_preserves_existing_files_unless_force_is_passed() {
+  use super::support::{Fixture, PASSWORD, terminal::Terminal};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  fixture
+    .request(
+      reqwest::Method::PUT,
+      &format!("/api/v1/environments/{id}/secrets/API_KEY"),
+      Some(json!({"value":"file-export-private-marker"})),
+    )
+    .await;
+  let path = fixture.directory.path().join("export.json");
+  for (force, expected_success) in [(false, true), (false, false), (true, true)] {
+    let mut command = fixture.command();
+    command.args(["export", &id, "--output", path.to_str().unwrap()]);
+    if force {
+      command.arg("--force");
+    }
+    let mut terminal = Terminal::new(command);
+    terminal.reply("Password:", &format!("{PASSWORD}\r"));
+    assert_eq!(terminal.finish().success(), expected_success);
+    assert!(!terminal.transcript.contains("file-export-private-marker"));
+    if expected_success {
+      assert_eq!(
+        serde_json::from_slice::<Value>(&fs::read(&path).unwrap()).unwrap(),
+        json!({"API_KEY":"file-export-private-marker"})
+      );
+      #[cfg(unix)]
+      {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+          fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+          0o600
+        );
+      }
+      fs::write(&path, b"existing-file-marker").unwrap();
+    } else {
+      assert_eq!(fs::read(&path).unwrap(), b"existing-file-marker");
+    }
+  }
+}

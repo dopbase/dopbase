@@ -5,8 +5,7 @@ use app::cli::{
 use axum::{Json, Router, extract::State, routing::get};
 use serde_json::{Value, json};
 use std::{
-  io::Write,
-  process::{Command, Stdio},
+  process::Command,
   sync::{Arc, Mutex},
 };
 use tempfile::TempDir;
@@ -16,7 +15,6 @@ const SECRET_MARKER: &str = "secret-value-marker";
 
 #[derive(Clone, Default)]
 struct CapturedRequests {
-  init: Arc<Mutex<Option<Value>>>,
   import: Arc<Mutex<Option<Value>>>,
 }
 
@@ -26,20 +24,6 @@ async fn session_handler() -> Json<Value> {
 
 async fn resolve_handler() -> Json<Value> {
   Json(json!({"data":{"id":"env_01TEST"}}))
-}
-
-async fn init_handler(
-  State(requests): State<CapturedRequests>,
-  Json(body): Json<Value>,
-) -> Json<Value> {
-  *requests.init.lock().unwrap() = Some(body);
-  Json(json!({
-    "data": {
-      "project": {"id":"proj_01TEST"},
-      "environmentId": "env_01TEST",
-      "secretCount": 2
-    }
-  }))
 }
 
 async fn import_handler(
@@ -64,7 +48,6 @@ async fn start_server() -> (CapturedRequests, String, tokio::task::JoinHandle<()
   let router = Router::new()
     .route("/api/v1/auth/session", get(session_handler))
     .route("/api/v1/environments/resolve", get(resolve_handler))
-    .route("/api/v1/projects/init", axum::routing::post(init_handler))
     .route(
       "/api/v1/environments/{id}/secrets/import",
       axum::routing::post(import_handler),
@@ -89,52 +72,6 @@ fn save_session(
     config: ClientConfig::default(),
   };
   session::save(&server, TOKEN, Some("admin@example.com")).unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn init_reads_yaml_from_stdin_and_sends_string_entries() {
-  let (requests, url, server) = start_server().await;
-  let directory = TempDir::new().unwrap();
-  save_session(&directory, &url);
-  let mut child = Command::new(env!("CARGO_BIN_EXE_dopbase"))
-    .args([
-      "--server",
-      &url,
-      "--data-dir",
-      directory.path().to_str().unwrap(),
-      "--json",
-      "init",
-      "storefront/development",
-      "--from",
-      "-",
-      "--format",
-      "yaml",
-    ])
-    .stdin(Stdio::piped())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .spawn()
-    .unwrap();
-  child
-    .stdin
-    .take()
-    .unwrap()
-    .write_all(format!("API_KEY: {SECRET_MARKER}\nEMPTY: \"\"\n").as_bytes())
-    .unwrap();
-  let output = child.wait_with_output().unwrap();
-  server.abort();
-
-  assert!(output.status.success(), "{output:?}");
-  let body = requests.init.lock().unwrap().clone().unwrap();
-  assert_eq!(body["projectName"], "storefront");
-  assert_eq!(body["environmentName"], "development");
-  assert_eq!(
-    body["entries"][0],
-    json!({"key":"API_KEY","value":SECRET_MARKER})
-  );
-  assert_eq!(body["entries"][1], json!({"key":"EMPTY","value":""}));
-  assert!(!String::from_utf8_lossy(&output.stdout).contains(SECRET_MARKER));
-  assert!(!String::from_utf8_lossy(&output.stderr).contains(SECRET_MARKER));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -175,4 +112,86 @@ async fn import_infers_toml_from_the_filename_and_preserves_dry_run() {
   );
   assert!(!String::from_utf8_lossy(&output.stdout).contains(SECRET_MARKER));
   assert!(!String::from_utf8_lossy(&output.stderr).contains(SECRET_MARKER));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn import_merge_and_replace_preserve_state_until_confirmed() {
+  use super::support::{Fixture, failure};
+  use reqwest::Method;
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  fixture
+    .request(
+      Method::PUT,
+      &format!("/api/v1/environments/{id}/secrets/KEEP"),
+      Some(json!({"value":"original"})),
+    )
+    .await;
+  let source = fixture.directory.path().join("import.json");
+  std::fs::write(&source, r#"{"NEW":"merge-private-marker"}"#).unwrap();
+  let merged = fixture
+    .json(&["import", &id, source.to_str().unwrap()])
+    .await;
+  assert_eq!(merged["addedKeys"], json!(["NEW"]));
+  assert_eq!(
+    fixture
+      .json(&["secret", "list", &id])
+      .await
+      .as_array()
+      .unwrap()
+      .len(),
+    2
+  );
+  std::fs::write(&source, r#"{"NEW":"replacement-private-marker"}"#).unwrap();
+  failure(
+    &fixture
+      .run(&["import", &id, source.to_str().unwrap(), "--replace"])
+      .await,
+    "Pass --yes",
+  );
+  let data = fixture
+    .request(
+      Method::POST,
+      &format!("/api/v1/environments/{id}/secrets/NEW/reveal"),
+      None,
+    )
+    .await;
+  assert_eq!(data["value"], "merge-private-marker");
+  assert_eq!(
+    fixture
+      .json(&["secret", "list", &id])
+      .await
+      .as_array()
+      .unwrap()
+      .len(),
+    2
+  );
+  let replaced = fixture
+    .json(&[
+      "import",
+      &id,
+      source.to_str().unwrap(),
+      "--replace",
+      "--yes",
+    ])
+    .await;
+  assert_eq!(replaced["deletedKeys"], json!(["KEEP"]));
+  assert_eq!(replaced["updatedKeys"], json!(["NEW"]));
+  let data = fixture
+    .request(
+      Method::POST,
+      &format!("/api/v1/environments/{id}/secrets/NEW/reveal"),
+      None,
+    )
+    .await;
+  assert_eq!(data["value"], "replacement-private-marker");
+  assert_eq!(
+    fixture
+      .json(&["secret", "list", &id])
+      .await
+      .as_array()
+      .unwrap()
+      .len(),
+    1
+  );
 }

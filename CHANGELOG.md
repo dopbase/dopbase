@@ -32,6 +32,9 @@ All notable changes to Dopbase are documented in this file.
 
 ### Improvement
 
+- CLI tests now cover every public command and subcommand, with shared fixtures
+  for real server and terminal workflows. Removed repeated cases.
+
 - Starting an uninitialized instance now shows setup methods, configuration
   guidance, and a link to the setup documentation as an informational notice.
 

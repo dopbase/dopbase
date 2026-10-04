@@ -13,14 +13,6 @@ use std::sync::{
 use std::{fs, path::PathBuf};
 use tempfile::TempDir;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-use std::{
-  io::Write,
-  process::{Command, Stdio},
-  thread,
-  time::{Duration, Instant},
-};
-
 const TOKEN: &str = "dbt_cache_credential_marker";
 const SECRET: &str = "cached-secret-marker";
 
@@ -315,71 +307,139 @@ async fn unavailable_server_without_cache_does_not_provide_runtime_values() {
   assert!(error.contains("child was not started"));
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interactive_child_reads_from_the_terminal_and_returns_its_exit_status() {
+  use super::support::{command, terminal::Terminal};
   let (_mode, url, task) = start_server().await;
   let directory = TempDir::new().unwrap();
-  let child_pid_path = directory.path().join("child.pid");
-  let launcher_path = directory.path().join("interactive-child.sh");
-  fs::write(
-    &launcher_path,
-    "exec \"$DOPBASE_BIN\" --server \"$DOPBASE_SERVER\" --data-dir \"$DOPBASE_DATA_DIR\" run env_01CACHE -- sh -c 'echo \"$$\" > \"$CHILD_PID_PATH\"; IFS= read -r line; [ \"$line\" = ping ] && [ \"$API_TOKEN\" = \"$EXPECTED_SECRET\" ]; exit 23'\n",
-  )
-  .unwrap();
-  let mut command = Command::new("script");
-  #[cfg(target_os = "macos")]
+  let mut command = command(directory.path());
   command
-    .args(["-q", "-e", "/dev/null", "sh"])
-    .arg(&launcher_path);
-  #[cfg(not(target_os = "macos"))]
-  command.args([
-    "-q",
-    "-e",
-    "-f",
-    "-c",
-    "sh \"$DOPBASE_TEST_SCRIPT\"",
-    "/dev/null",
-  ]);
-  command
-    .env("DOPBASE_BIN", env!("CARGO_BIN_EXE_dopbase"))
-    .env("DOPBASE_SERVER", &url)
-    .env("DOPBASE_DATA_DIR", directory.path())
-    .env("DOPBASE_TEST_SCRIPT", &launcher_path)
     .env("DOPBASE_TOKEN", TOKEN)
-    .env("CHILD_PID_PATH", &child_pid_path)
-    .env("EXPECTED_SECRET", SECRET)
-    .stdin(Stdio::piped())
-    .stdout(Stdio::null())
-    .stderr(Stdio::null());
-
-  let mut child = command.spawn().unwrap();
-  child.stdin.take().unwrap().write_all(b"ping\n").unwrap();
-
-  let deadline = Instant::now() + Duration::from_secs(3);
-  let status = loop {
-    if let Some(status) = child.try_wait().unwrap() {
-      break status;
-    }
-    if Instant::now() >= deadline {
-      if let Ok(pid) = fs::read_to_string(&child_pid_path)
-        && let Ok(pid) = pid.trim().parse::<i32>()
-      {
-        use nix::{
-          sys::signal::{Signal, killpg},
-          unistd::Pid,
-        };
-
-        let _ = killpg(Pid::from_raw(pid), Signal::SIGCONT);
-        let _ = killpg(Pid::from_raw(pid), Signal::SIGKILL);
-      }
-      let _ = child.kill();
-      let _ = child.wait();
-      panic!("interactive child did not finish after receiving terminal input");
-    }
-    thread::sleep(Duration::from_millis(10));
-  };
-
+    .env("EXPECTED_SECRET", SECRET);
+  command.args(["--server", &url, "run", "env_01CACHE", "--", "sh", "-c",
+    r#"printf child-ready; IFS= read -r line; if [ "$line" = ping ] && [ "$API_TOKEN" = "$EXPECTED_SECRET" ]; then exit 23; else exit 42; fi"#]);
+  let mut terminal = Terminal::new(command);
+  terminal.reply("child-ready", "ping\n");
+  assert_eq!(terminal.finish().code(), Some(23));
+  assert!(!terminal.transcript.contains(SECRET));
   task.abort();
-  assert_eq!(status.code(), Some(23));
+}
+
+use app::cli::commands::run_environment;
+use std::env::VarError;
+#[test]
+fn run_environment_uses_explicit_then_variable_then_saved_default() {
+  assert_eq!(
+    run_environment(
+      Some("env_explicit".into()),
+      Ok("env_variable".into()),
+      Some("env_default")
+    )
+    .unwrap()
+    .reference,
+    "env_explicit"
+  );
+  assert_eq!(
+    run_environment(None, Ok("env_variable".into()), Some("env_default"))
+      .unwrap()
+      .reference,
+    "env_variable"
+  );
+  assert_eq!(
+    run_environment(None, Err(VarError::NotPresent), Some("env_default"))
+      .unwrap()
+      .reference,
+    "env_default"
+  );
+}
+
+#[test]
+fn run_environment_rejects_empty_variable_and_explains_how_to_set_a_default() {
+  assert_eq!(
+    run_environment(None, Ok(String::new()), Some("env_default"))
+      .err()
+      .unwrap()
+      .to_string(),
+    "DOPBASE_ENV is set but empty"
+  );
+  let message = run_environment(None, Err(VarError::NotPresent), None)
+    .err()
+    .unwrap()
+    .to_string();
+  assert!(
+    message.contains("No default environment is set."),
+    "{message}"
+  );
+  assert!(
+    message.contains("dopbase env default <ENVIRONMENT_REF>"),
+    "{message}"
+  );
+}
+
+#[test]
+fn run_environment_rejects_a_non_unicode_variable() {
+  let invalid = std::ffi::OsString::from("invalid");
+  assert_eq!(
+    run_environment(
+      None,
+      Err(VarError::NotUnicode(invalid)),
+      Some("env_default")
+    )
+    .err()
+    .unwrap()
+    .to_string(),
+    "DOPBASE_ENV contains invalid Unicode"
+  );
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_revoked_token() {
+  use super::support::{Fixture, failure, output};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  fixture
+    .request(
+      reqwest::Method::PUT,
+      &format!("/api/v1/environments/{id}/secrets/API_KEY"),
+      Some(json!({"value":"runtime-private-marker"})),
+    )
+    .await;
+  let created = fixture
+    .json(&["token", "create", &id, "--name", "runner"])
+    .await;
+  let token = created["plaintextToken"].as_str().unwrap();
+  fixture.json(&["env", "default", &id]).await;
+  let mut command = fixture.command();
+  command
+    .env("API_KEY", "incorrect-parent-value")
+    .env("INHERITED_TEST_VALUE", "kept");
+  command.args(["run","--token",token,"--","sh","-c",
+    r#"[ "$API_KEY" = runtime-private-marker ] && [ "$INHERITED_TEST_VALUE" = kept ] || exit 41; printf child-ok; exit 23"#]);
+  let result = output(command, None).await;
+  assert_eq!(result.status.code(), Some(23));
+  assert_eq!(result.stdout, b"child-ok");
+  assert!(!String::from_utf8_lossy(&result.stderr).contains("runtime-private-marker"));
+  fixture
+    .json(&["token", "revoke", created["token"]["id"].as_str().unwrap()])
+    .await;
+  let marker = fixture.directory.path().join("child-was-started");
+  let mut command = fixture.command();
+  command.env("DOPBASE_CHILD_MARKER", &marker).args([
+    "run",
+    &id,
+    "--token",
+    token,
+    "--",
+    "sh",
+    "-c",
+    r#"printf started > "$DOPBASE_CHILD_MARKER""#,
+  ]);
+  let result = output(command, None).await;
+  failure(&result, "Dopbase authentication failed");
+  assert!(
+    !marker.exists(),
+    "run started its child after authentication failed"
+  );
 }

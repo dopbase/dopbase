@@ -367,3 +367,43 @@ async fn api_client_does_not_follow_redirects() {
   assert!(error.contains("server returned 302 Found"), "{error}");
   assert!(server_task.await.unwrap(), "client followed the redirect");
 }
+
+use app::cli::client::{credential_from_sources, validate_runner_token};
+#[test]
+fn explicit_runner_token_has_priority_over_environment_and_saved_credentials() {
+  let explicit = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let credential = credential_from_sources(
+    Some(explicit.into()),
+    Ok("environment-token".into()),
+    || panic!("saved credentials must not be loaded for an explicit token"),
+  )
+  .unwrap();
+
+  assert_eq!(credential.token.as_deref(), Some(explicit));
+  assert!(matches!(credential.source, CredentialSource::Argument));
+}
+
+#[test]
+fn environment_token_has_priority_over_the_saved_credential() {
+  let environment = "dbs_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+  let credential = credential_from_sources(None, Ok(environment.into()), || {
+    panic!("saved credentials must not be loaded when DOPBASE_TOKEN is set")
+  })
+  .unwrap();
+
+  assert_eq!(credential.token.as_deref(), Some(environment));
+  assert!(matches!(credential.source, CredentialSource::Environment));
+}
+
+#[test]
+fn runner_token_validation_rejects_empty_wrong_prefix_and_wrong_length() {
+  assert!(validate_runner_token("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").is_ok());
+  for token in [
+    "",
+    "dbc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "dbs_too-short",
+    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!",
+  ] {
+    assert!(validate_runner_token(token).is_err(), "accepted {token:?}");
+  }
+}

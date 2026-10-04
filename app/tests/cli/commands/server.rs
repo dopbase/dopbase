@@ -356,6 +356,8 @@ mod background {
         .output()
         .unwrap(),
     );
+    assert_eq!(output["stop_command"], "dopbase server stop");
+    assert_eq!(output["restart_command"], "dopbase server restart");
     let hinted_command = |field: &str| {
       let hint = output[field].as_str().unwrap();
       let mut command = Command::new("sh");
@@ -364,6 +366,7 @@ mod background {
       }
       command.env_remove("DOPBASE_INTERNAL_DAEMON_LAUNCH");
       command.env("NO_COLOR", "1");
+      command.env("DOPBASE_DATA_DIR", server.data());
       command.env("DOPBASE_TEST_BINARY", env!("CARGO_BIN_EXE_dopbase"));
       command.args([
         "-c",
@@ -371,6 +374,15 @@ mod background {
       ]);
       command
     };
+    let status = success(
+      server
+        .command()
+        .args(["--json", "server", "status"])
+        .output()
+        .unwrap(),
+    );
+    assert_eq!(status["status"], "running");
+    assert_eq!(status["mode"], "background");
     let before = server.pid();
     assert_eq!(before.bind_address, format!("127.0.0.1:{cli_port}"));
     let path = daemon::pid_file_path(&server.data());
@@ -606,4 +618,144 @@ mod background {
     assert_eq!(stopped["stopped"], true);
     assert!(!pid_path.exists());
   }
+}
+
+#[test]
+fn server_status_reports_a_stopped_data_directory() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let output = Command::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args([
+      "--data-dir",
+      directory.path().to_str().unwrap(),
+      "--json",
+      "server",
+      "status",
+    ])
+    .output()
+    .unwrap();
+
+  assert_eq!(output.status.code(), Some(1));
+  let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+  assert_eq!(value["status"], "stopped");
+  assert_eq!(value["mode"], serde_json::Value::Null);
+  assert!(!directory.path().join("dopbase.db.lock").exists());
+}
+
+#[tokio::test]
+async fn server_commands_reject_inapplicable_global_options() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let data_dir = directory.path().to_str().unwrap();
+  let cases: &[(&[&str], &str)] = &[
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--server",
+        "http://localhost:8840",
+        "server",
+        "status",
+      ],
+      "--server cannot be used with local `dopbase server` commands",
+    ),
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--json",
+        "server",
+        "start",
+      ],
+      "--json cannot be used with foreground `dopbase server start`. Use `dopbase server start --background --json`",
+    ),
+    (
+      &[
+        "dopbase",
+        "--data-dir",
+        data_dir,
+        "--json",
+        "server",
+        "logs",
+        "--watch",
+      ],
+      "--json cannot be used with `dopbase server logs --watch`",
+    ),
+  ];
+
+  for (arguments, expected) in cases {
+    let cli = app::cli::args::Cli::try_parse_from(*arguments).unwrap();
+    let error = app::cli::commands::execute(cli)
+      .await
+      .unwrap_err()
+      .to_string();
+    assert_eq!(error, *expected, "{arguments:?}");
+  }
+}
+
+use clap::Parser;
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn logs_command_tails_cleans_and_watches_until_interrupted() {
+  use super::support::{output, success};
+  use std::{io::Write, process::Stdio};
+  let directory = TempDir::new().unwrap();
+  let log = app::daemon::log_file_path(directory.path());
+  fs::write(&log, b"first\nsecond\nthird\n").unwrap();
+  let mut tail = command(directory.path());
+  tail.args(["--json", "server", "logs", "--lines", "2"]);
+  assert_eq!(
+    success(&output(tail, None).await)["lines"],
+    serde_json::json!(["second", "third"])
+  );
+  let mut clean = command(directory.path());
+  clean.args(["--json", "server", "logs", "--clean"]);
+  assert_eq!(success(&output(clean, None).await)["cleaned"], true);
+  assert!(fs::read(&log).unwrap().is_empty());
+  fs::write(&log, b"watch-start\n").unwrap();
+  let capture = directory.path().join("watch.out");
+  let mut watch = tokio::process::Command::from(command(directory.path()));
+  watch
+    .args(["server", "logs", "--watch"])
+    .kill_on_drop(true)
+    .stdin(Stdio::null())
+    .stdout(Stdio::from(fs::File::create(&capture).unwrap()))
+    .stderr(Stdio::null());
+  let mut child = watch.spawn().unwrap();
+  let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+  for expected in ["watch-start", "watch-added"] {
+    loop {
+      let text = fs::read_to_string(&capture).unwrap();
+      if text.contains(expected) {
+        break;
+      }
+      assert!(child.try_wait().unwrap().is_none());
+      assert!(
+        tokio::time::Instant::now() < deadline,
+        "logs watch did not emit {expected}"
+      );
+      tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    if expected == "watch-start" {
+      fs::OpenOptions::new()
+        .append(true)
+        .open(&log)
+        .unwrap()
+        .write_all(b"watch-added\n")
+        .unwrap();
+    }
+  }
+  nix::sys::signal::kill(
+    nix::unistd::Pid::from_raw(child.id().unwrap() as i32),
+    nix::sys::signal::Signal::SIGINT,
+  )
+  .unwrap();
+  assert!(
+    tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
+      .await
+      .unwrap()
+      .unwrap()
+      .success()
+  );
 }

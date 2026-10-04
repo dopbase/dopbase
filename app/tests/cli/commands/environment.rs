@@ -611,3 +611,52 @@ async fn env_clone_keeps_a_completed_clone_when_the_final_list_fails() {
   assert!(!state.recorded().contains(&"delete:env_100003".into()));
   assert_redacted(&output);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_commands_resolve_references_and_save_the_default() {
+  use super::support::{Fixture, failure};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  let all = fixture.json(&["env", "list"]).await;
+  assert_eq!(all.as_array().unwrap().len(), 1);
+  assert_eq!(all[0]["id"], id);
+  assert_eq!(fixture.json(&["env", "list", "fixture"]).await, all);
+  assert_eq!(
+    fixture.json(&["env", "show", "fixture/local"]).await["id"],
+    id
+  );
+  let default = fixture.json(&["env", "default", "fixture/local"]).await;
+  assert_eq!(default["environment"]["id"], id);
+  let config = app::cli::local_config::read(&fixture.client_dir.join("config.toml")).unwrap();
+  assert_eq!(config.default_environment.unwrap().environment_id, id);
+  let renamed = fixture.json(&["env", "rename", &id, "production"]).await;
+  assert_eq!(renamed["id"], id);
+  assert_eq!(renamed["name"], "production");
+  failure(
+    &fixture.run(&["env", "delete", "fixture/production"]).await,
+    "Pass --yes",
+  );
+  assert_eq!(
+    fixture.json(&["env", "show", &id]).await["name"],
+    "production"
+  );
+  assert_eq!(
+    fixture.json(&["env", "default", "--clear"]).await["cleared"],
+    true
+  );
+  assert!(
+    app::cli::local_config::read(&fixture.client_dir.join("config.toml"))
+      .unwrap()
+      .default_environment
+      .is_none()
+  );
+  fixture.json(&["env", "delete", &id, "--yes"]).await;
+  assert!(
+    fixture
+      .json(&["env", "list"])
+      .await
+      .as_array()
+      .unwrap()
+      .is_empty()
+  );
+}

@@ -87,30 +87,21 @@ fn explicit_format_overrides_the_extension() {
 
 #[test]
 fn parses_all_supported_formats() {
-  assert_eq!(
-    parse("A=one\nB=\"two three\"\n", SecretFormat::Dotenv)
-      .unwrap()
-      .len(),
-    2
-  );
-  assert_eq!(
-    parse(r#"{"A":"one","B":"two three"}"#, SecretFormat::Json)
-      .unwrap()
-      .len(),
-    2
-  );
-  assert_eq!(
-    parse("A: one\nB: \"two three\"\n", SecretFormat::Yaml)
-      .unwrap()
-      .len(),
-    2
-  );
-  assert_eq!(
-    parse("A = \"one\"\nB = \"two three\"\n", SecretFormat::Toml)
-      .unwrap()
-      .len(),
-    2
-  );
+  for (text, format) in [
+    ("A=one\nB=\"two three\"\n", SecretFormat::Dotenv),
+    (r#"{"A":"one","B":"two three"}"#, SecretFormat::Json),
+    ("A: one\nB: \"two three\"\n", SecretFormat::Yaml),
+    ("A = \"one\"\nB = \"two three\"\n", SecretFormat::Toml),
+  ] {
+    let parsed = parse(text, format).unwrap();
+    assert_eq!(
+      parsed
+        .iter()
+        .map(|entry| (entry.key.as_str(), entry.value.as_str()))
+        .collect::<Vec<_>>(),
+      [("A", "one"), ("B", "two three")]
+    );
+  }
 }
 
 #[test]
