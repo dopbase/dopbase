@@ -46,6 +46,8 @@ pub struct ServerConfig {
   /// manage the PID file.
   #[serde(skip)]
   pub daemonized: bool,
+  #[serde(skip)]
+  pub daemon_launch: Option<crate::daemon::LaunchDescriptor>,
   pub master_key: MasterKeyConfig,
   /// Records whether the public URL was configured or derived at startup.
   #[serde(skip)]
@@ -59,7 +61,7 @@ pub enum PublicUrlSource {
   NetworkPlaceholder,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ServerOverrides {
   pub data_dir: Option<PathBuf>,
   pub config_path: Option<PathBuf>,
@@ -92,7 +94,7 @@ struct MasterKeyConfigFile {
 
 /// `DOPBASE_*` environment overrides, structured so tests (and any embedder)
 /// can resolve configuration from injected values instead of process state.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentOverrides {
   pub data_dir: Option<PathBuf>,
   pub public_url: Option<String>,
@@ -104,7 +106,7 @@ pub struct EnvironmentOverrides {
 }
 
 impl EnvironmentOverrides {
-  fn read() -> Self {
+  pub(crate) fn read() -> Self {
     Self {
       data_dir: env::var_os(ENV_DATA_DIR).map(PathBuf::from),
       public_url: env::var(ENV_PUBLIC_URL).ok(),
@@ -148,6 +150,7 @@ impl ServerConfig {
       shutdown_grace_seconds: 10,
       docs_enabled: false,
       daemonized: false,
+      daemon_launch: None,
       public_url_source: PublicUrlSource::LoopbackDefault,
     }
   }
@@ -160,17 +163,25 @@ impl ServerConfig {
     overrides: &ServerOverrides,
     environment: EnvironmentOverrides,
   ) -> Result<Self> {
+    Self::load_with_environment_at(overrides, environment, &env::current_dir()?)
+  }
+
+  pub(crate) fn load_with_environment_at(
+    overrides: &ServerOverrides,
+    environment: EnvironmentOverrides,
+    working_directory: &Path,
+  ) -> Result<Self> {
     let fallback = dopbase_home();
     let selected_data_dir = overrides
       .data_dir
       .as_deref()
       .or(environment.data_dir.as_deref())
       .unwrap_or(&fallback);
-    let data_dir = resolve_path(selected_data_dir)?;
+    let data_dir = resolve_path_from(selected_data_dir, working_directory)?;
     let config_path = overrides
       .config_path
       .as_deref()
-      .map(resolve_path)
+      .map(|path| resolve_path_from(path, working_directory))
       .transpose()?
       .unwrap_or_else(|| data_dir.join(SERVER_CONFIG_FILENAME));
     let mut config = Self::for_data_dir(data_dir);
@@ -207,7 +218,7 @@ impl ServerConfig {
       overrides.host.clone().or(environment_host).or(file_host),
     )?;
     config.derive_public_url()?;
-    config.master_key.path = resolve_path(&config.master_key.path)?;
+    config.master_key.path = resolve_path_from(&config.master_key.path, working_directory)?;
     config.validate()?;
     Ok(config)
   }
@@ -467,15 +478,21 @@ pub fn database_path(url: &str) -> Result<PathBuf> {
 }
 
 fn resolve_path(path: &Path) -> Result<PathBuf> {
+  resolve_path_from(
+    path,
+    &env::current_dir().context("failed to resolve current directory")?,
+  )
+}
+
+fn resolve_path_from(
+  path: &Path,
+  working_directory: &Path,
+) -> Result<PathBuf> {
   let expanded = expand_home(path);
   if expanded.is_absolute() {
     Ok(expanded)
   } else {
-    Ok(
-      env::current_dir()
-        .context("failed to resolve current directory")?
-        .join(expanded),
-    )
+    Ok(working_directory.join(expanded))
   }
 }
 

@@ -1,33 +1,40 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
+pub(crate) const UP_MIGRATION: &str = "\
+`dopbase server up` has been replaced by `dopbase server start --background`.
+You can also use `dopbase server start -b`.
+
+Use `dopbase server start` to run the server in this terminal.
+
+No server was started.";
+pub(crate) const DOWN_MIGRATION: &str = "\
+`dopbase server down` has been replaced by `dopbase server stop`.
+Use `dopbase server stop --timeout 30` to allow more time for shutdown.
+
+No server was stopped.";
+
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase server start
-  dopbase server up --port 9000
+  dopbase server start --background --port 9000
   dopbase server status
   dopbase server logs --watch
-  dopbase server down
+  dopbase server stop
 ";
 
 const START_HELP: &str = "\
 Examples:
   dopbase server start
   dopbase server start --port 9000
+  dopbase server start --background
+  dopbase server start -b --port 9000
   dopbase server start --host 0.0.0.0 --public-url https://dopbase.example.com
 ";
-const UP_HELP: &str = "\
+const STOP_HELP: &str = "\
 Examples:
-  dopbase server up
-  dopbase server up --port 9000
-  dopbase server up --host 0.0.0.0
-  dopbase server up --host 0.0.0.0 --public-url http://203.0.113.10:8840
-  dopbase server up --docs
-";
-const DOWN_HELP: &str = "\
-Examples:
-  dopbase server down
-  dopbase server down --timeout 30
+  dopbase server stop
+  dopbase server stop --timeout 30
 ";
 const STATUS_HELP: &str = "\
 Examples:
@@ -47,13 +54,27 @@ pub enum ServerCommand {
   /// Run the server in the foreground. Press Ctrl+C to stop it.
   #[command(after_help = START_HELP)]
   Start(ServerStartArgs),
-  /// Start the server in the background on macOS or Linux.
-  #[command(after_help = UP_HELP)]
-  Up(ServerLaunchArgs),
   /// Stop the managed background server.
-  #[command(after_help = DOWN_HELP)]
-  Down {
+  #[command(after_help = STOP_HELP)]
+  Stop {
     /// Seconds to wait for a graceful shutdown before forcing it.
+    #[arg(long, default_value_t = 10)]
+    timeout: u64,
+  },
+  /// Restart the running background server with its saved launch settings.
+  #[command(
+    after_help = "Examples:\n  dopbase server restart\n  dopbase server restart --timeout 30"
+  )]
+  Restart {
+    /// Seconds to allow for graceful shutdown before forcing it.
+    #[arg(long, default_value_t = 10)]
+    timeout: u64,
+  },
+  #[command(hide = true, about = "Replaced by server start --background", after_help = UP_MIGRATION)]
+  Up(ServerLaunchArgs),
+  #[command(hide = true, about = "Replaced by server stop", after_help = DOWN_MIGRATION)]
+  Down {
+    /// Legacy shutdown timeout; this command only prints migration instructions.
     #[arg(long, default_value_t = 10)]
     timeout: u64,
   },
@@ -79,7 +100,10 @@ pub enum ServerCommand {
 pub struct ServerStartArgs {
   #[command(flatten)]
   pub launch: ServerLaunchArgs,
-  /// Internal: set by `server up` on the detached child process.
+  /// Start the server in the background on macOS or Linux.
+  #[arg(short = 'b', long, conflicts_with = "supervised")]
+  pub background: bool,
+  /// Internal: set on the detached child process.
   #[arg(long, hide = true)]
   pub supervised: bool,
 }

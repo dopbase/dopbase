@@ -6,6 +6,10 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `dopbase server start --background` (or `-b`) starts a managed background
+  server. `server restart` restarts it with the saved CLI and server environment
+  overrides while rereading configuration.
+
 - Server startup now creates missing server and client configuration files with
   commented examples for every supported setting. Client saves include the
   reference above active settings.
@@ -14,6 +18,15 @@ All notable changes to Dopbase are documented in this file.
   links from the README, documentation, and issue chooser.
 - A discussion publication manifest and a maintainer checklist for categories,
   pins, and the first month of community follow-up.
+
+### Note
+
+- `dopbase server up` and `dopbase server down` have been replaced by
+  `server start --background` and `server stop`. The old commands show an
+  informational migration notice and exit with status 1 without changing server
+  state. JSON mode returns `COMMAND_REPLACED` information on stdout.
+  Servers started before this change need one manual stop/start before restart
+  is available. Update scripts that use the previous commands.
 
 ### Fixed
 

@@ -1,6 +1,6 @@
 ---
 title: "Server lifecycle"
-description: "Start, stop, inspect, and read logs from a local Dopbase server."
+description: "Start, stop, restart, inspect, and read logs from a local Dopbase server."
 ---
 
 # Server lifecycle
@@ -10,7 +10,7 @@ SQLite storage, and Admin UI.
 
 ## Configuration files
 
-`server start` and `server up` create missing configuration files once the
+`server start` creates missing configuration files in either mode once the
 listener binds successfully:
 
 - `~/.dopbase/server.toml` describes every server setting, including defaults,
@@ -70,18 +70,20 @@ headers.
 
 ## Run in the background
 
-On macOS and Linux, `up` starts a managed background process and returns after
+On macOS and Linux, `start --background` starts a managed background process and returns after
 the listener is ready:
 
 ```bash
-dopbase server up
-dopbase server up --port 9000
+dopbase server start --background
+dopbase server start --background --port 9000
+dopbase server start -b
 ```
 
-`start` and `up` accept the same server options:
+`start` accepts these options in either mode:
 
 | Option                               | Purpose                                      |
 | ------------------------------------ | -------------------------------------------- |
+| `--background`, `-b`                 | Run a managed background server              |
 | `--config <FILE>`                    | Read a different `server.toml` file          |
 | `--host <HOST>`                      | Bind to an IP address, default `127.0.0.1`   |
 | `--port <PORT>`                      | Listen on a port, default `8840`             |
@@ -140,13 +142,54 @@ server writes to its attached terminal instead.
 ## Stop the background server
 
 ```bash
-dopbase server down
-dopbase server down --timeout 30
+dopbase server stop
+dopbase server stop --timeout 30
 ```
 
-`down` sends SIGTERM and waits up to 10 seconds by default. It uses SIGKILL if
+`stop` sends SIGTERM and waits up to 10 seconds by default. It uses SIGKILL if
 the process does not finish before the timeout. Stop a foreground server with
 Ctrl+C.
+
+## Restart the background server
+
+```bash
+dopbase server restart
+dopbase server restart --timeout 30
+dopbase server restart --json
+```
+
+`restart` requires a running managed background server. It preserves the original
+CLI options and server environment overrides, rereads the configuration file,
+and starts the replacement in the background. Saved overrides still take
+precedence over file settings. Relative paths use the original working directory.
+To change launch options or environment overrides, stop the server and start it again.
+
+Dopbase validates configuration before stopping the server and returns only when
+the replacement is ready. If configuration is invalid, the existing server keeps
+running. If startup fails after shutdown, the command reports the failure and
+points to the background log. There is a brief interruption during restart.
+
+The private PID file stores server launch settings and paths for restart. It does
+not store master-key contents, credentials, or the full process environment.
+A server started before this metadata was introduced must be stopped and started
+once with the updated binary before `restart` can be used.
+
+If the server is stopped, use `server start --background`. Stop a foreground
+server with Ctrl+C. Background lifecycle commands are supported on macOS and Linux.
+
+## Migrating from up and down
+
+| Previous command                   | Replacement                                                      |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `dopbase server up`                | `dopbase server start --background` or `dopbase server start -b` |
+| `dopbase server down`              | `dopbase server stop`                                            |
+| `dopbase server down --timeout 30` | `dopbase server stop --timeout 30`                               |
+
+`up` and `down` have been replaced. They show a blue `Info:` notice in terminals
+that support color and exit with status 1 without starting or stopping a server.
+With `--json`, they write an informational payload to stdout with
+`info.code = "COMMAND_REPLACED"`, the replacement command, and `success = false`.
+Update scripts to use the replacement commands.
 
 ## Storage and configuration
 

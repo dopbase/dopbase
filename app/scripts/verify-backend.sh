@@ -28,7 +28,7 @@ cleanup() {
     wait "${server_pid}" 2>/dev/null || true
   fi
   if [[ -x "${binary}" ]] && [[ -f "${background_data_dir}/dopbase.pid" ]]; then
-    "${binary}" --data-dir "${background_data_dir}" server down --timeout 2 >/dev/null 2>&1 || true
+    "${binary}" --data-dir "${background_data_dir}" server stop --timeout 2 >/dev/null 2>&1 || true
   fi
   rm -rf "${runtime_root}"
 }
@@ -116,7 +116,7 @@ kill -TERM "${server_pid}"
 wait "${server_pid}"
 server_pid=""
 
-"${binary}" --data-dir "${background_data_dir}" --json server up \
+"${binary}" --data-dir "${background_data_dir}" --json server start --background \
   --docs \
   --host 127.0.0.1 \
   --port 18377 \
@@ -125,7 +125,14 @@ curl --fail --silent http://127.0.0.1:18377/api/v1/health | grep --quiet '"succe
 "${binary}" --data-dir "${background_data_dir}" --json server status \
   | grep --quiet '"status": "running"'
 "${binary}" --data-dir "${background_data_dir}" server logs --lines 5 >/dev/null
-"${binary}" --data-dir "${background_data_dir}" server down
+"${binary}" --data-dir "${background_data_dir}" --json server restart >"${runtime_root}/background-restart.json"
+curl --fail --silent http://127.0.0.1:18377/api/v1/health | grep --quiet '"success":true'
+if "${binary}" --data-dir "${background_data_dir}" server down >"${runtime_root}/migration.out" 2>&1; then
+  echo "error: replaced server down unexpectedly succeeded" >&2
+  exit 1
+fi
+grep --quiet 'dopbase server stop' "${runtime_root}/migration.out"
+"${binary}" --data-dir "${background_data_dir}" server stop
 if "${binary}" --data-dir "${background_data_dir}" server status >/dev/null; then
   echo "error: background server still reports as running" >&2
   exit 1

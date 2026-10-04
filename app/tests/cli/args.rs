@@ -32,6 +32,8 @@ fn parses_every_v0_1_command_shape() {
     &["dopbase", "server", "start", "--data-dir", "/tmp/dopbase"],
     &["dopbase", "server", "start", "--docs"],
     &["dopbase", "server", "start", "--no-docs"],
+    &["dopbase", "server", "start", "--background"],
+    &["dopbase", "server", "start", "-b"],
     &["dopbase", "server", "up"],
     &["dopbase", "server", "up", "--docs"],
     &["dopbase", "server", "start", "--port", "8840"],
@@ -47,6 +49,9 @@ fn parses_every_v0_1_command_shape() {
       "--port",
       "9000",
     ],
+    &["dopbase", "server", "stop"],
+    &["dopbase", "server", "restart"],
+    &["dopbase", "server", "restart", "--timeout", "30"],
     &["dopbase", "server", "down"],
     &["dopbase", "server", "down", "--timeout", "30"],
     &["dopbase", "--data-dir", "/tmp/dopbase", "server", "status"],
@@ -330,14 +335,16 @@ fn docs_flags_last_flag_wins() {
     panic!("expected server start");
   };
   assert_eq!(args.launch.docs(), Some(false));
-  let cli = Cli::try_parse_from(["dopbase", "server", "up", "--no-docs", "--docs"]).unwrap();
+  let cli =
+    Cli::try_parse_from(["dopbase", "server", "start", "-b", "--no-docs", "--docs"]).unwrap();
   let Command::Server {
-    command: ServerCommand::Up(args),
+    command: ServerCommand::Start(args),
   } = cli.command
   else {
-    panic!("expected server up");
+    panic!("expected background server start");
   };
-  assert_eq!(args.docs(), Some(true));
+  assert!(args.background);
+  assert_eq!(args.launch.docs(), Some(true));
   let cli = Cli::try_parse_from(["dopbase", "server", "start"]).unwrap();
   let Command::Server {
     command: ServerCommand::Start(args),
@@ -370,7 +377,7 @@ fn removed_server_forms_are_rejected() {
     vec!["dopbase", "serve"],
     vec!["dopbase", "stop"],
     vec!["dopbase", "server", "run"],
-    vec!["dopbase", "server", "start", "--background"],
+    vec!["dopbase", "server", "start", "--background", "--supervised"],
     vec![
       "dopbase",
       "server",
@@ -632,7 +639,7 @@ fn top_level_help_lists_common_server_options() {
   assert!(help.contains("Common server options:"), "{help}");
   assert!(help.contains("--host <HOST>"), "{help}");
   assert!(help.contains("--port <PORT>"), "{help}");
-  assert!(!help.contains("--background"), "{help}");
+  assert!(help.contains("--background"), "{help}");
 }
 
 #[test]
@@ -659,13 +666,13 @@ fn top_level_help_lists_every_executable_environment_variable() {
 }
 
 #[test]
-fn every_command_help_has_examples() {
+fn every_public_command_help_has_examples() {
   fn check(
     command: &mut clap::Command,
     parent: &str,
   ) {
     for subcommand in command.get_subcommands_mut() {
-      if subcommand.get_name() == "help" {
+      if subcommand.get_name() == "help" || subcommand.is_hide_set() {
         continue;
       }
       let path = format!("{parent} {}", subcommand.get_name());
@@ -696,7 +703,7 @@ fn every_visible_argument_has_a_description() {
     }
 
     for subcommand in command.get_subcommands() {
-      if subcommand.get_name() == "help" {
+      if subcommand.get_name() == "help" || subcommand.is_hide_set() {
         continue;
       }
       check(subcommand, &format!("{parent} {}", subcommand.get_name()));
@@ -1089,7 +1096,7 @@ async fn server_commands_reject_inapplicable_global_options() {
         "server",
         "start",
       ],
-      "--json cannot be used with `dopbase server start`",
+      "--json cannot be used with foreground `dopbase server start`. Use `dopbase server start --background --json`",
     ),
     (
       &[
