@@ -14,6 +14,7 @@ precedence over values in `server.toml`.
 | `DOPBASE_TOKEN`                  | `dbs_xxxxxxxxxxxxxxxxx`       | Authenticates client commands with a runner or AI agent token. For `run`, it has lower priority than `--token` and higher priority than the encrypted credential saved by `dopbase login`. |
 | `DOPBASE_URL`                    | `https://dopbase.example.com` | Selects the server for client commands when the global `--server` option is not set.                                                                                                       |
 | `DOPBASE_ENV`                    | `payment-service/production`  | Selects the environment for `dopbase run` when no positional environment is given. An immutable ID such as `env_482731` also works.                                                        |
+| `DOPBASE_ROOT_EMAIL`             | `ops@example.com`             | Default root email for `server setup`. CLI mode generates a password; `--web` prefills the email through its setup link. Explicit `--email` takes precedence.                              |
 | `DOPBASE_DATA_DIR`               | `/srv/dopbase`                | Changes the directory used for server data and local CLI configuration. The default is `~/.dopbase`.                                                                                       |
 | `DOPBASE_HOST`                   | `0.0.0.0`                     | Sets the network interface used by `dopbase server start`, `dopbase server start --background`, and `dopbase server setup --web`. The default is `127.0.0.1`.                              |
 | `DOPBASE_PORT`                   | `9000`                        | Sets the server port. The default is `8840`.                                                                                                                                               |
@@ -37,6 +38,7 @@ dopbase run -- ./payment-service
 Start a self-hosted server with environment-based configuration:
 
 ```bash
+export DOPBASE_ROOT_EMAIL=ops@example.com
 export DOPBASE_DATA_DIR=/srv/dopbase
 export DOPBASE_HOST=0.0.0.0
 export DOPBASE_PORT=9000
@@ -46,6 +48,12 @@ export DOPBASE_MASTER_KEY_PATH=/run/secrets/dopbase-master-key
 dopbase server setup
 dopbase server start
 ```
+
+Run setup once using the same persistent data location as startup and save the
+generated password from its output. `DOPBASE_ROOT_EMAIL` is read only by setup;
+`server start` still requires an initialized instance. Blank values count as
+unset. Invalid nonempty values fail setup without creating files. See
+[server setup](./setup) for JSON output and web prefilling.
 
 Do not commit `DOPBASE_TOKEN` or a master key to source control. Supply them
 through your shell, process manager, CI secret store, or deployment platform.

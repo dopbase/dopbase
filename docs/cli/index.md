@@ -25,7 +25,9 @@ dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
 ```
 
-`server setup` initializes local storage and the root account. `init` creates a
+`server setup` initializes local storage and the root account. Set
+`DOPBASE_ROOT_EMAIL` or pass `--email` to generate a password without prompts.
+With `--web`, the same email prefills the browser form. `init` creates a
 project and environment through the running server. See [server setup](./setup).
 
 ## No hidden project or environment

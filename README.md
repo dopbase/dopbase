@@ -58,12 +58,16 @@ dopbase server setup
 dopbase server start
 ```
 
-Setup asks for the root email and a password with confirmation. Open
+Without an email default, setup asks for the root email and a password with
+confirmation. Open
 `http://localhost:8840` to sign in with those credentials.
 
 On a headless host, use `dopbase server setup --email admin@example.com` and save
 its generated password. For browser setup or backup restoration, use
-`dopbase server setup --web`. The [quick-start guide](./docs/guide/quick-start.md)
+`dopbase server setup --web`. You can also set `DOPBASE_ROOT_EMAIL`: CLI setup
+generates a password without prompts, while web setup prefills the email through
+its printed link. Explicit `--email` overrides the environment default.
+The [quick-start guide](./docs/guide/quick-start.md)
 covers sign-in, importing a `.env` file, and running an application with its secrets.
 
 Native release archives are available for macOS and Linux on AMD64 and ARM64.
@@ -118,6 +122,7 @@ Environment variables:
   DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_ROOT_EMAIL              Root email for server setup; --email overrides it
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
   DOPBASE_HOST                    Server bind host
   DOPBASE_PORT                    Server port (default: 8840)

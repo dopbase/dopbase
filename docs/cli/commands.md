@@ -47,8 +47,9 @@ or revoke browser sessions.
 
 Run `dopbase server setup` once before starting a fresh or reset instance. It
 prompts for the root email, a masked password of 12 to 128 characters, and
-confirmation. `--email EMAIL` generates a password and prints it once without
-prompting; it also supports global `--json`.
+confirmation when no email default is supplied. `--email EMAIL` or
+`DOPBASE_ROOT_EMAIL` generates a password and prints it once without prompting;
+this mode also supports global `--json`. Explicit `--email` takes precedence.
 
 Setup accepts `--config` and `--master-key-file` with global `--data-dir`,
 rejects `--server`, and leaves the server stopped. It creates no client session
@@ -57,8 +58,9 @@ project and environment workflow.
 
 `server setup --web` starts the existing foreground web flow, including backup
 restore. It accepts the foreground listener options listed below, continues
-serving after setup, and stops with Ctrl+C. `--web` conflicts with `--email` and
-rejects `--json`. Listener options require `--web` when used with setup.
+serving after setup, and stops with Ctrl+C. `--email` or `DOPBASE_ROOT_EMAIL`
+prefills the email through the printed setup link. Web setup rejects `--json`.
+Listener options require `--web` when used with setup.
 See [server setup](./setup) for output, recovery, and instance selection.
 
 ## Server lifecycle

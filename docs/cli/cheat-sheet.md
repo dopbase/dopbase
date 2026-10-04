@@ -46,6 +46,8 @@ examples for `secret set`.
 
 Run setup once before starting a fresh or reset instance. `--email` generates a
 password and supports `--json`; `--web` runs existing foreground browser setup.
+`DOPBASE_ROOT_EMAIL` supplies the default setup email. `--email` overrides it.
+CLI mode generates a password; `--web` prefills the email form.
 See [server setup](./setup).
 
 `--host` defaults to `127.0.0.1` and `--port` defaults to `8840`. When

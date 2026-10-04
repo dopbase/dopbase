@@ -53,6 +53,9 @@ Setup exits without starting a server or signing you in. On a headless host,
 `dopbase server setup --email admin@example.com` generates a password and prints
 it once. Save that password before closing the terminal.
 
+Set `DOPBASE_ROOT_EMAIL` to supply the email without repeating `--email`. An
+explicit `--email` overrides the environment default.
+
 Use `dopbase server setup --web` to keep the existing browser setup and backup
 restoration flow. See [server setup](/cli/setup) for the alternatives and custom
 instance options.

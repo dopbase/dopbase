@@ -17,7 +17,8 @@ dopbase server setup
 dopbase server start
 ```
 
-Setup asks for the root email, a masked password, and password confirmation.
+When neither `--email` nor a nonblank `DOPBASE_ROOT_EMAIL` is supplied, setup
+asks for the root email, a masked password, and password confirmation.
 Passwords must contain 12 to 128 characters. The command exits when setup is
 complete; it does not start HTTP or sign the CLI in. Cancel with Ctrl+C.
 
@@ -30,6 +31,23 @@ Provide an email to generate a password:
 ```bash
 dopbase server setup --email admin@example.com
 ```
+
+You can also supply the email through the environment:
+
+```bash
+export DOPBASE_ROOT_EMAIL=admin@example.com
+dopbase server setup
+```
+
+The email is resolved from `--email` first, then `DOPBASE_ROOT_EMAIL`. Empty or
+whitespace-only environment values count as unset. Invalid nonempty values
+fail before creating files or starting a listener; they do not fall back to
+prompts. A valid explicit `--email` overrides an invalid environment value.
+
+For Docker and cloud deployments, run setup once against the persistent data
+location used by subsequent startup. Setting this variable does not initialize
+an instance through `server start`. It is a setup input and is not stored in
+`server.toml`.
 
 The command prints the generated password once after creating the account.
 Save it before closing the terminal. Dopbase stores its password hash and does
@@ -54,7 +72,8 @@ Successful JSON output contains these fields. The values below are placeholders:
 }
 ```
 
-Diagnostics go to stderr. `--email` never prompts. Guided setup and `--web`
+Diagnostics go to stderr. `--email` or a nonblank `DOPBASE_ROOT_EMAIL` skips
+prompts in CLI mode and supports `--json`. Guided setup and `--web`
 reject `--json`; guided setup also requires a terminal.
 
 If setup commits but cannot deliver its output, it exits with an error and
@@ -71,13 +90,26 @@ This starts the existing foreground server and prints its setup token and link.
 Open the link to create root or restore a backup. Creating root starts a browser
 session and opens Projects. Restoring a backup opens Sign in.
 
+To prefill the root email, set `DOPBASE_ROOT_EMAIL` or pass `--email`:
+
+```bash
+dopbase server setup --web --email ops+cloud@example.com
+```
+
+The printed link includes an encoded email, for example
+`/setup?token=<SETUP_TOKEN>&email=ops%2Bcloud%40example.com`. Opening it fills the
+token and email fields, then removes those parameters from the address bar.
+The email remains editable. You still choose and confirm a password before
+submitting the form. With no email supplied, the existing token-only link is
+printed.
+
 The server continues running after setup. Press Ctrl+C to stop it; later, use
 `dopbase server start` or `dopbase server start --background`.
 
 Web setup accepts the same listener options as foreground startup, including
 `--host`, `--port`, `--public-url`, `--shutdown-grace-seconds`, `--docs`, and
-`--no-docs`. It does not support background setup. `--web` and `--email` cannot
-be combined. Listener options require `--web`.
+`--no-docs`. It does not support background setup. Listener options require
+`--web`.
 
 First-run CLI restore still works against this listener. In another terminal:
 
