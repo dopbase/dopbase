@@ -265,9 +265,23 @@ pub fn setup_token_message(
   public_url: &str,
   token: &str,
 ) -> String {
+  setup_token_message_with_email(public_url, token, None)
+}
+
+fn setup_token_message_with_email(
+  public_url: &str,
+  token: &str,
+  email: Option<&str>,
+) -> String {
   let base = public_url.trim_end_matches('/');
+  let mut query = url::form_urlencoded::Serializer::new(String::new());
+  query.append_pair("token", token);
+  if let Some(email) = email {
+    query.append_pair("email", email);
+  }
+  let query = query.finish();
   format!(
-    "\nDopbase setup token (shown once):\n{token}\n\nOr open this link to fill it in automatically:\n{base}/setup?token={token}\n"
+    "\nDopbase setup token (shown once):\n{token}\n\nOr open this link to fill it in automatically:\n{base}/setup?{query}\n"
   )
 }
 
@@ -277,18 +291,22 @@ pub async fn serve_with_ready(
   config: ServerConfig,
   ready: Option<&crate::daemon::Ready>,
 ) -> Result<()> {
-  serve_instance(config, ready, false).await
+  serve_instance(config, ready, false, None).await
 }
 
 /// Run the existing foreground server with first-run web setup enabled.
-pub(crate) async fn serve_setup(config: ServerConfig) -> Result<()> {
-  serve_instance(config, None, true).await
+pub(crate) async fn serve_setup(
+  config: ServerConfig,
+  email: Option<&str>,
+) -> Result<()> {
+  serve_instance(config, None, true, email).await
 }
 
 async fn serve_instance(
   config: ServerConfig,
   ready: Option<&crate::daemon::Ready>,
   setup_enabled: bool,
+  setup_email: Option<&str>,
 ) -> Result<()> {
   if !setup_enabled {
     require_initialized(&config).await?;
@@ -337,7 +355,10 @@ async fn serve_instance(
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
   if let Some(setup) = setup_token.as_deref() {
-    eprintln!("{}", setup_token_message(public_url, setup));
+    eprintln!(
+      "{}",
+      setup_token_message_with_email(public_url, setup, setup_email)
+    );
   }
   tracing::info!(%address,"Dopbase server started");
   let serve_result = axum::serve(listener, router(state.clone()))

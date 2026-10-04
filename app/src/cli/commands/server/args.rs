@@ -163,19 +163,25 @@ Examples:
   dopbase --data-dir /srv/dopbase --json server setup --email admin@example.com
   dopbase server setup --web
   dopbase server setup --web --port 9000
+  dopbase server setup --web --email admin@example.com
+  DOPBASE_ROOT_EMAIL=admin@example.com dopbase server setup
 
 CLI setup creates the root account and exits without starting a server.
---email generates a password and prints it once. Save it before closing the terminal.
+--email or DOPBASE_ROOT_EMAIL generates a password and prints it once in CLI mode.
+--email overrides DOPBASE_ROOT_EMAIL. Empty environment values use guided setup.
+Save the generated password before closing the terminal.
 --web runs the existing web setup server until you stop it with Ctrl+C.
+An email supplied with --web prefills the form through the printed setup link.
 Use the same --data-dir and --config options when starting the instance.
 ";
 
 #[derive(Args, Debug, Default)]
 pub struct ServerSetupArgs {
   /// Use the existing web setup flow in this terminal.
-  #[arg(long, conflicts_with = "email")]
+  #[arg(long)]
   pub web: bool,
-  /// Create root with a generated password, without prompting.
+  /// Root email; generates a password in CLI mode or prefills web setup.
+  /// Defaults to DOPBASE_ROOT_EMAIL when set.
   #[arg(long, value_name = "EMAIL")]
   pub email: Option<String>,
   #[command(flatten)]

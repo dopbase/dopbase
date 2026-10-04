@@ -2,6 +2,7 @@ use super::{ServerSetupArgs, handler::load_server_config};
 use crate::{
   cli::{client::CliCancelled, output, prompt},
   config::ensure_data_dir,
+  constants::config::ENV_ROOT_EMAIL,
   modules::{bootstrap::service, common},
   server::{InstanceLock, prepare_instance, require_uninitialized},
   services::token,
@@ -66,32 +67,31 @@ pub(super) async fn execute(
   {
     bail!("listener options require `dopbase server setup --web`");
   }
-  if !args.web && args.email.is_none() {
+  let email = resolve_email(args.email)?;
+  if !args.web && email.is_none() {
     if json_output {
       bail!(
-        "guided setup does not support --json. Pass --email to generate a password without prompting"
+        "guided setup does not support --json. Pass --email or set DOPBASE_ROOT_EMAIL to generate a password without prompting"
       );
     }
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
       bail!(
-        "guided setup requires a terminal. Pass --email to generate a password without prompting"
+        "guided setup requires a terminal. Pass --email or set DOPBASE_ROOT_EMAIL to generate a password without prompting"
       );
     }
   }
   let config = load_server_config(args.launch, data_dir, false, false)?;
   if args.web {
-    crate::server::serve_setup(config).await?;
+    crate::server::serve_setup(config, email.as_deref()).await?;
     return Ok(0);
   }
   require_uninitialized(&config).await?;
   if InstanceLock::is_held(&config.database_url)? {
     bail!("The instance is in use. Stop the running server or setup process before running setup.");
   }
-  let generated = args.email.is_some();
-  let email = match args.email {
-    Some(value) => {
-      common::validate_email(&value).map_err(|_| anyhow::anyhow!("Enter a valid email address."))?
-    }
+  let generated = email.is_some();
+  let email = match email {
+    Some(value) => value,
     None => {
       eprintln!("Initialize local instance: {}", config.data_dir.display());
       prompt::email("Root email:", CliCancelled::Setup)?
@@ -172,6 +172,23 @@ pub(super) async fn execute(
     })
   })?;
   Ok(0)
+}
+
+fn resolve_email(explicit: Option<String>) -> Result<Option<String>> {
+  let (value, source) = match explicit {
+    Some(value) => (value, "--email"),
+    None => match std::env::var(ENV_ROOT_EMAIL) {
+      Ok(value) if value.trim().is_empty() => return Ok(None),
+      Ok(value) => (value, ENV_ROOT_EMAIL),
+      Err(std::env::VarError::NotPresent) => return Ok(None),
+      Err(std::env::VarError::NotUnicode(_)) => {
+        bail!("{ENV_ROOT_EMAIL} must contain a valid UTF-8 email address")
+      }
+    },
+  };
+  common::validate_email(&value)
+    .map(Some)
+    .map_err(|_| anyhow::anyhow!("{source} must contain a valid email address."))
 }
 
 fn cli_error(error: crate::http::HttpError) -> anyhow::Error {

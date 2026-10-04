@@ -3,6 +3,7 @@ Environment variables:
   DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_ROOT_EMAIL              Root email for server setup; --email overrides it
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
   DOPBASE_HOST                    Server bind host
   DOPBASE_PORT                    Server port (default: 8840)
