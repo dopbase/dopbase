@@ -103,8 +103,14 @@ The email remains editable. You still choose and confirm a password before
 submitting the form. With no email supplied, the existing token-only link is
 printed.
 
+`--web` explicitly enables the web UI for this run, even when `web_ui = false`
+or `DOPBASE_WEB_UI=false`. The UI remains available after setup until you stop
+this process. The override is not saved.
+
 The server continues running after setup. Press Ctrl+C to stop it; later, use
-`dopbase server start` or `dopbase server start --background`.
+`dopbase server start` or `dopbase server start --background`. Normal startup
+follows the configured web UI setting. `--no-web-ui` applies only to
+`server start`.
 
 Web setup accepts the same listener options as foreground startup, including
 `--host`, `--port`, `--public-url`, `--shutdown-grace-seconds`, `--docs`, and

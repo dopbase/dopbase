@@ -47,6 +47,36 @@ apply to the current run and are not saved into the examples. `--data-dir` or
 `DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
 server config path while the client config stays in the data directory.
 
+## Disable the web UI
+
+The web UI is enabled by default. To use only the CLI and REST API, set this
+in `server.toml`:
+
+```toml
+web_ui = false
+```
+
+You can also disable it for a server run:
+
+```bash
+DOPBASE_WEB_UI=false dopbase server start
+dopbase server start --no-web-ui
+dopbase server start --background --no-web-ui
+```
+
+Priority is `--no-web-ui`, then `DOPBASE_WEB_UI`, then `web_ui` in
+`server.toml`, then the default `true`. File and environment values accept
+`true` or `false`. Restart after changing the saved setting. Background restart
+keeps the original CLI and environment overrides while rereading the file.
+
+When disabled, UI pages and bundled assets return a JSON 404 response. The
+CLI and REST API remain available. Swagger and OpenAPI still use the separate
+`docs` setting. Startup displays `Admin UI: disabled`.
+
+`server setup --web` explicitly enables the UI for that entire run, including
+after setup finishes. It leaves the saved setting unchanged; the next normal
+start follows configuration.
+
 ## Run in the foreground
 
 Use `start` while developing or when another process manager handles Dopbase:
@@ -109,6 +139,7 @@ dopbase server start -b
 | `--port <PORT>`                      | Listen on a port, default `8840`             |
 | `--public-url <URL>`                 | Set the URL clients use to reach the server  |
 | `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout                |
+| `--no-web-ui`                        | Disable the web UI for this run              |
 | `--docs`                             | Enable Swagger UI and the OpenAPI document   |
 | `--no-docs`                          | Disable API documentation for this run       |
 | `--master-key-file <FILE>`           | Read the server master key from another file |
@@ -238,6 +269,7 @@ Configure the listener with `host` and `port`. The old `bind_address`,
 version = 1
 host = "127.0.0.1"
 port = 8840
+web_ui = true
 docs = false
 ```
 
