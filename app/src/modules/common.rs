@@ -93,6 +93,7 @@ fn password_workers() -> &'static Arc<tokio::sync::Semaphore> {
 }
 
 pub async fn hash_password_async(value: String) -> Result<String, HttpError> {
+  let value = zeroize::Zeroizing::new(value);
   let permit = password_workers()
     .clone()
     .acquire_owned()
