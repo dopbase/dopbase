@@ -58,6 +58,9 @@ bun run dev:app
 bun run dev:docs
 ```
 
+Before first starting the Rust app, run `bun run prepare:app`, then
+`cargo run --manifest-path app/Cargo.toml -- server setup`. Use a separate
+`DOPBASE_DATA_DIR` for development and keep it the same during setup and startup.
 `bun run dev` starts the Admin UI and Rust app together. Use a targeted command
 when you need only one part of the repository.
 
