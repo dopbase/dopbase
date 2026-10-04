@@ -8,6 +8,25 @@ description: "Start, stop, inspect, and read logs from a local Dopbase server."
 The `dopbase server` commands manage the self-hosted HTTP server, REST API,
 SQLite storage, and Admin UI.
 
+## Configuration files
+
+`server start` and `server up` create missing configuration files once the
+listener binds successfully:
+
+- `~/.dopbase/server.toml` describes every server setting, including defaults,
+  examples, accepted values, and environment overrides.
+- `~/.dopbase/config.toml` describes client connection and default environment
+  settings.
+
+All generated settings and table headers are commented out. Uncomment the
+settings you need, including the table header for nested settings. Restart
+the server after changing `server.toml`.
+
+Startup leaves existing files untouched. CLI options and environment variables
+apply to the current run and are not saved into the examples. `--data-dir` or
+`DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
+server config path while the client config stays in the data directory.
+
 ## Run in the foreground
 
 Use `start` while developing or when another process manager handles Dopbase:
