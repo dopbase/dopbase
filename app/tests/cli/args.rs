@@ -923,3 +923,30 @@ fn parses_each_public_command_and_detects_missing_cases() {
     "update canonical cases when commands change"
   );
 }
+
+#[test]
+fn no_web_ui_is_a_start_only_flag() {
+  for (extra, expected) in [
+    (vec![], false),
+    (vec!["--no-web-ui"], true),
+    (vec!["--background", "--no-web-ui"], true),
+  ] {
+    let mut arguments = vec!["dopbase", "server", "start"];
+    arguments.extend(extra);
+    let cli = Cli::try_parse_from(arguments).unwrap();
+    let Command::Server {
+      command: ServerCommand::Start(args),
+    } = cli.command
+    else {
+      panic!("expected server start");
+    };
+    assert_eq!(args.no_web_ui, expected);
+  }
+  for command in ["setup", "restart", "stop", "status", "logs"] {
+    assert!(Cli::try_parse_from(["dopbase", "server", command, "--no-web-ui"]).is_err());
+  }
+  assert!(Cli::try_parse_from(["dopbase", "server", "setup", "--web", "--no-web-ui"]).is_err());
+  let help = contextual_help(&["dopbase", "server", "start", "--help"]);
+  assert!(help.contains("--no-web-ui"));
+  assert!(help.contains("DOPBASE_WEB_UI"));
+}

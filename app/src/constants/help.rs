@@ -9,6 +9,7 @@ Environment variables:
   DOPBASE_PORT                    Server port (default: 8840)
   DOPBASE_PUBLIC_URL              Public URL
   DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
+  DOPBASE_WEB_UI                  Enable or disable the web UI (default: true)
   DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
 
@@ -27,6 +28,7 @@ Quickstart:
 Common server options:
   --host <HOST>    Bind host (default: 127.0.0.1)
   --port <PORT>    Listen port (default: 8840)
+  --no-web-ui      Disable the web UI for server start
 
 Run 'dopbase help <command>' for details on any command.
 ";

@@ -231,6 +231,7 @@ pub fn startup_banner(
   bind_address: &str,
   data_dir: &std::path::Path,
   docs_enabled: bool,
+  web_ui_enabled: bool,
 ) -> String {
   let public_url = public_url.trim_end_matches('/');
   let heading = Style::new().effects(Effects::BOLD);
@@ -241,7 +242,14 @@ pub fn startup_banner(
     String::new(),
     format!("Public URL: {public_url}"),
     format!("Bind:       {bind_address}"),
-    format!("Admin UI:   {public_url}"),
+    format!(
+      "Admin UI:   {}",
+      if web_ui_enabled {
+        public_url
+      } else {
+        "disabled"
+      }
+    ),
     format!("API:        {public_url}/api/v1"),
     format!("Config:     {}", data_dir.display()),
   ];
@@ -296,9 +304,10 @@ pub async fn serve_with_ready(
 
 /// Run the existing foreground server with first-run web setup enabled.
 pub(crate) async fn serve_setup(
-  config: ServerConfig,
+  mut config: ServerConfig,
   email: Option<&str>,
 ) -> Result<()> {
+  config.web_ui_enabled = true;
   serve_instance(config, None, true, email).await
 }
 
@@ -348,7 +357,8 @@ async fn serve_instance(
       public_url,
       &state.config.bind_address,
       &state.config.data_dir,
-      state.config.docs_enabled
+      state.config.docs_enabled,
+      state.config.web_ui_enabled,
     )
   );
   if let Some(warning) = state.config.public_url_warning() {
@@ -460,9 +470,16 @@ impl Drop for InstanceLock {
   }
 }
 
-async fn static_fallback(uri: Uri) -> Response {
+async fn static_fallback(
+  axum::extract::State(state): axum::extract::State<AppState>,
+  uri: Uri,
+) -> Response {
   if uri.path().starts_with(api::PREFIX) {
     return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
+      .into_response();
+  }
+  if !state.config.web_ui_enabled {
+    return HttpError::not_found(REQUEST_INVALID, "The requested route was not found.")
       .into_response();
   }
   embedded_asset(uri.path()).unwrap_or_else(|| {
