@@ -18,6 +18,7 @@ pub(crate) async fn execute(
   json_output: bool,
 ) -> Result<i32> {
   match command {
+    ServerCommand::Setup(args) => super::setup::execute(args, data_dir, json_output).await,
     ServerCommand::Up(_) => migration_notice(
       super::args::UP_MIGRATION,
       "dopbase server start --background",
@@ -169,7 +170,7 @@ fn launch_overrides(
   }
 }
 
-fn load_server_config(
+pub(super) fn load_server_config(
   args: ServerLaunchArgs,
   data_dir: Option<PathBuf>,
   background: bool,

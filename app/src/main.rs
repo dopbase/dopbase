@@ -1,6 +1,7 @@
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
+    .with_writer(std::io::stderr)
     .with_env_filter(
       tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "app=info,tower_http=info".into()),
@@ -22,6 +23,22 @@ async fn main() {
         }
         std::process::exit(130)
       } else if json {
+        if let Some(initialized) =
+          error.downcast_ref::<app::cli::commands::server::SetupCommittedError>()
+        {
+          eprintln!(
+            "{}",
+            serde_json::json!({"success":false,"initialized":true,"email":initialized.email,"data_dir":initialized.data_dir,"error":{"CLI_ERROR":initialized.to_string()}})
+          );
+          std::process::exit(1);
+        }
+        if let Some(required) = error.downcast_ref::<app::server::InitializationRequired>() {
+          eprintln!(
+            "{}",
+            serde_json::json!({"success":false,"error":{"SETUP_REQUIRED":required.to_string()}})
+          );
+          std::process::exit(1);
+        }
         eprintln!(
           "{}",
           serde_json::json!({"success":false,"error":{"CLI_ERROR":error.to_string()}})

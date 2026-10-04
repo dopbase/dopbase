@@ -1,3 +1,8 @@
+mod instance;
+
+pub(crate) use instance::require_uninitialized;
+pub use instance::{InitializationRequired, require_initialized};
+
 use std::{
   fs::{File, OpenOptions},
   sync::Arc,
@@ -271,9 +276,27 @@ pub async fn serve_with_ready(
   config: ServerConfig,
   ready: Option<&crate::daemon::Ready>,
 ) -> Result<()> {
+  serve_instance(config, ready, false).await
+}
+
+/// Run the existing foreground server with first-run web setup enabled.
+pub(crate) async fn serve_setup(config: ServerConfig) -> Result<()> {
+  serve_instance(config, None, true).await
+}
+
+async fn serve_instance(
+  config: ServerConfig,
+  ready: Option<&crate::daemon::Ready>,
+  setup_enabled: bool,
+) -> Result<()> {
   ensure_data_dir(&config.data_dir)?;
   let _lock = InstanceLock::acquire(&config.database_url)?;
-  let state = build_state(config).await?;
+  let state = if setup_enabled {
+    require_uninitialized(&config).await?;
+    build_setup_state(config).await?
+  } else {
+    build_state(config).await?
+  };
   let setup_token = state.setup.read().await.token.clone();
   let address = state.config.bind_addr()?;
   let grace = state.config.shutdown_grace_seconds;

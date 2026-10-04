@@ -16,6 +16,7 @@ No server was stopped.";
 
 pub(crate) const HELP: &str = "\
 Examples:
+  dopbase server setup
   dopbase server start
   dopbase server start --background --port 9000
   dopbase server status
@@ -51,6 +52,9 @@ Examples:
 
 #[derive(Subcommand, Debug)]
 pub enum ServerCommand {
+  /// Initialize a local instance before starting the server.
+  #[command(after_help = SETUP_HELP)]
+  Setup(ServerSetupArgs),
   /// Run the server in the foreground. Press Ctrl+C to stop it.
   #[command(after_help = START_HELP)]
   Start(ServerStartArgs),
@@ -150,4 +154,30 @@ impl ServerLaunchArgs {
       None
     }
   }
+}
+
+const SETUP_HELP: &str = "\
+Examples:
+  dopbase server setup
+  dopbase server setup --email admin@example.com
+  dopbase --data-dir /srv/dopbase --json server setup --email admin@example.com
+  dopbase server setup --web
+  dopbase server setup --web --port 9000
+
+CLI setup creates the root account and exits without starting a server.
+--email generates a password and prints it once. Save it before closing the terminal.
+--web runs the existing web setup server until you stop it with Ctrl+C.
+Use the same --data-dir and --config options when starting the instance.
+";
+
+#[derive(Args, Debug, Default)]
+pub struct ServerSetupArgs {
+  /// Use the existing web setup flow in this terminal.
+  #[arg(long, conflicts_with = "email")]
+  pub web: bool,
+  /// Create root with a generated password, without prompting.
+  #[arg(long, value_name = "EMAIL")]
+  pub email: Option<String>,
+  #[command(flatten)]
+  pub launch: ServerLaunchArgs,
 }

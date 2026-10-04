@@ -67,6 +67,7 @@ pub(crate) fn password(
 pub(crate) fn new_password(
   label: &str,
   confirmation_label: &str,
+  cancelled: CliCancelled,
 ) -> Result<String> {
   Password::new(label)
     .with_display_mode(PasswordDisplayMode::Masked)
@@ -86,7 +87,7 @@ pub(crate) fn new_password(
       },
     )
     .prompt()
-    .map_err(|error| map_error(error, CliCancelled::PasswordConfirmation))
+    .map_err(|error| map_error(error, cancelled))
 }
 
 pub(super) fn confirm(

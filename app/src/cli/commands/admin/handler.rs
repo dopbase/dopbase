@@ -349,7 +349,11 @@ async fn reset_password(
       .fetch_optional(db.pool())
       .await?;
   let (admin_id, normalized) = admin.context("no administrator exists with that email")?;
-  let password = prompt::new_password("New password:", "Confirm new password:")?;
+  let password = prompt::new_password(
+    "New password:",
+    "Confirm new password:",
+    crate::cli::CliCancelled::PasswordConfirmation,
+  )?;
   let hash = crate::modules::common::hash_password(&password)
     .map_err(|_| anyhow::anyhow!("password hashing failed"))?;
   let now = chrono::Utc::now().to_rfc3339();

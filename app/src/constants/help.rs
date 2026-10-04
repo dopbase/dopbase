@@ -12,6 +12,7 @@ Environment variables:
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
 
 Quickstart:
+  dopbase server setup                     # initialize the local instance once
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server start --background        # run the server in the background (also -b)
   dopbase server stop                      # stop the background server
