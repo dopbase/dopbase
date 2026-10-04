@@ -84,7 +84,7 @@ async fn factory_reset_offline(
   } else {
     eprintln!("A ZIP backup will be saved next to the data directory before it is removed.");
   }
-  eprintln!("The next server start will create a fresh installation.");
+  eprintln!("Run `dopbase server setup` before starting the fresh instance.");
   if no_backup {
     eprintln!("Keep an external backup of anything you need before continuing.");
   }
@@ -114,7 +114,9 @@ async fn factory_reset_offline(
   } else {
     output::print_fields(&[("Backup:", "skipped (--no-backup)".into())]);
   }
-  output::print_text("Start Dopbase to create a fresh installation and complete first-run setup.");
+  output::print_text(
+    "Run `dopbase server setup`, then `dopbase server start`, using the same instance options.",
+  );
   Ok(())
 }
 

@@ -39,9 +39,10 @@ use crate::{
   state::{AppState, SetupState},
 };
 
-/// Build server state.
+/// Build runtime state for an initialized instance.
 pub async fn build_state(config: ServerConfig) -> Result<AppState> {
-  build_instance_state(config, true).await
+  require_initialized(&config).await?;
+  build_instance_state(config, false).await
 }
 
 /// Build state for an explicitly requested web setup or an isolated setup fixture.
@@ -62,7 +63,7 @@ pub(crate) async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient,
     .context("failed to initialize master key")?;
   let reset_marker = config.data_dir.join(".factory-reset.pending");
   if reset_marker.exists() {
-    // A reset marker is durable intent. Re-run the database phase on startup
+    // A reset marker is durable intent. Re-run the database phase during setup
     // so a process crash cannot leave a partially reset instance usable.
     let mut tx = db.pool().begin().await?;
     for table in [
@@ -289,6 +290,9 @@ async fn serve_instance(
   ready: Option<&crate::daemon::Ready>,
   setup_enabled: bool,
 ) -> Result<()> {
+  if !setup_enabled {
+    require_initialized(&config).await?;
+  }
   ensure_data_dir(&config.data_dir)?;
   let _lock = InstanceLock::acquire(&config.database_url)?;
   let state = if setup_enabled {

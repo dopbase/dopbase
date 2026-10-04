@@ -272,6 +272,7 @@ pub(crate) async fn restart(
   timeout: Duration,
   json_output: bool,
 ) -> Result<i32> {
+  crate::server::require_initialized(&config).await?;
   let stopped = stop_managed_for(Some(&config.data_dir), timeout, Some(expected)).await?;
   let started = start_managed(&config).await.map_err(|error| {
     error.context(format!(
@@ -290,6 +291,7 @@ async fn start_managed(_config: &ServerConfig) -> Result<Started> {
 
 #[cfg(unix)]
 async fn start_managed(config: &ServerConfig) -> Result<Started> {
+  crate::server::require_initialized(config).await?;
   let data_dir = &config.data_dir;
   ensure_data_dir(data_dir)?;
   let pid_path = pid_file_path(data_dir);

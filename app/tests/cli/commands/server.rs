@@ -116,7 +116,7 @@ fn help_lists_new_commands_and_explains_hidden_replaced_commands() {
     .unwrap();
   assert!(output.status.success());
   let help = String::from_utf8(output.stdout).unwrap();
-  for command in ["start", "stop", "restart", "status", "logs"] {
+  for command in ["setup", "start", "stop", "restart", "status", "logs"] {
     assert!(help.contains(command));
   }
   assert!(!help.contains("server up"));
@@ -254,10 +254,31 @@ mod background {
     ) {
       fs::write(self.directory.path().join("custom.toml"), contents).unwrap();
     }
+    fn initialize(&self) {
+      let output = self
+        .command()
+        .current_dir(self.directory.path())
+        .args([
+          "server",
+          "setup",
+          "--email",
+          "root@example.com",
+          "--config",
+          "custom.toml",
+        ])
+        .output()
+        .unwrap();
+      assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+    }
     fn start(
       &self,
       extra: &[&str],
     ) -> Value {
+      self.initialize();
       success(
         self
           .command()
@@ -305,6 +326,7 @@ mod background {
     let server = Server::new();
     let cli_port = port();
     server.config("docs = false\nport = 1\n[master_key]\npath = 'custom.key'\n");
+    server.initialize();
     let output = success(
       server
         .command()
@@ -516,6 +538,7 @@ mod background {
     let server = Server::new();
     let selected = port();
     server.config("port = 1\ndocs = false\n");
+    server.initialize();
     success(
       server
         .command()

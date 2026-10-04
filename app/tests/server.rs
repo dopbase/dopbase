@@ -1,5 +1,23 @@
 use app::server::InstanceLock;
 
+async fn initialize(config: &app::config::ServerConfig) {
+  let state = app::server::build_setup_state(config.clone())
+    .await
+    .unwrap();
+  let setup_token = state.setup.read().await.token.clone().unwrap();
+  app::modules::bootstrap::service::create(
+    &state,
+    app::modules::bootstrap::model::BootstrapAdminRequest {
+      setup_token,
+      email: "root@example.com".into(),
+      password: "fixture-password-123".into(),
+    },
+  )
+  .await
+  .unwrap();
+  state.db.close().await;
+}
+
 #[test]
 fn duplicate_instance_reports_running_server() {
   let directory = tempfile::TempDir::new().unwrap();
@@ -44,6 +62,7 @@ async fn failed_bind_does_not_create_configuration_references() {
     app::config::EnvironmentOverrides::default(),
   )
   .unwrap();
+  initialize(&config).await;
   let error = app::server::serve(config).await.unwrap_err();
   assert!(format!("{error:#}").contains("failed to bind"));
   assert!(!directory.path().join("server.toml").exists());
@@ -66,6 +85,7 @@ async fn reference_write_failure_stops_startup_with_the_affected_path() {
     app::config::EnvironmentOverrides::default(),
   )
   .unwrap();
+  initialize(&config).await;
   let error = app::server::serve(config).await.unwrap_err();
   assert!(format!("{error:#}").contains(&config_path.display().to_string()));
   assert!(!directory.path().join("config.toml").exists());
@@ -124,6 +144,16 @@ fn foreground_and_background_start_create_references_in_the_selected_locations()
       background,
       data_dir: data_dir.clone(),
     };
+    assert!(
+      command(&data_dir)
+        .args(["server", "setup", "--email", "root@example.com", "--config"])
+        .arg(&config_path)
+        .status()
+        .unwrap()
+        .success()
+    );
+    std::fs::remove_file(&config_path).unwrap();
+    std::fs::remove_file(data_dir.join("config.toml")).unwrap();
     let mut launch = command(&data_dir);
     launch.args(["server", "start", "--port", "0"]);
     if background {
