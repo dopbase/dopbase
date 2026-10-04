@@ -58,9 +58,9 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
-- Background startup prints aligned stop and restart commands that select the
-  correct data directory, including paths with spaces or apostrophes. JSON
-  output includes both `stop_command` and `restart_command`.
+- Background startup shows the short `dopbase server stop` and
+  `dopbase server restart` commands. JSON output includes both
+  `stop_command` and `restart_command`.
 
 - Direct invocation of the internal supervised server mode no longer claims a
   runtime-owned file descriptor. Readiness reporting attaches only to an

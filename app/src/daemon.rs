@@ -358,9 +358,8 @@ fn report_started(
     );
   }
 
-  let command = format!("dopbase server");
-  let stop_command = format!("{command} stop");
-  let restart_command = format!("{command} restart");
+  let stop_command = "dopbase server stop".to_owned();
+  let restart_command = "dopbase server restart".to_owned();
   if json_output {
     let mut value = serde_json::json!({
       "started": true, "version": env!("CARGO_PKG_VERSION"), "pid": started.pid,
