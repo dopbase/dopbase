@@ -6,6 +6,12 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `DOPBASE_ROOT_EMAIL` supplies the root email for `server setup`, with explicit
+  `--email` taking precedence. CLI setup generates a password without prompts;
+  web setup includes the email in its link and prefills the editable form.
+  `server setup --web --email` is now supported. Invalid email defaults fail
+  before setup writes files. `server start` still requires completed setup.
+
 - `dopbase server setup` initializes a local instance through guided root-account
   prompts or `--email` with a generated password shown once. `--json` supports
   generated-password setup. `server setup --web` runs the existing web claim
@@ -41,6 +47,10 @@ All notable changes to Dopbase are documented in this file.
   is available. Update scripts that use the previous commands.
 
 ### Fixed
+
+- Direct invocation of the internal supervised server mode no longer claims a
+  runtime-owned file descriptor. Readiness reporting attaches only to an
+  inherited write pipe, preventing reactor failures during startup rejection.
 
 - Remote CLI exports now send an explicit content length for empty POST
   requests, avoiding HTML errors from hosts that require it. The fix also
