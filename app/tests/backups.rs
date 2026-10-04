@@ -23,7 +23,7 @@ async fn test_app() -> (TempDir, app::state::AppState, Router) {
     docs_enabled: true,
     ..ServerConfig::default()
   };
-  let state = server::build_state(config).await.unwrap();
+  let state = server::build_setup_state(config).await.unwrap();
   let router = server::router(state.clone());
   (directory, state, router)
 }
@@ -418,7 +418,7 @@ async fn bootstrap_restore_lifecycle() {
     docs_enabled: true,
     ..ServerConfig::default()
   };
-  let state2 = server::build_state(config2).await.unwrap();
+  let state2 = server::build_setup_state(config2).await.unwrap();
   let router2 = server::router(state2.clone());
   let setup_token2 = state2.setup.read().await.token.clone().unwrap();
 
@@ -581,7 +581,7 @@ async fn bootstrap_restore_with_different_master_key() {
     docs_enabled: true,
     ..ServerConfig::default()
   };
-  let state2 = server::build_state(config2).await.unwrap();
+  let state2 = server::build_setup_state(config2).await.unwrap();
   let router2 = server::router(state2.clone());
   let setup_token2 = state2.setup.read().await.token.clone().unwrap();
 

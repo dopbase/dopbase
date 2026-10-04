@@ -34,7 +34,17 @@ use crate::{
   state::{AppState, SetupState},
 };
 
+/// Build server state.
 pub async fn build_state(config: ServerConfig) -> Result<AppState> {
+  build_instance_state(config, true).await
+}
+
+/// Build state for an explicitly requested web setup or an isolated setup fixture.
+pub async fn build_setup_state(config: ServerConfig) -> Result<AppState> {
+  build_instance_state(config, true).await
+}
+
+pub(crate) async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient, CryptoService)> {
   ensure_data_dir(&config.data_dir)?;
   let db = DbClient::connect(&config.database_url)
     .await
@@ -83,10 +93,18 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
     std::fs::remove_file(&reset_marker)
       .with_context(|| format!("failed to clear reset marker {}", reset_marker.display()))?;
   }
+  Ok((db, crypto))
+}
+
+async fn build_instance_state(
+  config: ServerConfig,
+  setup_enabled: bool,
+) -> Result<AppState> {
+  let (db, crypto) = prepare_instance(&config).await?;
   let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
     .fetch_one(db.pool())
     .await?;
-  let setup_token = if admin_count == 0 {
+  let setup_token = if setup_enabled && admin_count == 0 {
     Some(token::generate("setup_")?)
   } else {
     None
