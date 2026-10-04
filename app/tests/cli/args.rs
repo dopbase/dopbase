@@ -28,6 +28,17 @@ fn contextual_help(arguments: &[&str]) -> String {
 #[test]
 fn parses_every_v0_1_command_shape() {
   let commands: &[&[&str]] = &[
+    &["dopbase", "server", "setup"],
+    &["dopbase", "server", "setup", "--email", "root@example.com"],
+    &[
+      "dopbase",
+      "--json",
+      "server",
+      "setup",
+      "--email",
+      "root@example.com",
+    ],
+    &["dopbase", "server", "setup", "--web", "--port", "9000"],
     &["dopbase", "server", "start"],
     &["dopbase", "server", "start", "--data-dir", "/tmp/dopbase"],
     &["dopbase", "server", "start", "--docs"],
