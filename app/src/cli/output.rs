@@ -40,7 +40,7 @@ pub(super) fn print_success(message: &str) {
   anstream::println!("{SUCCESS}{message}{SUCCESS:#}");
 }
 
-pub(super) fn print_info(message: &str) {
+pub fn print_info(message: &str) {
   anstream::eprintln!("{INFO}Info:{INFO:#} {message}");
 }
 

@@ -6,6 +6,7 @@ use std::{fmt, path::PathBuf, str::FromStr};
 #[derive(Debug)]
 pub struct InitializationRequired {
   pub data_dir: PathBuf,
+  pub config_path: PathBuf,
 }
 
 impl fmt::Display for InitializationRequired {
@@ -15,7 +16,23 @@ impl fmt::Display for InitializationRequired {
   ) -> fmt::Result {
     write!(
       formatter,
-      "This instance has not been initialized.\nRun `dopbase server setup` first using the same --data-dir and --config options.\nData: {}",
+      concat!(
+        "This instance needs setup before it can start.\n\n",
+        "Choose a setup method:\n",
+        "  dopbase server setup\n",
+        "    Guided setup in this terminal.\n\n",
+        "  dopbase server setup --email admin@example.com\n",
+        "    Set up without prompts. A generated password will be shown once.\n\n",
+        "  dopbase server setup --web\n",
+        "    Set up through the web interface.\n\n",
+        "For custom setup, see https://docs.dopbase.com.\n\n",
+        "Use the same --data-dir and --config options for setup and start.\n\n",
+        "Server config: {}\n",
+        "Settings include the host, port, public URL, shutdown grace period, API docs, and master key file.\n",
+        "Run `dopbase server start --help` for CLI options.\n\n",
+        "Data: {}"
+      ),
+      self.config_path.display(),
       self.data_dir.display()
     )
   }
@@ -28,6 +45,7 @@ pub async fn require_initialized(config: &ServerConfig) -> Result<()> {
     return Err(
       InitializationRequired {
         data_dir: config.data_dir.clone(),
+        config_path: config.config_path.clone(),
       }
       .into(),
     );

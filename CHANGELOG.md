@@ -30,7 +30,17 @@ All notable changes to Dopbase are documented in this file.
 - A discussion publication manifest and a maintainer checklist for categories,
   pins, and the first month of community follow-up.
 
+### Improvement
+
+- Starting an uninitialized instance now shows setup methods, configuration
+  guidance, and a link to the setup documentation as an informational notice.
+
 ### Note
+
+- **Breaking:** Uninitialized background startup with `--json` now writes
+  `success = false` and `info.code = "SETUP_REQUIRED"` to stdout, replacing
+  `error.SETUP_REQUIRED` on stderr. The notice includes `message`, `data_dir`,
+  and `config_file`. Update scripts that read the previous response.
 
 - **Breaking:** Fresh and reset instances must run `dopbase server setup` before
   `server start` or `server start --background`. Normal startup no longer creates

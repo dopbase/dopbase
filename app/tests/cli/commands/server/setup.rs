@@ -42,29 +42,57 @@ async fn count(
 }
 
 #[test]
-fn uninitialized_start_rejects_every_launch_mode_without_provisioning() {
+fn uninitialized_start_shows_setup_guidance_without_provisioning() {
   let directory = TempDir::new().unwrap();
   for flags in [vec![], vec!["--background"], vec!["--supervised"]] {
     let data = directory.path().join("missing");
-    failure(
-      command(&data)
-        .args(["server", "start"])
-        .args(&flags)
-        .output()
-        .unwrap(),
-      "dopbase server setup",
+    let output = command(&data)
+      .args(["server", "start"])
+      .args(&flags)
+      .output()
+      .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let info = String::from_utf8(output.stderr).unwrap();
+    assert!(info.starts_with("Info:"), "{info}");
+    assert!(info.contains("dopbase server setup\n"), "{info}");
+    assert!(
+      info.contains("dopbase server setup --email admin@example.com"),
+      "{info}"
     );
+    assert!(info.contains("dopbase server setup --web"), "{info}");
+    assert!(info.contains("https://docs.dopbase.com"), "{info}");
+    assert!(
+      info.contains("same --data-dir and --config options"),
+      "{info}"
+    );
+    assert!(info.contains("host, port, public URL"), "{info}");
+    assert!(info.contains("server start --help"), "{info}");
+    assert!(!info.contains("Error:"), "{info}");
     assert!(!data.exists());
   }
+
   let data = directory.path().join("json-missing");
+  let config = directory.path().join("custom-server.toml");
   let output = command(&data)
-    .args(["--json", "server", "start", "--background"])
+    .args(["--json", "server", "start", "--background", "--config"])
+    .arg(&config)
     .output()
     .unwrap();
   assert_eq!(output.status.code(), Some(1));
-  assert!(output.stdout.is_empty());
-  let error: Value = serde_json::from_slice(&output.stderr).unwrap();
-  assert!(error["error"]["SETUP_REQUIRED"].is_string());
+  assert!(output.stderr.is_empty());
+  let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+  assert_eq!(value["success"], false);
+  assert_eq!(value["info"]["code"], "SETUP_REQUIRED");
+  assert!(
+    value["info"]["message"]
+      .as_str()
+      .unwrap()
+      .contains("https://docs.dopbase.com")
+  );
+  assert_eq!(value["info"]["data_dir"], data.to_str().unwrap());
+  assert_eq!(value["info"]["config_file"], config.to_str().unwrap());
+  assert!(value.get("error").is_none());
   assert!(!data.exists());
 }
 

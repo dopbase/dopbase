@@ -11,9 +11,17 @@ SQLite storage, and Admin UI.
 ## Initialize before starting
 
 A fresh or reset instance requires `dopbase server setup` before startup.
-`server start` and `server start --background` exit with an error when storage
-is uninitialized; they do not create a database, master key, or configuration
-references for a fresh instance. Existing initialized installations start as usual.
+`server start` and `server start --background` show an informational notice and
+exit with status 1 when storage is uninitialized. The notice lists setup methods,
+the selected data and configuration paths, and configuration guidance. Startup
+does not create a database, master key, or configuration references for a fresh
+instance. Existing initialized installations start as usual.
+
+With `--json`, background startup writes the notice to stdout with
+`success = false` and `info.code = "SETUP_REQUIRED"`. The `info` object also
+contains `message`, `data_dir`, and `config_file`. This replaces the previous
+`error.SETUP_REQUIRED` response on stderr. Other startup failures still report
+errors on stderr. Foreground startup does not support `--json`.
 
 See [server setup](./setup) for guided setup, generated passwords, and the
 existing web flow. `server setup --web` continues serving after setup until
