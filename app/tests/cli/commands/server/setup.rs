@@ -3,11 +3,12 @@ use app::{
   config::{EnvironmentOverrides, ServerConfig, ServerOverrides, sqlite_url},
   services::db::DbClient,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{
   fs,
   path::Path,
-  process::Stdio,
+  process::{Child, Stdio},
+  time::{Duration, Instant},
 };
 use tempfile::TempDir;
 
@@ -427,4 +428,119 @@ async fn credential_output_failure_reports_committed_initialization() {
       .unwrap(),
     "already been initialized",
   );
+}
+
+struct Running(Child);
+impl Drop for Running {
+  fn drop(&mut self) {
+    let _ = self.0.kill();
+    let _ = self.0.wait();
+  }
+}
+
+#[tokio::test]
+async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_serving() {
+  let directory = TempDir::new().unwrap();
+  let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let port = occupied.local_addr().unwrap().port();
+  drop(occupied);
+  let log_path = directory.path().join("web-output.log");
+  let mut running = Running(
+    command(directory.path())
+      .args(["server", "setup", "--web", "--port", &port.to_string()])
+      .stdout(Stdio::null())
+      .stderr(Stdio::from(fs::File::create(&log_path).unwrap()))
+      .spawn()
+      .unwrap(),
+  );
+  let client = reqwest::Client::new();
+  let base = format!("http://127.0.0.1:{port}");
+  let deadline = Instant::now() + Duration::from_secs(10);
+  loop {
+    if let Ok(response) = client.get(format!("{base}/api/v1/health")).send().await
+      && response.status().is_success()
+    {
+      break;
+    }
+    assert!(
+      running.0.try_wait().unwrap().is_none(),
+      "web setup exited before readiness"
+    );
+    assert!(Instant::now() < deadline, "web setup readiness timed out");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+  }
+  let text = fs::read_to_string(&log_path).unwrap();
+  let token = text
+    .lines()
+    .find(|line| line.starts_with("setup_"))
+    .unwrap();
+  assert!(text.contains(&format!("/setup?token={token}")));
+  assert!(
+    client
+      .get(format!("{base}/setup"))
+      .send()
+      .await
+      .unwrap()
+      .status()
+      .is_success()
+  );
+  let status: Value = client
+    .get(format!("{base}/api/v1/bootstrap/status"))
+    .send()
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+  assert_eq!(status["data"]["state"], "setupRequired");
+  let invalid = client
+    .post(format!("{base}/api/v1/bootstrap/admin"))
+    .json(
+      &json!({"setupToken":"wrong", "email":"root@example.com", "password":"fixture-password-123"}),
+    )
+    .send()
+    .await
+    .unwrap();
+  assert_eq!(invalid.status().as_u16(), 401);
+  let created = client
+    .post(format!("{base}/api/v1/bootstrap/admin"))
+    .json(
+      &json!({"setupToken":token, "email":"root@example.com", "password":"fixture-password-123"}),
+    )
+    .send()
+    .await
+    .unwrap();
+  assert_eq!(created.status().as_u16(), 201);
+  assert!(created.headers().contains_key("set-cookie"));
+  let body: Value = created.json().await.unwrap();
+  assert_eq!(body["data"]["role"], "root");
+  assert!(body["data"]["csrfToken"].is_string());
+  let login = client
+    .post(format!("{base}/api/v1/auth/login"))
+    .json(
+      &json!({"email":"root@example.com","password":"fixture-password-123","sessionKind":"cli"}),
+    )
+    .send()
+    .await
+    .unwrap();
+  assert!(login.status().is_success());
+  let status: Value = client
+    .get(format!("{base}/api/v1/bootstrap/status"))
+    .send()
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+  assert_eq!(status["data"]["state"], "ready");
+  assert!(running.0.try_wait().unwrap().is_none());
+  #[cfg(unix)]
+  {
+    nix::sys::signal::kill(
+      nix::unistd::Pid::from_raw(running.0.id() as i32),
+      nix::sys::signal::Signal::SIGTERM,
+    )
+    .unwrap();
+    assert!(running.0.wait().unwrap().success());
+  }
 }
