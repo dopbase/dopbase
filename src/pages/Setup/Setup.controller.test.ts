@@ -33,6 +33,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   routerPush.mockReset();
   routerReplace.mockReset();
+  vi.mocked(bootstrapApi.bootstrapAdmin).mockReset();
   for (const key of Object.keys(routeQuery)) delete routeQuery[key];
 });
 
@@ -52,6 +53,51 @@ describe("useSetupController", () => {
     expect(c.setupToken.value).toBe("");
     expect(routerReplace).not.toHaveBeenCalled();
   });
+  it("prefills email and token, removing both in one replacement", () => {
+    routeQuery.token = "setup_first-run-token";
+    routeQuery.email = "  ops+cloud@example.com  ";
+    routeQuery.other = "kept";
+    const c = useSetupController();
+    expect(c.setupToken.value).toBe("setup_first-run-token");
+    expect(c.email.value).toBe("ops+cloud@example.com");
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith({ query: { other: "kept" } });
+    expect(bootstrapApi.bootstrapAdmin).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, "", "  ", ["one@example.com", "two@example.com"]])(
+    "ignores an absent, blank or repeated email: %s",
+    (value) => {
+      routeQuery.email = value;
+      const c = useSetupController();
+      expect(c.email.value).toBe("");
+      expect(routerReplace).not.toHaveBeenCalled();
+    },
+  );
+
+  it("validates a prefilled email and lets the operator edit it", async () => {
+    routeQuery.email = "invalid";
+    const c = useSetupController();
+    c.setupToken.value = VALID.setupToken;
+    c.password.value = VALID.password;
+    c.confirmPassword.value = VALID.confirmPassword;
+    await c.submit();
+    expect(c.fieldErrors.value.email).toBe("Enter a valid email address.");
+    expect(bootstrapApi.bootstrapAdmin).not.toHaveBeenCalled();
+    vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "edited@example.com",
+      csrfToken: "csrf_1",
+    });
+    c.email.value = "edited@example.com";
+    await c.submit();
+    expect(bootstrapApi.bootstrapAdmin).toHaveBeenCalledWith({
+      setupToken: VALID.setupToken,
+      email: "edited@example.com",
+      password: VALID.password,
+    });
+  });
+
   it("blocks empty submissions with field errors", async () => {
     const c = useSetupController();
     await c.submit();

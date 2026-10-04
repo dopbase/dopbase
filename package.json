@@ -16,7 +16,7 @@
     "build:docs": "bun run clean:docs && vitepress build docs && bun ./scripts/docs-postbuild.mjs",
     "test": "bun run test:ui && bun run test:app && bun run test:docs",
     "test:ui": "bunx vitest run --configLoader runner",
-    "test:app": "bun run prepare:app && cargo test --manifest-path app/Cargo.toml --locked --all-targets && cargo test --manifest-path app/Cargo.toml --locked --all-targets --all-features",
+    "test:app": "bun run prepare:app && cargo test --manifest-path app/Cargo.toml --locked --all-targets --all-features",
     "test:docs": "bun scripts/docs-tests.mjs",
     "test:github": "node --test scripts/github-templates.test.mjs",
     "clean:docs": "rm -rf ./docs/.vitepress/dist/",

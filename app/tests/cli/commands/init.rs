@@ -105,3 +105,82 @@ fn zero_argument_init_explains_non_interactive_usage_before_connecting() {
   );
   assert!(stderr.contains("--from"), "{stderr}");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn init_reads_yaml_from_stdin_and_sends_string_entries() {
+  use super::support::{Fixture, output, success};
+  use reqwest::Method;
+  let fixture = Fixture::new().await;
+  let mut command = fixture.command();
+  command.args([
+    "--json",
+    "init",
+    "storefront/development",
+    "--from",
+    "-",
+    "--format",
+    "yaml",
+  ]);
+  let result = output(
+    command,
+    Some(b"API_KEY: secret-value-marker\nEMPTY: \"\"\n"),
+  )
+  .await;
+  let created = success(&result);
+  assert_eq!(created["project"]["name"], "storefront");
+  assert_eq!(created["secretCount"], 2);
+  let id = created["environmentId"].as_str().unwrap();
+  for (key, value) in [("API_KEY", "secret-value-marker"), ("EMPTY", "")] {
+    let data = fixture
+      .request(
+        Method::POST,
+        &format!("/api/v1/environments/{id}/secrets/{key}/reveal"),
+        None,
+      )
+      .await;
+    assert_eq!(data["value"], value);
+  }
+  assert!(!String::from_utf8_lossy(&result.stdout).contains("secret-value-marker"));
+  assert!(!String::from_utf8_lossy(&result.stderr).contains("secret-value-marker"));
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn guided_init_imports_and_deletes_the_source_only_after_confirmation() {
+  use super::support::{Fixture, terminal::Terminal};
+  let fixture = Fixture::new().await;
+  let working = TempDir::new().unwrap();
+  let source = working.path().join(".env");
+  std::fs::write(&source, b"API_KEY=guided-private-marker\n").unwrap();
+  let mut command = fixture.command();
+  command.current_dir(working.path()).arg("init");
+  let mut terminal = Terminal::new(command);
+  terminal.reply("Import into Dopbase?", "n\r");
+  assert!(terminal.finish().success());
+  assert!(
+    fixture
+      .json(&["project", "list"])
+      .await
+      .as_array()
+      .unwrap()
+      .is_empty()
+  );
+  assert!(source.exists());
+  let mut command = fixture.command();
+  command.current_dir(working.path()).arg("init");
+  let mut terminal = Terminal::new(command);
+  terminal.reply("Import into Dopbase?", "y\r");
+  terminal.reply("Project/environment", "guided/local\r");
+  terminal.reply("Delete .env now?", "y\r");
+  assert!(terminal.finish().success());
+  assert!(!terminal.transcript.contains("guided-private-marker"));
+  assert!(!source.exists());
+  let project = fixture.json(&["project", "show", "guided"]).await;
+  assert_eq!(project["name"], "guided");
+  let environment = fixture.json(&["env", "show", "guided/local"]).await;
+  let id = environment["id"].as_str().unwrap();
+  assert_eq!(
+    fixture.json(&["secret", "list", id]).await[0]["key"],
+    "API_KEY"
+  );
+}

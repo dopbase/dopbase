@@ -3,6 +3,7 @@ Environment variables:
   DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_ROOT_EMAIL              Root email for server setup; --email overrides it
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
   DOPBASE_HOST                    Server bind host
   DOPBASE_PORT                    Server port (default: 8840)
@@ -12,6 +13,7 @@ Environment variables:
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
 
 Quickstart:
+  dopbase server setup                     # initialize the local instance once
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server start --background        # run the server in the background (also -b)
   dopbase server stop                      # stop the background server

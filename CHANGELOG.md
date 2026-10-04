@@ -6,6 +6,17 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `DOPBASE_ROOT_EMAIL` supplies the root email for `server setup`, with explicit
+  `--email` taking precedence. CLI setup generates a password without prompts;
+  web setup includes the email in its link and prefills the editable form.
+  `server setup --web --email` is now supported. Invalid email defaults fail
+  before setup writes files. `server start` still requires completed setup.
+
+- `dopbase server setup` initializes a local instance through guided root-account
+  prompts or `--email` with a generated password shown once. `--json` supports
+  generated-password setup. `server setup --web` runs the existing web claim
+  and backup-restoration flow.
+
 - `dopbase server start --background` (or `-b`) starts a managed background
   server. `server restart` restarts it with the saved CLI and server environment
   overrides while rereading configuration.
@@ -19,7 +30,28 @@ All notable changes to Dopbase are documented in this file.
 - A discussion publication manifest and a maintainer checklist for categories,
   pins, and the first month of community follow-up.
 
+### Improvement
+
+- CLI tests now cover every public command and subcommand, with shared fixtures
+  for real server and terminal workflows. Removed repeated cases and duplicate
+  backend test runs.
+
+- Starting an uninitialized instance now shows setup methods, configuration
+  guidance, and a link to the setup documentation as an informational notice.
+
 ### Note
+
+- **Breaking:** Uninitialized background startup with `--json` now writes
+  `success = false` and `info.code = "SETUP_REQUIRED"` to stdout, replacing
+  `error.SETUP_REQUIRED` on stderr. The notice includes `message`, `data_dir`,
+  and `config_file`. Update scripts that read the previous response.
+
+- **Breaking:** Fresh and reset instances must run `dopbase server setup` before
+  `server start` or `server start --background`. Normal startup no longer creates
+  first-run storage or prints a setup token. To use browser setup or first-run
+  restore, run `dopbase server setup --web`. Existing initialized installations
+  need no setup again, and no database migration is required. `dopbase init`
+  retains its project and environment behavior.
 
 - `dopbase server up` and `dopbase server down` have been replaced by
   `server start --background` and `server stop`. The old commands show an
@@ -29,6 +61,14 @@ All notable changes to Dopbase are documented in this file.
   is available. Update scripts that use the previous commands.
 
 ### Fixed
+
+- Background startup shows the short `dopbase server stop` and
+  `dopbase server restart` commands. JSON output includes both
+  `stop_command` and `restart_command`.
+
+- Direct invocation of the internal supervised server mode no longer claims a
+  runtime-owned file descriptor. Readiness reporting attaches only to an
+  inherited write pipe, preventing reactor failures during startup rejection.
 
 - Remote CLI exports now send an explicit content length for empty POST
   requests, avoiding HTML errors from hosts that require it. The fix also

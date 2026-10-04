@@ -18,8 +18,8 @@ http://localhost:8840
 ```
 
 This default is implicit. Client commands can use it without a configuration
-file. Starting a server with `dopbase server start` or `dopbase server start --background`
-creates a missing `config.toml` with commented examples. The examples leave
+file. `dopbase server setup` creates a missing `config.toml` with commented examples.
+Startup also recreates missing reference files for an initialized instance. The examples leave
 the implicit local connection and unset default environment unchanged.
 
 If a configured remote server is unavailable, Dopbase fails clearly. It never
@@ -38,7 +38,7 @@ file together with the default server data. The CLI option takes precedence
 over the environment variable.
 
 The generated file describes every client setting with commented examples.
-Existing files stay untouched during server startup. When `client connect` or
+Existing files stay untouched during setup and server startup. When `client connect` or
 `env default` saves settings, Dopbase writes the reference at the top and the
 active settings below `# Saved client settings`. Edit active settings there
 instead of uncommenting an example for the same key.

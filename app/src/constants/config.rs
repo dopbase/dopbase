@@ -18,17 +18,19 @@ pub const ENV_HOST: &str = "DOPBASE_HOST";
 pub const ENV_MASTER_KEY_PATH: &str = "DOPBASE_MASTER_KEY_PATH";
 pub const ENV_PORT: &str = "DOPBASE_PORT";
 pub const ENV_PUBLIC_URL: &str = "DOPBASE_PUBLIC_URL";
+pub const ENV_ROOT_EMAIL: &str = "DOPBASE_ROOT_EMAIL";
 pub const ENV_RUN_ENVIRONMENT: &str = "DOPBASE_ENV";
 pub const ENV_SERVER_URL: &str = "DOPBASE_URL";
 pub const ENV_SHUTDOWN_GRACE_SECONDS: &str = "DOPBASE_SHUTDOWN_GRACE_SECONDS";
 pub const ENV_TOKEN: &str = "DOPBASE_TOKEN";
 
 /// Every environment variable read by the Dopbase executable.
-pub const fn executable_environment_names() -> [&'static str; 10] {
+pub const fn executable_environment_names() -> [&'static str; 11] {
   [
     ENV_TOKEN,
     ENV_SERVER_URL,
     ENV_RUN_ENVIRONMENT,
+    ENV_ROOT_EMAIL,
     ENV_DATA_DIR,
     ENV_HOST,
     ENV_PORT,

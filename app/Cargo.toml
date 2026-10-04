@@ -84,6 +84,9 @@ tempfile = "3"
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30", features = ["signal", "process", "fs"] }
 
+[target.'cfg(unix)'.dev-dependencies]
+nix = { version = "0.30", features = ["term"] }
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 

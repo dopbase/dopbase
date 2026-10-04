@@ -53,13 +53,22 @@ export function useSetupController() {
       confirmPassword.value === "" || password.value === confirmPassword.value,
   );
 
-  // Pre-fill the token from `?token=setup_...` (the server prints a one-click
-  // setup link on first run), then strip the secret from the address bar.
+  // Fill the setup link values, then remove them from the address bar.
+  const query = { ...route.query };
   const tokenParam = route.query.token;
+  const emailParam = route.query.email;
+  let consumedQuery = false;
   if (typeof tokenParam === "string" && tokenParam.trim() !== "") {
     setupToken.value = tokenParam.trim();
-    const query = { ...route.query };
     delete query.token;
+    consumedQuery = true;
+  }
+  if (typeof emailParam === "string" && emailParam.trim() !== "") {
+    email.value = emailParam.trim();
+    delete query.email;
+    consumedQuery = true;
+  }
+  if (consumedQuery) {
     void router.replace({ query });
   }
 

@@ -26,7 +26,7 @@ pub use project::ProjectCommand;
 pub use restore::RestoreArgs;
 pub use run::RunArgs;
 pub use secret::SecretCommand;
-pub use server::{ServerCommand, ServerLaunchArgs, ServerStartArgs};
+pub use server::{ServerCommand, ServerLaunchArgs, ServerSetupArgs, ServerStartArgs};
 pub use token::TokenCommand;
 
 #[derive(Parser, Debug)]
@@ -123,7 +123,7 @@ impl Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-  /// Start, stop, inspect, and read logs from a local Dopbase server.
+  /// Set up, start, stop, inspect, and read logs from a local Dopbase server.
   #[command(after_help = server::HELP)]
   Server {
     #[command(subcommand)]

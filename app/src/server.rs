@@ -1,3 +1,8 @@
+mod instance;
+
+pub(crate) use instance::require_uninitialized;
+pub use instance::{InitializationRequired, require_initialized};
+
 use std::{
   fs::{File, OpenOptions},
   sync::Arc,
@@ -34,7 +39,18 @@ use crate::{
   state::{AppState, SetupState},
 };
 
+/// Build runtime state for an initialized instance.
 pub async fn build_state(config: ServerConfig) -> Result<AppState> {
+  require_initialized(&config).await?;
+  build_instance_state(config, false).await
+}
+
+/// Build state for an explicitly requested web setup or an isolated setup fixture.
+pub async fn build_setup_state(config: ServerConfig) -> Result<AppState> {
+  build_instance_state(config, true).await
+}
+
+pub(crate) async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient, CryptoService)> {
   ensure_data_dir(&config.data_dir)?;
   let db = DbClient::connect(&config.database_url)
     .await
@@ -47,7 +63,7 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
     .context("failed to initialize master key")?;
   let reset_marker = config.data_dir.join(".factory-reset.pending");
   if reset_marker.exists() {
-    // A reset marker is durable intent. Re-run the database phase on startup
+    // A reset marker is durable intent. Re-run the database phase during setup
     // so a process crash cannot leave a partially reset instance usable.
     let mut tx = db.pool().begin().await?;
     for table in [
@@ -83,10 +99,18 @@ pub async fn build_state(config: ServerConfig) -> Result<AppState> {
     std::fs::remove_file(&reset_marker)
       .with_context(|| format!("failed to clear reset marker {}", reset_marker.display()))?;
   }
+  Ok((db, crypto))
+}
+
+async fn build_instance_state(
+  config: ServerConfig,
+  setup_enabled: bool,
+) -> Result<AppState> {
+  let (db, crypto) = prepare_instance(&config).await?;
   let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
     .fetch_one(db.pool())
     .await?;
-  let setup_token = if admin_count == 0 {
+  let setup_token = if setup_enabled && admin_count == 0 {
     Some(token::generate("setup_")?)
   } else {
     None
@@ -241,9 +265,23 @@ pub fn setup_token_message(
   public_url: &str,
   token: &str,
 ) -> String {
+  setup_token_message_with_email(public_url, token, None)
+}
+
+fn setup_token_message_with_email(
+  public_url: &str,
+  token: &str,
+  email: Option<&str>,
+) -> String {
   let base = public_url.trim_end_matches('/');
+  let mut query = url::form_urlencoded::Serializer::new(String::new());
+  query.append_pair("token", token);
+  if let Some(email) = email {
+    query.append_pair("email", email);
+  }
+  let query = query.finish();
   format!(
-    "\nDopbase setup token (shown once):\n{token}\n\nOr open this link to fill it in automatically:\n{base}/setup?token={token}\n"
+    "\nDopbase setup token (shown once):\n{token}\n\nOr open this link to fill it in automatically:\n{base}/setup?{query}\n"
   )
 }
 
@@ -253,9 +291,34 @@ pub async fn serve_with_ready(
   config: ServerConfig,
   ready: Option<&crate::daemon::Ready>,
 ) -> Result<()> {
+  serve_instance(config, ready, false, None).await
+}
+
+/// Run the existing foreground server with first-run web setup enabled.
+pub(crate) async fn serve_setup(
+  config: ServerConfig,
+  email: Option<&str>,
+) -> Result<()> {
+  serve_instance(config, None, true, email).await
+}
+
+async fn serve_instance(
+  config: ServerConfig,
+  ready: Option<&crate::daemon::Ready>,
+  setup_enabled: bool,
+  setup_email: Option<&str>,
+) -> Result<()> {
+  if !setup_enabled {
+    require_initialized(&config).await?;
+  }
   ensure_data_dir(&config.data_dir)?;
   let _lock = InstanceLock::acquire(&config.database_url)?;
-  let state = build_state(config).await?;
+  let state = if setup_enabled {
+    require_uninitialized(&config).await?;
+    build_setup_state(config).await?
+  } else {
+    build_state(config).await?
+  };
   let setup_token = state.setup.read().await.token.clone();
   let address = state.config.bind_addr()?;
   let grace = state.config.shutdown_grace_seconds;
@@ -292,7 +355,10 @@ pub async fn serve_with_ready(
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
   if let Some(setup) = setup_token.as_deref() {
-    eprintln!("{}", setup_token_message(public_url, setup));
+    eprintln!(
+      "{}",
+      setup_token_message_with_email(public_url, setup, setup_email)
+    );
   }
   tracing::info!(%address,"Dopbase server started");
   let serve_result = axum::serve(listener, router(state.clone()))

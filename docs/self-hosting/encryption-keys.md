@@ -19,8 +19,9 @@ This separation means that stealing the database alone should not reveal plainte
 
 Dopbase {{version}} uses a 256-bit master key in a local owner-only file. Set its
 location in `server.toml`, with `DOPBASE_MASTER_KEY_PATH`, or with the
-`--master-key-file` option. Dopbase creates the file when it initializes a new
-instance and verifies it before opening the HTTP listener.
+`--master-key-file` option. `dopbase server setup` creates a missing key when it
+initializes an instance and preserves an existing key. Startup verifies the key
+before opening the HTTP listener. Use the same key options for setup and startup.
 
 External key managers remain roadmap work. Future providers may include:
 

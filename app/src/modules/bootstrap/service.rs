@@ -32,6 +32,63 @@ pub struct CreatedAdmin {
   pub response: BootstrapAdminResponse,
   pub session_token: String,
 }
+pub(crate) struct RootCredentials {
+  pub email: String,
+  pub password_hash: String,
+}
+
+pub(crate) async fn prepare_root(
+  email: &str,
+  password: String,
+) -> Result<RootCredentials, HttpError> {
+  let email = common::validate_email(email)?;
+  common::validate_password(&password)?;
+  let password_hash = common::hash_password_async(password).await?;
+  Ok(RootCredentials {
+    email,
+    password_hash,
+  })
+}
+
+pub(crate) async fn create_root(
+  tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+  credentials: &RootCredentials,
+  now: &chrono::DateTime<Utc>,
+) -> Result<String, HttpError> {
+  let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
+    .fetch_one(&mut **tx)
+    .await?;
+  if admin_count > 0 {
+    return Err(HttpError::conflict(
+      "BOOTSTRAP_CLOSED",
+      "This instance has already been initialized.",
+    ));
+  }
+  let admin_id = token::public_id(ADMIN_ID_PREFIX);
+  repository::insert_admin(
+    tx,
+    &admin_id,
+    &credentials.email,
+    &credentials.password_hash,
+    &now.to_rfc3339(),
+  )
+  .await?;
+  common::audit(
+    &mut **tx,
+    "admin",
+    Some(&admin_id),
+    Some(&credentials.email),
+    "admin.bootstrapped",
+    None,
+    None,
+    Some("admin"),
+    Some(&admin_id),
+    serde_json::json!({}),
+  )
+  .await?;
+  Ok(admin_id)
+}
+
 pub async fn create(
   state: &AppState,
   request: BootstrapAdminRequest,
@@ -59,23 +116,13 @@ pub async fn create(
       "The setup token is invalid.",
     ));
   }
-  let hash = common::hash_password_async(request.password.clone()).await?;
-  let admin_id = token::public_id(ADMIN_ID_PREFIX);
+  let credentials = prepare_root(&email, request.password).await?;
   let session_id = token::public_id(SESSION_ID_PREFIX);
   let session_token = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;
   let csrf = token::generate(CSRF_TOKEN_PREFIX).map_err(|_| HttpError::internal())?;
   let now = Utc::now();
   let mut tx = state.db.pool().begin().await?;
-  let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
-    .fetch_one(&mut *tx)
-    .await?;
-  if admin_count > 0 {
-    return Err(HttpError::conflict(
-      "BOOTSTRAP_CLOSED",
-      "This instance has already been initialized.",
-    ));
-  }
-  repository::insert_admin(&mut tx, &admin_id, &email, &hash, &now.to_rfc3339()).await?;
+  let admin_id = create_root(&mut tx, &credentials, &now).await?;
   repository::insert_session(
     &mut tx,
     &session_id,
@@ -85,19 +132,6 @@ pub async fn create(
     &now.to_rfc3339(),
     &(now + Duration::hours(BROWSER_SESSION_IDLE_HOURS)).to_rfc3339(),
     &(now + Duration::hours(BROWSER_SESSION_ABSOLUTE_HOURS)).to_rfc3339(),
-  )
-  .await?;
-  common::audit(
-    &mut *tx,
-    "admin",
-    Some(&admin_id),
-    Some(&email),
-    "admin.bootstrapped",
-    None,
-    None,
-    Some("admin"),
-    Some(&admin_id),
-    serde_json::json!({}),
   )
   .await?;
   tx.commit().await?;

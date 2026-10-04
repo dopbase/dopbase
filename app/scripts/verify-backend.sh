@@ -4,16 +4,15 @@ set -euo pipefail
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
 
 cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets -- --test-threads=1
-cargo test --all-targets --all-features -- --test-threads=1
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-targets --all-features -- --test-threads=1
 
 # Release builds embed ../dist/ at compile time (rust-embed).
 if [[ ! -f ../dist/index.html ]]; then
   echo "error: dist/index.html not found. Run 'bun run build:ui' first." >&2
   exit 1
 fi
-cargo build --release
+cargo build --locked --release
 
 runtime_root="$(mktemp -d)"
 data_dir="${runtime_root}/data"
@@ -82,6 +81,21 @@ if (( verified_command_paths < 2 )); then
   exit 1
 fi
 
+# Normal startup must not provision a fresh instance.
+if "${binary}" --data-dir "${data_dir}" server start >"${runtime_root}/fresh-start.out" 2>&1; then
+  echo "error: uninitialized foreground startup unexpectedly succeeded" >&2
+  exit 1
+fi
+grep --quiet 'dopbase server setup' "${runtime_root}/fresh-start.out"
+test ! -e "${data_dir}"
+if "${binary}" --data-dir "${background_data_dir}" server start --background >"${runtime_root}/fresh-background.out" 2>&1; then
+  echo "error: uninitialized background startup unexpectedly succeeded" >&2
+  exit 1
+fi
+test ! -e "${background_data_dir}"
+DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" --json server setup >"${runtime_root}/setup.json"
+"${binary}" --data-dir "${background_data_dir}" --json server setup --email smoke@example.com >"${runtime_root}/background-setup.json"
+
 "${binary}" --data-dir "${data_dir}" server start \
   --docs \
   --host 127.0.0.1 \
@@ -111,6 +125,10 @@ test -f "${data_dir}/master.key"
 test -f "${data_dir}/dopbase.db.lock"
 test ! -e "${runtime_root}/dopbase.db"
 grep --quiet "Config:     ${data_dir}" "${server_log}"
+if grep --quiet 'Dopbase setup token' "${server_log}"; then
+  echo "error: runtime startup printed a setup token" >&2
+  exit 1
+fi
 
 kill -TERM "${server_pid}"
 wait "${server_pid}"

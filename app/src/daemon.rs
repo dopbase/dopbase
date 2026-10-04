@@ -72,11 +72,32 @@ pub struct Ready {
 
 impl Ready {
   /// Attach to the readiness pipe inherited from the parent command.
-  /// Returns `None` when this platform does not supervise servers.
+  /// Returns `None` when no inherited write pipe is available.
   pub fn attached() -> Option<Self> {
     #[cfg(unix)]
     {
-      use std::os::unix::io::FromRawFd;
+      use nix::libc;
+      use std::{mem::MaybeUninit, os::unix::io::FromRawFd};
+      // Only the parent's inherited write pipe belongs to this reporter.
+      // Tokio may own descriptor 3 when --supervised is invoked directly.
+      let descriptor_flags = unsafe { libc::fcntl(READY_FD, libc::F_GETFD) };
+      if descriptor_flags < 0 || descriptor_flags & libc::FD_CLOEXEC != 0 {
+        return None;
+      }
+      let mut metadata = MaybeUninit::<libc::stat>::uninit();
+      if unsafe { libc::fstat(READY_FD, metadata.as_mut_ptr()) } != 0 {
+        return None;
+      }
+      // fstat initialized metadata on success.
+      let metadata = unsafe { metadata.assume_init() };
+      let access_flags = unsafe { libc::fcntl(READY_FD, libc::F_GETFL) };
+      if metadata.st_mode & libc::S_IFMT != libc::S_IFIFO
+        || access_flags < 0
+        || access_flags & libc::O_ACCMODE != libc::O_WRONLY
+      {
+        return None;
+      }
+      // The inherited pipe is open and has no existing Rust owner in the child.
       Some(Self::for_writer(Box::new(BufWriter::new(unsafe {
         File::from_raw_fd(READY_FD)
       }))))
@@ -272,6 +293,7 @@ pub(crate) async fn restart(
   timeout: Duration,
   json_output: bool,
 ) -> Result<i32> {
+  crate::server::require_initialized(&config).await?;
   let stopped = stop_managed_for(Some(&config.data_dir), timeout, Some(expected)).await?;
   let started = start_managed(&config).await.map_err(|error| {
     error.context(format!(
@@ -290,6 +312,7 @@ async fn start_managed(_config: &ServerConfig) -> Result<Started> {
 
 #[cfg(unix)]
 async fn start_managed(config: &ServerConfig) -> Result<Started> {
+  crate::server::require_initialized(config).await?;
   let data_dir = &config.data_dir;
   ensure_data_dir(data_dir)?;
   let pid_path = pid_file_path(data_dir);
@@ -334,13 +357,15 @@ fn report_started(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let stop_command = "dopbase server stop";
+
+  let stop_command = "dopbase server stop".to_owned();
+  let restart_command = "dopbase server restart".to_owned();
   if json_output {
     let mut value = serde_json::json!({
       "started": true, "version": env!("CARGO_PKG_VERSION"), "pid": started.pid,
       "log_file": started.log_path, "pid_file": started.pid_file,
       "public_url": config.public_url, "bind_address": config.bind_address,
-      "stop_command": stop_command,
+      "stop_command": stop_command, "restart_command": restart_command,
     });
     if let Some(stopped) = stopped {
       value["restarted"] = true.into();
@@ -354,11 +379,15 @@ fn report_started(
     } else {
       "started"
     };
+    println!("Server {action} in the background.");
     println!(
-      "Server {action} in the background.\nPID:        {}\nLog:        {}\nStop with:  {}",
-      started.pid,
-      started.log_path.display(),
-      stop_command
+      "{}",
+      crate::cli::output::render_fields(&[
+        ("PID:", started.pid.to_string()),
+        ("Log:", started.log_path.display().to_string()),
+        ("Stop with:", stop_command),
+        ("Restart with:", restart_command),
+      ])
     );
     if stopped.is_some_and(|stopped| stopped.forced) {
       eprintln!("The previous server required a forced shutdown.");

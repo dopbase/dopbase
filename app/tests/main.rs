@@ -18,6 +18,7 @@ async fn test_app_with_docs(docs_enabled: bool) -> (TempDir, app::state::AppStat
   let directory = TempDir::new().unwrap();
   let database = directory.path().join("dopbase.db");
   let config = ServerConfig {
+    data_dir: directory.path().to_path_buf(),
     database_url: format!("sqlite://{}", database.display()),
     master_key: app::config::MasterKeyConfig {
       provider: "file".into(),
@@ -26,7 +27,7 @@ async fn test_app_with_docs(docs_enabled: bool) -> (TempDir, app::state::AppStat
     docs_enabled,
     ..ServerConfig::default()
   };
-  let state = server::build_state(config).await.unwrap();
+  let state = server::build_setup_state(config).await.unwrap();
   let router = server::router(state.clone());
   (directory, state, router)
 }

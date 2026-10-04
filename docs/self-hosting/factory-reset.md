@@ -76,9 +76,11 @@ need new access tokens.
 
 Factory reset does not uninstall the Dopbase binary. The Admin UI keeps the
 deployment settings and master key. The host command moves any settings and
-key stored inside the data directory, so the next start uses defaults unless
+key stored inside the data directory, so the next setup uses defaults unless
 you provide configuration elsewhere. Neither method removes files saved on
 client devices or securely erases the underlying disk.
 
-Restart the server to obtain a new setup token, then follow
-[setup and sign in](/ui/setup-and-sign-in).
+Stop any process still using the reset instance. Run `dopbase server setup`,
+then `dopbase server start`, using the same data directory and configuration
+options. For browser setup or backup restoration, use `dopbase server setup --web`.
+Normal startup rejects reset storage. See [setup and sign in](/ui/setup-and-sign-in).

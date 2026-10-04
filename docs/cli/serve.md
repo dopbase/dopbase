@@ -8,9 +8,29 @@ description: "Start, stop, restart, inspect, and read logs from a local Dopbase 
 The `dopbase server` commands manage the self-hosted HTTP server, REST API,
 SQLite storage, and Admin UI.
 
+## Initialize before starting
+
+A fresh or reset instance requires `dopbase server setup` before startup.
+`server start` and `server start --background` show an informational notice and
+exit with status 1 when storage is uninitialized. The notice lists setup methods,
+the selected data and configuration paths, and configuration guidance. Startup
+does not create a database, master key, or configuration references for a fresh
+instance. Existing initialized installations start as usual.
+
+With `--json`, background startup writes the notice to stdout with
+`success = false` and `info.code = "SETUP_REQUIRED"`. The `info` object also
+contains `message`, `data_dir`, and `config_file`. This replaces the previous
+`error.SETUP_REQUIRED` response on stderr. Other startup failures still report
+errors on stderr. Foreground startup does not support `--json`.
+
+See [server setup](./setup) for guided setup, generated passwords, and the
+existing web flow. `server setup --web` continues serving after setup until
+stopped with Ctrl+C.
+
 ## Configuration files
 
-`server start` creates missing configuration files in either mode once the
+CLI setup creates missing configuration files before creating root. Web setup
+and startup of an initialized instance create missing references once the
 listener binds successfully:
 
 - `~/.dopbase/server.toml` describes every server setting, including defaults,
@@ -22,7 +42,7 @@ All generated settings and table headers are commented out. Uncomment the
 settings you need, including the table header for nested settings. Restart
 the server after changing `server.toml`.
 
-Startup leaves existing files untouched. CLI options and environment variables
+Setup and startup leave existing files untouched. CLI options and environment variables
 apply to the current run and are not saved into the examples. `--data-dir` or
 `DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
 server config path while the client config stays in the data directory.
@@ -92,6 +112,11 @@ dopbase server start -b
 | `--docs`                             | Enable Swagger UI and the OpenAPI document   |
 | `--no-docs`                          | Disable API documentation for this run       |
 | `--master-key-file <FILE>`           | Read the server master key from another file |
+
+Startup prints stop and restart commands with the selected absolute data
+directory quoted for the shell. JSON output includes these as `stop_command`
+and `restart_command`. Use the printed commands to manage that instance from
+another working directory.
 
 Only one server can use a data directory at a time.
 
@@ -227,6 +252,6 @@ dopbase server start --docs
 
 You can also set `docs = true` in `server.toml` or `DOPBASE_DOCS=true`.
 
-Migrations run before the listener opens. New installations create a random
-master key with owner-only permissions. During shutdown, Dopbase stops new
+Migrations run before the listener opens. Explicit setup creates a random master key with owner-only permissions for
+new installations. During shutdown, Dopbase stops new
 requests, drains active requests, checkpoints SQLite, and closes the database.

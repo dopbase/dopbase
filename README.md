@@ -50,14 +50,25 @@ Dopbase keeps application secrets organized by project and environment on infras
 
 ## Quick start
 
-Install the latest release on macOS or Linux, then start a local server:
+Install the latest release on macOS or Linux, initialize the local instance, then start it:
 
 ```bash
 curl -fsSL https://dopbase.com/install.sh | sh
+dopbase server setup
 dopbase server start
 ```
 
-Open `http://localhost:8840` to finish setup in the Admin UI. The [quick-start guide](./docs/guide/quick-start.md) covers sign-in, importing a `.env` file, and running an application with its secrets.
+Without an email default, setup asks for the root email and a password with
+confirmation. Open
+`http://localhost:8840` to sign in with those credentials.
+
+On a headless host, use `dopbase server setup --email admin@example.com` and save
+its generated password. For browser setup or backup restoration, use
+`dopbase server setup --web`. You can also set `DOPBASE_ROOT_EMAIL`: CLI setup
+generates a password without prompts, while web setup prefills the email through
+its printed link. Explicit `--email` overrides the environment default.
+The [quick-start guide](./docs/guide/quick-start.md)
+covers sign-in, importing a `.env` file, and running an application with its secrets.
 
 Native release archives are available for macOS and Linux on AMD64 and ARM64.
 
@@ -69,7 +80,7 @@ Dopbase keeps application secrets in one binary: run a server, store secrets per
 Usage: dopbase [OPTIONS] <COMMAND>
 
 Commands:
-  server   Start, stop, inspect, and read logs from a local Dopbase server
+  server   Set up, start, stop, inspect, and read logs from a local Dopbase server
   client   Connect the CLI to a Dopbase server (`client connect <url>`)
   login    Authenticate with the active server
   logout   Remove the saved credential for the active server
@@ -79,7 +90,7 @@ Commands:
   env      Manage environments inside a project (create, clone, list, rename, delete)
   secret   Manage secrets in an environment (list, set, get, delete)
   import   Bulk-import secrets into an environment from a dotenv, JSON, YAML, or TOML source
-  export   Export an environment's secrets as dotenv, JSON, YAML, TOML, or a Docker env file
+  export   Export secrets as dotenv, JSON, YAML, TOML, or a Docker env file
   token    Manage CI/runner access tokens for an environment
   run      Run a command with an environment's secrets injected as env vars
   cache    Inspect and clean the encrypted runtime cache for the active server
@@ -111,6 +122,7 @@ Environment variables:
   DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
+  DOPBASE_ROOT_EMAIL              Root email for server setup; --email overrides it
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
   DOPBASE_HOST                    Server bind host
   DOPBASE_PORT                    Server port (default: 8840)
@@ -120,14 +132,14 @@ Environment variables:
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
 
 Quickstart:
+  dopbase server setup                     # initialize the local instance once
   dopbase server start                     # run a server on http://localhost:8840
   dopbase server start --background        # run the server in the background (also -b)
   dopbase server stop                      # stop the background server
-  dopbase server restart                   # restart with the saved launch settings
+  dopbase server restart                   # restart with saved launch settings
   dopbase login                            # authenticate with the active server
   dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
-  dopbase env clone myapp/dev staging      # copy secrets into a new environment
   dopbase secret set myapp/dev API_KEY --stdin
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 
@@ -137,6 +149,10 @@ Common server options:
 
 Run 'dopbase help <command>' for details on any command.
 ```
+
+Fresh or reset instances must run `server setup` before `server start`. Existing
+initialized installations do not need setup again. `init` creates a project and
+its first environment; it does not initialize the server.
 
 `server start` runs in the foreground. Add `--background` or `-b` to keep it running
 in the background. `server restart` preserves launch overrides and rereads configuration.
@@ -159,6 +175,7 @@ Project
 The server and client are built into the same `dopbase` executable:
 
 ```bash
+dopbase server setup
 dopbase server start
 dopbase login
 dopbase init
@@ -237,10 +254,16 @@ Scripts use the `action:target` pattern. The targets are `ui`, `app`, and
 | `bun run test:ui`    | Run only the Admin UI tests                 |
 | `bun run test:app`   | Run only the Rust application and CLI tests |
 
+Before the first `bun run dev` or `bun run dev:app`, initialize the development
+instance with `bun run prepare:app` followed by
+`cargo run --manifest-path app/Cargo.toml -- server setup`. Use the same
+`DOPBASE_DATA_DIR` setting for setup and development.
+
 The combined command serves the UI at `http://localhost:9000`, proxies `/api`
 requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
 `bun run build:app` and then
+`./app/target/release/dopbase server setup` once, then
 `./app/target/release/dopbase server start`. App commands build the Admin UI
 when the embedded assets are missing from a clean checkout.
 

@@ -19,7 +19,7 @@ async fn fixture() -> (TempDir, app::state::AppState, Router) {
     },
     ..ServerConfig::default()
   };
-  let state = server::build_state(config).await.unwrap();
+  let state = server::build_setup_state(config).await.unwrap();
   let router = server::router(state.clone());
   (dir, state, router)
 }

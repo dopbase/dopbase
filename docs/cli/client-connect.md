@@ -17,6 +17,7 @@ You can therefore start a default local server and sign in without running
 `connect` first:
 
 ```bash
+dopbase server setup # once for a fresh local instance
 dopbase server start
 dopbase login
 ```

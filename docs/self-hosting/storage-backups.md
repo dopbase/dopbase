@@ -74,7 +74,7 @@ Restoring replaces current database tables with the snapshot contents, verifies
 database integrity, and runs any outstanding schema migrations.
 
 - **On a running server (Admin UI)**: On the **Backups** page, click the restore icon next to any listed backup or upload a `.dop` file with **Upload Backup**. You will be prompted to confirm the restoration.
-- **During first-run setup (Admin UI)**: If you are setting up a new Dopbase server or disaster recovery host, visit `/setup`. Switch to the **Restore from Backup** tab, choose your `.dop` file, and click **Restore & initialize server**. The server decrypts and verifies the archive using its master key, populates the database, closes the initial setup window, and redirects you to sign in with the administrator credentials restored from the backup.
+- **During first-run setup (Admin UI)**: If you are setting up a new Dopbase server or disaster recovery host, run `dopbase server setup --web` and open its printed link. Switch to the **Restore from Backup** tab, choose your `.dop` file, and click **Restore & initialize server**. The server decrypts and verifies the archive using its master key, populates the database, closes the initial setup window, and redirects you to sign in with the administrator credentials restored from the backup.
 - **Via CLI**:
   ```bash
   # Interactive restore (prompts for confirmation and admin password)
@@ -86,7 +86,7 @@ database integrity, and runs any outstanding schema migrations.
 
 ### Server status requirement
 
-Backups and restorations require a live, connected server. Before initiating `dopbase backup` or `dopbase restore`, the CLI verifies that the server endpoint is reachable and responsive (`server_status: connected (live)`). If the server is offline or stopped, the operation aborts immediately with an error instructing you to start the server (`dopbase server start`) before proceeding.
+Backups and restorations require a live, connected server. Before initiating `dopbase backup` or `dopbase restore`, the CLI verifies that the server endpoint is reachable and responsive (`server_status: connected (live)`). If the server is offline or stopped, the operation aborts. Start an initialized instance with `dopbase server start`; for first-run restoration, start the setup listener with `dopbase server setup --web`.
 
 ## Backup principles
 

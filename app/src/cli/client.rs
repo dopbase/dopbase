@@ -16,6 +16,7 @@ use std::{
 #[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
   Login,
+  Setup,
   TokenInput,
   PasswordConfirmation,
   ServerSwitch,
@@ -30,6 +31,7 @@ impl fmt::Display for CliCancelled {
   ) -> fmt::Result {
     formatter.write_str(match self {
       Self::Login => "Login cancelled.",
+      Self::Setup => "Setup cancelled.",
       Self::TokenInput => "Token input cancelled.",
       Self::PasswordConfirmation => "Password confirmation cancelled.",
       Self::ServerSwitch => "Server switch cancelled.",

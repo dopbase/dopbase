@@ -17,6 +17,8 @@ the [CLI cheat sheet](./cheat-sheet).
 
 | Command                                | Purpose                             |
 | -------------------------------------- | ----------------------------------- |
+| `dopbase server setup`                 | Initialize local storage and root   |
+| `dopbase server setup --web`           | Run existing browser setup          |
 | `dopbase server start`                 | Run the server in the foreground    |
 | `dopbase server start --background`    | Start the server in the background  |
 | `dopbase server restart`               | Restart the background server       |
@@ -41,9 +43,29 @@ new endpoint. A foreground server must first be stopped with Ctrl+C. It does
 not select a project or environment, stop remote or unrelated local servers,
 or revoke browser sessions.
 
+## Server setup
+
+Run `dopbase server setup` once before starting a fresh or reset instance. It
+prompts for the root email, a masked password of 12 to 128 characters, and
+confirmation when no email default is supplied. `--email EMAIL` or
+`DOPBASE_ROOT_EMAIL` generates a password and prints it once without prompting;
+this mode also supports global `--json`. Explicit `--email` takes precedence.
+
+Setup accepts `--config` and `--master-key-file` with global `--data-dir`,
+rejects `--server`, and leaves the server stopped. It creates no client session
+and does not change the selected client endpoint. `dopbase init` remains the
+project and environment workflow.
+
+`server setup --web` starts the existing foreground web flow, including backup
+restore. It accepts the foreground listener options listed below, continues
+serving after setup, and stops with Ctrl+C. `--email` or `DOPBASE_ROOT_EMAIL`
+prefills the email through the printed setup link. Web setup rejects `--json`.
+Listener options require `--web` when used with setup.
+See [server setup](./setup) for output, recovery, and instance selection.
+
 ## Server lifecycle
 
-`server start` stays attached to the terminal and stops with Ctrl+C. On macOS
+An uninitialized instance must complete setup first. `server start` stays attached to the terminal and stops with Ctrl+C. On macOS
 and Linux, `server start --background` starts a managed background process. Use `server stop`
 to stop it, `server status` to inspect it, and `server logs` to read its output.
 `server restart` restarts a running background server with its saved CLI and
@@ -496,8 +518,9 @@ dopbase restore ./pre-upgrade.dop --key /path/to/source/master.key
 # Restore on a new server using a 64-character hex master key
 dopbase restore ./pre-upgrade.dop --key 4a2f8b9c01234567...
 
-# First-run restore requires the setup token printed by the target server
-dopbase restore ./pre-upgrade.dop --setup-token dbs_... --yes
+# First run: start `dopbase server setup --web` in another terminal
+# Use the setup token printed by that target listener
+dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
 ```
 
 | Argument / Flag         | Description                                                                                         |
@@ -518,7 +541,7 @@ dopbase restore ./pre-upgrade.dop --setup-token dbs_... --yes
   5. If `--key` was provided, re-keys restored secret metadata to the target server's existing `~/.dopbase/master.key`.
   6. Replaces SQLite database tables, runs any pending migrations, and preserves the active administrator session.
 - **On a first-run uninitialized server**:
-  - Restoring requires the one-time first-run setup token.
+  - Start its listener with `dopbase server setup --web`; restoration requires the printed one-time setup token.
 
 > [!IMPORTANT]
 > `dopbase restore` strictly requires the server to be live and connected (`server_status: connected (live)`).
@@ -550,7 +573,7 @@ root password. There is no non-interactive bypass.
 By default, the reset saves the whole data directory to a timestamped ZIP next
 to that directory, then removes the active data. The ZIP includes every
 database, master-key, configuration, backup, log, and local CLI file stored
-inside the directory. The next server start creates a fresh installation.
+inside the directory. Run `dopbase server setup` before starting the fresh instance.
 
 Pass `--no-backup` to remove the data directory without creating the ZIP. The
 same confirmation phrase and root password are still required.
