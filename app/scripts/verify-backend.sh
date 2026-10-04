@@ -5,7 +5,6 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
 
 cargo fmt --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
-cargo test --locked --all-targets -- --test-threads=1
 cargo test --locked --all-targets --all-features -- --test-threads=1
 
 # Release builds embed ../dist/ at compile time (rust-embed).
