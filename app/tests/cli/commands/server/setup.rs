@@ -195,3 +195,199 @@ fn human_generated_output_displays_password_once() {
   assert!(text.contains("dopbase server start"));
   assert!(text.contains("dopbase login"));
 }
+
+#[tokio::test]
+async fn repeated_and_competing_setup_preserve_the_first_account() {
+  let directory = TempDir::new().unwrap();
+  let data = directory.path().join("data");
+  let mut children = Vec::new();
+  for _ in 0..2 {
+    children.push(
+      command(&data)
+        .args(["--json", "server", "setup", "--email", "root@example.com"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap(),
+    );
+  }
+  let results: Vec<_> = children
+    .into_iter()
+    .map(|child| child.wait_with_output().unwrap())
+    .collect();
+  assert_eq!(
+    results
+      .iter()
+      .filter(|output| output.status.success())
+      .count(),
+    1
+  );
+  let original = fs::read(data.join("dopbase.db")).unwrap();
+  let key = fs::read(data.join("master.key")).unwrap();
+  failure(
+    command(&data)
+      .args(["server", "setup", "--email", "other@example.com"])
+      .output()
+      .unwrap(),
+    "already been initialized",
+  );
+  failure(
+    command(&data)
+      .args(["server", "setup", "--web"])
+      .output()
+      .unwrap(),
+    "already been initialized",
+  );
+  assert_eq!(fs::read(data.join("dopbase.db")).unwrap(), original);
+  assert_eq!(fs::read(data.join("master.key")).unwrap(), key);
+  let db = DbClient::connect(&sqlite_url(&data.join("dopbase.db")))
+    .await
+    .unwrap();
+  assert_eq!(count(&db, "admins").await, 1);
+  assert_eq!(count(&db, "audit_events").await, 1);
+  db.close().await;
+}
+
+#[tokio::test]
+async fn reference_write_failure_is_retryable_without_rotating_the_key() {
+  let directory = TempDir::new().unwrap();
+  let data = directory.path().join("data");
+  let blocked = directory.path().join("blocked");
+  fs::write(&blocked, "keep").unwrap();
+  let cfg = blocked.join("server.toml");
+  failure(
+    command(&data)
+      .args(["server", "setup", "--email", "root@example.com", "--config"])
+      .arg(&cfg)
+      .output()
+      .unwrap(),
+    "blocked",
+  );
+  let key = fs::read(data.join("master.key")).unwrap();
+  let db = DbClient::connect(&sqlite_url(&data.join("dopbase.db")))
+    .await
+    .unwrap();
+  assert_eq!(count(&db, "admins").await, 0);
+  db.close().await;
+  fs::remove_file(&blocked).unwrap();
+  assert!(
+    command(&data)
+      .args(["server", "setup", "--email", "root@example.com", "--config"])
+      .arg(&cfg)
+      .output()
+      .unwrap()
+      .status
+      .success()
+  );
+  assert_eq!(fs::read(data.join("master.key")).unwrap(), key);
+  assert!(cfg.exists());
+}
+
+#[test]
+fn setup_respects_the_existing_instance_lock() {
+  let directory = TempDir::new().unwrap();
+  let url = sqlite_url(&directory.path().join("dopbase.db"));
+  let _lock = app::server::InstanceLock::acquire(&url).unwrap();
+  failure(
+    command(directory.path())
+      .args(["server", "setup", "--email", "root@example.com"])
+      .output()
+      .unwrap(),
+    "instance is in use",
+  );
+  assert!(!directory.path().join("dopbase.db").exists());
+  assert!(!directory.path().join("master.key").exists());
+}
+
+#[test]
+fn corrupt_storage_is_not_treated_as_a_fresh_instance() {
+  let directory = TempDir::new().unwrap();
+  let database = directory.path().join("dopbase.db");
+  fs::write(&database, "corrupt database fixture").unwrap();
+  for args in [
+    vec!["server", "start"],
+    vec!["server", "setup", "--email", "root@example.com"],
+  ] {
+    failure(
+      command(directory.path()).args(args).output().unwrap(),
+      "failed to inspect SQLite initialization",
+    );
+    assert_eq!(
+      fs::read_to_string(&database).unwrap(),
+      "corrupt database fixture"
+    );
+    assert!(!directory.path().join("master.key").exists());
+  }
+}
+
+#[tokio::test]
+async fn incorrect_key_during_setup_preserves_uninitialized_storage() {
+  let directory = TempDir::new().unwrap();
+  let state = app::server::build_setup_state(config(directory.path()))
+    .await
+    .unwrap();
+  state.db.close().await;
+  let key = fs::read(directory.path().join("master.key")).unwrap();
+  let wrong_key = directory.path().join("wrong.key");
+  fs::write(&wrong_key, [0xff; 32]).unwrap();
+  failure(
+    command(directory.path())
+      .args([
+        "server",
+        "setup",
+        "--email",
+        "root@example.com",
+        "--master-key-file",
+      ])
+      .arg(&wrong_key)
+      .output()
+      .unwrap(),
+    "configured master key does not match",
+  );
+  assert_eq!(fs::read(directory.path().join("master.key")).unwrap(), key);
+  let db = DbClient::connect(&sqlite_url(&directory.path().join("dopbase.db")))
+    .await
+    .unwrap();
+  assert_eq!(count(&db, "admins").await, 0);
+  db.close().await;
+  generated(directory.path());
+}
+
+#[tokio::test]
+async fn only_explicit_setup_resumes_pending_factory_reset() {
+  let directory = TempDir::new().unwrap();
+  generated(directory.path());
+  let key = fs::read(directory.path().join("master.key")).unwrap();
+  let marker = directory.path().join(".factory-reset.pending");
+  fs::write(&marker, "reset in progress").unwrap();
+  fs::create_dir(directory.path().join("backups")).unwrap();
+  let backup = directory.path().join("backups/fixture.dop");
+  fs::write(&backup, "old backup fixture").unwrap();
+  failure(
+    command(directory.path())
+      .args(["server", "start"])
+      .output()
+      .unwrap(),
+    "dopbase server setup",
+  );
+  assert!(marker.exists());
+  assert!(backup.exists());
+  let output = command(directory.path())
+    .args(["server", "setup", "--email", "replacement@example.com"])
+    .output()
+    .unwrap();
+  assert!(output.status.success());
+  assert!(!marker.exists());
+  assert!(!backup.exists());
+  assert_eq!(fs::read(directory.path().join("master.key")).unwrap(), key);
+  let db = DbClient::connect(&sqlite_url(&directory.path().join("dopbase.db")))
+    .await
+    .unwrap();
+  let email: String = sqlx::query_scalar("SELECT email FROM admins")
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+  assert_eq!(email, "replacement@example.com");
+  assert_eq!(count(&db, "admins").await, 1);
+  db.close().await;
+}
