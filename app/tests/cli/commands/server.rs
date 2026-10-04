@@ -618,6 +618,81 @@ mod background {
     assert_eq!(stopped["stopped"], true);
     assert!(!pid_path.exists());
   }
+
+  #[tokio::test]
+  async fn web_ui_restart_preserves_launch_overrides_and_rereads_file_settings() {
+    for source in ["flag", "environment", "file"] {
+      let server = Server::new();
+      let selected = port();
+      server.config(&format!("port = {selected}\nweb_ui = true\n"));
+      server.initialize();
+      let mut start = server.command();
+      start.current_dir(server.directory.path()).args([
+        "--json",
+        "server",
+        "start",
+        "--background",
+        "--config",
+        "custom.toml",
+      ]);
+      match source {
+        "flag" => {
+          start.arg("--no-web-ui").env("DOPBASE_WEB_UI", "true");
+        }
+        "environment" => {
+          start.env("DOPBASE_WEB_UI", "false");
+        }
+        _ => {}
+      }
+      success(start.output().unwrap());
+      let base = format!("http://127.0.0.1:{selected}");
+      let client = reqwest::Client::new();
+      assert_eq!(
+        client.get(&base).send().await.unwrap().status().as_u16(),
+        if source == "file" { 200 } else { 404 }
+      );
+      let saved = server.pid().launch.unwrap();
+      assert_eq!(
+        saved.overrides.web_ui,
+        if source == "flag" { Some(false) } else { None }
+      );
+      assert_eq!(
+        saved.environment.web_ui.as_deref(),
+        match source {
+          "flag" => Some("true"),
+          "environment" => Some("false"),
+          _ => None,
+        }
+      );
+      // File-only launches reread this; the other launches keep their captured inputs.
+      server.config(&format!(
+        "port = {selected}\nweb_ui = {}\n",
+        source != "file"
+      ));
+      success(
+        server
+          .command()
+          .env("DOPBASE_WEB_UI", "true")
+          .args(["--json", "server", "restart"])
+          .output()
+          .unwrap(),
+      );
+      let client = reqwest::Client::new();
+      assert_eq!(
+        client.get(&base).send().await.unwrap().status().as_u16(),
+        404
+      );
+      assert!(
+        client
+          .get(format!("{base}/api/v1/health"))
+          .send()
+          .await
+          .unwrap()
+          .status()
+          .is_success()
+      );
+    }
+  }
 }
 
 #[test]
