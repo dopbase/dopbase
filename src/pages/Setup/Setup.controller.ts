@@ -54,7 +54,7 @@ export function useSetupController() {
   );
 
   // Pre-fill the token from `?token=setup_...` (the server prints a one-click
-  // setup link on first run), then strip the secret from the address bar.
+  // setup link during `server setup --web`), then strip the secret from the address bar.
   const tokenParam = route.query.token;
   if (typeof tokenParam === "string" && tokenParam.trim() !== "") {
     setupToken.value = tokenParam.trim();
