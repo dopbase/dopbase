@@ -21,6 +21,7 @@ use crate::{
 
 /// File descriptor the supervised server reports readiness on.
 const READY_FD: i32 = 3;
+pub(crate) const ENV_DAEMON_LAUNCH: &str = "DOPBASE_INTERNAL_DAEMON_LAUNCH";
 
 /// Server-only launch inputs, saved in the private PID file for restart.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,6 +32,30 @@ pub struct LaunchDescriptor {
   pub working_directory: PathBuf,
 }
 
+impl LaunchDescriptor {
+  pub(crate) fn config(&self) -> Result<ServerConfig> {
+    if self.version != 1 {
+      bail!(
+        "unsupported saved server launch version {}. Stop the server and start it again with `dopbase server start --background`",
+        self.version
+      );
+    }
+    if !self.working_directory.is_absolute() || !self.working_directory.is_dir() {
+      bail!(
+        "the original server working directory is unavailable: {}",
+        self.working_directory.display()
+      );
+    }
+    let mut config = ServerConfig::load_with_environment_at(
+      &self.overrides,
+      self.environment.clone(),
+      &self.working_directory,
+    )?;
+    config.daemonized = true;
+    config.daemon_launch = Some(self.clone());
+    Ok(config)
+  }
+}
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -231,53 +256,71 @@ pub struct Started {
   pub setup_token: Option<String>,
 }
 
-/// Start `dopbase server start` as a detached background server.
-///
-/// The foreground command validates the configuration, refuses to run when a
-/// daemon is already active for this data directory, spawns the binary again
-/// with `--supervised`, and waits for the readiness report before returning.
-#[cfg(not(unix))]
+/// Start a supervised background server and report readiness.
 pub(crate) async fn start(
-  _config: ServerConfig,
-  _flags: &[String],
-  _json_output: bool,
+  config: ServerConfig,
+  json_output: bool,
 ) -> Result<i32> {
+  let started = start_managed(&config).await?;
+  report_started(&config, &started, json_output, None);
+  Ok(0)
+}
+
+pub(crate) async fn restart(
+  config: ServerConfig,
+  expected: &PidFile,
+  timeout: Duration,
+  json_output: bool,
+) -> Result<i32> {
+  let stopped = stop_managed_for(Some(&config.data_dir), timeout, Some(expected)).await?;
+  let started = start_managed(&config).await.map_err(|error| {
+    error.context(format!(
+      "the server stopped, but restart failed. Check {}",
+      log_file_path(&config.data_dir).display()
+    ))
+  })?;
+  report_started(&config, &started, json_output, Some(&stopped));
+  Ok(0)
+}
+
+#[cfg(not(unix))]
+async fn start_managed(_config: &ServerConfig) -> Result<Started> {
   bail!("--background is only supported on macOS and Linux");
 }
 
 #[cfg(unix)]
-pub(crate) async fn start(
-  config: ServerConfig,
-  flags: &[String],
-  json_output: bool,
-) -> Result<i32> {
-  use nix::{sys::signal::kill, unistd::Pid};
-
-  let data_dir = config.data_dir.clone();
-  ensure_data_dir(&data_dir)?;
-  let pid_path = pid_file_path(&data_dir);
-  if let Ok(existing) = read_pid_file(&pid_path) {
-    if kill(Pid::from_raw(existing.pid as i32), None).is_ok() {
-      bail!(
-        "Dopbase server is already running (pid {}, data directory {}). Stop it before starting another one",
-        existing.pid,
-        data_dir.display()
-      );
-    }
-    let _ = remove_pid_file(&pid_path);
+async fn start_managed(config: &ServerConfig) -> Result<Started> {
+  let data_dir = &config.data_dir;
+  ensure_data_dir(data_dir)?;
+  let pid_path = pid_file_path(data_dir);
+  match inspect(data_dir)? {
+    ManagedDaemonState::Running(existing) => bail!(
+      "Dopbase server is already running (pid {}, data directory {}). Stop it with `dopbase server stop` before starting another one",
+      existing.pid,
+      data_dir.display()
+    ),
+    ManagedDaemonState::Stale => remove_pid_file(&pid_path)?,
+    ManagedDaemonState::Absent => {}
   }
-  // A foreground server does not write a PID file, so also check the shared
-  // database lock before spawning a detached child.
-  let _lock = crate::server::InstanceLock::acquire(&config.database_url)?;
-  drop(_lock);
-  let started = spawn(&data_dir, flags).await?;
+  // Foreground and background servers share the database lock.
+  let lock = crate::server::InstanceLock::acquire(&config.database_url)?;
+  drop(lock);
+  spawn(data_dir, config.daemon_launch.as_ref()).await
+}
+
+fn report_started(
+  config: &ServerConfig,
+  started: &Started,
+  json_output: bool,
+  stopped: Option<&Stopped>,
+) {
   if !json_output {
     anstream::eprintln!(
       "\n{}\n",
       crate::server::startup_banner(
         &config.public_url,
         &config.bind_address,
-        &data_dir,
+        &config.data_dir,
         config.docs_enabled,
       )
     );
@@ -291,37 +334,43 @@ pub(crate) async fn start(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let stop_command = "dopbase server down";
+  let stop_command = "dopbase server stop";
   if json_output {
-    print_value(
-      true,
-      &serde_json::json!({
-          "started": true,
-          "version": env!("CARGO_PKG_VERSION"),
-          "pid": started.pid,
-          "log_file": started.log_path.display().to_string(),
-          "pid_file": started.pid_file.display().to_string(),
-          "public_url": config.public_url,
-          "bind_address": config.bind_address,
-          "stop_command": stop_command,
-      }),
-    );
+    let mut value = serde_json::json!({
+      "started": true, "version": env!("CARGO_PKG_VERSION"), "pid": started.pid,
+      "log_file": started.log_path, "pid_file": started.pid_file,
+      "public_url": config.public_url, "bind_address": config.bind_address,
+      "stop_command": stop_command,
+    });
+    if let Some(stopped) = stopped {
+      value["restarted"] = true.into();
+      value["previous_pid"] = stopped.pid.into();
+      value["forced"] = stopped.forced.into();
+    }
+    print_value(true, &value);
   } else {
+    let action = if stopped.is_some() {
+      "restarted"
+    } else {
+      "started"
+    };
     println!(
-      "Server started in the background.\nPID:        {}\nLog:        {}\nStop with:  {}",
+      "Server {action} in the background.\nPID:        {}\nLog:        {}\nStop with:  {}",
       started.pid,
       started.log_path.display(),
       stop_command
     );
+    if stopped.is_some_and(|stopped| stopped.forced) {
+      eprintln!("The previous server required a forced shutdown.");
+    }
   }
-  Ok(0)
 }
 
 /// Spawn the detached server process and wait for its readiness report.
 #[cfg(unix)]
 async fn spawn(
   data_dir: &Path,
-  flags: &[String],
+  launch: Option<&LaunchDescriptor>,
 ) -> Result<Started> {
   use std::{
     io::pipe,
@@ -348,13 +397,17 @@ async fn spawn(
   let binary = std::env::current_exe().context("failed to locate the dopbase binary")?;
   let mut command = Command::new(binary);
   command
-    .args(flags)
+    .args(["server", "start", "--supervised"])
     .stdin(Stdio::null())
     .stdout(Stdio::from(log))
     .stderr(Stdio::from(log_error));
-  // Strip DOPBASE_* variables so the child resolves its configuration from
-  // the explicit flags above. Everything else (PATH, HOME, RUST_LOG, …)
-  // passes through.
+  command.env_remove(ENV_DAEMON_LAUNCH);
+  if let Some(launch) = launch {
+    command.current_dir(&launch.working_directory);
+    command.env(ENV_DAEMON_LAUNCH, serde_json::to_string(launch)?);
+  }
+  // Remove live server overrides; the child uses the captured launch inputs.
+  // Other process settings such as PATH, HOME, and RUST_LOG pass through.
   for variable in crate::constants::config::daemon_environment_names() {
     command.env_remove(variable);
   }
@@ -380,7 +433,7 @@ async fn spawn(
       });
     }
   }
-  let child = command
+  let mut child = command
     .spawn()
     .context("failed to start the background server")?;
   drop(writer);
@@ -392,15 +445,23 @@ async fn spawn(
   });
   let line = match tokio::time::timeout(READY_TIMEOUT, read).await {
     Ok(Ok(Ok(line))) if !line.trim().is_empty() => line,
-    Ok(_) => bail!(
-      "the background server exited before becoming ready. See {}",
-      log_path.display()
-    ),
-    Err(_) => bail!(
-      "the background server did not become ready within {}s. See {}",
-      READY_TIMEOUT.as_secs(),
-      log_path.display()
-    ),
+    Ok(_) => {
+      let _ = child.kill();
+      let _ = child.wait();
+      bail!(
+        "the background server exited before becoming ready. See {}",
+        log_path.display()
+      );
+    }
+    Err(_) => {
+      let _ = child.kill();
+      let _ = child.wait();
+      bail!(
+        "the background server did not become ready within {}s. See {}",
+        READY_TIMEOUT.as_secs(),
+        log_path.display()
+      );
+    }
   };
 
   let mut parts = line.split_whitespace();
@@ -419,6 +480,8 @@ async fn spawn(
     }
     Some("error") => {
       let message = line.trim().strip_prefix("error ").unwrap_or(line.trim());
+      let _ = child.kill();
+      let _ = child.wait();
       bail!("{message}. See {}", log_path.display());
     }
     _ => bail!(
@@ -440,18 +503,27 @@ async fn spawn(
 /// Reads the PID file, sends `SIGTERM` (which the server's graceful shutdown
 /// handles), waits for the process to exit, and escalates to `SIGKILL` after
 /// the grace period. Stale PID files are reported and removed.
-#[cfg(not(unix))]
 pub async fn stop_managed(
+  data_dir: Option<&Path>,
+  grace: Duration,
+) -> Result<Stopped> {
+  stop_managed_for(data_dir, grace, None).await
+}
+
+#[cfg(not(unix))]
+async fn stop_managed_for(
   _data_dir: Option<&Path>,
   _grace: Duration,
+  _expected: Option<&PidFile>,
 ) -> Result<Stopped> {
   bail!("stopping the background server is only supported on macOS and Linux");
 }
 
 #[cfg(unix)]
-pub async fn stop_managed(
+async fn stop_managed_for(
   data_dir: Option<&Path>,
   grace: Duration,
+  expected: Option<&PidFile>,
 ) -> Result<Stopped> {
   use nix::{
     errno::Errno,
@@ -474,6 +546,11 @@ pub async fn stop_managed(
       )));
     }
   };
+  if expected.is_some_and(|expected| {
+    expected.pid != pid_file.pid || expected.started_at != pid_file.started_at
+  }) {
+    bail!("the running server changed while preparing restart. Run `dopbase server restart` again");
+  }
   // The daemon holds an exclusive advisory lock on its PID file for its
   // entire lifetime. An unlocked file is stale even if its PID has since
   // been reused by an unrelated live process, so it must never be signalled.

@@ -13,7 +13,9 @@ Environment variables:
 
 Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
-  dopbase server up                        # run the server in the background
+  dopbase server start --background        # run the server in the background (also -b)
+  dopbase server stop                      # stop the background server
+  dopbase server restart                   # restart with saved launch settings
   dopbase login                            # authenticate with the active server
   dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file

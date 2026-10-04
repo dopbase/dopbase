@@ -6,6 +6,7 @@ use std::{io::Write, path::Path};
 
 const HEADING: Style = Style::new().effects(Effects::BOLD);
 const SUCCESS: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+const INFO: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
 const WARNING: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)));
 
 pub(super) fn print_json(value: &Value) -> Result<()> {
@@ -37,6 +38,10 @@ pub(super) fn print_raw(value: &str) -> Result<()> {
 
 pub(super) fn print_success(message: &str) {
   anstream::println!("{SUCCESS}{message}{SUCCESS:#}");
+}
+
+pub(super) fn print_info(message: &str) {
+  anstream::eprintln!("{INFO}Info:{INFO:#} {message}");
 }
 
 pub(super) fn print_warning(message: &str) {

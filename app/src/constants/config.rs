@@ -41,7 +41,7 @@ pub const fn executable_environment_names() -> [&'static str; 10] {
 
 /// Every `DOPBASE_*` environment variable the server configuration reads.
 /// The background server strips these from its child process so the daemon
-/// resolves its configuration from explicit command-line flags only.
+/// resolves its configuration from the captured launch inputs.
 pub const fn daemon_environment_names() -> [&'static str; 8] {
   [
     ENV_DATA_DIR,

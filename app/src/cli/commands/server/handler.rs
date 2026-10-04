@@ -1,11 +1,11 @@
 use super::{ServerCommand, ServerLaunchArgs};
 use crate::cli::output;
 use crate::{
-  config::{ServerConfig, ServerOverrides, resolve_data_dir, sqlite_url},
+  config::{EnvironmentOverrides, ServerConfig, ServerOverrides, resolve_data_dir, sqlite_url},
   constants::config::DATABASE_FILENAME,
   daemon::ManagedDaemonState,
 };
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use std::{
   path::{Path, PathBuf},
@@ -18,44 +18,91 @@ pub(crate) async fn execute(
   json_output: bool,
 ) -> Result<i32> {
   match command {
+    ServerCommand::Up(_) => migration_notice(
+      super::args::UP_MIGRATION,
+      "dopbase server start --background",
+      json_output,
+    ),
+    ServerCommand::Down { .. } => migration_notice(
+      super::args::DOWN_MIGRATION,
+      "dopbase server stop",
+      json_output,
+    ),
     ServerCommand::Start(args) => {
-      if json_output {
-        bail!("--json cannot be used with `dopbase server start`");
+      if args.background {
+        let environment = EnvironmentOverrides::read();
+        let mut overrides = launch_overrides(args.launch, data_dir, true, false);
+        let mut config = ServerConfig::load_with_environment(&overrides, environment.clone())?;
+        overrides.data_dir = Some(config.data_dir.clone());
+        overrides.config_path = Some(config.config_path.clone());
+        config.daemon_launch = Some(crate::daemon::LaunchDescriptor {
+          version: 1,
+          overrides,
+          environment,
+          working_directory: std::env::current_dir()
+            .context("failed to resolve current directory")?,
+        });
+        return crate::daemon::start(config, json_output).await;
       }
-      let supervised = args.supervised;
-      let config = load_server_config(args.launch, data_dir, false, supervised)?;
-      let ready = supervised.then(crate::daemon::Ready::attached).flatten();
-      let result = crate::server::serve_with_ready(config, ready.as_ref()).await;
+      if json_output {
+        bail!(
+          "--json cannot be used with foreground `dopbase server start`. Use `dopbase server start --background --json`"
+        );
+      }
+      let ready = args
+        .supervised
+        .then(crate::daemon::Ready::attached)
+        .flatten();
+      let result = async {
+        let config = if args.supervised {
+          match std::env::var(crate::daemon::ENV_DAEMON_LAUNCH) {
+            Ok(value) => serde_json::from_str::<crate::daemon::LaunchDescriptor>(&value)
+              .context("invalid internal server launch settings")?
+              .config()?,
+            Err(std::env::VarError::NotPresent) => {
+              load_server_config(args.launch, data_dir, false, true)?
+            }
+            Err(error) => return Err(error.into()),
+          }
+        } else {
+          load_server_config(args.launch, data_dir, false, false)?
+        };
+        crate::server::serve_with_ready(config, ready.as_ref()).await
+      }
+      .await;
       if let (Some(ready), Err(error)) = (&ready, &result) {
         ready.fail(&format!("{error:#}"));
       }
       result?;
       Ok(0)
     }
-    ServerCommand::Up(args) => {
-      let config = load_server_config(args.clone(), data_dir, true, false)?;
-      let flags = server_start_flags(&args, &config.data_dir);
-      crate::daemon::start(config, &flags, json_output).await
-    }
-    ServerCommand::Down { timeout } => {
+    ServerCommand::Stop { timeout } => {
       let resolved_data_dir = resolve_data_dir(data_dir.as_deref())?;
-      let check_foreground = matches!(
-        crate::daemon::inspect(&resolved_data_dir),
-        Ok(ManagedDaemonState::Absent | ManagedDaemonState::Stale)
-      );
-      if check_foreground
-        && crate::server::InstanceLock::is_held(&sqlite_url(
-          &resolved_data_dir.join(DATABASE_FILENAME),
-        ))?
-      {
-        bail!("the server is running in the foreground. Stop it with Ctrl+C");
-      }
+      reject_foreground(&resolved_data_dir)?;
       crate::daemon::stop(
-        data_dir.as_deref(),
+        Some(&resolved_data_dir),
         Duration::from_secs(timeout),
         json_output,
       )
       .await
+    }
+    ServerCommand::Restart { timeout } => {
+      let resolved_data_dir = resolve_data_dir(data_dir.as_deref())?;
+      reject_foreground(&resolved_data_dir)?;
+      let pid = match crate::daemon::inspect(&resolved_data_dir)? {
+        ManagedDaemonState::Running(pid) => pid,
+        ManagedDaemonState::Absent | ManagedDaemonState::Stale => bail!(
+          "the background server is stopped. Start it with `dopbase server start --background`"
+        ),
+      };
+      let launch = pid.launch.as_deref().context(
+        "this server has no saved launch settings. Run `dopbase server stop`, then start it again with `dopbase server start --background` before using restart"
+      )?;
+      let config = launch.config()?;
+      if config.data_dir != resolved_data_dir {
+        bail!("saved launch settings do not match the selected data directory");
+      }
+      crate::daemon::restart(config, &pid, Duration::from_secs(timeout), json_output).await
     }
     ServerCommand::Status => server_status(data_dir.as_deref(), json_output),
     ServerCommand::Logs {
@@ -71,13 +118,44 @@ pub(crate) async fn execute(
   }
 }
 
-fn load_server_config(
+fn migration_notice(
+  message: &str,
+  replacement: &str,
+  json_output: bool,
+) -> Result<i32> {
+  if json_output {
+    output::print_json(&json!({
+      "success": false,
+      "info": {
+        "code": "COMMAND_REPLACED",
+        "message": message,
+        "replacement": replacement,
+      },
+    }))?;
+  } else {
+    output::print_info(message);
+  }
+  Ok(1)
+}
+
+fn reject_foreground(data_dir: &Path) -> Result<()> {
+  if matches!(
+    crate::daemon::inspect(data_dir),
+    Ok(ManagedDaemonState::Absent | ManagedDaemonState::Stale)
+  ) && crate::server::InstanceLock::is_held(&sqlite_url(&data_dir.join(DATABASE_FILENAME)))?
+  {
+    bail!("the server is running in the foreground. Stop it with Ctrl+C");
+  }
+  Ok(())
+}
+
+fn launch_overrides(
   args: ServerLaunchArgs,
   data_dir: Option<PathBuf>,
   background: bool,
   supervised: bool,
-) -> Result<ServerConfig> {
-  ServerConfig::load(&ServerOverrides {
+) -> ServerOverrides {
+  ServerOverrides {
     data_dir,
     docs: args.docs(),
     background,
@@ -88,7 +166,16 @@ fn load_server_config(
     host: args.host,
     shutdown_grace_seconds: args.shutdown_grace_seconds,
     master_key_path: args.master_key_file,
-  })
+  }
+}
+
+fn load_server_config(
+  args: ServerLaunchArgs,
+  data_dir: Option<PathBuf>,
+  background: bool,
+  supervised: bool,
+) -> Result<ServerConfig> {
+  ServerConfig::load(&launch_overrides(args, data_dir, background, supervised))
 }
 
 fn server_status(
@@ -171,45 +258,4 @@ fn server_status(
       }
     }
   }
-}
-
-/// Build the argv for the detached server from the public launch options.
-fn server_start_flags(
-  args: &ServerLaunchArgs,
-  data_dir: &Path,
-) -> Vec<String> {
-  let mut flags = vec!["server".to_string(), "start".to_string()];
-  if let Some(value) = &args.config {
-    flags.push("--config".into());
-    flags.push(value.to_string_lossy().into_owned());
-  }
-  if let Some(value) = args.port {
-    flags.push("--port".into());
-    flags.push(value.to_string());
-  }
-  if let Some(value) = &args.host {
-    flags.push("--host".into());
-    flags.push(value.clone());
-  }
-  if let Some(value) = &args.public_url {
-    flags.push("--public-url".into());
-    flags.push(value.clone());
-  }
-  if let Some(value) = args.shutdown_grace_seconds {
-    flags.push("--shutdown-grace-seconds".into());
-    flags.push(value.to_string());
-  }
-  match args.docs() {
-    Some(true) => flags.push("--docs".into()),
-    Some(false) => flags.push("--no-docs".into()),
-    None => {}
-  }
-  if let Some(value) = &args.master_key_file {
-    flags.push("--master-key-file".into());
-    flags.push(value.to_string_lossy().into_owned());
-  }
-  flags.push("--data-dir".into());
-  flags.push(data_dir.to_string_lossy().into_owned());
-  flags.push("--supervised".into());
-  flags
 }
