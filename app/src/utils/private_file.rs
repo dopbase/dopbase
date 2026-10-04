@@ -17,10 +17,48 @@ pub fn write(
   contents: &[u8],
   replace: bool,
 ) -> Result<()> {
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent)?;
+  let mode = if replace {
+    ExistingFile::Replace
+  } else {
+    ExistingFile::Reject
+  };
+  write_with_mode(path, contents, mode).map(|_| ())
+}
+
+/// Create a private file atomically, leaving an existing destination untouched.
+/// Returns true when created, or false when the destination already exists.
+pub fn write_if_missing(
+  path: &Path,
+  contents: &[u8],
+) -> Result<bool> {
+  match fs::symlink_metadata(path) {
+    Ok(_) => return Ok(false),
+    Err(error) if error.kind() == ErrorKind::NotFound => {}
+    Err(error) => {
+      return Err(error).with_context(|| format!("failed to inspect {}", path.display()));
+    }
   }
-  let temporary = unique_temporary(path)?;
+  write_with_mode(path, contents, ExistingFile::Preserve)
+}
+
+#[derive(Clone, Copy)]
+enum ExistingFile {
+  Replace,
+  Reject,
+  Preserve,
+}
+
+fn write_with_mode(
+  path: &Path,
+  contents: &[u8],
+  mode: ExistingFile,
+) -> Result<bool> {
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent)
+      .with_context(|| format!("failed to create parent directory for {}", path.display()))?;
+  }
+  let temporary =
+    unique_temporary(path).with_context(|| format!("failed to write {}", path.display()))?;
   let result = (|| {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -34,12 +72,16 @@ pub fn write(
     file.sync_all()?;
     drop(file);
 
-    if replace {
+    if matches!(mode, ExistingFile::Replace) {
       replace_file(&temporary, path)?;
     } else {
       match fs::hard_link(&temporary, path) {
         Ok(()) => fs::remove_file(&temporary)?,
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+          if matches!(mode, ExistingFile::Preserve) {
+            fs::remove_file(&temporary)?;
+            return Ok(false);
+          }
           bail!(
             "{} already exists. Pass --force to overwrite it",
             path.display()
@@ -55,7 +97,7 @@ pub fn write(
     {
       File::open(parent)?.sync_all()?;
     }
-    Ok(())
+    Ok(true)
   })();
   if result.is_err() {
     let _ = fs::remove_file(&temporary);

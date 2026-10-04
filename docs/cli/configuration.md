@@ -17,8 +17,10 @@ When no server is configured, the CLI uses:
 http://localhost:8840
 ```
 
-This default is implicit. Dopbase does not need to create a configuration file
-just to connect to a server started with the default `dopbase server start` settings.
+This default is implicit. Client commands can use it without a configuration
+file. Starting a server with `dopbase server start` or `dopbase server up`
+creates a missing `config.toml` with commented examples. The examples leave
+the implicit local connection and unset default environment unchanged.
 
 If a configured remote server is unavailable, Dopbase fails clearly. It never
 falls back to localhost, Cloud, or another endpoint.
@@ -34,6 +36,12 @@ macOS and Linux: ~/.dopbase/config.toml
 Use the global `--data-dir <dir>` option or `DOPBASE_DATA_DIR` to relocate this
 file together with the default server data. The CLI option takes precedence
 over the environment variable.
+
+The generated file describes every client setting with commented examples.
+Existing files stay untouched during server startup. When `client connect` or
+`env default` saves settings, Dopbase writes the reference at the top and the
+active settings below `# Saved client settings`. Edit active settings there
+instead of uncommenting an example for the same key.
 
 The v{{version}} schema contains only non-secret client state:
 

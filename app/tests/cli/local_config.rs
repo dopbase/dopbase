@@ -26,6 +26,10 @@ fn default_environment_is_saved_as_an_id_scoped_to_the_server() {
   let server = server(&directory, "https://one.example.com");
 
   save_default_environment(&server, "env_01TEST").unwrap();
+  let contents = std::fs::read_to_string(&server.config_path).unwrap();
+  assert!(contents.starts_with("# Dopbase client configuration\n"));
+  assert!(contents.contains("# Saved client settings\n"));
+  assert!(contents.contains("# [default_environment]\n"));
   let config = read(&server.config_path).unwrap();
 
   assert_eq!(
@@ -76,6 +80,12 @@ fn clearing_only_removes_the_active_servers_default() {
   );
 
   assert!(clear_default_environment(&server).unwrap());
+  let contents = std::fs::read_to_string(&server.config_path).unwrap();
+  assert_eq!(
+    contents.matches("# Dopbase client configuration").count(),
+    1
+  );
+  assert_eq!(contents.matches("# Saved client settings").count(), 1);
   assert!(
     read(&server.config_path)
       .unwrap()
@@ -195,4 +205,40 @@ fn unsupported_schemes_and_url_metadata_are_rejected() {
       .to_string()
       .contains("must not contain a query or fragment")
   );
+}
+
+#[test]
+fn commented_client_examples_parse_without_selecting_an_example_environment() {
+  let directory = TempDir::new().unwrap();
+  let path = directory.path().join("config.toml");
+  app::cli::local_config::write(
+    &path,
+    &ClientConfig {
+      version: 1,
+      server_url: None,
+      default_environment: None,
+    },
+  )
+  .unwrap();
+  let text = std::fs::read_to_string(&path).unwrap();
+  let examples = text.split("# Saved client settings").next().unwrap();
+  assert!(toml::from_str::<toml::Table>(examples).unwrap().is_empty());
+  let uncommented = examples
+    .lines()
+    .filter_map(|line| line.strip_prefix("# "))
+    .filter(|line| {
+      line.starts_with("version = ")
+        || line.starts_with("server_url = ")
+        || line.starts_with("environment_id = ")
+        || *line == "[default_environment]"
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
+  let example: ClientConfig = toml::from_str(&uncommented).unwrap();
+  assert_eq!(example.version, 1);
+  assert_eq!(example.server_url.as_deref(), Some("http://localhost:8840"));
+  let default = example.default_environment.unwrap();
+  assert_eq!(default.server_url, "http://localhost:8840");
+  assert_eq!(default.environment_id, "env_482731");
+  assert!(read(&path).unwrap().default_environment.is_none());
 }

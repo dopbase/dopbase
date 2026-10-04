@@ -188,9 +188,12 @@ impl ApiClient {
     body: Option<Value>,
     classify_availability: bool,
   ) -> Result<Value> {
+    let empty_post = method == Method::POST && body.is_none();
     let mut request = self.request_builder(method, path);
     if let Some(body) = body {
       request = request.json(&body);
+    } else if empty_post {
+      request = request.header(reqwest::header::CONTENT_LENGTH, 0);
     }
     self.send_request(request, classify_availability).await
   }
@@ -225,14 +228,27 @@ impl ApiClient {
         AvailabilityError::new(format!("Dopbase at {} returned {status}", self.base_url)).into(),
       );
     }
-    let value: Value = if classify_availability {
-      let bytes = read_limited_response(response, MAX_RUNTIME_RESPONSE_BYTES).await?;
-      serde_json::from_slice(&bytes).context("server returned an invalid JSON response")?
+    let bytes = if classify_availability {
+      read_limited_response(response, MAX_RUNTIME_RESPONSE_BYTES).await?
     } else {
       response
-        .json()
+        .bytes()
         .await
-        .context("server returned an invalid JSON response")?
+        .context("failed to read server response body")?
+        .to_vec()
+    };
+    let value: Value = match serde_json::from_slice(&bytes) {
+      Ok(value) => value,
+      Err(_) if !status.is_success() => {
+        return Err(
+          ResponseError {
+            status,
+            message: format!("server returned {status} (non-JSON response)"),
+          }
+          .into(),
+        );
+      }
+      Err(error) => return Err(error).context("server returned an invalid JSON response"),
     };
     if !status.is_success() {
       let errors = value

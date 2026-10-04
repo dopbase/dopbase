@@ -6,10 +6,22 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- Server startup now creates missing server and client configuration files with
+  commented examples for every supported setting. Client saves include the
+  reference above active settings.
+
 - Community discussion forms, starter tutorials with verified CLI output, and
   links from the README, documentation, and issue chooser.
 - A discussion publication manifest and a maintainer checklist for categories,
   pins, and the first month of community follow-up.
+
+### Fixed
+
+- Remote CLI exports now send an explicit content length for empty POST
+  requests, avoiding HTML errors from hosts that require it. The fix also
+  applies to other CLI commands that send empty POST requests.
+- CLI errors now report the HTTP status when a server returns a non-JSON error
+  response.
 
 ## 0.1.8 - 2026-09-26
 
