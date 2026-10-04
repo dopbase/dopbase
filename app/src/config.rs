@@ -282,6 +282,24 @@ impl ServerConfig {
     }
   }
 
+  /// Create missing configuration references without changing saved settings.
+  pub fn ensure_reference_files(&self) -> Result<()> {
+    ensure_data_dir(&self.data_dir)?;
+    let mut reference = include_str!("config/server.toml")
+      .replace("{{PORT}}", &DEFAULT_PORT.to_string())
+      .replace("{{PUBLIC_URL}}", DEFAULT_PUBLIC_URL);
+    let key_path =
+      std::collections::BTreeMap::from([("path", self.data_dir.join(MASTER_KEY_FILENAME))]);
+    for line in toml::to_string(&key_path)?.lines() {
+      reference.push_str("# ");
+      reference.push_str(line);
+      reference.push('\n');
+    }
+    crate::utils::private_file::write_if_missing(&self.config_path, reference.as_bytes())?;
+    crate::cli::local_config::ensure_reference_file(&self.data_dir.join(CLIENT_CONFIG_FILENAME))?;
+    Ok(())
+  }
+
   pub fn bind_addr(&self) -> Result<SocketAddr> {
     self.bind_address.parse().context("invalid bind address")
   }

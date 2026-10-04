@@ -413,3 +413,137 @@ fn creates_owner_only_data_directory() {
     0o700
   );
 }
+
+fn uncomment_server_examples(reference: &str) -> String {
+  reference
+    .lines()
+    .filter_map(|line| line.strip_prefix("# "))
+    .filter(|line| {
+      line.starts_with("[master_key]")
+        || [
+          "version",
+          "host",
+          "port",
+          "public_url",
+          "shutdown_grace_seconds",
+          "docs",
+          "provider",
+          "path",
+        ]
+        .iter()
+        .any(|key| line.starts_with(&format!("{key} = ")))
+        || line.starts_with('"')
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+#[test]
+fn generated_references_load_defaults_and_uncommented_server_examples() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let data_dir = directory.path().join("data with 'quotes' and \\\"slashes");
+  let overrides = ServerOverrides {
+    data_dir: Some(data_dir.clone()),
+    port: Some(9000),
+    docs: Some(true),
+    master_key_path: Some(directory.path().join("temporary.key")),
+    ..Default::default()
+  };
+  let config =
+    ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap();
+  assert!(
+    !data_dir.exists(),
+    "loading configuration must stay read-only"
+  );
+  config.ensure_reference_files().unwrap();
+
+  for filename in [
+    SERVER_CONFIG_FILENAME,
+    app::constants::config::CLIENT_CONFIG_FILENAME,
+  ] {
+    let contents = fs::read_to_string(data_dir.join(filename)).unwrap();
+    assert!(
+      contents
+        .lines()
+        .all(|line| line.is_empty() || line.starts_with('#'))
+    );
+    assert!(toml::from_str::<toml::Table>(&contents).unwrap().is_empty());
+  }
+  let client = app::cli::local_config::read(&data_dir.join("config.toml")).unwrap();
+  assert_eq!(client.version, 1);
+  assert!(client.server_url.is_none());
+  assert!(client.default_environment.is_none());
+
+  let reference = fs::read_to_string(&config.config_path).unwrap();
+  assert!(!reference.contains("temporary.key"));
+  fs::write(&config.config_path, uncomment_server_examples(&reference)).unwrap();
+  let reloaded = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(data_dir.clone()),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert_eq!(reloaded.bind_address, DEFAULT_BIND_ADDRESS);
+  assert_eq!(
+    reloaded.public_url,
+    app::constants::config::DEFAULT_PUBLIC_URL
+  );
+  assert_eq!(reloaded.shutdown_grace_seconds, 10);
+  assert!(!reloaded.docs_enabled);
+  assert_eq!(reloaded.master_key.provider, "file");
+  assert_eq!(reloaded.master_key.path, data_dir.join(MASTER_KEY_FILENAME));
+}
+
+#[test]
+fn reference_creation_preserves_existing_files_and_custom_config_paths() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let data_dir = directory.path().join("data");
+  let config_path = directory.path().join("custom/server.toml");
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(data_dir.clone()),
+      config_path: Some(config_path.clone()),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  fs::create_dir_all(&data_dir).unwrap();
+  let client_path = data_dir.join("config.toml");
+  let saved_client = "# My connection\nversion = 1\nserver_url = 'https://example.com'\n";
+  fs::write(&client_path, saved_client).unwrap();
+  config.ensure_reference_files().unwrap();
+  assert!(config_path.exists());
+  assert!(!data_dir.join(SERVER_CONFIG_FILENAME).exists());
+  assert_eq!(fs::read_to_string(&client_path).unwrap(), saved_client);
+
+  let saved_server = "# My server\nport = 9123\ndocs = true\n";
+  fs::write(&config_path, saved_server).unwrap();
+  config.ensure_reference_files().unwrap();
+  assert_eq!(fs::read_to_string(config_path).unwrap(), saved_server);
+  assert_eq!(fs::read_to_string(client_path).unwrap(), saved_client);
+}
+
+#[cfg(unix)]
+#[test]
+fn generated_reference_files_are_private() {
+  use std::os::unix::fs::PermissionsExt;
+  let directory = tempfile::TempDir::new().unwrap();
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(directory.path().join("data")),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  config.ensure_reference_files().unwrap();
+  for path in [&config.config_path, &config.data_dir.join("config.toml")] {
+    assert_eq!(
+      fs::metadata(path).unwrap().permissions().mode() & 0o777,
+      0o600
+    );
+  }
+}

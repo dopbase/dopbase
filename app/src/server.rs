@@ -262,6 +262,7 @@ pub async fn serve_with_ready(
   let listener = tokio::net::TcpListener::bind(address)
     .await
     .with_context(|| format!("failed to bind {address}"))?;
+  state.config.ensure_reference_files()?;
   let daemonized = state.config.daemonized;
   let _pid_file_lock = if daemonized {
     Some(crate::daemon::write_pid_file(

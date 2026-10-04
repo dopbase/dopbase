@@ -1,0 +1,52 @@
+# Dopbase server configuration
+#
+# Uncomment a setting to change it.
+# Priority: CLI options > environment variables > this file > defaults.
+# Restart the server after editing this file.
+
+# Configuration schema version. Supported value: 1.
+# version = 1
+
+# Network interface to listen on.
+# Default: "127.0.0.1" (local connections only).
+# Examples: "localhost", "0.0.0.0", "192.168.1.20".
+# Use "0.0.0.0" to listen on all IPv4 interfaces.
+# Environment: DOPBASE_HOST
+# host = "127.0.0.1"
+
+# Port to listen on.
+# Default: {{PORT}}. Example: 9000.
+# Environment: DOPBASE_PORT
+# port = {{PORT}}
+
+# Address clients use to reach this server.
+# Accepts an absolute HTTP or HTTPS URL.
+# Examples: "http://localhost:9000", "https://dopbase.example.com".
+# When omitted, local binds use http://localhost:<port>.
+# Network binds show http://SERVER_HOST:<port> until you set this.
+# Environment: DOPBASE_PUBLIC_URL
+# public_url = "{{PUBLIC_URL}}"
+
+# Seconds to wait for in-flight requests during shutdown.
+# Accepts: 1 to 300. Default: 10.
+# Environment: DOPBASE_SHUTDOWN_GRACE_SECONDS
+# shutdown_grace_seconds = 10
+
+# Enable Swagger UI at /api/docs.
+# Accepts: true or false. Default: false.
+# Environment: DOPBASE_DOCS
+# docs = false
+
+# Master encryption key settings.
+# Uncomment the table header before enabling settings below.
+# [master_key]
+
+# Key storage provider. Supported value: "file".
+# provider = "file"
+
+# Location of the master encryption key file.
+# Default: master.key inside the selected data directory.
+# Accepts an absolute path, a ~/ path, or a path relative
+# to the directory where Dopbase starts.
+# Example: "/etc/dopbase/master.key".
+# Environment: DOPBASE_MASTER_KEY_PATH
