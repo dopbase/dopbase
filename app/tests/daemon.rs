@@ -224,3 +224,16 @@ async fn stop_never_signals_a_live_process_from_an_unowned_stale_pid_file() {
   unrelated.kill().unwrap();
   let _ = unrelated.wait();
 }
+
+#[test]
+fn saved_launch_settings_without_web_ui_remain_compatible() {
+  let launch: app::daemon::LaunchDescriptor = serde_json::from_value(serde_json::json!({
+    "version": 1,
+    "overrides": {"background": true, "supervised": false},
+    "environment": {},
+    "working_directory": "/tmp"
+  }))
+  .unwrap();
+  assert_eq!(launch.overrides.web_ui, None);
+  assert_eq!(launch.environment.web_ui, None);
+}

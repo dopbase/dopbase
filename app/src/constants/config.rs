@@ -14,6 +14,7 @@ pub const DAEMON_LOG_FILENAME: &str = "serve.log";
 
 pub const ENV_DATA_DIR: &str = "DOPBASE_DATA_DIR";
 pub const ENV_DOCS: &str = "DOPBASE_DOCS";
+pub const ENV_WEB_UI: &str = "DOPBASE_WEB_UI";
 pub const ENV_HOST: &str = "DOPBASE_HOST";
 pub const ENV_MASTER_KEY_PATH: &str = "DOPBASE_MASTER_KEY_PATH";
 pub const ENV_PORT: &str = "DOPBASE_PORT";
@@ -25,7 +26,7 @@ pub const ENV_SHUTDOWN_GRACE_SECONDS: &str = "DOPBASE_SHUTDOWN_GRACE_SECONDS";
 pub const ENV_TOKEN: &str = "DOPBASE_TOKEN";
 
 /// Every environment variable read by the Dopbase executable.
-pub const fn executable_environment_names() -> [&'static str; 11] {
+pub const fn executable_environment_names() -> [&'static str; 12] {
   [
     ENV_TOKEN,
     ENV_SERVER_URL,
@@ -36,6 +37,7 @@ pub const fn executable_environment_names() -> [&'static str; 11] {
     ENV_PORT,
     ENV_PUBLIC_URL,
     ENV_DOCS,
+    ENV_WEB_UI,
     ENV_MASTER_KEY_PATH,
     ENV_SHUTDOWN_GRACE_SECONDS,
   ]
@@ -44,10 +46,11 @@ pub const fn executable_environment_names() -> [&'static str; 11] {
 /// Every `DOPBASE_*` environment variable the server configuration reads.
 /// The background server strips these from its child process so the daemon
 /// resolves its configuration from the captured launch inputs.
-pub const fn daemon_environment_names() -> [&'static str; 8] {
+pub const fn daemon_environment_names() -> [&'static str; 9] {
   [
     ENV_DATA_DIR,
     ENV_DOCS,
+    ENV_WEB_UI,
     ENV_HOST,
     ENV_MASTER_KEY_PATH,
     ENV_PORT,
