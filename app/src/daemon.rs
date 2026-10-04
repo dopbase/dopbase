@@ -357,8 +357,8 @@ fn report_started(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let data_dir = config.data_dir.to_string_lossy().replace("'", "'\\''");
-  let command = format!("dopbase --data-dir '{data_dir}' server");
+
+  let command = format!("dopbase server");
   let stop_command = format!("{command} stop");
   let restart_command = format!("{command} restart");
   if json_output {
