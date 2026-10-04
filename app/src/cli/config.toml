@@ -1,0 +1,30 @@
+# Dopbase client configuration
+#
+# Uncomment a setting to change it.
+# Priority: --server > DOPBASE_URL > server_url > localhost default.
+# Server settings belong in server.toml.
+# When saved settings appear below, edit those instead of uncommenting examples.
+
+# Configuration schema version. Supported value: 1.
+# version = 1
+
+# Server used by client commands.
+# Default when omitted: "{{PUBLIC_URL}}".
+# Examples: "http://localhost:9000", "https://dopbase.example.com".
+# Save a connection with: dopbase client connect <URL>
+# server_url = "{{PUBLIC_URL}}"
+
+# Optional default environment for dopbase run.
+# No environment is selected by default.
+# Save it with: dopbase env default <ENVIRONMENT_REF>
+# Clear it with: dopbase env default --clear
+#
+# Uncomment the table header and both settings to configure it manually.
+# [default_environment]
+
+# Server that owns this environment.
+# The default is used only when this matches the active server URL.
+# server_url = "{{PUBLIC_URL}}"
+
+# Immutable environment ID. This value is an example.
+# environment_id = "env_482731"

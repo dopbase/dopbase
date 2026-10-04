@@ -122,6 +122,15 @@ pub fn clear_default_environment(server: &ResolvedServer) -> Result<bool> {
   write(&server.config_path, &config)?;
   Ok(true)
 }
+fn reference() -> String {
+  include_str!("config.toml").replace("{{PUBLIC_URL}}", DEFAULT_PUBLIC_URL)
+}
+
+pub(crate) fn ensure_reference_file(path: &Path) -> Result<()> {
+  crate::utils::private_file::write_if_missing(path, reference().as_bytes())?;
+  Ok(())
+}
+
 pub fn write(
   path: &Path,
   config: &ClientConfig,
@@ -129,7 +138,11 @@ pub fn write(
   if let Some(parent) = path.parent() {
     ensure_data_dir(parent)?;
   }
-  let text = toml::to_string_pretty(config)?;
+  let text = format!(
+    "{}\n# Saved client settings\n{}",
+    reference(),
+    toml::to_string_pretty(config)?
+  );
   crate::utils::private_file::write(path, text.as_bytes(), true)
 }
 pub fn normalize(value: &str) -> Result<String> {
