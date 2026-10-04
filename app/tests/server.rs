@@ -74,7 +74,7 @@ async fn reference_write_failure_stops_startup_with_the_affected_path() {
 
 #[cfg(unix)]
 #[test]
-fn start_and_up_create_references_in_the_selected_locations() {
+fn foreground_and_background_start_create_references_in_the_selected_locations() {
   use std::{
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -106,27 +106,28 @@ fn start_and_up_create_references_in_the_selected_locations() {
         let _ = child.wait();
       }
       if self.background {
-        let _ = command(&self.data_dir).args(["server", "down"]).status();
+        let _ = command(&self.data_dir).args(["server", "stop"]).status();
       }
     }
   }
 
-  for mode in ["start", "up"] {
+  for background in [false, true] {
     let directory = tempfile::TempDir::new().unwrap();
     let data_dir = directory.path().join("data");
-    let config_path = if mode == "up" {
+    let config_path = if background {
       directory.path().join("custom/server.toml")
     } else {
       data_dir.join("server.toml")
     };
     let mut running = RunningServer {
       child: None,
-      background: mode == "up",
+      background,
       data_dir: data_dir.clone(),
     };
     let mut launch = command(&data_dir);
-    launch.args(["server", mode, "--port", "0"]);
-    if mode == "up" {
+    launch.args(["server", "start", "--port", "0"]);
+    if background {
+      launch.arg("--background");
       launch.arg("--config").arg(&config_path);
       assert!(
         launch.status().unwrap().success(),
@@ -163,7 +164,7 @@ fn start_and_up_create_references_in_the_selected_locations() {
         .unwrap()
         .starts_with("# Dopbase client configuration\n")
     );
-    if mode == "up" {
+    if background {
       assert!(!data_dir.join("server.toml").exists());
     }
     drop(running);
