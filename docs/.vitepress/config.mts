@@ -267,6 +267,7 @@ const config = defineConfig({
         {
           text: "Server & Connections",
           items: [
+            { text: "Server setup", link: "/cli/setup" },
             { text: "Server lifecycle", link: "/cli/serve" },
             { text: "Client connect", link: "/cli/client-connect" },
           ],
