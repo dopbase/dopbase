@@ -6,6 +6,11 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `dopbase server setup` initializes a local instance through guided root-account
+  prompts or `--email` with a generated password shown once. `--json` supports
+  generated-password setup. `server setup --web` runs the existing web claim
+  and backup-restoration flow.
+
 - `dopbase server start --background` (or `-b`) starts a managed background
   server. `server restart` restarts it with the saved CLI and server environment
   overrides while rereading configuration.
@@ -20,6 +25,13 @@ All notable changes to Dopbase are documented in this file.
   pins, and the first month of community follow-up.
 
 ### Note
+
+- **Breaking:** Fresh and reset instances must run `dopbase server setup` before
+  `server start` or `server start --background`. Normal startup no longer creates
+  first-run storage or prints a setup token. To use browser setup or first-run
+  restore, run `dopbase server setup --web`. Existing initialized installations
+  need no setup again, and no database migration is required. `dopbase init`
+  retains its project and environment behavior.
 
 - `dopbase server up` and `dopbase server down` have been replaced by
   `server start --background` and `server stop`. The old commands show an
