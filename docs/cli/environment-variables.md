@@ -15,7 +15,7 @@ precedence over values in `server.toml`.
 | `DOPBASE_URL`                    | `https://dopbase.example.com` | Selects the server for client commands when the global `--server` option is not set.                                                                                                       |
 | `DOPBASE_ENV`                    | `payment-service/production`  | Selects the environment for `dopbase run` when no positional environment is given. An immutable ID such as `env_482731` also works.                                                        |
 | `DOPBASE_DATA_DIR`               | `/srv/dopbase`                | Changes the directory used for server data and local CLI configuration. The default is `~/.dopbase`.                                                                                       |
-| `DOPBASE_HOST`                   | `0.0.0.0`                     | Sets the network interface used by `dopbase server start` and `dopbase server start --background`. The default is `127.0.0.1`.                                                             |
+| `DOPBASE_HOST`                   | `0.0.0.0`                     | Sets the network interface used by `dopbase server start`, `dopbase server start --background`, and `dopbase server setup --web`. The default is `127.0.0.1`.                              |
 | `DOPBASE_PORT`                   | `9000`                        | Sets the server port. The default is `8840`.                                                                                                                                               |
 | `DOPBASE_PUBLIC_URL`             | `https://dopbase.example.com` | Sets the URL shown to clients and used in generated links. Without it, a network bind uses a detected HTTP address and prints a warning.                                                   |
 | `DOPBASE_DOCS`                   | `true`                        | Enables or disables Swagger UI and the OpenAPI document. Accepted values are `true` and `false`. The default is `false`.                                                                   |
@@ -43,6 +43,7 @@ export DOPBASE_PORT=9000
 export DOPBASE_PUBLIC_URL=https://dopbase.example.com
 export DOPBASE_MASTER_KEY_PATH=/run/secrets/dopbase-master-key
 
+dopbase server setup
 dopbase server start
 ```
 
