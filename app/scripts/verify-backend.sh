@@ -94,7 +94,7 @@ if "${binary}" --data-dir "${background_data_dir}" server start --background >"$
   exit 1
 fi
 test ! -e "${background_data_dir}"
-"${binary}" --data-dir "${data_dir}" --json server setup --email smoke@example.com >"${runtime_root}/setup.json"
+DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" --json server setup >"${runtime_root}/setup.json"
 "${binary}" --data-dir "${background_data_dir}" --json server setup --email smoke@example.com >"${runtime_root}/background-setup.json"
 
 "${binary}" --data-dir "${data_dir}" server start \
