@@ -51,8 +51,17 @@ fn cache_paths(server: &ResolvedServer) -> (PathBuf, PathBuf, PathBuf) {
   )
 }
 
-async fn resolve_handler(State(mode): State<Arc<AtomicU8>>) -> impl IntoResponse {
+async fn resolve_handler(State(mode): State<Arc<AtomicU8>>) -> axum::response::Response {
   match mode.load(Ordering::SeqCst) {
+    7 => {
+      return (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "<html>proxy-error-marker</html>",
+      )
+        .into_response();
+    }
+    8 => return (StatusCode::UNAUTHORIZED, "proxy-error-marker").into_response(),
+    9 => return (StatusCode::OK, "<html>proxy-error-marker</html>").into_response(),
     1 => (
       StatusCode::SERVICE_UNAVAILABLE,
       Json(json!({"error":{"SERVER_UNAVAILABLE":"try later"}})),
@@ -67,6 +76,7 @@ async fn resolve_handler(State(mode): State<Arc<AtomicU8>>) -> impl IntoResponse
     ),
     _ => (StatusCode::OK, Json(json!({"data":{"id":"env_01CACHE"}}))),
   }
+  .into_response()
 }
 
 async fn runtime_handler(State(mode): State<Arc<AtomicU8>>) -> impl IntoResponse {
@@ -191,6 +201,28 @@ async fn live_fetch_refreshes_encrypted_cache_and_falls_back_only_on_availabilit
         0o600
       );
     }
+  }
+
+  mode.store(7, Ordering::SeqCst);
+  let cached_from_proxy_error = runtime_cache::load(&server, &api, "payment-service/development")
+    .await
+    .unwrap();
+  assert!(matches!(
+    cached_from_proxy_error.source,
+    RuntimeSource::Cache { .. }
+  ));
+
+  for (response_mode, expected_error) in [
+    (8, "server returned 401 Unauthorized (non-JSON response)"),
+    (9, "server returned an invalid JSON response"),
+  ] {
+    mode.store(response_mode, Ordering::SeqCst);
+    let error = runtime_cache::load(&server, &api, "payment-service/development")
+      .await
+      .unwrap_err();
+    let message = format!("{error:#}");
+    assert!(message.contains(expected_error), "{message}");
+    assert!(!message.contains("proxy-error-marker"));
   }
 
   mode.store(2, Ordering::SeqCst);
