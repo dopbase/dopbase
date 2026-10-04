@@ -114,7 +114,7 @@ operational state. If the server is stopped or disconnected, the CLI halts and g
 to start the server:
 
 ```bash
-dopbase server up
+dopbase server start --background
 ```
 
 ---

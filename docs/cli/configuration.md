@@ -18,7 +18,7 @@ http://localhost:8840
 ```
 
 This default is implicit. Client commands can use it without a configuration
-file. Starting a server with `dopbase server start` or `dopbase server up`
+file. Starting a server with `dopbase server start` or `dopbase server start --background`
 creates a missing `config.toml` with commented examples. The examples leave
 the implicit local connection and unset default environment unchanged.
 

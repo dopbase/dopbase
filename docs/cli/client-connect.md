@@ -58,7 +58,7 @@ session, and clear the saved default environment. There is no non-interactive
 bypass.
 
 If a foreground `dopbase server start` process is using the same data directory, stop
-it with Ctrl+C before switching. A `dopbase server up` process representing
+it with Ctrl+C before switching. A `dopbase server start --background` process representing
 the current endpoint is stopped automatically after confirmation. Remote
 servers, unrelated local servers, and browser sessions are never stopped or
 revoked.
