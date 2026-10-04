@@ -391,3 +391,40 @@ async fn only_explicit_setup_resumes_pending_factory_reset() {
   assert_eq!(count(&db, "admins").await, 1);
   db.close().await;
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn credential_output_failure_reports_committed_initialization() {
+  let directory = TempDir::new().unwrap();
+  let (read, write) = nix::unistd::pipe().unwrap();
+  drop(read);
+  let output = command(directory.path())
+    .args(["--json", "server", "setup", "--email", "root@example.com"])
+    .stdout(Stdio::from(write))
+    .stderr(Stdio::piped())
+    .spawn()
+    .unwrap()
+    .wait_with_output()
+    .unwrap();
+  assert_eq!(output.status.code(), Some(1));
+  let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+  assert_eq!(error["initialized"], true);
+  assert!(
+    error["error"]["CLI_ERROR"]
+      .as_str()
+      .unwrap()
+      .contains("dopbase admin reset-password")
+  );
+  let db = DbClient::connect(&sqlite_url(&directory.path().join("dopbase.db")))
+    .await
+    .unwrap();
+  assert_eq!(count(&db, "admins").await, 1);
+  db.close().await;
+  failure(
+    command(directory.path())
+      .args(["server", "setup", "--email", "root@example.com"])
+      .output()
+      .unwrap(),
+    "already been initialized",
+  );
+}
