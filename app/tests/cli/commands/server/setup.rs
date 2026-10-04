@@ -544,3 +544,170 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     assert!(running.0.wait().unwrap().success());
   }
 }
+
+#[cfg(unix)]
+mod guided {
+  use super::*;
+  use nix::{
+    fcntl::{FcntlArg, OFlag, fcntl},
+    pty::{Winsize, openpty},
+  };
+  use std::{
+    io::{Read, Write},
+    os::unix::process::CommandExt,
+  };
+
+  struct Terminal {
+    process: Running,
+    master: fs::File,
+    transcript: String,
+  }
+  impl Terminal {
+    fn new(data: &Path) -> Self {
+      let pty = openpty(
+        Some(&Winsize {
+          ws_row: 40,
+          ws_col: 120,
+          ws_xpixel: 0,
+          ws_ypixel: 0,
+        }),
+        None,
+      )
+      .unwrap();
+      let slave = fs::File::from(pty.slave);
+      let master = fs::File::from(pty.master);
+      fcntl(&master, FcntlArg::F_SETFL(OFlag::O_NONBLOCK)).unwrap();
+      let mut cmd = command(data);
+      cmd
+        .env("TERM", "xterm")
+        .args(["server", "setup"])
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::from(slave));
+      unsafe {
+        cmd.pre_exec(|| {
+          nix::unistd::setsid().map_err(std::io::Error::from)?;
+          if nix::libc::ioctl(0, nix::libc::TIOCSCTTY as _, 0) == -1 {
+            return Err(std::io::Error::last_os_error());
+          }
+          Ok(())
+        });
+      }
+      Self {
+        process: Running(cmd.spawn().unwrap()),
+        master,
+        transcript: String::new(),
+      }
+    }
+    fn read(&mut self) {
+      let mut buf = [0; 8192];
+      if let Ok(n) = self.master.read(&mut buf) {
+        let chunk = String::from_utf8_lossy(&buf[..n]);
+        if chunk.contains("\x1b[6n") {
+          self.master.write_all(b"\x1b[1;1R").unwrap();
+        }
+        self.transcript.push_str(&chunk);
+      }
+    }
+    fn wait_for(
+      &mut self,
+      expected: &str,
+      from: usize,
+    ) {
+      let deadline = Instant::now() + Duration::from_secs(10);
+      loop {
+        self.read();
+        if self.transcript[from..].contains(expected) {
+          return;
+        }
+        assert!(
+          self.process.0.try_wait().unwrap().is_none(),
+          "guided setup exited before expected prompt"
+        );
+        assert!(
+          Instant::now() < deadline,
+          "guided setup prompt timed out: {expected}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+      }
+    }
+    fn send(
+      &mut self,
+      value: &str,
+    ) -> usize {
+      let from = self.transcript.len();
+      self.master.write_all(value.as_bytes()).unwrap();
+      from
+    }
+    fn finish(&mut self) -> std::process::ExitStatus {
+      let deadline = Instant::now() + Duration::from_secs(10);
+      loop {
+        self.read();
+        if let Some(status) = self.process.0.try_wait().unwrap() {
+          self.read();
+          return status;
+        }
+        assert!(Instant::now() < deadline, "guided setup exit timed out");
+        std::thread::sleep(Duration::from_millis(10));
+      }
+    }
+  }
+
+  #[tokio::test]
+  async fn guided_setup_validates_email_password_boundaries_and_confirmation() {
+    let directory = TempDir::new().unwrap();
+    let mut terminal = Terminal::new(directory.path());
+    terminal.wait_for("Root email:", 0);
+    let from = terminal.send("invalid\r");
+    terminal.wait_for("valid email", from);
+    let from = terminal.send(&format!("{}ROOT@EXAMPLE.COM\r", "\x7f".repeat(7)));
+    terminal.wait_for("Root password:", from);
+    let from = terminal.send("short\r");
+    terminal.wait_for("at least 12", from);
+    let from = terminal.send(&format!("{}{}\r", "\x7f".repeat(5), "x".repeat(129)));
+    terminal.wait_for("at most 128", from);
+    let password = "fixture-pw12";
+    let from = terminal.send(&format!("{}{password}\r", "\x7f".repeat(129)));
+    terminal.wait_for("Confirm root password:", from);
+    let from = terminal.send("different-password\r");
+    terminal.wait_for("Passwords do not match", from);
+    let from = terminal.send(&format!("{password}\r"));
+    terminal.wait_for("Confirm root password:", from);
+    terminal.send(&format!("{password}\r"));
+    assert!(terminal.finish().success());
+    assert!(!terminal.transcript.contains(password));
+    assert!(!terminal.transcript.contains("different-password"));
+    let db = DbClient::connect(&sqlite_url(&directory.path().join("dopbase.db")))
+      .await
+      .unwrap();
+    let (email, hash): (String, String) = sqlx::query_as("SELECT email,password_hash FROM admins")
+      .fetch_one(db.pool())
+      .await
+      .unwrap();
+    assert_eq!(email, "root@example.com");
+    assert!(
+      argon2::PasswordVerifier::verify_password(
+        &argon2::Argon2::default(),
+        password.as_bytes(),
+        &argon2::PasswordHash::new(&hash).unwrap()
+      )
+      .is_ok()
+    );
+    assert_eq!(count(&db, "sessions").await, 0);
+    db.close().await;
+  }
+
+  #[test]
+  fn cancelling_guided_password_leaves_no_account_or_storage() {
+    let directory = TempDir::new().unwrap();
+    let data = directory.path().join("missing");
+    let mut terminal = Terminal::new(&data);
+    terminal.wait_for("Root email:", 0);
+    let from = terminal.send("root@example.com\r");
+    terminal.wait_for("Root password:", from);
+    terminal.send("\x03");
+    assert_eq!(terminal.finish().code(), Some(130));
+    assert!(terminal.transcript.contains("Setup cancelled."));
+    assert!(!data.exists());
+  }
+}
