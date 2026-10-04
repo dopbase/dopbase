@@ -121,7 +121,9 @@ Environment variables:
 
 Quickstart:
   dopbase server start                     # run a server on http://localhost:8840
-  dopbase server up                        # run the server in the background
+  dopbase server start --background        # run the server in the background (also -b)
+  dopbase server stop                      # stop the background server
+  dopbase server restart                   # restart with the saved launch settings
   dopbase login                            # authenticate with the active server
   dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
@@ -135,6 +137,12 @@ Common server options:
 
 Run 'dopbase help <command>' for details on any command.
 ```
+
+`server start` runs in the foreground. Add `--background` or `-b` to keep it running
+in the background. `server restart` preserves launch overrides and rereads configuration.
+`server up` and `server down` have been replaced by `server start --background`
+and `server stop`. The old commands show an informational migration notice and
+exit with status 1 without starting or stopping a server.
 
 ## Why Dopbase
 
