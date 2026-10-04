@@ -13,12 +13,24 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  config::{ServerConfig, ensure_data_dir, resolve_data_dir},
+  config::{
+    EnvironmentOverrides, ServerConfig, ServerOverrides, ensure_data_dir, resolve_data_dir,
+  },
   constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME},
 };
 
 /// File descriptor the supervised server reports readiness on.
 const READY_FD: i32 = 3;
+
+/// Server-only launch inputs, saved in the private PID file for restart.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LaunchDescriptor {
+  pub version: u32,
+  pub overrides: ServerOverrides,
+  pub environment: EnvironmentOverrides,
+  pub working_directory: PathBuf,
+}
+
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -106,6 +118,8 @@ pub struct PidFile {
   pub bind_address: String,
   #[serde(default)]
   pub public_url: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub launch: Option<Box<LaunchDescriptor>>,
 }
 
 impl PidFile {
@@ -155,12 +169,23 @@ pub fn write_pid_file(
   bind_address: &str,
   public_url: &str,
 ) -> Result<File> {
+  write_pid_file_with_launch(path, pid, bind_address, public_url, None)
+}
+
+pub(crate) fn write_pid_file_with_launch(
+  path: &Path,
+  pid: u32,
+  bind_address: &str,
+  public_url: &str,
+  launch: Option<LaunchDescriptor>,
+) -> Result<File> {
   let payload = PidFile {
     pid,
     started_at: chrono::Utc::now().to_rfc3339(),
     version: env!("CARGO_PKG_VERSION").to_string(),
     bind_address: bind_address.to_string(),
     public_url: Some(public_url.to_string()),
+    launch: launch.map(Box::new),
   };
   let json = serde_json::to_string_pretty(&payload)?;
   crate::utils::private_file::write(path, json.as_bytes(), true)?;

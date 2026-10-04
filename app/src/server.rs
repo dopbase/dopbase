@@ -265,11 +265,12 @@ pub async fn serve_with_ready(
   state.config.ensure_reference_files()?;
   let daemonized = state.config.daemonized;
   let _pid_file_lock = if daemonized {
-    Some(crate::daemon::write_pid_file(
+    Some(crate::daemon::write_pid_file_with_launch(
       &crate::daemon::pid_file_path(&state.config.data_dir),
       std::process::id(),
       &state.config.bind_address,
       &state.config.public_url,
+      state.config.daemon_launch.clone(),
     )?)
   } else {
     None
