@@ -325,7 +325,12 @@ mod background {
 
   #[tokio::test]
   async fn restart_preserves_overrides_and_relative_paths_while_rereading_configuration() {
-    let server = Server::new();
+    let server = Server {
+      directory: tempfile::Builder::new()
+        .prefix("dopbase's instance $HOME ")
+        .tempdir()
+        .unwrap(),
+    };
     let cli_port = port();
     server.config("docs = false\nport = 1\n[master_key]\npath = 'custom.key'\n");
     server.initialize();
@@ -351,7 +356,21 @@ mod background {
         .output()
         .unwrap(),
     );
-    assert_eq!(output["stop_command"], "dopbase server stop");
+    let hinted_command = |field: &str| {
+      let hint = output[field].as_str().unwrap();
+      let mut command = Command::new("sh");
+      for name in executable_environment_names() {
+        command.env_remove(name);
+      }
+      command.env_remove("DOPBASE_INTERNAL_DAEMON_LAUNCH");
+      command.env("NO_COLOR", "1");
+      command.env("DOPBASE_TEST_BINARY", env!("CARGO_BIN_EXE_dopbase"));
+      command.args([
+        "-c",
+        &format!("dopbase() {{ \"$DOPBASE_TEST_BINARY\" \"$@\"; }}\n{hint} --json"),
+      ]);
+      command
+    };
     let before = server.pid();
     assert_eq!(before.bind_address, format!("127.0.0.1:{cli_port}"));
     let path = daemon::pid_file_path(&server.data());
@@ -419,12 +438,10 @@ mod background {
     server.config("docs = true\nport = 1\n[master_key]\npath = 'custom.key'\n");
     let other = TempDir::new().unwrap();
     let restart = success(
-      server
-        .command()
+      hinted_command("restart_command")
         .current_dir(other.path())
         .env("DOPBASE_PORT", "invalid")
         .env("DOPBASE_HOST", "invalid")
-        .args(["--json", "server", "restart"])
         .output()
         .unwrap(),
     );
@@ -448,9 +465,8 @@ mod background {
       key
     );
     let stopped = success(
-      server
-        .command()
-        .args(["--json", "server", "stop"])
+      hinted_command("stop_command")
+        .current_dir(other.path())
         .output()
         .unwrap(),
     );

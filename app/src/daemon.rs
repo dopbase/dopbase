@@ -357,13 +357,16 @@ fn report_started(
       crate::server::setup_token_message(&config.public_url, token)
     );
   }
-  let stop_command = "dopbase server stop";
+  let data_dir = config.data_dir.to_string_lossy().replace("'", "'\\''");
+  let command = format!("dopbase --data-dir '{data_dir}' server");
+  let stop_command = format!("{command} stop");
+  let restart_command = format!("{command} restart");
   if json_output {
     let mut value = serde_json::json!({
       "started": true, "version": env!("CARGO_PKG_VERSION"), "pid": started.pid,
       "log_file": started.log_path, "pid_file": started.pid_file,
       "public_url": config.public_url, "bind_address": config.bind_address,
-      "stop_command": stop_command,
+      "stop_command": stop_command, "restart_command": restart_command,
     });
     if let Some(stopped) = stopped {
       value["restarted"] = true.into();
@@ -377,11 +380,15 @@ fn report_started(
     } else {
       "started"
     };
+    println!("Server {action} in the background.");
     println!(
-      "Server {action} in the background.\nPID:        {}\nLog:        {}\nStop with:  {}",
-      started.pid,
-      started.log_path.display(),
-      stop_command
+      "{}",
+      crate::cli::output::render_fields(&[
+        ("PID:", started.pid.to_string()),
+        ("Log:", started.log_path.display().to_string()),
+        ("Stop with:", stop_command),
+        ("Restart with:", restart_command),
+      ])
     );
     if stopped.is_some_and(|stopped| stopped.forced) {
       eprintln!("The previous server required a forced shutdown.");

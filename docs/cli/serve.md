@@ -113,6 +113,11 @@ dopbase server start -b
 | `--no-docs`                          | Disable API documentation for this run       |
 | `--master-key-file <FILE>`           | Read the server master key from another file |
 
+Startup prints stop and restart commands with the selected absolute data
+directory quoted for the shell. JSON output includes these as `stop_command`
+and `restart_command`. Use the printed commands to manage that instance from
+another working directory.
+
 Only one server can use a data directory at a time.
 
 ## Check status
