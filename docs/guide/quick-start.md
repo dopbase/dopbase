@@ -8,9 +8,10 @@ description: "Install Dopbase, start a local secrets server, import an existing 
 This walkthrough installs Dopbase {{version}}, starts a local server, imports an
 existing `.env` file, and runs an application with its secrets.
 
-::: warning Fresh install required
-Dopbase {{version}} expects a fresh data directory. Databases and backups from earlier
-releases are not supported. Keep the matching `master.key` with every backup.
+::: warning Backup compatibility
+Databases and backups from unsupported earlier releases cannot be used. Keep the
+matching `master.key` with every backup. This command change requires no database
+migration; already initialized instances do not need setup again.
 :::
 
 ## 1. Install Dopbase
@@ -39,7 +40,24 @@ Set `DOPBASE_INSTALL_DIR` to choose another directory and
 `DOPBASE_REPOSITORY_URL`. An explicit
 `DOPBASE_DOWNLOAD_BASE_URL` still overrides the complete release download path.
 
-## 2. Start the server
+## 2. Set up the server
+
+Initialize the local instance once:
+
+```bash
+dopbase server setup
+```
+
+Enter the root email, a password of 12 to 128 characters, and its confirmation.
+Setup exits without starting a server or signing you in. On a headless host,
+`dopbase server setup --email admin@example.com` generates a password and prints
+it once. Save that password before closing the terminal.
+
+Use `dopbase server setup --web` to keep the existing browser setup and backup
+restoration flow. See [server setup](/cli/setup) for the alternatives and custom
+instance options.
+
+## 3. Start the server
 
 ```bash
 dopbase server start
@@ -52,18 +70,19 @@ Dopbase
 Secure, Simple and Private
 Version {{version}}
 
+Public URL: http://localhost:8840
+Bind:       127.0.0.1:8840
 Admin UI:   http://localhost:8840
 API:        http://localhost:8840/api/v1
 Config:     ~/.dopbase
 ```
 
-The same address serves the Admin UI in a browser. The first visit walks you
-through claiming the server with the setup token. The [Admin UI guide](/ui/)
-covers every screen.
+The same address serves the Admin UI in a browser. Sign in with the root
+credentials created during setup. The [Admin UI guide](/ui/) covers every screen.
 
 Keep this process running while you use the client.
 
-## 3. Confirm the client configuration
+## 4. Confirm the client configuration
 
 Open another terminal. With no configured server, Dopbase uses the local
 default automatically:
@@ -86,7 +105,7 @@ No repository or global config file is required for the implicit local server.
 Use `dopbase client connect <server-url>` when targeting another local or
 self-hosted instance.
 
-## 4. Sign in
+## 5. Sign in
 
 ```bash
 dopbase login
@@ -95,7 +114,7 @@ dopbase login
 `login` authenticates with the resolved server and saves the token in the
 encrypted local session file.
 
-## 5. Bootstrap a project
+## 6. Initialize a project
 
 From an application directory with an existing `.env` file:
 
@@ -109,7 +128,7 @@ Dopbase shows the variable count and asks for a new target such as
 transaction and stores every `.env` entry as an encrypted secret. After the
 import, it asks whether to delete `.env`, with Yes selected by default.
 
-## 6. Run the application
+## 7. Run the application
 
 Use the readable environment reference while developing:
 

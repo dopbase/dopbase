@@ -8,10 +8,11 @@ description: "Run Dopbase as a self-hosted secrets manager with one executable, 
 Dopbase runs as one self-hosted executable with SQLite storage and an embedded Admin UI.
 
 ```bash
+dopbase server setup
 dopbase server start
 ```
 
-The command starts the service with local defaults. Operators still need to configure networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.
+Setup initializes the instance once. Startup runs that initialized instance with local defaults. On a headless host, use `dopbase server setup --email admin@example.com` and save the generated password. See [server setup](/cli/setup). Operators still need to configure networking, TLS, master-key storage, backups, monitoring, upgrades, and recovery.
 
 ## What you operate
 
