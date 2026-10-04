@@ -8,9 +8,21 @@ description: "Start, stop, restart, inspect, and read logs from a local Dopbase 
 The `dopbase server` commands manage the self-hosted HTTP server, REST API,
 SQLite storage, and Admin UI.
 
+## Initialize before starting
+
+A fresh or reset instance requires `dopbase server setup` before startup.
+`server start` and `server start --background` exit with an error when storage
+is uninitialized; they do not create a database, master key, or configuration
+references for a fresh instance. Existing initialized installations start as usual.
+
+See [server setup](./setup) for guided setup, generated passwords, and the
+existing web flow. `server setup --web` continues serving after setup until
+stopped with Ctrl+C.
+
 ## Configuration files
 
-`server start` creates missing configuration files in either mode once the
+CLI setup creates missing configuration files before creating root. Web setup
+and startup of an initialized instance create missing references once the
 listener binds successfully:
 
 - `~/.dopbase/server.toml` describes every server setting, including defaults,
@@ -22,7 +34,7 @@ All generated settings and table headers are commented out. Uncomment the
 settings you need, including the table header for nested settings. Restart
 the server after changing `server.toml`.
 
-Startup leaves existing files untouched. CLI options and environment variables
+Setup and startup leave existing files untouched. CLI options and environment variables
 apply to the current run and are not saved into the examples. `--data-dir` or
 `DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
 server config path while the client config stays in the data directory.
@@ -227,6 +239,6 @@ dopbase server start --docs
 
 You can also set `docs = true` in `server.toml` or `DOPBASE_DOCS=true`.
 
-Migrations run before the listener opens. New installations create a random
-master key with owner-only permissions. During shutdown, Dopbase stops new
+Migrations run before the listener opens. Explicit setup creates a random master key with owner-only permissions for
+new installations. During shutdown, Dopbase stops new
 requests, drains active requests, checkpoints SQLite, and closes the database.
