@@ -18,8 +18,9 @@ the [CLI cheat sheet](./cheat-sheet).
 | Command                                | Purpose                             |
 | -------------------------------------- | ----------------------------------- |
 | `dopbase server start`                 | Run the server in the foreground    |
-| `dopbase server up`                    | Start the server in the background  |
-| `dopbase server down`                  | Stop the background server          |
+| `dopbase server start --background`    | Start the server in the background  |
+| `dopbase server restart`               | Restart the background server       |
+| `dopbase server stop`                  | Stop the background server          |
 | `dopbase server status`                | Check the local server process      |
 | `dopbase server logs`                  | Read background server logs         |
 | `dopbase client connect <server-url>`  | Validate and save another server    |
@@ -43,14 +44,18 @@ or revoke browser sessions.
 ## Server lifecycle
 
 `server start` stays attached to the terminal and stops with Ctrl+C. On macOS
-and Linux, `server up` starts a managed background process. Use `server down`
+and Linux, `server start --background` starts a managed background process. Use `server stop`
 to stop it, `server status` to inspect it, and `server logs` to read its output.
-See [server lifecycle](./serve) for options and examples.
+`server restart` restarts a running background server with its saved CLI and
+environment overrides while rereading configuration. It accepts `--timeout`
+(default 10 seconds). Stop and start again to change explicit launch overrides.
+See [server lifecycle](./serve) for options, migration steps, and examples.
 
-`server start` and `server up` accept the same launch options:
+`server start` accepts these options in either mode:
 
 | Option                               | Purpose                                     |
 | ------------------------------------ | ------------------------------------------- |
+| `--background`, `-b`                 | Run a managed background server             |
 | `--config <FILE>`                    | Read a different server configuration file  |
 | `--host <HOST>`                      | Bind to an IP address, default `127.0.0.1`  |
 | `--port <PORT>`                      | Listen on a port, default `8840`            |
@@ -59,12 +64,16 @@ See [server lifecycle](./serve) for options and examples.
 | `--docs` / `--no-docs`               | Enable or disable API documentation         |
 | `--master-key-file <FILE>`           | Read the master key from another file       |
 
-`server down --timeout <SECONDS>` waits 10 seconds by default. `server logs`
+`server stop --timeout <SECONDS>` waits 10 seconds by default. `server logs`
 accepts `--lines <COUNT>` (default 100), `--watch` or `-w`, and `--clean`.
 `--clean --watch` clears the existing log before waiting for new output.
 
-The old `serve`, `serve --background`, and `stop` commands are not supported.
-Use `server start`, `server up`, and `server down` respectively.
+`server up` and `server down` have been replaced by `server start --background`
+and `server stop`. The old commands show an informational migration notice and
+exit with status 1 without starting or stopping a server.
+
+The old top-level `serve`, `serve --background`, and `stop` commands are not supported.
+Use `server start`, `server start --background`, and `server stop` respectively.
 
 ## Check for updates
 
