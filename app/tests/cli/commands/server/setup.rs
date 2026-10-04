@@ -92,6 +92,10 @@ fn setup_rejects_invalid_modes_before_creating_state() {
     ),
     (vec!["server", "setup", "--email", "invalid"], "valid email"),
     (
+      vec!["server", "setup", "--web", "--email", "invalid"],
+      "valid email",
+    ),
+    (
       vec![
         "server",
         "setup",
@@ -113,11 +117,7 @@ fn setup_rejects_invalid_modes_before_creating_state() {
     assert!(String::from_utf8_lossy(&output.stderr).contains(message));
     assert!(!data.exists());
   }
-  for args in [
-    vec!["server", "setup", "--web", "--email", "root@example.com"],
-    vec!["server", "setup", "--background"],
-    vec!["setup"],
-  ] {
+  for args in [vec!["server", "setup", "--background"], vec!["setup"]] {
     assert_eq!(
       command(&data).args(args).output().unwrap().status.code(),
       Some(2)
@@ -128,73 +128,211 @@ fn setup_rejects_invalid_modes_before_creating_state() {
 
 #[tokio::test]
 async fn generated_setup_creates_one_root_and_audit_without_sessions_or_login() {
-  let directory = TempDir::new().unwrap();
-  let data = directory.path().join("instance");
-  let result = generated(&data);
-  assert_eq!(result["initialized"], true);
-  assert_eq!(result["email"], "root@example.com");
-  assert_eq!(result["data_dir"], data.to_str().unwrap());
-  let password = result["password"].as_str().unwrap();
-  assert_eq!(password.len(), 43);
-  let db = DbClient::connect(&sqlite_url(&data.join("dopbase.db")))
-    .await
-    .unwrap();
-  let (id, email, hash, role): (String, String, String, String) =
-    sqlx::query_as("SELECT id,email,password_hash,role FROM admins")
-      .fetch_one(db.pool())
+  for environment in [None, Some("  ROOT@EXAMPLE.COM  ")] {
+    let directory = TempDir::new().unwrap();
+    let data = directory.path().join("instance");
+    let result = match environment {
+      None => generated(&data),
+      Some(email) => success(
+        command(&data)
+          .env("DOPBASE_ROOT_EMAIL", email)
+          .args(["--json", "server", "setup"])
+          .stdin(Stdio::null())
+          .output()
+          .unwrap(),
+      ),
+    };
+    assert_eq!(result["initialized"], true);
+    assert_eq!(result["email"], "root@example.com");
+    assert_eq!(result["data_dir"], data.to_str().unwrap());
+    let password = result["password"].as_str().unwrap();
+    assert_eq!(password.len(), 43);
+    let db = DbClient::connect(&sqlite_url(&data.join("dopbase.db")))
       .await
       .unwrap();
-  assert_eq!(result["admin_id"], id);
-  assert_eq!(email, "root@example.com");
-  assert_eq!(role, "root");
-  assert!(
-    argon2::PasswordVerifier::verify_password(
-      &argon2::Argon2::default(),
-      password.as_bytes(),
-      &argon2::PasswordHash::new(&hash).unwrap()
-    )
-    .is_ok()
-  );
-  assert_eq!(count(&db, "admins").await, 1);
-  assert_eq!(count(&db, "sessions").await, 0);
-  let events: i64 =
-    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='admin.bootstrapped'")
-      .fetch_one(db.pool())
-      .await
-      .unwrap();
-  assert_eq!(events, 1);
-  db.close().await;
-  let runtime = app::server::build_state(config(&data)).await.unwrap();
-  assert!(runtime.setup.read().await.token.is_none());
-  runtime.db.close().await;
-  assert!(!data.join("serve.log").exists());
-  assert!(!data.join("dopbase.pid").exists());
-  for name in ["server.toml", "config.toml"] {
-    let contents = fs::read_to_string(data.join(name)).unwrap();
-    assert!(!contents.contains(password));
-    assert!(!contents.contains("root@example.com"));
+    let (id, email, hash, role): (String, String, String, String) =
+      sqlx::query_as("SELECT id,email,password_hash,role FROM admins")
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(result["admin_id"], id);
+    assert_eq!(email, "root@example.com");
+    assert_eq!(role, "root");
+    assert!(
+      argon2::PasswordVerifier::verify_password(
+        &argon2::Argon2::default(),
+        password.as_bytes(),
+        &argon2::PasswordHash::new(&hash).unwrap()
+      )
+      .is_ok()
+    );
+    assert_eq!(count(&db, "admins").await, 1);
+    assert_eq!(count(&db, "sessions").await, 0);
+    let events: i64 =
+      sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='admin.bootstrapped'")
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+    assert_eq!(events, 1);
+    db.close().await;
+    let runtime = app::server::build_state(config(&data)).await.unwrap();
+    assert!(runtime.setup.read().await.token.is_none());
+    runtime.db.close().await;
+    assert!(!data.join("serve.log").exists());
+    assert!(!data.join("dopbase.pid").exists());
+    for name in ["server.toml", "config.toml"] {
+      let contents = fs::read_to_string(data.join(name)).unwrap();
+      assert!(!contents.contains(password));
+      assert!(!contents.contains("root@example.com"));
+    }
   }
 }
 
 #[test]
 fn human_generated_output_displays_password_once() {
+  for environment in [false, true] {
+    let directory = TempDir::new().unwrap();
+    let mut cmd = command(directory.path());
+    cmd.args(["server", "setup"]);
+    if environment {
+      cmd.env("DOPBASE_ROOT_EMAIL", "root@example.com");
+    } else {
+      cmd.args(["--email", "root@example.com"]);
+    }
+    let output = cmd
+      .stdin(Stdio::null())
+      .env("RUST_LOG", "debug")
+      .output()
+      .unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    let password = text
+      .lines()
+      .find_map(|line| line.strip_prefix("Password (shown once): "))
+      .unwrap();
+    assert_eq!(password.len(), 43);
+    assert_eq!(text.matches(password).count(), 1);
+    assert!(!String::from_utf8_lossy(&output.stderr).contains(password));
+    assert!(text.contains("dopbase server start"));
+    assert!(text.contains("dopbase login"));
+  }
+}
+
+#[test]
+fn environment_email_validation_and_blank_fallback_create_no_files() {
   let directory = TempDir::new().unwrap();
-  let output = command(directory.path())
-    .args(["server", "setup", "--email", "root@example.com"])
-    .env("RUST_LOG", "debug")
-    .output()
-    .unwrap();
-  assert!(output.status.success());
-  let text = String::from_utf8(output.stdout).unwrap();
-  let password = text
-    .lines()
-    .find_map(|line| line.strip_prefix("Password (shown once): "))
-    .unwrap();
-  assert_eq!(password.len(), 43);
-  assert_eq!(text.matches(password).count(), 1);
-  assert!(!String::from_utf8_lossy(&output.stderr).contains(password));
-  assert!(text.contains("dopbase server start"));
-  assert!(text.contains("dopbase login"));
+  let data = directory.path().join("missing");
+  for email in ["", "  ", "invalid", "a@", "a@b@example.com"] {
+    for web in [false, true] {
+      if web && email.trim().is_empty() {
+        continue;
+      }
+      let mut cmd = command(&data);
+      cmd
+        .env("DOPBASE_ROOT_EMAIL", email)
+        .args(["server", "setup"]);
+      if web {
+        cmd.arg("--web");
+      }
+      let expected = if email.trim().is_empty() {
+        "requires a terminal"
+      } else {
+        "DOPBASE_ROOT_EMAIL must contain a valid email address"
+      };
+      failure(cmd.stdin(Stdio::null()).output().unwrap(), expected);
+      assert!(!data.exists());
+    }
+  }
+}
+
+#[cfg(unix)]
+#[test]
+fn non_unicode_environment_email_is_rejected_unless_explicitly_overridden() {
+  use std::os::unix::ffi::OsStringExt;
+  let directory = TempDir::new().unwrap();
+  let data = directory.path().join("missing");
+  for web in [false, true] {
+    let mut cmd = command(&data);
+    cmd
+      .env(
+        "DOPBASE_ROOT_EMAIL",
+        std::ffi::OsString::from_vec(vec![0xff]),
+      )
+      .args(["server", "setup"]);
+    if web {
+      cmd.arg("--web");
+    }
+    failure(
+      cmd.output().unwrap(),
+      "DOPBASE_ROOT_EMAIL must contain a valid UTF-8 email address",
+    );
+    assert!(!data.exists());
+  }
+  let result = success(
+    command(&data)
+      .env(
+        "DOPBASE_ROOT_EMAIL",
+        std::ffi::OsString::from_vec(vec![0xff]),
+      )
+      .args(["--json", "server", "setup", "--email", "root@example.com"])
+      .stdin(Stdio::null())
+      .output()
+      .unwrap(),
+  );
+  assert_eq!(result["email"], "root@example.com");
+}
+
+#[test]
+fn explicit_email_overrides_environment_without_fallback() {
+  let directory = TempDir::new().unwrap();
+  for environment in ["other@example.com", "invalid"] {
+    let instance = TempDir::new_in(directory.path()).unwrap();
+    let result = success(
+      command(instance.path())
+        .env("DOPBASE_ROOT_EMAIL", environment)
+        .args(["--json", "server", "setup", "--email", " ROOT@EXAMPLE.COM "])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap(),
+    );
+    assert_eq!(result["email"], "root@example.com");
+    failure(
+      command(instance.path())
+        .env("DOPBASE_ROOT_EMAIL", "other@example.com")
+        .args(["server", "setup"])
+        .output()
+        .unwrap(),
+      "already been initialized",
+    );
+  }
+  let missing = directory.path().join("missing");
+  failure(
+    command(&missing)
+      .env("DOPBASE_ROOT_EMAIL", "valid@example.com")
+      .args(["server", "setup", "--email", "invalid"])
+      .output()
+      .unwrap(),
+    "--email must contain a valid email address",
+  );
+  assert!(!missing.exists());
+}
+
+#[test]
+fn environment_email_never_initializes_server_start() {
+  let directory = TempDir::new().unwrap();
+  let missing = directory.path().join("missing");
+  for flags in [vec![], vec!["--background"], vec!["--supervised"]] {
+    failure(
+      command(&missing)
+        .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+        .args(["server", "start"])
+        .args(flags)
+        .output()
+        .unwrap(),
+      "dopbase server setup",
+    );
+    assert!(!missing.exists());
+  }
 }
 
 #[tokio::test]
@@ -440,108 +578,143 @@ impl Drop for Running {
 
 #[tokio::test]
 async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_serving() {
-  let directory = TempDir::new().unwrap();
-  let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-  let port = occupied.local_addr().unwrap().port();
-  drop(occupied);
-  let log_path = directory.path().join("web-output.log");
-  let mut running = Running(
-    command(directory.path())
-      .args(["server", "setup", "--web", "--port", &port.to_string()])
-      .stdout(Stdio::null())
-      .stderr(Stdio::from(fs::File::create(&log_path).unwrap()))
-      .spawn()
-      .unwrap(),
-  );
-  let client = reqwest::Client::new();
-  let base = format!("http://127.0.0.1:{port}");
-  let deadline = Instant::now() + Duration::from_secs(10);
-  loop {
-    if let Ok(response) = client.get(format!("{base}/api/v1/health")).send().await
-      && response.status().is_success()
-    {
-      break;
+  for (environment, explicit, expected_email) in [
+    (None, None, None),
+    (
+      Some(" ROOT+SETUP@EXAMPLE.COM "),
+      None,
+      Some("root+setup@example.com"),
+    ),
+    (
+      Some("invalid"),
+      Some("CLI+SETUP@EXAMPLE.COM"),
+      Some("cli+setup@example.com"),
+    ),
+  ] {
+    let directory = TempDir::new().unwrap();
+    let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = occupied.local_addr().unwrap().port();
+    drop(occupied);
+    let log_path = directory.path().join("web-output.log");
+    let mut cmd = command(directory.path());
+    cmd.args(["server", "setup", "--web", "--port", &port.to_string()]);
+    if let Some(email) = environment {
+      cmd.env("DOPBASE_ROOT_EMAIL", email);
+    }
+    if let Some(email) = explicit {
+      cmd.args(["--email", email]);
+    }
+    let mut running = Running(
+      cmd
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(fs::File::create(&log_path).unwrap()))
+        .spawn()
+        .unwrap(),
+    );
+    let client = reqwest::Client::new();
+    let base = format!("http://127.0.0.1:{port}");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+      if let Ok(response) = client.get(format!("{base}/api/v1/health")).send().await
+        && response.status().is_success()
+      {
+        break;
+      }
+      assert!(
+        running.0.try_wait().unwrap().is_none(),
+        "web setup exited before readiness"
+      );
+      assert!(Instant::now() < deadline, "web setup readiness timed out");
+      tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let text = fs::read_to_string(&log_path).unwrap();
+    let token = text
+      .lines()
+      .find(|line| line.starts_with("setup_"))
+      .unwrap();
+    assert!(text.contains(&format!("/setup?token={token}")));
+    let link = text
+      .lines()
+      .find(|line| line.contains("/setup?token="))
+      .unwrap();
+    let url = url::Url::parse(link).unwrap();
+    let pairs: Vec<_> = url.query_pairs().collect();
+    assert_eq!(pairs.len(), if expected_email.is_some() { 2 } else { 1 });
+    assert_eq!(pairs[0].0, "token");
+    assert_eq!(pairs[0].1, token);
+    if let Some(expected) = expected_email {
+      assert_eq!(pairs[1].0, "email");
+      assert_eq!(pairs[1].1, expected);
+      assert!(link.contains("%2B"));
     }
     assert!(
-      running.0.try_wait().unwrap().is_none(),
-      "web setup exited before readiness"
+      client
+        .get(format!("{base}/setup"))
+        .send()
+        .await
+        .unwrap()
+        .status()
+        .is_success()
     );
-    assert!(Instant::now() < deadline, "web setup readiness timed out");
-    tokio::time::sleep(Duration::from_millis(20)).await;
-  }
-  let text = fs::read_to_string(&log_path).unwrap();
-  let token = text
-    .lines()
-    .find(|line| line.starts_with("setup_"))
-    .unwrap();
-  assert!(text.contains(&format!("/setup?token={token}")));
-  assert!(
-    client
-      .get(format!("{base}/setup"))
+    let status: Value = client
+      .get(format!("{base}/api/v1/bootstrap/status"))
       .send()
       .await
       .unwrap()
-      .status()
-      .is_success()
-  );
-  let status: Value = client
-    .get(format!("{base}/api/v1/bootstrap/status"))
-    .send()
-    .await
-    .unwrap()
-    .json()
-    .await
-    .unwrap();
-  assert_eq!(status["data"]["state"], "setupRequired");
-  let invalid = client
-    .post(format!("{base}/api/v1/bootstrap/admin"))
-    .json(
-      &json!({"setupToken":"wrong", "email":"root@example.com", "password":"fixture-password-123"}),
-    )
-    .send()
-    .await
-    .unwrap();
-  assert_eq!(invalid.status().as_u16(), 401);
-  let created = client
-    .post(format!("{base}/api/v1/bootstrap/admin"))
-    .json(
-      &json!({"setupToken":token, "email":"root@example.com", "password":"fixture-password-123"}),
-    )
-    .send()
-    .await
-    .unwrap();
-  assert_eq!(created.status().as_u16(), 201);
-  assert!(created.headers().contains_key("set-cookie"));
-  let body: Value = created.json().await.unwrap();
-  assert_eq!(body["data"]["role"], "root");
-  assert!(body["data"]["csrfToken"].is_string());
-  let login = client
-    .post(format!("{base}/api/v1/auth/login"))
-    .json(
-      &json!({"email":"root@example.com","password":"fixture-password-123","sessionKind":"cli"}),
-    )
-    .send()
-    .await
-    .unwrap();
-  assert!(login.status().is_success());
-  let status: Value = client
-    .get(format!("{base}/api/v1/bootstrap/status"))
-    .send()
-    .await
-    .unwrap()
-    .json()
-    .await
-    .unwrap();
-  assert_eq!(status["data"]["state"], "ready");
-  assert!(running.0.try_wait().unwrap().is_none());
-  #[cfg(unix)]
-  {
-    nix::sys::signal::kill(
-      nix::unistd::Pid::from_raw(running.0.id() as i32),
-      nix::sys::signal::Signal::SIGTERM,
-    )
-    .unwrap();
-    assert!(running.0.wait().unwrap().success());
+      .json()
+      .await
+      .unwrap();
+    assert_eq!(status["data"]["state"], "setupRequired");
+    let invalid = client
+      .post(format!("{base}/api/v1/bootstrap/admin"))
+      .json(
+        &json!({"setupToken":"wrong", "email":"root@example.com", "password":"fixture-password-123"}),
+      )
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(invalid.status().as_u16(), 401);
+    let created = client
+      .post(format!("{base}/api/v1/bootstrap/admin"))
+      .json(
+        &json!({"setupToken":token, "email":"root@example.com", "password":"fixture-password-123"}),
+      )
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(created.status().as_u16(), 201);
+    assert!(created.headers().contains_key("set-cookie"));
+    let body: Value = created.json().await.unwrap();
+    assert_eq!(body["data"]["role"], "root");
+    assert!(body["data"]["csrfToken"].is_string());
+    let login = client
+      .post(format!("{base}/api/v1/auth/login"))
+      .json(
+        &json!({"email":"root@example.com","password":"fixture-password-123","sessionKind":"cli"}),
+      )
+      .send()
+      .await
+      .unwrap();
+    assert!(login.status().is_success());
+    let status: Value = client
+      .get(format!("{base}/api/v1/bootstrap/status"))
+      .send()
+      .await
+      .unwrap()
+      .json()
+      .await
+      .unwrap();
+    assert_eq!(status["data"]["state"], "ready");
+    assert!(running.0.try_wait().unwrap().is_none());
+    #[cfg(unix)]
+    {
+      nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(running.0.id() as i32),
+        nix::sys::signal::Signal::SIGTERM,
+      )
+      .unwrap();
+      assert!(running.0.wait().unwrap().success());
+    }
   }
 }
 
@@ -564,6 +737,12 @@ mod guided {
   }
   impl Terminal {
     fn new(data: &Path) -> Self {
+      Self::with_email(data, None)
+    }
+    fn with_email(
+      data: &Path,
+      email: Option<&str>,
+    ) -> Self {
       let pty = openpty(
         Some(&Winsize {
           ws_row: 40,
@@ -578,6 +757,9 @@ mod guided {
       let master = fs::File::from(pty.master);
       fcntl(&master, FcntlArg::F_SETFL(OFlag::O_NONBLOCK)).unwrap();
       let mut cmd = command(data);
+      if let Some(email) = email {
+        cmd.env("DOPBASE_ROOT_EMAIL", email);
+      }
       cmd
         .env("TERM", "xterm")
         .args(["server", "setup"])
@@ -701,7 +883,7 @@ mod guided {
   fn cancelling_guided_password_leaves_no_account_or_storage() {
     let directory = TempDir::new().unwrap();
     let data = directory.path().join("missing");
-    let mut terminal = Terminal::new(&data);
+    let mut terminal = Terminal::with_email(&data, Some("  "));
     terminal.wait_for("Root email:", 0);
     let from = terminal.send("root@example.com\r");
     terminal.wait_for("Root password:", from);
