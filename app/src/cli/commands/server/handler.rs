@@ -71,7 +71,7 @@ pub(crate) async fn execute(
       }
       .await;
       if let (Some(ready), Err(error)) = (&ready, &result) {
-        ready.fail(&format!("{error:#}"));
+        ready.fail_error(error);
       }
       result?;
       Ok(0)

@@ -9,8 +9,10 @@ use std::{
   time::Duration,
 };
 
+use crate::server::provision::{GeneratedSetup, SetupCommittedError, StartupMode};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 use crate::{
   config::{
@@ -129,6 +131,31 @@ impl Ready {
     self.report(line);
   }
 
+  pub(crate) fn ok_with_setup(
+    &self,
+    pid: u32,
+    setup: &GeneratedSetup,
+  ) -> Result<()> {
+    let payload = Zeroizing::new(serde_json::to_string(setup)?);
+    let line = Zeroizing::new(format!("ok {pid} setup-json {}", payload.as_str()));
+    self.report_checked(&line)
+  }
+
+  pub(crate) fn fail_error(
+    &self,
+    error: &anyhow::Error,
+  ) {
+    if let Some(committed) = error.downcast_ref::<SetupCommittedError>() {
+      let payload = serde_json::json!({
+        "email": committed.email, "data_dir": committed.data_dir,
+        "message": committed.reason.to_string(),
+      });
+      self.report(format!("error-setup {payload}"));
+    } else {
+      self.fail(&format!("{error:#}"));
+    }
+  }
+
   /// Report a startup failure. `message` must be a single line, so any
   /// newlines in the error chain are flattened.
   pub fn fail(
@@ -142,17 +169,24 @@ impl Ready {
     &self,
     line: String,
   ) {
+    let _ = self.report_checked(&line);
+  }
+
+  fn report_checked(
+    &self,
+    line: &str,
+  ) -> Result<()> {
     if self.reported.swap(true, Ordering::SeqCst) {
-      return;
+      return Ok(());
     }
     let mut writer = self
       .writer
       .lock()
       .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _ = writer
-      .write_all(line.as_bytes())
-      .and_then(|_| writer.write_all(b"\n"))
-      .and_then(|_| writer.flush());
+    writer.write_all(line.as_bytes())?;
+    writer.write_all(b"\n")?;
+    writer.flush()?;
+    Ok(())
   }
 }
 
@@ -275,6 +309,8 @@ pub struct Started {
   pub log_path: PathBuf,
   pub pid_file: PathBuf,
   pub setup_token: Option<String>,
+  pub(crate) setup: Option<GeneratedSetup>,
+  child: std::process::Child,
 }
 
 /// Start a supervised background server and report readiness.
@@ -282,8 +318,24 @@ pub(crate) async fn start(
   config: ServerConfig,
   json_output: bool,
 ) -> Result<i32> {
-  let started = start_managed(&config).await?;
-  report_started(&config, &started, json_output, None);
+  let mut started = start_managed(&config).await?;
+  if let Err(error) = report_started(&config, &started, json_output, None) {
+    if let Some(setup) = &started.setup {
+      // This command is still the child's parent. Reap it here rather than
+      // waiting for a detached-process exit check, which would see a zombie.
+      let _ = started.child.kill();
+      let stopped = started.child.wait();
+      let _ = remove_pid_file(&started.pid_file);
+      let reason = match stopped {
+        Ok(_) => error.context("failed to deliver setup output"),
+        Err(stop_error) => error.context(format!(
+          "failed to deliver setup output; failed to reap the server: {stop_error}"
+        )),
+      };
+      return Err(setup.committed_error(reason));
+    }
+    return Err(error);
+  }
   Ok(0)
 }
 
@@ -301,7 +353,7 @@ pub(crate) async fn restart(
       log_file_path(&config.data_dir).display()
     ))
   })?;
-  report_started(&config, &started, json_output, Some(&stopped));
+  report_started(&config, &started, json_output, Some(&stopped))?;
   Ok(0)
 }
 
@@ -312,7 +364,10 @@ async fn start_managed(_config: &ServerConfig) -> Result<Started> {
 
 #[cfg(unix)]
 async fn start_managed(config: &ServerConfig) -> Result<Started> {
-  crate::server::require_initialized(config).await?;
+  let root_email = match crate::server::provision::startup_mode(config).await? {
+    StartupMode::Generated(email) => Some(email),
+    _ => None,
+  };
   let data_dir = &config.data_dir;
   ensure_data_dir(data_dir)?;
   let pid_path = pid_file_path(data_dir);
@@ -328,7 +383,12 @@ async fn start_managed(config: &ServerConfig) -> Result<Started> {
   // Foreground and background servers share the database lock.
   let lock = crate::server::InstanceLock::acquire(&config.database_url)?;
   drop(lock);
-  spawn(data_dir, config.daemon_launch.as_ref()).await
+  spawn(
+    data_dir,
+    config.daemon_launch.as_ref(),
+    root_email.as_deref(),
+  )
+  .await
 }
 
 fn report_started(
@@ -336,7 +396,7 @@ fn report_started(
   started: &Started,
   json_output: bool,
   stopped: Option<&Stopped>,
-) {
+) -> Result<()> {
   if !json_output {
     anstream::eprintln!(
       "\n{}\n",
@@ -373,8 +433,25 @@ fn report_started(
       value["previous_pid"] = stopped.pid.into();
       value["forced"] = stopped.forced.into();
     }
-    print_value(true, &value);
+    #[derive(Serialize)]
+    struct StartOutput<'a> {
+      #[serde(flatten)]
+      fields: serde_json::Value,
+      #[serde(skip_serializing_if = "Option::is_none")]
+      setup: Option<&'a GeneratedSetup>,
+    }
+    let output = Zeroizing::new(
+      serde_json::to_string_pretty(&StartOutput {
+        fields: value,
+        setup: started.setup.as_ref(),
+      })?
+        + "\n",
+    );
+    crate::cli::output::print_raw(&output)?;
   } else {
+    if let Some(setup) = &started.setup {
+      crate::cli::output::print_raw(&setup.human_output())?;
+    }
     let action = if stopped.is_some() {
       "restarted"
     } else {
@@ -394,6 +471,7 @@ fn report_started(
       eprintln!("The previous server required a forced shutdown.");
     }
   }
+  Ok(())
 }
 
 /// Spawn the detached server process and wait for its readiness report.
@@ -401,6 +479,7 @@ fn report_started(
 async fn spawn(
   data_dir: &Path,
   launch: Option<&LaunchDescriptor>,
+  root_email: Option<&str>,
 ) -> Result<Started> {
   use std::{
     io::pipe,
@@ -432,6 +511,10 @@ async fn spawn(
     .stdout(Stdio::from(log))
     .stderr(Stdio::from(log_error));
   command.env_remove(ENV_DAEMON_LAUNCH);
+  command.env_remove(crate::constants::config::ENV_ROOT_EMAIL);
+  if let Some(email) = root_email {
+    command.env(crate::constants::config::ENV_ROOT_EMAIL, email);
+  }
   if let Some(launch) = launch {
     command.current_dir(&launch.working_directory);
     command.env(ENV_DAEMON_LAUNCH, serde_json::to_string(launch)?);
@@ -494,7 +577,13 @@ async fn spawn(
     }
   };
 
-  let mut parts = line.split_whitespace();
+  let line = Zeroizing::new(line);
+  let (status, setup_json) = match line.split_once(" setup-json ") {
+    Some((status, payload)) => (status, Some(payload)),
+    None => (line.as_str(), None),
+  };
+  let setup: Option<GeneratedSetup> = setup_json.map(serde_json::from_str).transpose()?;
+  let mut parts = status.split_whitespace();
   let mut setup_token = None;
   let reported_pid;
   match parts.next() {
@@ -507,6 +596,25 @@ async fn spawn(
         }
         key = parts.next();
       }
+    }
+    Some("error-setup") => {
+      let _ = child.kill();
+      let _ = child.wait();
+      let value: serde_json::Value =
+        serde_json::from_str(status.strip_prefix("error-setup ").unwrap_or(""))?;
+      return Err(
+        SetupCommittedError {
+          email: value["email"].as_str().unwrap_or_default().to_owned(),
+          data_dir: serde_json::from_value(value["data_dir"].clone())?,
+          reason: anyhow::anyhow!(
+            "{}",
+            value["message"]
+              .as_str()
+              .unwrap_or("background setup failed")
+          ),
+        }
+        .into(),
+      );
     }
     Some("error") => {
       let message = line.trim().strip_prefix("error ").unwrap_or(line.trim());
@@ -525,6 +633,8 @@ async fn spawn(
     log_path,
     pid_file: pid_file_path(data_dir),
     setup_token,
+    setup,
+    child,
   })
 }
 
