@@ -2,6 +2,99 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## 0.1.9 - 2026-10-05
+
+Dopbase 0.1.9 adds guided server setup, automatic first-run initialization,
+optional web UI, and background server restart. Generated configuration
+files include setting examples, CLI exports work with hosts that require
+a content length, and community tutorials cover common workflows. Scripts
+using `server up`, `server down`, or the previous setup-required JSON
+response need updating.
+
+### Added
+
+- Disable the web UI with `web_ui = false` in `server.toml`,
+  `DOPBASE_WEB_UI=false`, or `server start --no-web-ui`. It stays enabled by
+  default. CLI and REST API access remain available, and API documentation uses
+  its own setting. Background restart preserves launch overrides.
+  `server setup --web` explicitly enables the UI for that run without changing
+  saved configuration.
+
+- `DOPBASE_ROOT_EMAIL` supplies the root email for `server setup`, with explicit
+  `--email` taking precedence. CLI setup generates a password without prompts;
+  web setup includes the email in its link and prefills the editable form.
+  `server setup --web --email` is now supported. Invalid email defaults fail
+  before setup writes files. On fresh `server start`, the variable creates root
+  with a generated password shown once; initialized startup ignores it.
+
+- `dopbase server setup` initializes a local instance through guided root-account
+  prompts or `--email` with a generated password shown once. `--json` supports
+  generated-password setup. `server setup --web` runs the existing web claim
+  and backup-restoration flow.
+
+- `dopbase server start --background` (or `-b`) starts a managed background
+  server. `server restart` restarts it with the saved CLI and server environment
+  overrides while rereading configuration.
+
+- Server startup now creates missing server and client configuration files with
+  commented examples for every supported setting. Client saves include the
+  reference above active settings.
+
+- Community discussion forms, starter tutorials with verified CLI output, and
+  links from the README, documentation, and issue chooser.
+- A discussion publication manifest and a maintainer checklist for categories,
+  pins, and the first month of community follow-up.
+
+### Improvement
+
+- CLI tests now cover every public command and subcommand, with shared fixtures
+  for real server and terminal workflows. Removed repeated cases and duplicate
+  backend test runs.
+
+- `server start` initializes fresh instances automatically through the existing
+  protected web setup flow or a root email with generated credentials. Foreground
+  and background modes keep serving after setup. Background credentials return
+  only to the launching command, including an optional `setup` object in JSON.
+  Disabled UI settings are respected; interrupted factory resets still require
+  explicit setup. Credential-output failure stops the new server and preserves
+  the initialized account for offline password recovery.
+
+### Note
+
+- **Breaking:** With the web UI disabled and no bootstrap root email, background
+  startup with `--json` writes
+  `success = false` and `info.code = "SETUP_REQUIRED"` to stdout, replacing
+  `error.SETUP_REQUIRED` on stderr. The notice includes `message`, `data_dir`,
+  and `config_file`. Update scripts that read the previous response.
+
+- Existing initialized installations preserve accounts and credentials. No
+  database migration is required. Explicit terminal setup, web setup, and backup
+  restoration keep their existing behavior. `dopbase init` retains its project
+  and environment workflow.
+
+- `dopbase server up` and `dopbase server down` have been replaced by
+  `server start --background` and `server stop`. The old commands show an
+  informational migration notice and exit with status 1 without changing server
+  state. JSON mode returns `COMMAND_REPLACED` information on stdout.
+  Servers started before this change need one manual stop/start before restart
+  is available. Update scripts that use the previous commands.
+
+### Fixed
+
+- Background startup shows the short `dopbase server stop` and
+  `dopbase server restart` commands. JSON output includes both
+  `stop_command` and `restart_command`.
+
+- Direct invocation of the internal supervised server mode no longer claims a
+  runtime-owned file descriptor. Readiness reporting attaches only to an
+  inherited write pipe, preventing reactor failures during startup rejection.
+
+- Remote CLI exports now send an explicit content length for empty POST
+  requests, avoiding HTML errors from hosts that require it. The fix also
+  applies to other CLI commands that send empty POST requests.
+- CLI errors now report the HTTP status when a server returns a non-JSON error
+  response.
+
 ## 0.1.9 - Unreleased
 
 ### Added
