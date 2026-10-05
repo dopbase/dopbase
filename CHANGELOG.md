@@ -13,6 +13,17 @@ response need updating.
 
 ### Added
 
+- `dopbase env edit <ENVIRONMENT_REF>` opens an environment in Vim, Neovim,
+  Helix, nano, or a custom terminal editor. It checks the target before password
+  confirmation and offers to add secrets when an environment is empty. It
+  validates edits, previews key changes, removes editor files, and saves only
+  after confirmation. Prints "Checking changes..." and "Saving..." while
+  waiting for the server.
+  Comments and ordering persist across CLI and UI sessions. `--editor` selects
+  a command and `--dry-run` previews without saving. Protected editor profiles,
+  private files, revision checks, and session cleanup reduce plaintext exposure.
+  Custom commands require acknowledgement; comments remain unencrypted metadata.
+
 - Disable the web UI with `web_ui = false` in `server.toml`,
   `DOPBASE_WEB_UI=false`, or `server start --no-web-ui`. It stays enabled by
   default. CLI and REST API access remain available, and API documentation uses
@@ -47,6 +58,10 @@ response need updating.
 
 ### Improvement
 
+- `dopbase env list` and the list printed after `env clone` show a single
+  `ENVIRONMENT` column with `project/environment` values. IDs, update times,
+  and JSON output keep their existing format.
+
 - CLI tests now cover every public command and subcommand, with shared fixtures
   for real server and terminal workflows. Removed repeated cases and duplicate
   backend test runs.
@@ -80,6 +95,12 @@ response need updating.
   is available. Update scripts that use the previous commands.
 
 ### Fixed
+
+- Secret exports include values, layout, and a revision from one snapshot.
+  Imports check supplied revisions during dry runs as well as apply, protecting
+  edits from concurrent changes. Layout imports reject slots containing values.
+  CLI response buffers are cleared after parsing, and exported JSON values are
+  moved out of the response instead of copied.
 
 - Background startup shows the short `dopbase server stop` and
   `dopbase server restart` commands. JSON output includes both

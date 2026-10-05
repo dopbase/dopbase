@@ -212,16 +212,31 @@ affected resource counts and requires confirmation. Automation must pass
 
 ## Environment commands
 
-| Command                                                                          | Purpose                            |
-| -------------------------------------------------------------------------------- | ---------------------------------- |
-| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`                              | Create an environment              |
-| `dopbase env clone <PROJECT_REF/SOURCE_ENVIRONMENT_NAME> <NEW_ENVIRONMENT_NAME>` | Clone secrets to a new environment |
-| `dopbase env default <ENVIRONMENT_REF>`                                          | Set the run default                |
-| `dopbase env default --clear`                                                    | Clear the run default              |
-| `dopbase env list [PROJECT_REF]`                                                 | List environments                  |
-| `dopbase env show <ENVIRONMENT_REF>`                                             | Show environment metadata          |
-| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>`                    | Rename an environment              |
-| `dopbase env delete <ENVIRONMENT_REF>`                                           | Delete an environment              |
+| Command                                                                          | Purpose                                  |
+| -------------------------------------------------------------------------------- | ---------------------------------------- |
+| `dopbase env create <PROJECT_REF/ENVIRONMENT_NAME>`                              | Create an environment                    |
+| `dopbase env clone <PROJECT_REF/SOURCE_ENVIRONMENT_NAME> <NEW_ENVIRONMENT_NAME>` | Clone secrets to a new environment       |
+| `dopbase env edit <ENVIRONMENT_REF>`                                             | Edit an environment in a terminal editor |
+| `dopbase env default <ENVIRONMENT_REF>`                                          | Set the run default                      |
+| `dopbase env default --clear`                                                    | Clear the run default                    |
+| `dopbase env list [PROJECT_REF]`                                                 | List environments                        |
+| `dopbase env show <ENVIRONMENT_REF>`                                             | Show environment metadata                |
+| `dopbase env rename <ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>`                    | Rename an environment                    |
+| `dopbase env delete <ENVIRONMENT_REF>`                                           | Delete an environment                    |
+
+`dopbase env list` shows `ENVIRONMENT`, `ID`, and `UPDATED` columns. Each
+`ENVIRONMENT` value uses the project and environment names, such as
+`payment-service/local`. Filtering by project name or ID keeps this format.
+`--json` returns the environment records with separate `projectName` and `name`
+fields.
+
+```text
+ENVIRONMENT                  ID           UPDATED
+payment-service/local        env_100001   2026-10-05 08:30 UTC
+payment-service/production   env_100002   2026-10-05 09:00 UTC
+
+2 environment(s)
+```
 
 Deleting an environment also deletes its secrets and scoped tokens. The
 operation requires confirmation or `--yes` and is recorded in the audit log.
@@ -252,6 +267,75 @@ returns the same environment array as `dopbase env list <PROJECT_REF> --json`.
 The clone copies current secret key/value pairs only. It does not copy editor
 layout, tokens, audit history, IDs, or timestamps, and it does not keep the two
 environments synchronized.
+
+## Edit a whole environment
+
+```bash
+dopbase env edit payment-service/staging
+dopbase env edit payment-service/staging --editor hx
+dopbase env edit payment-service/staging --editor nvim --dry-run
+```
+
+`env edit` requires a terminal. With an existing login, Dopbase first checks
+that the environment exists and lists its secret metadata. If it is empty,
+Dopbase asks whether to add secrets; pressing Enter exits without password
+confirmation or opening an editor. Existing sessions always require password
+confirmation before export. A login completed by this command counts as
+confirmation, so it does not ask twice.
+
+Editor selection uses `--editor`, then `VISUAL`, then `EDITOR`. If none is set,
+Dopbase uses the first installed editor from Vim, Neovim, Helix, and nano.
+Commands are split into arguments without a shell; shell expansion and pipelines are unavailable.
+
+The editor opens the current secrets as `.env` text. On exit, Dopbase parses
+the document and runs a server dry run. The preview lists added, updated, and
+deleted key names without showing their values. Type `apply` to save, `edit`
+to reopen the buffer, or press Enter to cancel. `--dry-run` stops after the
+preview and saves nothing. Invalid documents can be reopened for correction.
+
+Removing a line schedules that key for deletion. `KEY=` saves an empty value.
+Deleting every secret requires typing the environment reference. There is no
+`--yes` option, and `--json` is unavailable for this interactive command.
+
+Comments, blank lines, and key ordering survive later CLI and UI sessions.
+Comments are unencrypted metadata. Put credentials in values, never in
+comments. Use escaped newlines for multiline values, such as
+`PRIVATE_KEY="first\nsecond"`. Variable references and command substitutions
+remain literal text; Dopbase never evaluates them.
+
+The environment must remain unchanged from loading through saving. If another
+user changes its secrets or layout, Dopbase stops with a conflict. Start a
+fresh editing session to work from the current values. Failed or uncertain
+save requests are not automatically retried. Dopbase removes the editor files
+before submitting a confirmed draft. Once submission starts, an interruption
+waits for the server response instead of reporting a cancellation while a save
+may still commit.
+
+### Editor security
+
+Known editors use a protected session with isolated configuration and disabled
+plugins, language servers, swap files, backups, and persistent history where
+applicable. This means your usual configuration and custom mappings are not
+loaded. On macOS, a `nano` alias pointing to Pico is treated as a custom
+editor. A custom command, including a known editor with extra arguments,
+requires acknowledgement before values are fetched. Custom editors must wait
+until editing finishes; a launcher that returns immediately is unsuitable.
+
+Dopbase uses an owner-only session directory under the active client
+configuration directory's `secret-edit` folder. The directory has mode `0700`
+and the `.env` file has mode `0600`. The editor receives a limited environment
+without Dopbase tokens or unrelated credentials. Unsafe file replacements,
+symlinks, hard links, and documents larger than 8 MiB are rejected.
+
+Dopbase removes session files after success, cancellation, errors, Ctrl+C,
+and handled termination signals. A later `env edit` invocation removes
+abandoned sessions while preserving active sessions. Cleanup failures report
+the remaining directory. Linux and macOS are supported.
+
+External editors receive plaintext. Forced termination, power loss, disk
+snapshots, a compromised editor, or terminal recording can expose it. File
+deletion does not guarantee forensic erasure. Read the
+[security model](/reference/security#terminal-editor-sessions) for these limits.
 
 ## Secret commands
 

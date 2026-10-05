@@ -71,6 +71,21 @@ correlation is returned in the `X-Request-Id` header. Errors never include
 request bodies, plaintext secrets, tokens, key material, SQL, or filesystem
 details.
 
+## Secret editor snapshots
+
+`POST /api/v1/environments/{id}/secrets/export` returns `entries`, `revision`,
+and nullable `envLayout` from one snapshot. Export retains its existing human
+access requirements and audit event. Layout contains comments and empty key
+slots; comments are unencrypted metadata.
+
+Pass `expectedRevision` to the import endpoint for both the dry run and apply.
+A stale revision returns `409` with `IMPORT_PREVIEW_STALE`, including during a
+dry run. Replace apply requires a revision. Invalid layout slots, including
+slots containing values, return `422` with `ENV_LAYOUT_INVALID`.
+
+Existing export clients can ignore the added fields. `env edit` requires a
+server that supplies the snapshot revision and fails safely when it is missing.
+
 ## Authentication
 
 - Browser sessions use an HttpOnly, SameSite Strict cookie and require the
