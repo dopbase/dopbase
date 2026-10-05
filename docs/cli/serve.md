@@ -8,30 +8,79 @@ description: "Start, stop, restart, inspect, and read logs from a local Dopbase 
 The `dopbase server` commands manage the self-hosted HTTP server, REST API,
 SQLite storage, and Admin UI.
 
-## Initialize before starting
+## Automatic first startup
 
-A fresh or reset instance requires `dopbase server setup` before startup.
-`server start` and `server start --background` show an informational notice and
-exit with status 1 when storage is uninitialized. The notice lists setup methods,
-the selected data and configuration paths, and configuration guidance. Startup
-does not create a database, master key, or configuration references for a fresh
-instance. Existing initialized installations start as usual.
+```bash
+dopbase server start
+```
 
-With `--json`, background startup writes the notice to stdout with
-`success = false` and `info.code = "SETUP_REQUIRED"`. The `info` object also
-contains `message`, `data_dir`, and `config_file`. This replaces the previous
-`error.SETUP_REQUIRED` response on stderr. Other startup failures still report
-errors on stderr. Foreground startup does not support `--json`.
+On fresh storage, startup creates the database, master key, and configuration
+examples, then prints the existing protected web setup link. Open it to create
+root or restore a backup. The server keeps running after setup. An initialized
+instance starts normally without changing its accounts or credentials.
 
-See [server setup](./setup) for guided setup, generated passwords, and the
-existing web flow. `server setup --web` continues serving after setup until
-stopped with Ctrl+C.
+To create root without opening a browser, supply an email:
+
+```bash
+DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+```
+
+Dopbase generates a password, displays it once, and continues serving. Save the
+password, then sign in through the Admin UI or `dopbase login`. Account creation
+does not sign you in. Existing instances ignore this input, including invalid
+values. Missing or blank values select web setup on fresh storage; invalid
+nonblank values fail before creating files.
+
+Foreground and background startup use the same rules. Automatic setup respects
+`--no-web-ui`, `DOPBASE_WEB_UI=false`, and `web_ui = false`. With the UI disabled,
+supply `DOPBASE_ROOT_EMAIL` or complete explicit CLI setup first. A pending
+factory reset still requires explicit setup; automatic startup does not finish
+an interrupted reset. Storage and master-key errors never fall back to setup.
+
+Explicit setup remains available when you want terminal prompts, standalone
+provisioning, or the web flow with an email prefilled.
+
+For background startup with a root email:
+
+```bash
+DOPBASE_ROOT_EMAIL=admin@example.com dopbase --json server start --background
+```
+
+The launching command returns the password once. JSON keeps the normal startup
+fields and adds `setup` only when this start created root:
+
+```json
+{
+  "setup": {
+    "initialized": true,
+    "admin_id": "<root-account-id>",
+    "email": "admin@example.com",
+    "data_dir": "/srv/dopbase",
+    "password": "<generated-password>"
+  }
+}
+```
+
+This excerpt omits the unchanged startup fields. Later starts and restarts omit
+`setup`. The managed daemon log and PID metadata do not contain the password.
+Foreground output captured by Docker, redirected files, or CI may retain it.
+
+If credential delivery fails after account creation, Dopbase stops the new
+server and reports that initialization committed. Background JSON errors include
+`initialized: true`. Recover with `dopbase admin reset-password EMAIL` using the
+same instance options; another start will not generate replacement credentials.
+
+With a disabled UI and no root email, background `--json` writes an informational
+notice to stdout with `success = false`, `info.code = "SETUP_REQUIRED"`,
+`message`, `data_dir`, and `config_file`. Other startup failures use stderr.
+Foreground startup does not support `--json`.
+
+See [server setup](./setup) for the unchanged explicit setup commands.
 
 ## Configuration files
 
-CLI setup creates missing configuration files before creating root. Web setup
-and startup of an initialized instance create missing references once the
-listener binds successfully:
+CLI setup creates missing configuration files before creating root. Automatic
+startup and web setup create missing references after the listener binds:
 
 - `~/.dopbase/server.toml` describes every server setting, including defaults,
   examples, accepted values, and environment overrides.
@@ -144,10 +193,9 @@ dopbase server start -b
 | `--no-docs`                          | Disable API documentation for this run       |
 | `--master-key-file <FILE>`           | Read the server master key from another file |
 
-Startup prints stop and restart commands with the selected absolute data
-directory quoted for the shell. JSON output includes these as `stop_command`
-and `restart_command`. Use the printed commands to manage that instance from
-another working directory.
+Startup prints `dopbase server stop` and `dopbase server restart`. JSON output
+includes these as `stop_command` and `restart_command`. If you use a custom data
+directory, add the same `--data-dir` option when managing that instance.
 
 Only one server can use a data directory at a time.
 
@@ -284,6 +332,7 @@ dopbase server start --docs
 
 You can also set `docs = true` in `server.toml` or `DOPBASE_DOCS=true`.
 
-Migrations run before the listener opens. Explicit setup creates a random master key with owner-only permissions for
-new installations. During shutdown, Dopbase stops new
+Migrations run before HTTP requests are served. Setup and automatic startup
+create a random master key with owner-only permissions for new installations.
+During shutdown, Dopbase stops new
 requests, drains active requests, checkpoints SQLite, and closes the database.

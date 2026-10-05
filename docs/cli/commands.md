@@ -45,7 +45,7 @@ or revoke browser sessions.
 
 ## Server setup
 
-Run `dopbase server setup` once before starting a fresh or reset instance. It
+Use `dopbase server setup` for optional standalone terminal initialization. It
 prompts for the root email, a masked password of 12 to 128 characters, and
 confirmation when no email default is supplied. `--email EMAIL` or
 `DOPBASE_ROOT_EMAIL` generates a password and prints it once without prompting;
@@ -65,7 +65,11 @@ See [server setup](./setup) for output, recovery, and instance selection.
 
 ## Server lifecycle
 
-An uninitialized instance must complete setup first. `server start` stays attached to the terminal and stops with Ctrl+C. On macOS
+Fresh startup enters existing web setup, or creates root with a generated password
+when `DOPBASE_ROOT_EMAIL` is supplied. Existing instances preserve credentials.
+With the web UI disabled and no email, complete CLI setup first. Interrupted
+factory resets also require explicit setup. `server start` stays attached to the
+terminal and stops with Ctrl+C. On macOS
 and Linux, `server start --background` starts a managed background process. Use `server stop`
 to stop it, `server status` to inspect it, and `server logs` to read its output.
 `server restart` restarts a running background server with its saved CLI and
@@ -519,7 +523,7 @@ dopbase restore ./pre-upgrade.dop --key /path/to/source/master.key
 # Restore on a new server using a 64-character hex master key
 dopbase restore ./pre-upgrade.dop --key 4a2f8b9c01234567...
 
-# First run: start `dopbase server setup --web` in another terminal
+# First run: start without DOPBASE_ROOT_EMAIL, or use `server setup --web`
 # Use the setup token printed by that target listener
 dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
 ```
@@ -542,7 +546,7 @@ dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
   5. If `--key` was provided, re-keys restored secret metadata to the target server's existing `~/.dopbase/master.key`.
   6. Replaces SQLite database tables, runs any pending migrations, and preserves the active administrator session.
 - **On a first-run uninitialized server**:
-  - Start its listener with `dopbase server setup --web`; restoration requires the printed one-time setup token.
+  - Start with no bootstrap email, or use `server setup --web`; restoration requires the printed one-time setup token.
 
 > [!IMPORTANT]
 > `dopbase restore` strictly requires the server to be live and connected (`server_status: connected (live)`).
@@ -574,7 +578,8 @@ root password. There is no non-interactive bypass.
 By default, the reset saves the whole data directory to a timestamped ZIP next
 to that directory, then removes the active data. The ZIP includes every
 database, master-key, configuration, backup, log, and local CLI file stored
-inside the directory. Run `dopbase server setup` before starting the fresh instance.
+inside the directory. Start again to enter automatic setup on the fresh instance.
+An interrupted web reset still requires explicit setup to finish its pending work.
 
 Pass `--no-backup` to remove the data directory without creating the ZIP. The
 same confirmation phrase and root password are still required.

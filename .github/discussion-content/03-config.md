@@ -2,17 +2,18 @@
 
 ## Current setup commands
 
-Fresh instances now require explicit setup before startup. For terminal setup:
+Fresh instances enter existing web setup during startup:
 
 ```bash
-dopbase --data-dir "$HOME/.dopbase-discussion-server" server setup
 dopbase --data-dir "$HOME/.dopbase-discussion-server" server start --port 18840
 ```
 
-For the browser claim and backup restore used in the recorded walkthrough below,
-run `dopbase --data-dir "$HOME/.dopbase-discussion-server" server setup --web --port 18840`.
-That process keeps serving after setup. Stop it before using `server start` later.
-`dopbase init` still creates application projects and environments.
+Open the printed setup link to create root or restore a backup. The process
+keeps serving afterward. Existing instances start normally. Supplying
+`DOPBASE_ROOT_EMAIL` creates root with a generated password instead; omit it
+when following the browser exercise. Explicit `server setup` commands remain
+available, and pending factory resets still require explicit setup.
+`dopbase init` creates application projects and environments.
 
 See the [current setup guide](https://dopbase.com/docs/cli/setup). The following
 transcript records version 0.1.8, which performed web setup during startup.
@@ -198,9 +199,8 @@ It is still port 18840 and the login remains saved. Failed validation does not s
 
 ## Start and select another local server
 
-For current builds, use `server setup --web --port 19000` with the custom data
-directory below to follow this browser exercise. The captured `server start`
-command belongs to the recorded 0.1.8 walkthrough.
+Current builds also enter web setup through `server start` on fresh storage.
+Omit `DOPBASE_ROOT_EMAIL` when following this browser exercise.
 
 In a third terminal, start a separate instance:
 

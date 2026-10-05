@@ -12,7 +12,6 @@ Both server and client commands ship in the same `dopbase` executable:
 
 ```bash
 # Server role
-dopbase server setup
 dopbase server start
 
 # Client role
@@ -25,7 +24,9 @@ dopbase import payment-service/staging .env.staging
 dopbase run payment-service/development -- npm start
 ```
 
-`server setup` initializes local storage and the root account. Set
+Fresh `server start` automatically enters web setup. Supplying `DOPBASE_ROOT_EMAIL`
+instead creates root with a generated password; initialized startup ignores it.
+Explicit `server setup` initializes local storage and root without starting HTTP. Set
 `DOPBASE_ROOT_EMAIL` or pass `--email` to generate a password without prompts.
 With `--web`, the same email prefills the browser form. `init` creates a
 project and environment through the running server. See [server setup](./setup).
@@ -50,7 +51,7 @@ See [environment variables](./environment-variables) for every supported
 
 ## Typical sequence
 
-1. Run `dopbase server setup` once, then start the local server, or obtain another Dopbase endpoint.
+1. Run `dopbase server start` and complete first-run setup, or obtain another Dopbase endpoint.
 2. Use implicit localhost or select another server with `dopbase client connect`.
 3. Authenticate with `dopbase login` or a scoped runner token.
 4. Run `dopbase init` from a directory with a `.env`, or pass a target and file explicitly.
@@ -60,8 +61,8 @@ See [environment variables](./environment-variables) for every supported
 
 Commands should work in both a terminal and automation. Human-readable and
 structured output includes a secret value only when the user requests reveal,
-export, or generated-password setup. `server setup --email` prints the new root
-password once; protect that output.
+export, or generated-password setup. `server setup --email` and fresh startup
+with `DOPBASE_ROOT_EMAIL` print the new root password once; protect that output.
 
 Errors identify the server, project, environment, and failed operation when
 safe. They must not include request bodies, tokens, plaintext secrets, or

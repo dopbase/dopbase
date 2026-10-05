@@ -119,8 +119,8 @@ dopbase server start --background
 
 ---
 
-For first-run restoration, run `dopbase server setup --web` instead of normal
-startup, then use `dopbase restore --setup-token <SETUP_TOKEN>` from another
+For first-run restoration, use `dopbase server start` without a bootstrap email
+or explicit `dopbase server setup --web`, then use `dopbase restore --setup-token <SETUP_TOKEN>` from another
 terminal. No browser is needed for that restore command. The setup listener
 continues running after restoration until you stop it.
 
@@ -227,8 +227,14 @@ manager or cold storage vault.
 
 ### Restoring on first-run setup
 
+On fresh storage, `dopbase server start` without `DOPBASE_ROOT_EMAIL` opens
+the same protected setup flow. Explicit `server setup --web` remains useful
+when an email is set or the web UI is disabled. During restoration, avoid
+automatic root creation so the backup supplies the original accounts.
+
 For a fresh instance, run `dopbase server setup --web`, then open the printed
-setup link. Normal `server start` requires completed initialization.
+setup link. Automatic `server start` without a bootstrap email uses the same
+flow on fresh storage.
 
 1. On the welcome screen, switch to the **Restore from Backup** tab.
 2. Enter the one-time setup token printed by the target server.
