@@ -15,6 +15,8 @@ pub use commands::run::cache as runtime_cache;
 pub mod output;
 #[doc(hidden)]
 pub mod prompt;
+#[doc(hidden)]
+pub mod secret_editor;
 pub mod secret_format;
 #[doc(hidden)]
 pub mod session;

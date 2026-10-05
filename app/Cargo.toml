@@ -79,6 +79,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = { version = "1", features = ["serde"] }
 zeroize = "1"
+shlex = "2"
 tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
