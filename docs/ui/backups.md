@@ -105,6 +105,11 @@ During restoration:
 
 ## Restoring on first-run setup
 
+On fresh storage, `dopbase server start` without `DOPBASE_ROOT_EMAIL` opens
+the same protected setup flow. Explicit `server setup --web` remains useful
+when an email is set or the web UI is disabled. During restoration, avoid
+automatic root creation so the backup supplies the original accounts.
+
 When initializing a brand-new Dopbase instance, start the existing web setup
 listener with `dopbase server setup --web`. It prints a setup link and token.
 

@@ -5,10 +5,43 @@ description: "Initialize a local Dopbase instance from the terminal or use the e
 
 # Server setup
 
-Run setup once for each local instance before starting it. Setup creates the
-SQLite database, master key, configuration examples, and protected root account.
+Startup can initialize a fresh instance automatically. Explicit setup creates
+the SQLite database, master key, configuration examples, and protected root account
+without requiring automatic startup.
 It does not initialize an application project. Use `dopbase init` for that
 project and environment workflow after the server is running.
+
+## Automatic first startup
+
+```bash
+dopbase server start
+```
+
+On fresh storage, startup creates the database, master key, and configuration
+examples, then prints the existing protected web setup link. Open it to create
+root or restore a backup. The server keeps running after setup. An initialized
+instance starts normally without changing its accounts or credentials.
+
+To create root without opening a browser, supply an email:
+
+```bash
+DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+```
+
+Dopbase generates a password, displays it once, and continues serving. Save the
+password, then sign in through the Admin UI or `dopbase login`. Account creation
+does not sign you in. Existing instances ignore this input, including invalid
+values. Missing or blank values select web setup on fresh storage; invalid
+nonblank values fail before creating files.
+
+Foreground and background startup use the same rules. Automatic setup respects
+`--no-web-ui`, `DOPBASE_WEB_UI=false`, and `web_ui = false`. With the UI disabled,
+supply `DOPBASE_ROOT_EMAIL` or complete explicit CLI setup first. A pending
+factory reset still requires explicit setup; automatic startup does not finish
+an interrupted reset. Storage and master-key errors never fall back to setup.
+
+Explicit setup remains available when you want terminal prompts, standalone
+provisioning, or the web flow with an email prefilled.
 
 ## Guided setup
 
@@ -44,10 +77,12 @@ whitespace-only environment values count as unset. Invalid nonempty values
 fail before creating files or starting a listener; they do not fall back to
 prompts. A valid explicit `--email` overrides an invalid environment value.
 
-For Docker and cloud deployments, run setup once against the persistent data
-location used by subsequent startup. Setting this variable does not initialize
-an instance through `server start`. It is a setup input and is not stored in
-`server.toml`.
+For Docker and cloud deployments, use the same persistent data location on every
+start. `DOPBASE_ROOT_EMAIL` also initializes fresh storage during `server start`.
+It is a bootstrap input, not a password-reset setting, and is not saved in
+`server.toml` or background restart metadata. To restore a backup on fresh
+storage, omit this variable during automatic startup or explicitly use
+`server setup --web`, where the email only prefills the form.
 
 The command prints the generated password once after creating the account.
 Save it before closing the terminal. Dopbase stores its password hash and does
@@ -147,8 +182,7 @@ instance at a time.
 An initialized instance needs no setup again. Setup refuses to replace its root
 account. Use offline password recovery if access is lost.
 
-After a factory reset, stop the running process and run setup before restarting.
-Explicit setup also completes a pending reset left by an interrupted operation.
-
-Fresh or uninitialized storage cannot be started with `server start`, including
-background startup. The command exits with instructions to run setup first.
+After a completed factory reset, stop the running process and start again to
+enter automatic setup. If `.factory-reset.pending` remains after an interrupted
+reset, startup stops without deleting more data. Run explicit setup with the
+same instance options to finish the reset before starting again.

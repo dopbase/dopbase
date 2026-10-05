@@ -5,18 +5,22 @@ description: "Initialize Dopbase through the CLI or existing web flow, then sign
 
 # Setup and sign in
 
-Initialize a fresh instance before starting it. The default setup runs in the
-terminal and creates the protected root account:
+Start the server:
 
 ```bash
-dopbase server setup
 dopbase server start
 ```
 
-Enter the root email, a password of 12 to 128 characters, and its confirmation.
-Then open the Admin UI and sign in. Setup does not create a CLI or browser
-session. `dopbase server setup --email admin@example.com` generates a password
-and prints it once instead of prompting. See [server setup](/cli/setup).
+Fresh storage enters protected browser setup automatically. An initialized
+instance starts normally and shows Sign in.
+
+For startup without browser setup, supply `DOPBASE_ROOT_EMAIL`. Dopbase creates
+root on fresh storage, prints a generated password once, and continues serving.
+Sign in with those credentials. Existing instances ignore the bootstrap email.
+
+Guided terminal setup remains available with `dopbase server setup`, followed
+by startup. It creates no login session. See [server setup](/cli/setup) for
+background output, disabled web UI settings, and interrupted-reset recovery.
 
 ## Web setup
 
@@ -26,7 +30,9 @@ To use the existing browser setup or restore a backup:
 dopbase server setup --web
 ```
 
-This starts the foreground server and prints a one-time token and link:
+Explicit web setup and automatic fresh startup without a root email print the
+same one-time token and link. Explicit `--web` also enables a disabled UI for
+that run:
 
 ```text
 Dopbase setup token (shown once):
@@ -62,7 +68,8 @@ with the master key remains the fallback. See [identity and tokens](/reference/i
 
 ## Signing in
 
-Sign in with the email and password you chose during setup.
+Sign in with the email and password you chose during setup, or the generated
+password returned by startup or explicit CLI setup.
 
 Sign-in behavior:
 

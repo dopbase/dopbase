@@ -6,7 +6,8 @@ description: "Dopbase exposes a versioned REST API with a generated OpenAPI 3 sp
 # REST API
 
 Dopbase exposes the versioned REST API used by the CLI and embedded Admin UI.
-[Initialize a fresh instance](/cli/setup) before starting it.
+Fresh startup enters [automatic setup](/cli/setup); complete it before using
+authenticated endpoints.
 Enable API documentation with `dopbase server start --docs`. The generated OpenAPI 3
 specification is then available from the running server:
 

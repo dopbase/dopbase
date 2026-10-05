@@ -209,16 +209,15 @@ jobs:
           }
           trap cleanup EXIT
 
-          # Startup must leave a fresh instance untouched until explicit setup.
-          if "${binary}" --data-dir "${data_dir}" server start >"${runtime_root}/fresh-start.out" 2>&1; then
+          # A fresh instance with a disabled UI and no root email needs explicit setup.
+          if "${binary}" --data-dir "${data_dir}" server start --no-web-ui >"${runtime_root}/fresh-start.out" 2>&1; then
             echo "error: fresh startup unexpectedly succeeded" >&2
             exit 1
           fi
           grep --quiet 'dopbase server setup' "${runtime_root}/fresh-start.out"
           test ! -e "${data_dir}"
-          "${binary}" --data-dir "${data_dir}" --json server setup --email smoke@example.com >"${runtime_root}/setup.json"
 
-          "${binary}" --data-dir "${data_dir}" server start \
+          DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" server start \
             --docs \
             --host 127.0.0.1 \
             --port "${SMOKE_PORT}" \
@@ -253,6 +252,7 @@ jobs:
           curl --fail --silent "${public_url}/api/v1/openapi.json" | grep --quiet '"openapi"'
           curl --fail --silent --location "${public_url}/api/docs/" >/dev/null
 
+          grep --quiet 'Password (shown once):' "${server_log}"
           test -f "${data_dir}/dopbase.db"
           test -f "${data_dir}/master.key"
           test -f "${data_dir}/dopbase.db.lock"

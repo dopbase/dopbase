@@ -29,7 +29,7 @@ pub(super) fn print_text(value: &str) {
   anstream::println!("{value}");
 }
 
-pub(super) fn print_raw(value: &str) -> Result<()> {
+pub(crate) fn print_raw(value: &str) -> Result<()> {
   let mut stdout = std::io::stdout().lock();
   stdout.write_all(value.as_bytes())?;
   stdout.flush()?;

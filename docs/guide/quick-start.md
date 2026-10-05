@@ -40,31 +40,35 @@ Set `DOPBASE_INSTALL_DIR` to choose another directory and
 `DOPBASE_REPOSITORY_URL`. An explicit
 `DOPBASE_DOWNLOAD_BASE_URL` still overrides the complete release download path.
 
-## 2. Set up the server
-
-Initialize the local instance once:
-
-```bash
-dopbase server setup
-```
-
-Enter the root email, a password of 12 to 128 characters, and its confirmation.
-Setup exits without starting a server or signing you in. On a headless host,
-`dopbase server setup --email admin@example.com` generates a password and prints
-it once. Save that password before closing the terminal.
-
-Set `DOPBASE_ROOT_EMAIL` to supply the email without repeating `--email`. An
-explicit `--email` overrides the environment default.
-
-Use `dopbase server setup --web` to keep the existing browser setup and backup
-restoration flow. See [server setup](/cli/setup) for the alternatives and custom
-instance options.
-
-## 3. Start the server
+## 2. Start the server
 
 ```bash
 dopbase server start
 ```
+
+Fresh storage automatically enters the existing web setup flow and prints a
+protected setup link. Keep this process running.
+
+## 3. Complete setup
+
+Open the printed setup link. Enter your root email and a password of 12 to 128
+characters, then confirm it. Setup signs you into the browser and opens Projects;
+the server continues serving. Existing instances skip setup and show Sign in.
+
+For startup without browser setup:
+
+```bash
+DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+```
+
+This creates root on fresh storage and displays a generated password once. Save
+it and sign in with it. Subsequent starts preserve the account and ignore the
+bootstrap email. Guided terminal setup remains available through
+`dopbase server setup`, followed by startup.
+
+To restore a backup, use the web setup link without supplying a bootstrap email,
+or run `dopbase server setup --web`. See [server setup](/cli/setup) for disabled
+web UI settings, background credential output, and interrupted-reset recovery.
 
 The default local server exposes:
 
@@ -80,8 +84,8 @@ API:        http://localhost:8840/api/v1
 Config:     ~/.dopbase
 ```
 
-The same address serves the Admin UI in a browser. Sign in with the root
-credentials created during setup. The [Admin UI guide](/ui/) covers every screen.
+The same address serves the Admin UI in a browser. If root was created from an
+email supplied at startup, sign in with the generated credentials. The [Admin UI guide](/ui/) covers every screen.
 
 Keep this process running while you use the client.
 

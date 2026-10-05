@@ -1,4 +1,5 @@
 mod instance;
+pub(crate) mod provision;
 
 pub(crate) use instance::require_uninitialized;
 pub use instance::{InitializationRequired, require_initialized};
@@ -317,39 +318,121 @@ async fn serve_instance(
   setup_enabled: bool,
   setup_email: Option<&str>,
 ) -> Result<()> {
-  if !setup_enabled {
-    require_initialized(&config).await?;
-  }
+  use provision::{GeneratedSetup, StartupMode, cli_error, commit_root};
+  use zeroize::Zeroizing;
+
+  let mode = if setup_enabled {
+    require_uninitialized(&config).await?;
+    StartupMode::Web
+  } else {
+    provision::startup_mode(&config).await?
+  };
+  // Prepare credentials before creating files. Recheck state while holding the lock.
+  let mut prepared = if let StartupMode::Generated(email) = &mode {
+    let password = Zeroizing::new(token::generate("")?);
+    let credentials = modules::bootstrap::service::prepare_root(email, password.to_string())
+      .await
+      .map_err(cli_error)?;
+    Some((password, credentials))
+  } else {
+    None
+  };
   ensure_data_dir(&config.data_dir)?;
   let _lock = InstanceLock::acquire(&config.database_url)?;
-  let state = if setup_enabled {
+  let mode = if setup_enabled {
     require_uninitialized(&config).await?;
-    build_setup_state(config).await?
+    StartupMode::Web
   } else {
-    build_state(config).await?
+    provision::startup_mode(&config).await?
   };
-  let setup_token = state.setup.read().await.token.clone();
-  let address = state.config.bind_addr()?;
-  let grace = state.config.shutdown_grace_seconds;
-  let listener = tokio::net::TcpListener::bind(address)
-    .await
-    .with_context(|| format!("failed to bind {address}"))?;
+  // Bind before automatic account creation so a busy port cannot consume credentials.
+  let address = config.bind_addr()?;
+  let listener = if matches!(mode, StartupMode::Generated(_)) {
+    Some(
+      tokio::net::TcpListener::bind(address)
+        .await
+        .with_context(|| format!("failed to bind {address}"))?,
+    )
+  } else {
+    None
+  };
+  let state = match mode {
+    StartupMode::Runtime => build_state(config).await?,
+    StartupMode::Web => build_setup_state(config).await?,
+    StartupMode::Generated(_) => build_instance_state(config, false).await?,
+  };
+  let listener = match listener {
+    Some(listener) => listener,
+    None => tokio::net::TcpListener::bind(address)
+      .await
+      .with_context(|| format!("failed to bind {address}"))?,
+  };
   state.config.ensure_reference_files()?;
+  let generated_setup = if let StartupMode::Generated(email) = mode {
+    let (password, credentials) = prepared
+      .take()
+      .context("missing prepared root credentials")?;
+    let admin_id = commit_root(&state.db, &credentials).await?;
+    let setup = GeneratedSetup {
+      initialized: true,
+      admin_id,
+      email,
+      data_dir: state.config.data_dir.clone(),
+      password,
+    };
+    state.setup.write().await.token = None;
+    if let Err(error) = state.db.checkpoint().await {
+      state.db.close().await;
+      return Err(setup.committed_error(
+        anyhow::Error::from(error).context("failed to checkpoint initialized storage"),
+      ));
+    }
+    Some(setup)
+  } else {
+    None
+  };
+  drop(prepared);
+  let setup_token = state.setup.read().await.token.clone();
+  let grace = state.config.shutdown_grace_seconds;
   let daemonized = state.config.daemonized;
   let _pid_file_lock = if daemonized {
-    Some(crate::daemon::write_pid_file_with_launch(
+    match crate::daemon::write_pid_file_with_launch(
       &crate::daemon::pid_file_path(&state.config.data_dir),
       std::process::id(),
       &state.config.bind_address,
       &state.config.public_url,
       state.config.daemon_launch.clone(),
-    )?)
+    ) {
+      Ok(lock) => Some(lock),
+      Err(error) => {
+        state.db.close().await;
+        return Err(match &generated_setup {
+          Some(setup) => setup.committed_error(error),
+          None => error,
+        });
+      }
+    }
   } else {
     None
   };
-  if let Some(ready) = ready {
+  if let Some(setup) = &generated_setup {
+    let delivered = if let Some(ready) = ready {
+      ready.ok_with_setup(std::process::id(), setup)
+    } else {
+      crate::cli::output::print_raw(&setup.human_output())
+    };
+    if let Err(error) = delivered {
+      if daemonized {
+        let _ =
+          crate::daemon::remove_pid_file(&crate::daemon::pid_file_path(&state.config.data_dir));
+      }
+      state.db.close().await;
+      return Err(setup.committed_error(error.context("failed to deliver setup output")));
+    }
+  } else if let Some(ready) = ready {
     ready.ok(std::process::id(), setup_token.as_deref());
   }
+  drop(generated_setup);
   let public_url = state.config.public_url.trim_end_matches('/');
   anstream::eprintln!(
     "\n{}\n",

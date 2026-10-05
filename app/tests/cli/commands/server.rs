@@ -1,4 +1,5 @@
 mod setup;
+mod start;
 
 use app::{constants::config::executable_environment_names, daemon};
 use serde_json::Value;

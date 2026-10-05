@@ -80,7 +80,9 @@ key stored inside the data directory, so the next setup uses defaults unless
 you provide configuration elsewhere. Neither method removes files saved on
 client devices or securely erases the underlying disk.
 
-Stop any process still using the reset instance. Run `dopbase server setup`,
-then `dopbase server start`, using the same data directory and configuration
-options. For browser setup or backup restoration, use `dopbase server setup --web`.
-Normal startup rejects reset storage. See [setup and sign in](/ui/setup-and-sign-in).
+Stop any process still using the reset instance. After a completed reset,
+`dopbase server start` enters automatic setup using the same instance options.
+For backup restoration, omit `DOPBASE_ROOT_EMAIL` during startup or use
+`dopbase server setup --web`. If `.factory-reset.pending` remains after an
+interruption, startup stops without deleting more data. Run explicit setup
+using the same data directory and configuration options to complete recovery. See [setup and sign in](/ui/setup-and-sign-in).

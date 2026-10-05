@@ -42,12 +42,12 @@ async fn count(
 }
 
 #[test]
-fn uninitialized_start_shows_setup_guidance_without_provisioning() {
+fn disabled_web_ui_start_shows_setup_guidance_without_provisioning() {
   let directory = TempDir::new().unwrap();
   for flags in [vec![], vec!["--background"], vec!["--supervised"]] {
     let data = directory.path().join("missing");
     let output = command(&data)
-      .args(["server", "start"])
+      .args(["server", "start", "--no-web-ui"])
       .args(&flags)
       .output()
       .unwrap();
@@ -75,7 +75,14 @@ fn uninitialized_start_shows_setup_guidance_without_provisioning() {
   let data = directory.path().join("json-missing");
   let config = directory.path().join("custom-server.toml");
   let output = command(&data)
-    .args(["--json", "server", "start", "--background", "--config"])
+    .args([
+      "--json",
+      "server",
+      "start",
+      "--background",
+      "--no-web-ui",
+      "--config",
+    ])
     .arg(&config)
     .output()
     .unwrap();
@@ -345,24 +352,6 @@ fn explicit_email_overrides_environment_without_fallback() {
   assert!(!missing.exists());
 }
 
-#[test]
-fn environment_email_never_initializes_server_start() {
-  let directory = TempDir::new().unwrap();
-  let missing = directory.path().join("missing");
-  for flags in [vec![], vec!["--background"], vec!["--supervised"]] {
-    failure(
-      command(&missing)
-        .env("DOPBASE_ROOT_EMAIL", "root@example.com")
-        .args(["server", "start"])
-        .args(flags)
-        .output()
-        .unwrap(),
-      "dopbase server setup",
-    );
-    assert!(!missing.exists());
-  }
-}
-
 #[tokio::test]
 async fn repeated_and_competing_setup_preserve_the_first_account() {
   let directory = TempDir::new().unwrap();
@@ -462,6 +451,16 @@ fn setup_respects_the_existing_instance_lock() {
       .unwrap(),
     "instance is in use",
   );
+  for background in [false, true] {
+    let mut cmd = command(directory.path());
+    cmd
+      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .args(["server", "start"]);
+    if background {
+      cmd.arg("--background");
+    }
+    failure(cmd.output().unwrap(), "already running");
+  }
   assert!(!directory.path().join("dopbase.db").exists());
   assert!(!directory.path().join("master.key").exists());
 }
@@ -473,10 +472,15 @@ fn corrupt_storage_is_not_treated_as_a_fresh_instance() {
   fs::write(&database, "corrupt database fixture").unwrap();
   for args in [
     vec!["server", "start"],
+    vec!["server", "start", "--background"],
     vec!["server", "setup", "--email", "root@example.com"],
   ] {
     failure(
-      command(directory.path()).args(args).output().unwrap(),
+      command(directory.path())
+        .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+        .args(args)
+        .output()
+        .unwrap(),
       "failed to inspect SQLite initialization",
     );
     assert_eq!(
@@ -511,6 +515,20 @@ async fn incorrect_key_during_setup_preserves_uninitialized_storage() {
       .unwrap(),
     "configured master key does not match",
   );
+  for background in [false, true] {
+    let mut cmd = command(directory.path());
+    cmd
+      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .args(["server", "start", "--port", "0", "--master-key-file"])
+      .arg(&wrong_key);
+    if background {
+      cmd.arg("--background");
+    }
+    failure(
+      cmd.output().unwrap(),
+      "configured master key does not match",
+    );
+  }
   assert_eq!(fs::read(directory.path().join("master.key")).unwrap(), key);
   let db = DbClient::connect(&sqlite_url(&directory.path().join("dopbase.db")))
     .await
@@ -530,13 +548,20 @@ async fn only_explicit_setup_resumes_pending_factory_reset() {
   fs::create_dir(directory.path().join("backups")).unwrap();
   let backup = directory.path().join("backups/fixture.dop");
   fs::write(&backup, "old backup fixture").unwrap();
-  failure(
-    command(directory.path())
-      .args(["server", "start"])
-      .output()
-      .unwrap(),
-    "dopbase server setup",
-  );
+  for background in [false, true] {
+    for email in ["", "replacement@example.com"] {
+      let mut cmd = command(directory.path());
+      cmd
+        .env("DOPBASE_ROOT_EMAIL", email)
+        .args(["server", "start"]);
+      if background {
+        cmd.arg("--background");
+      }
+      failure(cmd.output().unwrap(), "factory reset was interrupted");
+      assert!(marker.exists());
+      assert!(backup.exists());
+    }
+  }
   assert!(marker.exists());
   assert!(backup.exists());
   let output = command(directory.path())
@@ -596,7 +621,7 @@ async fn credential_output_failure_reports_committed_initialization() {
   );
 }
 
-struct Running(Child);
+pub(super) struct Running(pub(super) Child);
 impl Drop for Running {
   fn drop(&mut self) {
     let _ = self.0.kill();
@@ -606,14 +631,18 @@ impl Drop for Running {
 
 #[tokio::test]
 async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_serving() {
-  for (environment, explicit, expected_email) in [
-    (None, None, None),
+  for (automatic, environment, explicit, expected_email) in [
+    (false, None, None, None),
+    (true, None, None, None),
+    (true, Some("  "), None, None),
     (
+      false,
       Some(" ROOT+SETUP@EXAMPLE.COM "),
       None,
       Some("root+setup@example.com"),
     ),
     (
+      false,
       Some("invalid"),
       Some("CLI+SETUP@EXAMPLE.COM"),
       Some("cli+setup@example.com"),
@@ -623,12 +652,20 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = occupied.local_addr().unwrap().port();
     drop(occupied);
-    let saved_config = "web_ui = false\n";
+    let saved_config = if automatic {
+      "web_ui = true\n"
+    } else {
+      "web_ui = false\n"
+    };
     fs::write(directory.path().join("server.toml"), saved_config).unwrap();
     let log_path = directory.path().join("web-output.log");
     let mut cmd = command(directory.path());
-    cmd.args(["server", "setup", "--web", "--port", &port.to_string()]);
-    cmd.env("DOPBASE_WEB_UI", "false");
+    if automatic {
+      cmd.args(["server", "start", "--port", &port.to_string()]);
+    } else {
+      cmd.args(["server", "setup", "--web", "--port", &port.to_string()]);
+      cmd.env("DOPBASE_WEB_UI", "false");
+    }
     if let Some(email) = environment {
       cmd.env("DOPBASE_ROOT_EMAIL", email);
     }
@@ -783,12 +820,16 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
       }
       assert_eq!(
         client.get(&base).send().await.unwrap().status().as_u16(),
-        404
+        if automatic { 200 } else { 404 }
       );
       assert!(
         fs::read_to_string(&log_path)
           .unwrap()
-          .contains("Admin UI:   disabled")
+          .contains(if automatic {
+            "Admin UI:   http://"
+          } else {
+            "Admin UI:   disabled"
+          })
       );
       nix::sys::signal::kill(
         nix::unistd::Pid::from_raw(restarted.0.id() as i32),

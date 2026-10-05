@@ -2,42 +2,23 @@ use super::{ServerSetupArgs, handler::load_server_config};
 use crate::{
   cli::{client::CliCancelled, output, prompt},
   config::ensure_data_dir,
-  constants::config::ENV_ROOT_EMAIL,
-  modules::{bootstrap::service, common},
-  server::{InstanceLock, prepare_instance, require_uninitialized},
+  modules::bootstrap::service,
+  server::{
+    InstanceLock, prepare_instance,
+    provision::{cli_error, commit_root, resolve_email},
+    require_uninitialized,
+  },
   services::token,
 };
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use std::{
-  fmt,
   io::{self, IsTerminal},
   path::{Path, PathBuf},
 };
 use zeroize::Zeroizing;
 
-#[derive(Debug)]
-pub struct SetupCommittedError {
-  pub email: String,
-  pub data_dir: PathBuf,
-  reason: anyhow::Error,
-}
-
-impl fmt::Display for SetupCommittedError {
-  fn fmt(
-    &self,
-    formatter: &mut fmt::Formatter<'_>,
-  ) -> fmt::Result {
-    write!(
-      formatter,
-      "The instance is initialized, but setup could not finish: {}.\nData: {}\nIf you did not receive the password, run `dopbase admin reset-password {}` using the same instance options. Then run `dopbase server start`.",
-      self.reason,
-      self.data_dir.display(),
-      self.email
-    )
-  }
-}
-impl std::error::Error for SetupCommittedError {}
+pub use crate::server::provision::SetupCommittedError;
 
 #[derive(Serialize)]
 struct SetupOutput<'a> {
@@ -115,12 +96,7 @@ pub(super) async fn execute(
   let (db, _crypto) = prepare_instance(&config).await?;
   let provision = async {
     config.ensure_reference_files()?;
-    let mut tx = db.pool().begin().await?;
-    let admin_id = service::create_root(&mut tx, &credentials, &chrono::Utc::now())
-      .await
-      .map_err(cli_error)?;
-    tx.commit().await?;
-    Ok::<String, anyhow::Error>(admin_id)
+    commit_root(&db, &credentials).await
   }
   .await;
   let admin_id = match provision {
@@ -172,25 +148,4 @@ pub(super) async fn execute(
     })
   })?;
   Ok(0)
-}
-
-fn resolve_email(explicit: Option<String>) -> Result<Option<String>> {
-  let (value, source) = match explicit {
-    Some(value) => (value, "--email"),
-    None => match std::env::var(ENV_ROOT_EMAIL) {
-      Ok(value) if value.trim().is_empty() => return Ok(None),
-      Ok(value) => (value, ENV_ROOT_EMAIL),
-      Err(std::env::VarError::NotPresent) => return Ok(None),
-      Err(std::env::VarError::NotUnicode(_)) => {
-        bail!("{ENV_ROOT_EMAIL} must contain a valid UTF-8 email address")
-      }
-    },
-  };
-  common::validate_email(&value)
-    .map(Some)
-    .map_err(|_| anyhow::anyhow!("{source} must contain a valid email address."))
-}
-
-fn cli_error(error: crate::http::HttpError) -> anyhow::Error {
-  anyhow::anyhow!(error.errors.into_values().collect::<Vec<_>>().join(" "))
 }

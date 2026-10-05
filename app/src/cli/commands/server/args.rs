@@ -25,6 +25,11 @@ Examples:
 ";
 
 const START_HELP: &str = "\
+Fresh instances use web setup. Set DOPBASE_ROOT_EMAIL to create root with a generated password shown once.
+Initialized instances start normally and ignore DOPBASE_ROOT_EMAIL.
+With the web UI disabled, supply a root email or run `dopbase server setup` first.
+Pending factory resets require explicit setup.
+
 Examples:
   dopbase server start
   dopbase server start --port 9000

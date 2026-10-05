@@ -50,23 +50,29 @@ Dopbase keeps application secrets organized by project and environment on infras
 
 ## Quick start
 
-Install the latest release on macOS or Linux, initialize the local instance, then start it:
+Install the latest release on macOS or Linux and start it:
 
 ```bash
 curl -fsSL https://dopbase.com/install.sh | sh
-dopbase server setup
 dopbase server start
 ```
 
-Without an email default, setup asks for the root email and a password with
-confirmation. Open
-`http://localhost:8840` to sign in with those credentials.
+On fresh storage, startup prints the existing protected web setup link. Open it
+to create root or restore a backup. The server continues running after setup.
+An initialized instance starts normally.
 
-On a headless host, use `dopbase server setup --email admin@example.com` and save
-its generated password. For browser setup or backup restoration, use
-`dopbase server setup --web`. You can also set `DOPBASE_ROOT_EMAIL`: CLI setup
-generates a password without prompts, while web setup prefills the email through
-its printed link. Explicit `--email` overrides the environment default.
+To create root without browser setup, run
+`DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start`. Save the generated
+password shown once, then sign in. Later starts ignore this bootstrap input and
+preserve credentials. Background startup returns credentials to the launching
+command; Docker or redirected foreground output can retain them in logs.
+
+`dopbase server setup` remains available for guided terminal setup;
+`server setup --email` generates a password and exits, while
+`server setup --web --email` prefills the existing browser form. With the web UI
+disabled, supply a root email or complete CLI setup first. Interrupted factory
+resets still require explicit setup.
+
 The [quick-start guide](./docs/guide/quick-start.md)
 covers sign-in, importing a `.env` file, and running an application with its secrets.
 
@@ -122,18 +128,18 @@ Environment variables:
   DOPBASE_TOKEN                   Bearer token for a machine runner or AI agent. Overrides the saved login
   DOPBASE_URL                     Server URL for client commands when --server is not set
   DOPBASE_ENV                     Environment for dopbase run when its argument is omitted
-  DOPBASE_ROOT_EMAIL              Root email for server setup; --email overrides it
+  DOPBASE_ROOT_EMAIL              Root email for first startup or setup; setup --email overrides it
   DOPBASE_DATA_DIR                State and configuration directory (default: ~/.dopbase)
   DOPBASE_HOST                    Server bind host
   DOPBASE_PORT                    Server port (default: 8840)
   DOPBASE_PUBLIC_URL              Public URL
   DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
+  DOPBASE_WEB_UI                  Enable or disable the web UI (default: true)
   DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
 
 Quickstart:
-  dopbase server setup                     # initialize the local instance once
-  dopbase server start                     # run a server on http://localhost:8840
+  dopbase server start                     # start on http://localhost:8840; fresh instances enter setup
   dopbase server start --background        # run the server in the background (also -b)
   dopbase server stop                      # stop the background server
   dopbase server restart                   # restart with saved launch settings
@@ -146,13 +152,14 @@ Quickstart:
 Common server options:
   --host <HOST>    Bind host (default: 127.0.0.1)
   --port <PORT>    Listen port (default: 8840)
+  --no-web-ui      Disable the web UI for server start
 
 Run 'dopbase help <command>' for details on any command.
 ```
 
-Fresh or reset instances must run `server setup` before `server start`. Existing
-initialized installations do not need setup again. `init` creates a project and
-its first environment; it does not initialize the server.
+Fresh instances enter automatic setup during `server start`; completed resets
+use the same flow. Pending resets still require explicit setup. `init` creates
+a project and its first environment; it does not initialize the server.
 
 `server start` runs in the foreground. Add `--background` or `-b` to keep it running
 in the background. `server restart` preserves launch overrides and rereads configuration.
@@ -175,7 +182,6 @@ Project
 The server and client are built into the same `dopbase` executable:
 
 ```bash
-dopbase server setup
 dopbase server start
 dopbase login
 dopbase init
@@ -254,16 +260,14 @@ Scripts use the `action:target` pattern. The targets are `ui`, `app`, and
 | `bun run test:ui`    | Run only the Admin UI tests                 |
 | `bun run test:app`   | Run only the Rust application and CLI tests |
 
-Before the first `bun run dev` or `bun run dev:app`, initialize the development
-instance with `bun run prepare:app` followed by
-`cargo run --manifest-path app/Cargo.toml -- server setup`. Use the same
-`DOPBASE_DATA_DIR` setting for setup and development.
+`bun run dev` and `bun run dev:app` automatically enter setup on fresh storage.
+Use a separate `DOPBASE_DATA_DIR` for development. Open the printed setup link or
+supply `DOPBASE_ROOT_EMAIL` to generate credentials without browser setup.
 
 The combined command serves the UI at `http://localhost:9000`, proxies `/api`
 requests to the backend at `http://localhost:8840`, and stops both processes
 when you press Ctrl-C. To serve the Admin UI and API from one executable, run
 `bun run build:app` and then
-`./app/target/release/dopbase server setup` once, then
 `./app/target/release/dopbase server start`. App commands build the Admin UI
 when the embedded assets are missing from a clean checkout.
 

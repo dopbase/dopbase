@@ -81,22 +81,20 @@ if (( verified_command_paths < 2 )); then
   exit 1
 fi
 
-# Normal startup must not provision a fresh instance.
-if "${binary}" --data-dir "${data_dir}" server start >"${runtime_root}/fresh-start.out" 2>&1; then
+# A disabled UI without a bootstrap email still requires explicit setup.
+if "${binary}" --data-dir "${data_dir}" server start --no-web-ui >"${runtime_root}/fresh-start.out" 2>&1; then
   echo "error: uninitialized foreground startup unexpectedly succeeded" >&2
   exit 1
 fi
 grep --quiet 'dopbase server setup' "${runtime_root}/fresh-start.out"
 test ! -e "${data_dir}"
-if "${binary}" --data-dir "${background_data_dir}" server start --background >"${runtime_root}/fresh-background.out" 2>&1; then
+if "${binary}" --data-dir "${background_data_dir}" server start --background --no-web-ui >"${runtime_root}/fresh-background.out" 2>&1; then
   echo "error: uninitialized background startup unexpectedly succeeded" >&2
   exit 1
 fi
 test ! -e "${background_data_dir}"
-DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" --json server setup >"${runtime_root}/setup.json"
-"${binary}" --data-dir "${background_data_dir}" --json server setup --email smoke@example.com >"${runtime_root}/background-setup.json"
 
-"${binary}" --data-dir "${data_dir}" server start \
+DOPBASE_ROOT_EMAIL= "${binary}" --data-dir "${data_dir}" server start \
   --docs \
   --host 127.0.0.1 \
   --port 18376 \
@@ -125,25 +123,38 @@ test -f "${data_dir}/master.key"
 test -f "${data_dir}/dopbase.db.lock"
 test ! -e "${runtime_root}/dopbase.db"
 grep --quiet "Config:     ${data_dir}" "${server_log}"
-if grep --quiet 'Dopbase setup token' "${server_log}"; then
-  echo "error: runtime startup printed a setup token" >&2
-  exit 1
-fi
+grep --quiet 'Dopbase setup token' "${server_log}"
+setup_token="$(awk '/^setup_/ { print; exit }' "${server_log}")"
+test -n "${setup_token}"
+curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/admin \
+  --header 'Content-Type: application/json' \
+  --data "{\"setupToken\":\"${setup_token}\",\"email\":\"smoke@example.com\",\"password\":\"fixture-password-123\"}" \
+  >"${runtime_root}/claim.json"
+curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/status | grep --quiet '"state":"ready"'
 
 kill -TERM "${server_pid}"
 wait "${server_pid}"
 server_pid=""
 
-"${binary}" --data-dir "${background_data_dir}" --json server start --background \
+DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${background_data_dir}" --json server start --background \
   --docs \
   --host 127.0.0.1 \
   --port 18377 \
   >"${runtime_root}/background-start.json"
+grep --quiet '"initialized": true' "${runtime_root}/background-start.json"
+if grep --quiet 'Password (shown once)' "${background_data_dir}/serve.log"; then
+  echo "error: background password leaked to daemon log" >&2
+  exit 1
+fi
 curl --fail --silent http://127.0.0.1:18377/api/v1/health | grep --quiet '"success":true'
 "${binary}" --data-dir "${background_data_dir}" --json server status \
   | grep --quiet '"status": "running"'
 "${binary}" --data-dir "${background_data_dir}" server logs --lines 5 >/dev/null
 "${binary}" --data-dir "${background_data_dir}" --json server restart >"${runtime_root}/background-restart.json"
+if grep --quiet '"setup"' "${runtime_root}/background-restart.json"; then
+  echo "error: restart generated new credentials" >&2
+  exit 1
+fi
 curl --fail --silent http://127.0.0.1:18377/api/v1/health | grep --quiet '"success":true'
 if "${binary}" --data-dir "${background_data_dir}" server down >"${runtime_root}/migration.out" 2>&1; then
   echo "error: replaced server down unexpectedly succeeded" >&2

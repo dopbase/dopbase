@@ -18,6 +18,7 @@ impl fmt::Display for InitializationRequired {
       formatter,
       concat!(
         "This instance needs setup before it can start.\n\n",
+        "For automatic setup with the web UI disabled, set DOPBASE_ROOT_EMAIL to the root email.\n\n",
         "Choose a setup method:\n",
         "  dopbase server setup\n",
         "    Guided setup in this terminal.\n\n",
@@ -63,7 +64,7 @@ pub(crate) async fn require_uninitialized(config: &ServerConfig) -> Result<()> {
   Ok(())
 }
 
-async fn initialization_required(config: &ServerConfig) -> Result<bool> {
+pub(super) async fn initialization_required(config: &ServerConfig) -> Result<bool> {
   if config
     .data_dir
     .join(".factory-reset.pending")
