@@ -5,9 +5,9 @@ release on GitHub. It is written for maintainers and AI agents.
 
 ## Release rules
 
-- Use a stable semantic version in `MAJOR.MINOR.PATCH` form, such as `0.1.7`.
+- Use a stable semantic version in `MAJOR.MINOR.PATCH` form, such as `x.x.x`.
 - Release branches are named `release/<version>`.
-- Tags contain the version only, such as `0.1.7`; do not prefix them with `v`.
+- Tags contain the version only, such as `0.1.9`; do not prefix them with `v`.
 - Create the release branch from the latest `origin/main`.
 - Keep unrelated changes out of the release pull request.
 - A repository owner must manually review and approve the pull request.
@@ -99,11 +99,11 @@ Add a new section at the top of `CHANGELOG.md` in this form:
 ```markdown
 ## <version> - YYYY-MM-DD
 
-One short summary paragraph, no more than 500 characters.
+One short summary paragraph, no more than 600 characters.
 
 ### Added
 
-- A user-visible change.
+- A changes heres.
 ```
 
 Use the current release date. Include only applicable headings from this list:
