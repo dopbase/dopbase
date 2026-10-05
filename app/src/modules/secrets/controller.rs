@@ -160,8 +160,8 @@ pub async fn reveal(
 /// Import secrets
 ///
 /// Merge or replace a batch of secrets, optionally as a dry run that only
-/// reports what would change. Requires the CSRF header for browser
-/// sessions.
+/// reports what would change. Expected revisions are checked during both
+/// preview and apply. Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
   path = crate::constants::api::secrets::IMPORT,
@@ -174,7 +174,8 @@ pub async fn reveal(
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
-    (status = 422, description = "A secret key or value is invalid, a key is duplicated, or a limit is exceeded", body = crate::http::ErrorBody),
+    (status = 409, description = "A replace preview is required, or the supplied revision is stale", body = crate::http::ErrorBody),
+    (status = 422, description = "A key, value, or layout is invalid, a key is duplicated, or a limit is exceeded", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn import(
@@ -222,7 +223,8 @@ pub async fn layout(
 
 /// Export all secrets
 ///
-/// Decrypt and return every secret in the environment. Requires recent
+/// Decrypt and return every secret with layout and revision from one snapshot.
+/// Requires recent
 /// password authentication and the CSRF header for browser sessions. The
 /// export is recorded in the audit log.
 #[utoipa::path(
@@ -232,7 +234,7 @@ pub async fn layout(
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
   responses(
-    (status = 200, description = "Secrets exported", body = inline(HttpResponseFormat<ExportSecretsResponse>)),
+    (status = 200, description = "Secrets, layout, and collection revision exported from one snapshot", body = inline(HttpResponseFormat<ExportSecretsResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Recent password authentication and a valid CSRF token are required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),

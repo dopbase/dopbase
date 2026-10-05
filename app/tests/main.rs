@@ -442,7 +442,7 @@ async fn concurrent_secret_sets_increment_every_version() {
 }
 
 #[tokio::test]
-async fn import_apply_rejects_a_stale_preview_revision() {
+async fn import_rejects_stale_revisions_during_preview_and_apply() {
   let (_directory, state, router, token, environment_id) = admin_environment().await;
   let base = format!("/api/v1/environments/{environment_id}/secrets");
   let (_, preview, _) = call(
@@ -454,6 +454,18 @@ async fn import_apply_rejects_a_stale_preview_revision() {
   )
   .await;
   let revision = preview["data"]["revision"].as_str().unwrap();
+  let (status, snapshot, _) = call(
+    &router,
+    "POST",
+    &format!("{base}/export"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(snapshot["data"]["revision"], revision);
+  assert!(snapshot["data"]["entries"].as_array().unwrap().is_empty());
+  assert!(snapshot["data"]["envLayout"].is_null());
   let (status, _, _) = call(
     &router,
     "PUT",
@@ -469,6 +481,16 @@ async fn import_apply_rejects_a_stale_preview_revision() {
     &format!("{base}/import"),
     Some(&token),
     Some(json!({"mode":"replace","dryRun":false,"expectedRevision":revision,"entries":[{"key":"A","value":"one"}]})),
+  )
+  .await;
+  assert_eq!(status, 409);
+  assert!(body["error"]["IMPORT_PREVIEW_STALE"].is_string());
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    &format!("{base}/import"),
+    Some(&token),
+    Some(json!({"mode":"replace","dryRun":true,"expectedRevision":revision,"entries":[]})),
   )
   .await;
   assert_eq!(status, 409);
@@ -1004,6 +1026,30 @@ async fn env_layout_persists_with_import_and_omits_values() {
       .unwrap()
       .contains("postgres")
   );
+
+  let (_, snapshot, _) = call(
+    &router,
+    "POST",
+    &format!("{base}/export"),
+    Some(token),
+    None,
+  )
+  .await;
+  assert_eq!(snapshot["data"]["envLayout"], layout_text);
+  assert_eq!(snapshot["data"]["entries"].as_array().unwrap().len(), 2);
+  for layout in [
+    "API_KEY=plaintext-private-marker",
+    "API_KEY=\nAPI_KEY=",
+    "not a slot",
+  ] {
+    for dry_run in [true, false] {
+      let (status, body, _) = call(&router, "POST", &format!("{base}/import"), Some(token),
+        Some(json!({"mode":"replace","dryRun":dry_run,"entries":[],"envLayout":layout,"expectedRevision":snapshot["data"]["revision"]}))).await;
+      assert_eq!(status, 422);
+      assert!(body["error"]["ENV_LAYOUT_INVALID"].is_string());
+      assert!(!body.to_string().contains("plaintext-private-marker"));
+    }
+  }
 
   // A layout beyond the size limit is rejected.
   let huge = "x".repeat(64 * 1024 + 1);
