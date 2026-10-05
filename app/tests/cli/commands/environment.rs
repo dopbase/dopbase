@@ -475,9 +475,17 @@ async fn env_clone_human_output_lists_every_environment_in_the_project() {
   let stdout = String::from_utf8_lossy(&output.stdout);
   assert!(stdout.contains("Cloned 2 secrets from payment-service/local"));
   assert!(stdout.contains("ENVIRONMENT"));
-  assert!(stdout.contains("local"));
-  assert!(stdout.contains("staging"));
-  assert!(stdout.contains("production"));
+  assert!(stdout.contains("payment-service/local"));
+  assert!(stdout.contains("payment-service/staging"));
+  assert!(stdout.contains("payment-service/production"));
+  let header = stdout
+    .lines()
+    .find(|line| line.starts_with("ENVIRONMENT"))
+    .unwrap();
+  assert_eq!(
+    header.split_whitespace().collect::<Vec<_>>(),
+    ["ENVIRONMENT", "ID", "UPDATED"]
+  );
   assert!(stdout.contains("3 environment(s)"));
   assert!(!stdout.contains("\"projectName\""));
   assert_redacted(&output);
@@ -621,6 +629,36 @@ async fn environment_commands_resolve_references_and_save_the_default() {
   assert_eq!(all.as_array().unwrap().len(), 1);
   assert_eq!(all[0]["id"], id);
   assert_eq!(fixture.json(&["env", "list", "fixture"]).await, all);
+  assert_eq!(all[0]["projectName"], "fixture");
+  assert_eq!(all[0]["name"], "local");
+  let project_id = all[0]["projectId"].as_str().unwrap();
+  fixture.json(&["project", "create", "other"]).await;
+  let other = fixture.json(&["env", "create", "other/local"]).await;
+  for (arguments, expected_names) in [
+    (vec!["env", "list"], vec!["fixture/local", "other/local"]),
+    (vec!["env", "list", "fixture"], vec!["fixture/local"]),
+    (vec!["env", "list", project_id], vec!["fixture/local"]),
+  ] {
+    let output = fixture.run(&arguments).await;
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let mut lines = stdout.lines();
+    assert_eq!(
+      lines.next().unwrap().split_whitespace().collect::<Vec<_>>(),
+      ["ENVIRONMENT", "ID", "UPDATED"]
+    );
+    let actual_names = lines
+      .take_while(|line| !line.is_empty())
+      .map(|line| line.split_whitespace().next().unwrap())
+      .collect::<Vec<_>>();
+    assert_eq!(actual_names, expected_names);
+    assert!(stdout.contains(&id));
+    assert!(stdout.contains(" UTC"));
+    assert!(stdout.contains(&format!("{} environment(s)", expected_names.len())));
+  }
+  fixture
+    .json(&["env", "delete", other["id"].as_str().unwrap(), "--yes"])
+    .await;
   assert_eq!(
     fixture.json(&["env", "show", "fixture/local"]).await["id"],
     id
@@ -659,6 +697,17 @@ async fn environment_commands_resolve_references_and_save_the_default() {
       .unwrap()
       .is_empty()
   );
+  for (arguments, expected) in [
+    (vec!["env", "list"], "No environments found."),
+    (
+      vec!["env", "list", "fixture"],
+      "No environments found for fixture.",
+    ),
+  ] {
+    let output = fixture.run(&arguments).await;
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), expected);
+  }
 }
 
 #[cfg(unix)]

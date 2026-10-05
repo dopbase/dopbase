@@ -343,8 +343,11 @@ fn print_environments(
     .iter()
     .map(|environment| {
       vec![
-        output::string(environment, "projectName"),
-        output::string(environment, "name"),
+        format!(
+          "{}/{}",
+          output::string(environment, "projectName"),
+          output::string(environment, "name")
+        ),
         output::string(environment, "id"),
         output::timestamp(environment, "updatedAt"),
       ]
@@ -355,7 +358,7 @@ fn print_environments(
     |project| format!("No environments found for {project}."),
   );
   output::print_table(
-    &["PROJECT", "ENVIRONMENT", "ID", "UPDATED"],
+    &["ENVIRONMENT", "ID", "UPDATED"],
     &rows,
     &empty,
     &format!("{} environment(s)", rows.len()),
