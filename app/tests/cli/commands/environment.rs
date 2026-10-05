@@ -660,3 +660,6 @@ async fn environment_commands_resolve_references_and_save_the_default() {
       .is_empty()
   );
 }
+
+#[cfg(unix)]
+mod edit;

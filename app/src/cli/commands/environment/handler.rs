@@ -64,6 +64,20 @@ pub(crate) async fn execute(
   json_output: bool,
 ) -> Result<i32> {
   let command = match command {
+    EnvCommand::Edit {
+      environment,
+      editor,
+      dry_run,
+    } => {
+      return super::edit::execute(
+        server,
+        &environment,
+        editor.as_deref(),
+        dry_run,
+        json_output,
+      )
+      .await;
+    }
     EnvCommand::Default { environment, clear } => {
       if clear {
         let cleared = local_config::clear_default_environment(server)?;
@@ -94,6 +108,9 @@ pub(crate) async fn execute(
   };
   let api = client::human_client(server).await?;
   match command {
+    EnvCommand::Edit { .. } => {
+      unreachable!("editor commands are handled before client acquisition")
+    }
     EnvCommand::Default { .. } => unreachable!(),
     EnvCommand::Create { target } => {
       let (project, name) = target.into_parts();
