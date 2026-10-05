@@ -284,7 +284,7 @@ confirmation before export. A login completed by this command counts as
 confirmation, so it does not ask twice.
 
 Editor selection uses `--editor`, then `VISUAL`, then `EDITOR`. If none is set,
-Dopbase uses the first installed editor from Vim, Neovim, Helix, and nano.
+Dopbase checks for `nvim`, `vim`, `hx`, and `nano`, in that order.
 Commands are split into arguments without a shell; shell expansion and pipelines are unavailable.
 
 The editor opens the current secrets as `.env` text. On exit, Dopbase parses

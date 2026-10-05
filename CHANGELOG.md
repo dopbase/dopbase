@@ -96,6 +96,9 @@ response need updating.
 
 ### Fixed
 
+- CLI documentation now lists the `env edit` fallback order correctly:
+  `nvim`, `vim`, `hx`, then `nano`.
+
 - Secret exports include values, layout, and a revision from one snapshot.
   Imports check supplied revisions during dry runs as well as apply, protecting
   edits from concurrent changes. Layout imports reject slots containing values.
