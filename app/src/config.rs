@@ -12,7 +12,7 @@ use url::{Host, Url};
 use crate::constants::config::{
   CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT, ENV_DATA_DIR,
   ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT, ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS,
-  MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
+  ENV_WEB_UI, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -42,6 +42,8 @@ pub struct ServerConfig {
   pub shutdown_grace_seconds: u64,
   #[serde(skip)]
   pub docs_enabled: bool,
+  #[serde(skip)]
+  pub web_ui_enabled: bool,
   /// True when this process runs as a supervised background server and must
   /// manage the PID file.
   #[serde(skip)]
@@ -70,6 +72,7 @@ pub struct ServerOverrides {
   pub host: Option<String>,
   pub shutdown_grace_seconds: Option<u64>,
   pub docs: Option<bool>,
+  pub web_ui: Option<bool>,
   pub background: bool,
   pub supervised: bool,
   pub master_key_path: Option<PathBuf>,
@@ -83,6 +86,7 @@ struct ServerConfigFile {
   host: Option<String>,
   shutdown_grace_seconds: Option<u64>,
   docs: Option<bool>,
+  web_ui: Option<bool>,
   master_key: Option<MasterKeyConfigFile>,
 }
 
@@ -102,6 +106,7 @@ pub struct EnvironmentOverrides {
   pub host: Option<String>,
   pub shutdown_grace_seconds: Option<String>,
   pub docs: Option<String>,
+  pub web_ui: Option<String>,
   pub master_key_path: Option<PathBuf>,
 }
 
@@ -114,6 +119,7 @@ impl EnvironmentOverrides {
       host: env::var(ENV_HOST).ok(),
       shutdown_grace_seconds: env::var(ENV_SHUTDOWN_GRACE_SECONDS).ok(),
       docs: env::var(ENV_DOCS).ok(),
+      web_ui: env::var(ENV_WEB_UI).ok(),
       master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
     }
   }
@@ -149,6 +155,7 @@ impl ServerConfig {
       public_url: DEFAULT_PUBLIC_URL.into(),
       shutdown_grace_seconds: 10,
       docs_enabled: false,
+      web_ui_enabled: true,
       daemonized: false,
       daemon_launch: None,
       public_url_source: PublicUrlSource::LoopbackDefault,
@@ -237,6 +244,9 @@ impl ServerConfig {
     if let Some(value) = file.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
     }
+    if let Some(value) = file.web_ui {
+      self.web_ui_enabled = value;
+    }
     if let Some(value) = file.docs {
       self.docs_enabled = value;
     }
@@ -264,6 +274,9 @@ impl ServerConfig {
         .parse()
         .context("invalid DOPBASE_SHUTDOWN_GRACE_SECONDS")?;
     }
+    if let Some(value) = environment.web_ui {
+      self.web_ui_enabled = value.parse().context("invalid DOPBASE_WEB_UI")?;
+    }
     if let Some(value) = environment.docs {
       self.docs_enabled = value.parse().context("invalid DOPBASE_DOCS")?;
     }
@@ -283,6 +296,9 @@ impl ServerConfig {
     }
     if let Some(value) = overrides.shutdown_grace_seconds {
       self.shutdown_grace_seconds = value;
+    }
+    if let Some(value) = overrides.web_ui {
+      self.web_ui_enabled = value;
     }
     if let Some(value) = overrides.docs {
       self.docs_enabled = value;

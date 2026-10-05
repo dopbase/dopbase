@@ -6,6 +6,13 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- Disable the web UI with `web_ui = false` in `server.toml`,
+  `DOPBASE_WEB_UI=false`, or `server start --no-web-ui`. It stays enabled by
+  default. CLI and REST API access remain available, and API documentation uses
+  its own setting. Background restart preserves launch overrides.
+  `server setup --web` explicitly enables the UI for that run without changing
+  saved configuration.
+
 - `DOPBASE_ROOT_EMAIL` supplies the root email for `server setup`, with explicit
   `--email` taking precedence. CLI setup generates a password without prompts;
   web setup includes the email in its link and prefills the editable form.

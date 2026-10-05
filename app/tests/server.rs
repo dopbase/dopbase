@@ -200,3 +200,25 @@ fn foreground_and_background_start_create_references_in_the_selected_locations()
     drop(running);
   }
 }
+
+#[test]
+fn startup_banner_reports_web_ui_state_independently_of_docs() {
+  for web_ui_enabled in [false, true] {
+    for docs_enabled in [false, true] {
+      let banner = app::server::startup_banner(
+        "http://localhost:8840/",
+        "127.0.0.1:8840",
+        std::path::Path::new("/tmp/data"),
+        docs_enabled,
+        web_ui_enabled,
+      );
+      assert!(banner.contains(if web_ui_enabled {
+        "Admin UI:   http://localhost:8840"
+      } else {
+        "Admin UI:   disabled"
+      }));
+      assert!(banner.contains("API:        http://localhost:8840/api/v1"));
+      assert_eq!(banner.contains("API Specs:"), docs_enabled);
+    }
+  }
+}

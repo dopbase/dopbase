@@ -623,9 +623,12 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = occupied.local_addr().unwrap().port();
     drop(occupied);
+    let saved_config = "web_ui = false\n";
+    fs::write(directory.path().join("server.toml"), saved_config).unwrap();
     let log_path = directory.path().join("web-output.log");
     let mut cmd = command(directory.path());
     cmd.args(["server", "setup", "--web", "--port", &port.to_string()]);
+    cmd.env("DOPBASE_WEB_UI", "false");
     if let Some(email) = environment {
       cmd.env("DOPBASE_ROOT_EMAIL", email);
     }
@@ -734,6 +737,19 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
       .unwrap();
     assert_eq!(status["data"]["state"], "ready");
     assert!(running.0.try_wait().unwrap().is_none());
+    assert!(
+      client
+        .get(&base)
+        .send()
+        .await
+        .unwrap()
+        .status()
+        .is_success()
+    );
+    assert_eq!(
+      fs::read_to_string(directory.path().join("server.toml")).unwrap(),
+      saved_config
+    );
     #[cfg(unix)]
     {
       nix::sys::signal::kill(
@@ -742,6 +758,44 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
       )
       .unwrap();
       assert!(running.0.wait().unwrap().success());
+      let mut restarted = Running(
+        command(directory.path())
+          .args(["server", "start", "--port", &port.to_string()])
+          .stdout(Stdio::null())
+          .stderr(Stdio::from(fs::File::create(&log_path).unwrap()))
+          .spawn()
+          .unwrap(),
+      );
+      let client = reqwest::Client::new();
+      let deadline = Instant::now() + Duration::from_secs(10);
+      loop {
+        if let Ok(response) = client.get(format!("{base}/api/v1/health")).send().await
+          && response.status().is_success()
+        {
+          break;
+        }
+        assert!(restarted.0.try_wait().unwrap().is_none());
+        assert!(
+          Instant::now() < deadline,
+          "normal startup readiness timed out"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+      }
+      assert_eq!(
+        client.get(&base).send().await.unwrap().status().as_u16(),
+        404
+      );
+      assert!(
+        fs::read_to_string(&log_path)
+          .unwrap()
+          .contains("Admin UI:   disabled")
+      );
+      nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(restarted.0.id() as i32),
+        nix::sys::signal::Signal::SIGTERM,
+      )
+      .unwrap();
+      assert!(restarted.0.wait().unwrap().success());
     }
   }
 }

@@ -28,6 +28,7 @@ const START_HELP: &str = "\
 Examples:
   dopbase server start
   dopbase server start --port 9000
+  dopbase server start --no-web-ui
   dopbase server start --background
   dopbase server start -b --port 9000
   dopbase server start --host 0.0.0.0 --public-url https://dopbase.example.com
@@ -104,6 +105,9 @@ pub enum ServerCommand {
 pub struct ServerStartArgs {
   #[command(flatten)]
   pub launch: ServerLaunchArgs,
+  /// Disable the web UI for this run, overriding server.toml or DOPBASE_WEB_UI.
+  #[arg(long)]
+  pub no_web_ui: bool,
   /// Start the server in the background on macOS or Linux.
   #[arg(short = 'b', long, conflicts_with = "supervised")]
   pub background: bool,
@@ -170,7 +174,8 @@ CLI setup creates the root account and exits without starting a server.
 --email or DOPBASE_ROOT_EMAIL generates a password and prints it once in CLI mode.
 --email overrides DOPBASE_ROOT_EMAIL. Empty environment values use guided setup.
 Save the generated password before closing the terminal.
---web runs the existing web setup server until you stop it with Ctrl+C.
+--web enables the web UI for this run, even when web_ui or DOPBASE_WEB_UI is false.
+The setup server keeps running until you stop it with Ctrl+C.
 An email supplied with --web prefills the form through the printed setup link.
 Use the same --data-dir and --config options when starting the instance.
 ";

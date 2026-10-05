@@ -32,6 +32,11 @@
 # Environment: DOPBASE_SHUTDOWN_GRACE_SECONDS
 # shutdown_grace_seconds = 10
 
+# Enable the web UI. The CLI and REST API remain available when disabled.
+# Accepts: true or false. Default: true.
+# Environment: DOPBASE_WEB_UI
+# web_ui = true
+
 # Enable Swagger UI at /api/docs.
 # Accepts: true or false. Default: false.
 # Environment: DOPBASE_DOCS

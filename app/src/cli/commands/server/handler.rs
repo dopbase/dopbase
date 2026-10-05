@@ -30,9 +30,10 @@ pub(crate) async fn execute(
       json_output,
     ),
     ServerCommand::Start(args) => {
+      let mut overrides = launch_overrides(args.launch, data_dir, args.background, args.supervised);
+      overrides.web_ui = args.no_web_ui.then_some(false);
       if args.background {
         let environment = EnvironmentOverrides::read();
-        let mut overrides = launch_overrides(args.launch, data_dir, true, false);
         let mut config = ServerConfig::load_with_environment(&overrides, environment.clone())?;
         overrides.data_dir = Some(config.data_dir.clone());
         overrides.config_path = Some(config.config_path.clone());
@@ -60,13 +61,11 @@ pub(crate) async fn execute(
             Ok(value) => serde_json::from_str::<crate::daemon::LaunchDescriptor>(&value)
               .context("invalid internal server launch settings")?
               .config()?,
-            Err(std::env::VarError::NotPresent) => {
-              load_server_config(args.launch, data_dir, false, true)?
-            }
+            Err(std::env::VarError::NotPresent) => ServerConfig::load(&overrides)?,
             Err(error) => return Err(error.into()),
           }
         } else {
-          load_server_config(args.launch, data_dir, false, false)?
+          ServerConfig::load(&overrides)?
         };
         crate::server::serve_with_ready(config, ready.as_ref()).await
       }
@@ -159,6 +158,7 @@ fn launch_overrides(
   ServerOverrides {
     data_dir,
     docs: args.docs(),
+    web_ui: None,
     background,
     supervised,
     config_path: args.config,

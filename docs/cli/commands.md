@@ -83,6 +83,7 @@ See [server lifecycle](./serve) for options, migration steps, and examples.
 | `--port <PORT>`                      | Listen on a port, default `8840`            |
 | `--public-url <URL>`                 | Set the URL clients use to reach the server |
 | `--shutdown-grace-seconds <SECONDS>` | Set the request-drain timeout               |
+| `--no-web-ui`                        | Disable the web UI for `server start`       |
 | `--docs` / `--no-docs`               | Enable or disable API documentation         |
 | `--master-key-file <FILE>`           | Read the master key from another file       |
 

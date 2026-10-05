@@ -345,6 +345,7 @@ fn report_started(
         &config.bind_address,
         &config.data_dir,
         config.docs_enabled,
+        config.web_ui_enabled,
       )
     );
   }

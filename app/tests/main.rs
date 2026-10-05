@@ -15,6 +15,13 @@ async fn test_app() -> (TempDir, app::state::AppState, Router) {
 }
 
 async fn test_app_with_docs(docs_enabled: bool) -> (TempDir, app::state::AppState, Router) {
+  test_app_with_ui(docs_enabled, true).await
+}
+
+async fn test_app_with_ui(
+  docs_enabled: bool,
+  web_ui_enabled: bool,
+) -> (TempDir, app::state::AppState, Router) {
   let directory = TempDir::new().unwrap();
   let database = directory.path().join("dopbase.db");
   let config = ServerConfig {
@@ -25,6 +32,7 @@ async fn test_app_with_docs(docs_enabled: bool) -> (TempDir, app::state::AppStat
       path: directory.path().join("master.key"),
     },
     docs_enabled,
+    web_ui_enabled,
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();
@@ -1141,4 +1149,74 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
   .await;
   assert_eq!(status, 400);
   state.db.close().await;
+}
+
+#[tokio::test]
+async fn disabled_web_ui_blocks_pages_and_assets_but_keeps_cli_api_and_optional_docs() {
+  for docs_enabled in [false, true] {
+    let (_directory, state, router) = test_app_with_ui(docs_enabled, false).await;
+    for path in [
+      "/",
+      "/index.html",
+      "/login",
+      "/setup",
+      "/projects/example/settings",
+      "/favicon.svg",
+      "/missing.js",
+    ] {
+      let (status, body, headers) = call(&router, "GET", path, None, None).await;
+      assert_eq!(status, 404, "{path}");
+      assert_eq!(headers[header::CONTENT_TYPE], "application/json");
+      assert_eq!(
+        body,
+        json!({"success":false,"error":{"REQUEST_INVALID":"The requested route was not found."}})
+      );
+      assert_eq!(headers["x-content-type-options"], "nosniff");
+    }
+    let (status, body, _) = call(&router, "GET", "/api/v1/missing", None, None).await;
+    assert_eq!(status, 404);
+    assert_eq!(
+      body["error"]["REQUEST_INVALID"],
+      "The requested API route was not found."
+    );
+    assert_eq!(get(&router, "/api/v1/health").await.status(), 200);
+    assert_eq!(
+      get(&router, "/api/docs/").await.status(),
+      if docs_enabled { 200 } else { 404 }
+    );
+    assert_eq!(
+      get(&router, "/api/v1/openapi.json").await.status(),
+      if docs_enabled { 200 } else { 404 }
+    );
+    let setup = state.setup.read().await.token.clone().unwrap();
+    let (status, _, _) = call(
+      &router,
+      "POST",
+      "/api/v1/bootstrap/admin",
+      None,
+      Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let (status, login, _) = call(
+      &router,
+      "POST",
+      "/api/v1/auth/login",
+      None,
+      Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let token = login["data"]["token"].as_str().unwrap();
+    let (status, _, _) = call(
+      &router,
+      "POST",
+      "/api/v1/projects",
+      Some(token),
+      Some(json!({"name":"cli-only"})),
+    )
+    .await;
+    assert_eq!(status, 201);
+    state.db.close().await;
+  }
 }

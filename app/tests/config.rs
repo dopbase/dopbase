@@ -24,6 +24,7 @@ fn defaults_use_the_dopbase_data_directory() {
     config.config_path,
     config.data_dir.join(SERVER_CONFIG_FILENAME)
   );
+  assert!(config.web_ui_enabled);
   config.validate().unwrap();
 }
 
@@ -427,6 +428,7 @@ fn uncomment_server_examples(reference: &str) -> String {
           "public_url",
           "shutdown_grace_seconds",
           "docs",
+          "web_ui",
           "provider",
           "path",
         ]
@@ -446,6 +448,7 @@ fn generated_references_load_defaults_and_uncommented_server_examples() {
     data_dir: Some(data_dir.clone()),
     port: Some(9000),
     docs: Some(true),
+    web_ui: Some(false),
     master_key_path: Some(directory.path().join("temporary.key")),
     ..Default::default()
   };
@@ -492,6 +495,7 @@ fn generated_references_load_defaults_and_uncommented_server_examples() {
   );
   assert_eq!(reloaded.shutdown_grace_seconds, 10);
   assert!(!reloaded.docs_enabled);
+  assert!(reloaded.web_ui_enabled);
   assert_eq!(reloaded.master_key.provider, "file");
   assert_eq!(reloaded.master_key.path, data_dir.join(MASTER_KEY_FILENAME));
 }
@@ -545,5 +549,73 @@ fn generated_reference_files_are_private() {
       fs::metadata(path).unwrap().permissions().mode() & 0o777,
       0o600
     );
+  }
+}
+
+#[test]
+fn web_ui_precedence_is_cli_then_environment_then_file_then_default() {
+  for (file, environment, cli, expected) in [
+    (None, None, None, true),
+    (Some(false), None, None, false),
+    (Some(true), None, None, true),
+    (Some(true), Some("false"), None, false),
+    (Some(false), Some("true"), None, true),
+    (Some(true), Some("true"), Some(false), false),
+    (Some(false), Some("false"), Some(true), true),
+  ] {
+    let directory = tempfile::TempDir::new().unwrap();
+    if let Some(value) = file {
+      fs::write(
+        directory.path().join(SERVER_CONFIG_FILENAME),
+        format!("web_ui = {value}\n"),
+      )
+      .unwrap();
+    }
+    let config = ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(directory.path().into()),
+        web_ui: cli,
+        ..Default::default()
+      },
+      EnvironmentOverrides {
+        web_ui: environment.map(str::to_owned),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    assert_eq!(
+      config.web_ui_enabled, expected,
+      "file={file:?}, env={environment:?}, cli={cli:?}"
+    );
+  }
+}
+
+#[test]
+fn invalid_web_ui_settings_are_rejected() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let overrides = ServerOverrides {
+    data_dir: Some(directory.path().into()),
+    ..Default::default()
+  };
+  for value in ["yes", "0", "", "TRUE"] {
+    let error = ServerConfig::load_with_environment(
+      &overrides,
+      EnvironmentOverrides {
+        web_ui: Some(value.into()),
+        ..Default::default()
+      },
+    )
+    .unwrap_err();
+    assert!(format!("{error:#}").contains("invalid DOPBASE_WEB_UI"));
+  }
+  for value in ["'false'", "0"] {
+    fs::write(
+      directory.path().join(SERVER_CONFIG_FILENAME),
+      format!("web_ui = {value}\n"),
+    )
+    .unwrap();
+    let error =
+      ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap_err();
+    assert!(format!("{error:#}").contains("failed to parse"));
   }
 }
