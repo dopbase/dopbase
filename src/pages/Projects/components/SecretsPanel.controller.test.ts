@@ -41,6 +41,8 @@ function makeController(environmentId = "env_1") {
 
 const storedLayout = "# app\nDATABASE_URL=\nAPI_KEY=\n";
 const exported = {
+  revision: "revision-1",
+  envLayout: storedLayout,
   entries: [
     { key: "DATABASE_URL", value: "postgres://secret" },
     { key: "API_KEY", value: "k-123" },

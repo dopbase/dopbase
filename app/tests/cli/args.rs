@@ -693,6 +693,7 @@ fn resource_parameters_use_consistent_value_names() {
       "<ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>",
     ),
     (&["dopbase", "env", "delete", "--help"], "<ENVIRONMENT_REF>"),
+    (&["dopbase", "env", "edit", "--help"], "<ENVIRONMENT_REF>"),
     (
       &["dopbase", "secret", "list", "--help"],
       "<ENVIRONMENT_REF>",
@@ -822,6 +823,7 @@ fn binary_prints_contextual_help_and_keeps_the_usage_error_exit_code() {
 
 #[test]
 fn parses_each_public_command_and_detects_missing_cases() {
+  assert!(Cli::try_parse_from(["dopbase", "secret", "edit", "billing/local"]).is_err());
   fn leaves(
     command: &clap::Command,
     parent: &str,
@@ -876,6 +878,15 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "env", "show", "billing/local"],
     &["dopbase", "env", "rename", "billing/local", "production"],
     &["dopbase", "env", "delete", "billing/local"],
+    &[
+      "dopbase",
+      "env",
+      "edit",
+      "billing/local",
+      "--editor",
+      "hx",
+      "--dry-run",
+    ],
     &["dopbase", "secret", "list", "billing/local"],
     &["dopbase", "secret", "set", "billing/local", "API_KEY"],
     &["dopbase", "secret", "get", "billing/local", "API_KEY"],

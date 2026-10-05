@@ -12,6 +12,7 @@ use std::{
   io::{self, IsTerminal},
   time::Duration,
 };
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
@@ -239,7 +240,8 @@ impl ApiClient {
         .context("failed to read server response body")?
         .to_vec()
     };
-    let value: Value = match serde_json::from_slice(&bytes) {
+    let bytes = Zeroizing::new(bytes);
+    let mut value: Value = match serde_json::from_slice(&bytes) {
       Ok(value) => value,
       Err(_) if !status.is_success() => {
         return Err(
@@ -274,7 +276,12 @@ impl ApiClient {
         .into(),
       );
     }
-    Ok(value.get("data").cloned().unwrap_or(Value::Null))
+    Ok(
+      value
+        .get_mut("data")
+        .map(Value::take)
+        .unwrap_or(Value::Null),
+    )
   }
   pub async fn health(&self) -> Result<Value> {
     self.request(Method::GET, api::health::ROOT, None).await
@@ -609,12 +616,12 @@ pub fn normalize_login_email(value: &str) -> Result<String> {
   crate::modules::common::validate_email(value)
     .map_err(|_| anyhow::anyhow!("Enter a valid email address."))
 }
-enum HumanClient {
+pub(crate) enum HumanClient {
   Existing(ApiClient),
   NewlyAuthenticated(ApiClient),
 }
 
-async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
+pub(crate) async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
   let credential = credential(server)?;
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
@@ -640,29 +647,44 @@ pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   })
 }
 
+impl HumanClient {
+  pub(crate) fn client(&self) -> &ApiClient {
+    match self {
+      Self::Existing(client) | Self::NewlyAuthenticated(client) => client,
+    }
+  }
+
+  pub(crate) async fn confirm_plaintext_access(self) -> Result<ApiClient> {
+    match self {
+      HumanClient::NewlyAuthenticated(client) => Ok(client),
+      HumanClient::Existing(client) => {
+        let password = prompt_password_confirmation().await?;
+        let request = client.request(
+          Method::POST,
+          api::auth::REAUTHENTICATE,
+          Some(json!({"password":password})),
+        );
+        tokio::select! {
+          result = request => { result?; }
+          signal = tokio::signal::ctrl_c() => {
+            signal?;
+            return Err(CliCancelled::PasswordConfirmation.into());
+          }
+        }
+        Ok(client)
+      }
+    }
+  }
+}
+
 pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
   if !io::stdin().is_terminal() {
     bail!("interactive password confirmation is required for plaintext secret access");
   }
-  match acquire_human_client(server).await? {
-    HumanClient::NewlyAuthenticated(client) => Ok(client),
-    HumanClient::Existing(client) => {
-      let password = prompt_password_confirmation().await?;
-      let request = client.request(
-        Method::POST,
-        api::auth::REAUTHENTICATE,
-        Some(json!({"password":password})),
-      );
-      tokio::select! {
-        result = request => { result?; }
-        signal = tokio::signal::ctrl_c() => {
-          signal?;
-          return Err(CliCancelled::PasswordConfirmation.into());
-        }
-      }
-      Ok(client)
-    }
-  }
+  acquire_human_client(server)
+    .await?
+    .confirm_plaintext_access()
+    .await
 }
 
 pub(crate) async fn ensure_recent_authentication(client: &ApiClient) -> Result<()> {

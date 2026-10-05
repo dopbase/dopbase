@@ -5,6 +5,19 @@ use crate::constants::help::ENVIRONMENT_ARG_HELP;
 
 #[derive(Subcommand, Debug)]
 pub enum EnvCommand {
+  /// Edit all secrets as .env text in a terminal editor.
+  #[command(after_help = EDIT_HELP)]
+  Edit {
+    #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
+    environment: String,
+    /// Editor command. Defaults to VISUAL, EDITOR, or an installed editor.
+    #[arg(long, value_name = "COMMAND")]
+    editor: Option<String>,
+    /// Validate and preview the edits without saving them.
+    #[arg(long)]
+    dry_run: bool,
+  },
+
   /// Set or clear the default environment used by `dopbase run`.
   #[command(after_help = DEFAULT_HELP)]
   Default {
@@ -79,6 +92,7 @@ pub enum EnvCommand {
 
 pub(crate) const HELP: &str = "\
 Examples:
+  dopbase env edit payment-service/production
   dopbase env create payment-service/production
   dopbase env clone payment-service/local production
   dopbase env list payment-service
@@ -119,4 +133,18 @@ const DELETE_HELP: &str = "\
 Examples:
   dopbase env delete payment-service/staging
   dopbase env delete payment-service/staging --yes
+";
+
+const EDIT_HELP: &str = "\
+Examples:
+  dopbase env edit payment-service/production
+  dopbase env edit payment-service/production --editor hx
+  dopbase env edit env_482731 --dry-run
+
+Checks the environment before password confirmation. Empty environments offer
+to add secrets. Requires a terminal. Dopbase validates the edited
+.env document, previews changed key names, and asks before saving. Removing a
+line schedules that key for deletion. Comments are unencrypted metadata; never
+put credentials in comments. Known editors use isolated configuration. Custom
+commands require acknowledgement of their plaintext exposure.
 ";
