@@ -157,8 +157,10 @@ If an existing unrelated failure prevents a check from passing, describe the fai
 
 Releases use annotated semantic-version tags. Before tagging, update the
 version in `package.json` and `app/Cargo.toml`, refresh `app/Cargo.lock`, and
-move the release notes from `Unreleased` to a dated version section in
-`CHANGELOG.md`. Merge those changes into `main`, then create and push the tag
+keep draft release notes under the planned version in `CHANGELOG.md`, such as
+`## 0.1.9 - Unreleased`. Replace `Unreleased` with the release date before
+publishing; release generation requires a dated heading. Merge those changes
+into `main`, then create and push the tag
 from the release commit:
 
 Start each release section with one short summary paragraph. Add only the
