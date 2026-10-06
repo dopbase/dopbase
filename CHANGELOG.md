@@ -2,6 +2,31 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Runner tokens can export their assigned environment with `dopbase export`,
+  using `DOPBASE_TOKEN` or an encrypted credential saved by `login --token`.
+  Pipeline exports need no terminal or password prompt and require a live server
+  response. Export formats, private files, and overwrite protection remain
+  unchanged. Added an AWS CodeBuild example using Secrets Manager.
+
+### Security
+
+- Runner exports enforce environment scope and record the runner token ID and
+  secret count in the audit log without secret values. Human password
+  confirmation, browser CSRF checks, and AI agent restrictions remain in place.
+
+### Note
+
+- **Breaking:** Removed `dopbase run -t <TOKEN>` and `--token <TOKEN>`.
+  Inject `DOPBASE_TOKEN` through a CI secret store or deployment platform, or
+  save a runner credential with `dopbase login --token`. Authentication now
+  resolves `DOPBASE_TOKEN`, then the encrypted saved credential. An invalid
+  environment credential never falls back to saved credentials. Arguments
+  after `--` still belong to the child command.
+
 ## 0.1.9 - 2026-10-05
 
 [Dopbase](https://dopbase.com) 0.1.9 adds guided server setup, automatic first-run initialization,
