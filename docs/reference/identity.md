@@ -37,9 +37,10 @@ The prompt does not echo the token. A provisioning script can pipe it instead:
 printf '%s' "$RUNNER_TOKEN" | dopbase login --token
 ```
 
-For one run, pass `-t <TOKEN>` or `--token <TOKEN>` before the child-command
-separator. CI and deployment platforms can set `DOPBASE_TOKEN`. Authentication
-uses the command flag first, then `DOPBASE_TOKEN`, then the saved credential.
+CI and deployment platforms should inject `DOPBASE_TOKEN` from their secret
+store. Authentication uses `DOPBASE_TOKEN`, then the encrypted saved credential.
+An invalid environment credential stops the command; Dopbase does not fall back
+to a saved credential.
 
 `dopbase login` and `dopbase login --token` encrypt their credential in the
 extensionless `session` file under the Dopbase data directory. The separate
@@ -50,10 +51,11 @@ used only for its matching server. Saving another credential replaces it.
 The encrypted payload also caches the administrator email for offline
 `dopbase client status` output. The password is never stored.
 
-Plaintext `secret get --reveal` and `export` operations in the official CLI
-require interactive password confirmation every time. This is a CLI safety
-gate. Direct HTTP clients continue to follow the server's existing recent-
-authentication policy.
+Human `secret get --reveal` and `export` operations in the official CLI require
+interactive password confirmation every time. Runner tokens can export their
+assigned environment without a prompt, using `DOPBASE_TOKEN` or a saved runner
+credential. Direct HTTP clients follow the server's authentication policy;
+browser exports require recent password authentication and a valid CSRF header.
 
 For application servers, create a runner token scoped to one environment:
 
@@ -62,9 +64,10 @@ dopbase token create payment-service/production \
   --name production-server --role runner
 ```
 
-The plaintext token is displayed only once. A runner can retrieve and inject
-values from its assigned environment, but cannot change secrets, export them,
-or access another environment. Production and staging servers should always
+The plaintext token is displayed only once. A runner can retrieve, inject, and
+export values from its assigned environment. It cannot change secrets or access
+another environment. Exports are audited with the runner token ID and secret
+count, without recording values. Production and staging servers should always
 use different runner tokens. Runner tokens have no expiry by default. Use
 `--expires-in 12h` or `--expires-in 7d` when creating one for a short job.
 Durations must be whole hours or days, up to 1,095 days.
@@ -133,10 +136,10 @@ See
 
 Tokens must be scoped, revocable, and hidden from logs. Operators should use the narrowest permissions available and rotate a token immediately if it may have been exposed.
 
-`dopbase run` removes Dopbase authentication variables before starting the
-child process. A token passed with `--token` may be exposed through process
-inspection or shell history, so use a saved token or `DOPBASE_TOKEN` for normal
-deployment workflows.
+`dopbase run` removes `DOPBASE_TOKEN` before starting the child process. Use a
+saved runner credential on a persistent server, or let your deployment platform
+inject `DOPBASE_TOKEN`. Environment variables still need protection from logs
+and processes that can inspect the runner.
 
 The session and key files are restricted to the current user where the platform
 supports it. An attacker that can read both files can decrypt the token. Use

@@ -2,16 +2,20 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## 0.1.9 - 2026-10-05
+## 0.1.9 - Unreleased
 
-[Dopbase](https://dopbase.com) 0.1.9 adds guided server setup, automatic first-run initialization,
-optional web UI, and background server restart. Generated configuration
-files include setting examples, CLI exports work with hosts that require
-a content length, and community tutorials cover common workflows. Scripts
-using `server up`, `server down`, or the previous setup-required JSON
-response need updating.
+[Dopbase](https://dopbase.com) 0.1.9 adds guided server setup, optional web UI,
+background server management, terminal secret editing, and runner exports for
+pipelines. AI agent tokens can read CLI metadata. Run token arguments, legacy
+server commands, and some setup responses change in this release.
 
 ### Added
+
+- Runner tokens can export their assigned environment with `dopbase export`,
+  using `DOPBASE_TOKEN` or an encrypted credential saved by `login --token`.
+  Pipeline exports need no terminal or password prompt and require a live server
+  response. Export formats, private files, and overwrite protection remain
+  unchanged. Added an AWS CodeBuild example using Secrets Manager.
 
 - `dopbase env edit <ENVIRONMENT_REF>` opens an environment in Vim, Neovim,
   Helix, nano, or a custom terminal editor. It checks the target before password
@@ -74,7 +78,20 @@ response need updating.
   explicit setup. Credential-output failure stops the new server and preserves
   the initialized account for offline password recovery.
 
+### Security
+
+- Runner exports enforce environment scope and record the runner token ID and
+  secret count in the audit log without secret values. Human password
+  confirmation, browser CSRF checks, and AI agent restrictions remain in place.
+
 ### Note
+
+- **Breaking:** Removed `dopbase run -t <TOKEN>` and `--token <TOKEN>`.
+  Inject `DOPBASE_TOKEN` through a CI secret store or deployment platform, or
+  save a runner credential with `dopbase login --token`. Authentication now
+  resolves `DOPBASE_TOKEN`, then the encrypted saved credential. An invalid
+  environment credential never falls back to saved credentials. Arguments
+  after `--` still belong to the child command.
 
 - **Breaking:** With the web UI disabled and no bootstrap root email, background
   startup with `--json` writes
@@ -88,13 +105,19 @@ response need updating.
   and environment workflow.
 
 - `dopbase server up` and `dopbase server down` have been replaced by
-  `server start --background` and `server stop`. The old commands show an
-  informational migration notice and exit with status 1 without changing server
-  state. JSON mode returns `COMMAND_REPLACED` information on stdout.
-  Servers started before this change need one manual stop/start before restart
-  is available. Update scripts that use the previous commands.
+  `server start --background` or `server start -b` and `server stop`.
+  The old commands show an informational migration notice and exit with
+  status 1 without changing server state. JSON mode returns `COMMAND_REPLACED`
+  information on stdout. Servers started before this change need one manual
+  stop/start before restart is available. Update scripts that use the previous commands.
 
 ### Fixed
+
+- AI agent tokens now work with `project list`, `project show`, `env list`,
+  `env show`, `secret list`, and `secret get` without `--reveal`. Metadata reads
+  validate the token through the API instead of requiring a human session.
+  Invalid, expired, and revoked tokens fail without falling back to saved
+  credentials. Secret values and writes remain restricted.
 
 - CLI documentation now lists the `env edit` fallback order correctly:
   `nvim`, `vim`, `hx`, then `nano`.

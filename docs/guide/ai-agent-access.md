@@ -67,12 +67,8 @@ dopbase client status
 ```
 
 `client status` reports the identity as `ai_agent` without printing the token.
-For a trusted local setup, you can save the token in Dopbase's encrypted client
-session instead:
-
-```bash
-printf '%s' "$AI_AGENT_TOKEN" | dopbase login --token
-```
+Use `DOPBASE_TOKEN` for agent credentials. `login --token` saves runner tokens
+for runtime secrets and pipeline exports.
 
 Run this setup outside the agent conversation so the token never becomes part
 of its prompt.
@@ -84,13 +80,17 @@ tools to parse:
 
 ```bash
 dopbase --json project list
+dopbase --json project show payment-service
 dopbase --json env list payment-service
+dopbase --json env show payment-service/staging
 dopbase --json secret list payment-service/staging
 dopbase --json secret get payment-service/staging DATABASE_URL
 ```
 
 These commands return identifiers, names, versions, and timestamps. They never
-return the value of `DATABASE_URL` or any other secret.
+return the value of `DATABASE_URL` or any other secret. The server validates
+agent tokens on each metadata request. Invalid, expired, or revoked tokens fail
+without using a saved human credential.
 
 For example, ask a coding agent:
 

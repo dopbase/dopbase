@@ -16,6 +16,11 @@ pub(crate) async fn execute(
 ) -> Result<i32> {
   let api = if matches!(&command, SecretCommand::Get { reveal: true, .. }) {
     client::recently_authenticated_client(server).await?
+  } else if matches!(
+    &command,
+    SecretCommand::List { .. } | SecretCommand::Get { reveal: false, .. }
+  ) {
+    client::metadata_client(server).await?
   } else {
     client::human_client(server).await?
   };

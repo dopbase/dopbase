@@ -64,5 +64,5 @@ A revocable credential that allows a machine identity to perform permitted opera
 
 ## Runner token
 
-A service token scoped to retrieving secrets from one environment for
-`dopbase run`. It cannot modify or export secrets.
+A service token scoped to retrieving and exporting secrets from one environment.
+It supports `dopbase run` and `dopbase export`, but cannot modify secrets.

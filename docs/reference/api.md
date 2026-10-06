@@ -91,8 +91,15 @@ server that supplies the snapshot revision and fails safely when it is missing.
 - Browser sessions use an HttpOnly, SameSite Strict cookie and require the
   server-issued `X-Dopbase-CSRF` header for mutations.
 - CLI sessions, runner identities, and AI service accounts use `Authorization: Bearer <token>`.
-- A runner token can retrieve runtime secrets only from its assigned
-  environment. It cannot list metadata, mutate secrets, reveal, or export.
+- A runner token can retrieve runtime secrets and export the snapshot of its
+  assigned environment. It cannot list secret metadata, mutate secrets, reveal
+  individual values, or access another environment. Export retains the existing
+  `entries`, `revision`, and `envLayout` response fields and records the runner
+  token ID in the audit log. Browser exports still require recent password
+  authentication and a valid CSRF header.
+
+Runner exports require server support for runner access to the export endpoint.
+Update the server before or alongside the CLI; older servers reject the request.
 
 The OpenAPI document declares the `cookieAuth`, `bearerAuth`, and `csrfHeader`
 security schemes.

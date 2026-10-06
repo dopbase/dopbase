@@ -415,7 +415,7 @@ async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_re
   command
     .env("API_KEY", "incorrect-parent-value")
     .env("INHERITED_TEST_VALUE", "kept");
-  command.args(["run","--token",token,"--","sh","-c",
+  command.env("DOPBASE_TOKEN", token).args(["run","--","sh","-c",
     r#"[ "$API_KEY" = runtime-private-marker ] && [ "$INHERITED_TEST_VALUE" = kept ] || exit 41; printf child-ok; exit 23"#]);
   let result = output(command, None).await;
   assert_eq!(result.status.code(), Some(23));
@@ -426,16 +426,17 @@ async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_re
     .await;
   let marker = fixture.directory.path().join("child-was-started");
   let mut command = fixture.command();
-  command.env("DOPBASE_CHILD_MARKER", &marker).args([
-    "run",
-    &id,
-    "--token",
-    token,
-    "--",
-    "sh",
-    "-c",
-    r#"printf started > "$DOPBASE_CHILD_MARKER""#,
-  ]);
+  command
+    .env("DOPBASE_TOKEN", token)
+    .env("DOPBASE_CHILD_MARKER", &marker)
+    .args([
+      "run",
+      &id,
+      "--",
+      "sh",
+      "-c",
+      r#"printf started > "$DOPBASE_CHILD_MARKER""#,
+    ]);
   let result = output(command, None).await;
   failure(&result, "Dopbase authentication failed");
   assert!(

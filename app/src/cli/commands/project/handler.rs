@@ -13,7 +13,11 @@ pub(crate) async fn execute(
   server: &local_config::ResolvedServer,
   json_output: bool,
 ) -> Result<i32> {
-  let api = client::human_client(server).await?;
+  let api = if matches!(&command, ProjectCommand::List | ProjectCommand::Show { .. }) {
+    client::metadata_client(server).await?
+  } else {
+    client::human_client(server).await?
+  };
   match command {
     ProjectCommand::Create { name } => {
       let data = api

@@ -130,13 +130,11 @@ The server resolution order is:
 3. The endpoint saved by `dopbase client connect`
 4. `http://localhost:8840`
 
-Machine runners can register a credential with `dopbase login --token`. CI
-systems and deployment platforms can use `DOPBASE_TOKEN`. For `dopbase run`, an
-explicit `-t <TOKEN>` or `--token <TOKEN>` takes precedence over
-`DOPBASE_TOKEN`, followed by the encrypted credential saved by `login`. A saved
-credential is used only when it matches the resolved server. Command-line
-tokens may be visible in shell history and process inspection, so they are best
-kept for one-off overrides.
+Machine runners can save an encrypted credential with `dopbase login --token`.
+CI systems and deployment platforms should inject `DOPBASE_TOKEN` from their
+secret store. Authentication uses `DOPBASE_TOKEN`, then the encrypted credential
+saved by `login`. A saved credential is used only when it matches the resolved
+server. An invalid environment credential never falls back to the saved one.
 
 `dopbase client status` displays the config path, resolved server and its source,
 authentication source, locally identified credential type, login email, and
@@ -434,13 +432,59 @@ and remove the file after the command exits.
 
 File export refuses to overwrite an existing path unless `--force` is passed
 and creates the file with restrictive permissions where the platform supports
-them. Export and stdout reveal plaintext values and therefore require reveal
-permission and create an audit event. The CLI also requires interactive
-password confirmation for every export. Non-interactive export is rejected.
+them. Export reveals plaintext values and records access in the audit log.
+Human CLI exports require interactive password confirmation. Runner tokens can
+export only their assigned environment without a prompt, using `DOPBASE_TOKEN`
+or an encrypted saved runner credential. AI agent tokens cannot export values.
+
+Exports require a live server response. They never fall back to the encrypted
+run cache. Authentication, network, or rendering failures leave an existing
+output file untouched.
 
 The Admin UI provides the same workflow for dotenv files, with a visual review
 and dry-run summary before anything is stored. See
 [import and export](/ui/import-export).
+
+### Export in AWS CodeBuild
+
+Install Dopbase in the build image and use a runner token scoped to the target
+environment. Store a JSON secret containing a `token` field in AWS Secrets
+Manager, for example under `dopbase/production`. Give the CodeBuild service role
+`secretsmanager:GetSecretValue` access to that secret. CodeBuild injects it as
+`DOPBASE_TOKEN` through `env.secrets-manager`:
+
+```yaml
+version: 0.2
+env:
+  shell: bash
+  variables:
+    DOPBASE_URL: https://dopbase.example.com
+  secrets-manager:
+    DOPBASE_TOKEN: "dopbase/production:token"
+phases:
+  build:
+    commands:
+      - |
+        (
+          set -eu
+          set +x
+          secrets_dir=$(mktemp -d)
+          trap 'rm -rf "$secrets_dir"' EXIT
+          dopbase export env_482731 --output "$secrets_dir/.env"
+          ./deploy.sh "$secrets_dir/.env"
+        )
+```
+
+Replace the environment ID and deployment command with your own. The build
+must be able to reach the Dopbase server. The shell exits if export fails and
+removes its temporary secrets directory when the block ends. Keep `.env` out of
+build logs, source control, container image layers, and ordinary build artifacts.
+No `dopbase login` step is needed.
+
+AWS Systems Manager Parameter Store is another option, using
+`env.parameter-store` and the corresponding IAM permissions. See the
+[AWS CodeBuild buildspec reference](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html)
+for both integrations and permissions, including KMS requirements.
 
 ## Runner tokens
 
@@ -465,9 +509,10 @@ Without `--expires-in`, a runner token does not expire. Use `never` or a whole
 number followed by `h` or `d`, up to `26280h` or `1095d`. The server rejects
 expired tokens even if the client's clock is wrong. The list shows each token's
 expiry and status.
-A runner token can retrieve values
-for its assigned environment so `dopbase run` can inject them, but it cannot
-modify, export, or access another environment.
+A runner token can retrieve values for `dopbase run` and export them from its
+assigned environment. It cannot modify secrets or access another environment.
+Export audit entries identify the runner token and secret count without storing
+values.
 
 ## Run a process
 
@@ -484,10 +529,10 @@ printf '%s' "$RUNNER_TOKEN" | dopbase login --token
 dopbase run payment-service/production -- npm start
 ```
 
-Use an explicit token only for a one-off command:
+For CI jobs, inject `DOPBASE_TOKEN` through the pipeline's secret store:
 
 ```bash
-dopbase run payment-service/production -t "$RUNNER_TOKEN" -- npm start
+dopbase run payment-service/production -- npm start
 ```
 
 Automation may set `DOPBASE_ENV` instead:

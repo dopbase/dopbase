@@ -105,7 +105,6 @@ pub fn is_conflict_error(error: &anyhow::Error) -> bool {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
-  Argument,
   Environment,
   EncryptedSession,
   None,
@@ -114,7 +113,6 @@ pub enum CredentialSource {
 impl CredentialSource {
   pub fn as_str(self) -> &'static str {
     match self {
-      Self::Argument => "argument",
       Self::Environment => "environment",
       Self::EncryptedSession => "encrypted_session",
       Self::None => "none",
@@ -476,33 +474,17 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  credential_with_token(server, None)
-}
-
-pub fn credential_with_token(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<Credential> {
-  credential_from_sources(token, env::var(ENV_TOKEN), || session::load(server))
+  credential_from_sources(env::var(ENV_TOKEN), || session::load(server))
 }
 
 #[doc(hidden)]
 pub fn credential_from_sources<F>(
-  token: Option<String>,
   environment: Result<String, env::VarError>,
   saved: F,
 ) -> Result<Credential>
 where
   F: FnOnce() -> Result<Option<session::StoredSession>>,
 {
-  if let Some(token) = token {
-    validate_runner_token(&token)?;
-    return Ok(Credential {
-      token: Some(token),
-      source: CredentialSource::Argument,
-      email: None,
-    });
-  }
   match environment {
     Ok(token) => {
       if token.is_empty() {
@@ -622,7 +604,13 @@ pub(crate) enum HumanClient {
 }
 
 pub(crate) async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
-  let credential = credential(server)?;
+  acquire_human_client_with_credential(server, credential(server)?).await
+}
+
+async fn acquire_human_client_with_credential(
+  server: &ResolvedServer,
+  credential: Credential,
+) -> Result<HumanClient> {
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
     if client
@@ -645,6 +633,22 @@ pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   Ok(match acquire_human_client(server).await? {
     HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
   })
+}
+
+pub(crate) async fn metadata_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
+  if credential
+    .token
+    .as_deref()
+    .is_some_and(|token| token.starts_with(crate::constants::tokens::AGENT_TOKEN_PREFIX))
+  {
+    return authenticated_client(server, credential);
+  }
+  Ok(
+    match acquire_human_client_with_credential(server, credential).await? {
+      HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
+    },
+  )
 }
 
 impl HumanClient {
@@ -682,6 +686,29 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
     bail!("interactive password confirmation is required for plaintext secret access");
   }
   acquire_human_client(server)
+    .await?
+    .confirm_plaintext_access()
+    .await
+}
+
+pub(crate) async fn export_client(server: &ResolvedServer) -> Result<ApiClient> {
+  use crate::constants::tokens::{AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX};
+
+  let credential = credential(server)?;
+  match credential.token.as_deref() {
+    Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => {
+      validate_runner_token(token)?;
+      return authenticated_client(server, credential);
+    }
+    Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => {
+      bail!("AI agents may access secret metadata but never secret values");
+    }
+    _ => {}
+  }
+  if !io::stdin().is_terminal() {
+    bail!("interactive password confirmation is required for plaintext secret access");
+  }
+  acquire_human_client_with_credential(server, credential)
     .await?
     .confirm_plaintext_access()
     .await
@@ -728,11 +755,8 @@ async fn prompt_password_confirmation() -> Result<String> {
     }
   }
 }
-pub async fn any_authenticated_client(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<ApiClient> {
-  let credential = credential_with_token(server, token)?;
+pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
   authenticated_client(server, credential)
 }
 

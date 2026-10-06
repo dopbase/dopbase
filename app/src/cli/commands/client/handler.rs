@@ -278,8 +278,7 @@ pub fn status_document(
 
 fn credential_identity(credential: &Credential) -> &'static str {
   match credential.source {
-    CredentialSource::Argument | CredentialSource::Environment => match credential.token.as_deref()
-    {
+    CredentialSource::Environment => match credential.token.as_deref() {
       Some(token) if token.starts_with(ADMIN_SESSION_PREFIX) => "human",
       Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
       Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",

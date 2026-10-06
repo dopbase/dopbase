@@ -11,10 +11,9 @@ pub(crate) async fn execute(
 ) -> Result<i32> {
   let RunArgs {
     environment,
-    token,
     command,
   } = args;
-  let api = client::any_authenticated_client(server, token).await?;
+  let api = client::any_authenticated_client(server).await?;
   let selection = run_environment(
     environment,
     env::var(ENV_RUN_ENVIRONMENT),

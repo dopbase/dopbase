@@ -442,8 +442,29 @@ pub async fn export(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<ExportSecretsResponse, HttpError> {
-  require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (actor_type, actor_id, actor_label) = match identity {
+    AuthIdentity::Admin { .. } => {
+      require_recent_browser_auth(identity)?;
+      let (admin_id, email) = require_project_manager(identity)?;
+      ("admin", admin_id, Some(email))
+    }
+    AuthIdentity::Runner {
+      token_id,
+      environment_id,
+    } if environment_id == id => ("runner", token_id.as_str(), None),
+    AuthIdentity::Runner { .. } => {
+      return Err(HttpError::forbidden(
+        TOKEN_SCOPE_INVALID,
+        "The runner token cannot access this environment.",
+      ));
+    }
+    AuthIdentity::ServiceAccount { .. } => {
+      return Err(HttpError::forbidden(
+        crate::constants::errors::AUTHORIZATION_DENIED,
+        "AI agents may access secret metadata but never secret values.",
+      ));
+    }
+  };
   let env = environment(state, id).await?;
   let mut tx = state.db.pool().begin().await?;
   let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
@@ -466,9 +487,9 @@ pub async fn export(
   tx.rollback().await?;
   common::audit(
     state.db.pool(),
-    "admin",
-    Some(admin_id),
-    Some(email),
+    actor_type,
+    Some(actor_id),
+    actor_label,
     "secret.exported",
     Some(&env.project_id),
     Some(id),

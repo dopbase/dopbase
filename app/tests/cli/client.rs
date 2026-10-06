@@ -370,23 +370,9 @@ async fn api_client_does_not_follow_redirects() {
 
 use app::cli::client::{credential_from_sources, validate_runner_token};
 #[test]
-fn explicit_runner_token_has_priority_over_environment_and_saved_credentials() {
-  let explicit = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-  let credential = credential_from_sources(
-    Some(explicit.into()),
-    Ok("environment-token".into()),
-    || panic!("saved credentials must not be loaded for an explicit token"),
-  )
-  .unwrap();
-
-  assert_eq!(credential.token.as_deref(), Some(explicit));
-  assert!(matches!(credential.source, CredentialSource::Argument));
-}
-
-#[test]
 fn environment_token_has_priority_over_the_saved_credential() {
   let environment = "dbs_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
-  let credential = credential_from_sources(None, Ok(environment.into()), || {
+  let credential = credential_from_sources(Ok(environment.into()), || {
     panic!("saved credentials must not be loaded when DOPBASE_TOKEN is set")
   })
   .unwrap();
@@ -405,5 +391,20 @@ fn runner_token_validation_rejects_empty_wrong_prefix_and_wrong_length() {
     "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!",
   ] {
     assert!(validate_runner_token(token).is_err(), "accepted {token:?}");
+  }
+}
+
+#[test]
+fn invalid_environment_token_never_loads_saved_credentials() {
+  for environment in [
+    Ok(String::new()),
+    Err(std::env::VarError::NotUnicode("invalid".into())),
+  ] {
+    assert!(
+      credential_from_sources(environment, || {
+        panic!("invalid environment credentials must not fall back to saved credentials")
+      })
+      .is_err()
+    );
   }
 }
