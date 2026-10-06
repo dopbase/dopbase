@@ -200,6 +200,42 @@ impl Fixture {
       .into()
   }
 
+  pub async fn agent_token(&self) -> Value {
+    let (cookie, csrf) = browser_credentials(self).await;
+    let api = reqwest::Client::new();
+    let account: Value = api
+      .post(format!("{}/api/v1/service-accounts", self.url))
+      .header("cookie", &cookie)
+      .header("x-dopbase-csrf", &csrf)
+      .json(&json!({"name":"metadata-agent"}))
+      .send()
+      .await
+      .unwrap()
+      .error_for_status()
+      .unwrap()
+      .json()
+      .await
+      .unwrap();
+    let response: Value = api
+      .post(format!(
+        "{}/api/v1/service-accounts/{}/tokens",
+        self.url,
+        account["data"]["id"].as_str().unwrap()
+      ))
+      .header("cookie", &cookie)
+      .header("x-dopbase-csrf", &csrf)
+      .json(&json!({"name":"agent"}))
+      .send()
+      .await
+      .unwrap()
+      .error_for_status()
+      .unwrap()
+      .json()
+      .await
+      .unwrap();
+    response["data"].clone()
+  }
+
   pub async fn stop(&self) {
     self.task.abort();
     while !self.task.is_finished() {
@@ -347,4 +383,27 @@ pub mod terminal {
       let _ = self.child.wait();
     }
   }
+}
+
+pub async fn browser_credentials(fixture: &Fixture) -> (String, String) {
+  let response = reqwest::Client::new()
+    .post(format!("{}/api/v1/auth/login", fixture.url))
+    .json(&json!({"email":EMAIL,"password":PASSWORD,"sessionKind":"browser"}))
+    .send()
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap();
+  let cookie = response.headers()["set-cookie"]
+    .to_str()
+    .unwrap()
+    .split(';')
+    .next()
+    .unwrap()
+    .to_owned();
+  let login: Value = response.json().await.unwrap();
+  (
+    cookie,
+    login["data"]["csrfToken"].as_str().unwrap().to_owned(),
+  )
 }

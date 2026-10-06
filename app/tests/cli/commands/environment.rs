@@ -712,3 +712,34 @@ async fn environment_commands_resolve_references_and_save_the_default() {
 
 #[cfg(unix)]
 mod edit;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_metadata_environment_commands_return_names_and_ids() {
+  use super::support::{Fixture, output, success};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  let created = fixture.agent_token().await;
+  let token = created["plaintextToken"].as_str().unwrap();
+  for arguments in [
+    vec!["env", "list"],
+    vec!["env", "list", "fixture"],
+    vec!["env", "show", "fixture/local"],
+  ] {
+    let mut command = fixture.command();
+    command
+      .env("DOPBASE_TOKEN", token)
+      .args(["--json"])
+      .args(arguments);
+    let result = output(command, None).await;
+    let value = success(&result);
+    assert_eq!(
+      if value.is_array() {
+        &value[0]["id"]
+      } else {
+        &value["id"]
+      },
+      id.as_str()
+    );
+    assert!(!String::from_utf8_lossy(&result.stdout).contains(token));
+  }
+}

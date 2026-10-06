@@ -635,6 +635,22 @@ pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   })
 }
 
+pub(crate) async fn metadata_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
+  if credential
+    .token
+    .as_deref()
+    .is_some_and(|token| token.starts_with(crate::constants::tokens::AGENT_TOKEN_PREFIX))
+  {
+    return authenticated_client(server, credential);
+  }
+  Ok(
+    match acquire_human_client_with_credential(server, credential).await? {
+      HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
+    },
+  )
+}
+
 impl HumanClient {
   pub(crate) fn client(&self) -> &ApiClient {
     match self {

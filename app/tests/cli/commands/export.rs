@@ -447,39 +447,7 @@ async fn runner_export_rejects_other_environments_and_invalid_credentials_withou
 async fn agent_export_is_denied_by_the_cli_and_server() {
   use super::support::{failure, output};
   let (fixture, id, _) = runner_fixture().await;
-  let (cookie, csrf) = browser_credentials(&fixture).await;
-  let api = reqwest::Client::new();
-  let account: Value = api
-    .post(format!("{}/api/v1/service-accounts", fixture.url))
-    .header("cookie", &cookie)
-    .header("x-dopbase-csrf", &csrf)
-    .json(&json!({"name":"export-agent"}))
-    .send()
-    .await
-    .unwrap()
-    .error_for_status()
-    .unwrap()
-    .json()
-    .await
-    .unwrap();
-  let response: Value = api
-    .post(format!(
-      "{}/api/v1/service-accounts/{}/tokens",
-      fixture.url,
-      account["data"]["id"].as_str().unwrap()
-    ))
-    .header("cookie", &cookie)
-    .header("x-dopbase-csrf", &csrf)
-    .json(&json!({"name":"agent"}))
-    .send()
-    .await
-    .unwrap()
-    .error_for_status()
-    .unwrap()
-    .json()
-    .await
-    .unwrap();
-  let created = &response["data"];
+  let created = fixture.agent_token().await;
   let token = created["plaintextToken"].as_str().unwrap();
   for saved in [false, true] {
     let mut command = fixture.command();
@@ -571,7 +539,7 @@ async fn runner_export_preserves_files_on_render_failure_and_never_falls_back_to
 async fn browser_export_still_requires_csrf_and_recent_password_authentication() {
   let (fixture, id, _) = runner_fixture().await;
   let api = reqwest::Client::new();
-  let (cookie, valid_csrf) = browser_credentials(&fixture).await;
+  let (cookie, valid_csrf) = super::support::browser_credentials(&fixture).await;
   let endpoint = format!("{}/api/v1/environments/{id}/secrets/export", fixture.url);
   for csrf in [None, Some("invalid"), Some(valid_csrf.as_str())] {
     let mut request = api.post(&endpoint).header("cookie", &cookie);
@@ -603,28 +571,4 @@ async fn browser_export_still_requires_csrf_and_recent_password_authentication()
   assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
   let body: Value = response.json().await.unwrap();
   assert!(body["error"]["RECENT_AUTHENTICATION_REQUIRED"].is_string());
-}
-
-async fn browser_credentials(fixture: &super::support::Fixture) -> (String, String) {
-  use super::support::{EMAIL, PASSWORD};
-  let response = reqwest::Client::new()
-    .post(format!("{}/api/v1/auth/login", fixture.url))
-    .json(&json!({"email":EMAIL,"password":PASSWORD,"sessionKind":"browser"}))
-    .send()
-    .await
-    .unwrap()
-    .error_for_status()
-    .unwrap();
-  let cookie = response.headers()["set-cookie"]
-    .to_str()
-    .unwrap()
-    .split(';')
-    .next()
-    .unwrap()
-    .to_owned();
-  let login: Value = response.json().await.unwrap();
-  (
-    cookie,
-    login["data"]["csrfToken"].as_str().unwrap().to_owned(),
-  )
 }

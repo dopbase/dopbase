@@ -106,7 +106,11 @@ pub(crate) async fn execute(
     }
     command => command,
   };
-  let api = client::human_client(server).await?;
+  let api = if matches!(&command, EnvCommand::List { .. } | EnvCommand::Show { .. }) {
+    client::metadata_client(server).await?
+  } else {
+    client::human_client(server).await?
+  };
   match command {
     EnvCommand::Edit { .. } => {
       unreachable!("editor commands are handled before client acquisition")
