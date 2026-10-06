@@ -224,9 +224,9 @@ pub async fn layout(
 /// Export all secrets
 ///
 /// Decrypt and return every secret with layout and revision from one snapshot.
-/// Requires recent
-/// password authentication and the CSRF header for browser sessions. The
-/// export is recorded in the audit log.
+/// Browser sessions require recent password authentication and the CSRF header.
+/// Runner tokens may export only their assigned environment.
+/// Every successful export is recorded in the audit log.
 #[utoipa::path(
   post,
   path = crate::constants::api::secrets::EXPORT,
@@ -236,7 +236,7 @@ pub async fn layout(
   responses(
     (status = 200, description = "Secrets, layout, and collection revision exported from one snapshot", body = inline(HttpResponseFormat<ExportSecretsResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Recent password authentication and a valid CSRF token are required", body = crate::http::ErrorBody),
+    (status = 403, description = "Runner scope or human authentication requirements were not met", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
   ),
 )]
@@ -246,7 +246,9 @@ pub async fn export(
   identity: AuthIdentity,
   Path(id): Path<String>,
 ) -> Result<HttpResponse<ExportSecretsResponse>, SecretError> {
-  require_mutation(&identity, &headers)?;
+  if !matches!(identity, AuthIdentity::Runner { .. }) {
+    require_mutation(&identity, &headers)?;
+  }
   Ok(HttpResponse::ok(
     service::export(&state, &identity, &id).await?,
     "SECRETS_EXPORTED",

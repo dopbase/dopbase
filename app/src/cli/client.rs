@@ -604,7 +604,13 @@ pub(crate) enum HumanClient {
 }
 
 pub(crate) async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
-  let credential = credential(server)?;
+  acquire_human_client_with_credential(server, credential(server)?).await
+}
+
+async fn acquire_human_client_with_credential(
+  server: &ResolvedServer,
+  credential: Credential,
+) -> Result<HumanClient> {
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
     if client
@@ -664,6 +670,29 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
     bail!("interactive password confirmation is required for plaintext secret access");
   }
   acquire_human_client(server)
+    .await?
+    .confirm_plaintext_access()
+    .await
+}
+
+pub(crate) async fn export_client(server: &ResolvedServer) -> Result<ApiClient> {
+  use crate::constants::tokens::{AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX};
+
+  let credential = credential(server)?;
+  match credential.token.as_deref() {
+    Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => {
+      validate_runner_token(token)?;
+      return authenticated_client(server, credential);
+    }
+    Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => {
+      bail!("AI agents may access secret metadata but never secret values");
+    }
+    _ => {}
+  }
+  if !io::stdin().is_terminal() {
+    bail!("interactive password confirmation is required for plaintext secret access");
+  }
+  acquire_human_client_with_credential(server, credential)
     .await?
     .confirm_plaintext_access()
     .await
