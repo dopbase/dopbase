@@ -105,7 +105,6 @@ pub fn is_conflict_error(error: &anyhow::Error) -> bool {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
-  Argument,
   Environment,
   EncryptedSession,
   None,
@@ -114,7 +113,6 @@ pub enum CredentialSource {
 impl CredentialSource {
   pub fn as_str(self) -> &'static str {
     match self {
-      Self::Argument => "argument",
       Self::Environment => "environment",
       Self::EncryptedSession => "encrypted_session",
       Self::None => "none",
@@ -476,33 +474,17 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  credential_with_token(server, None)
-}
-
-pub fn credential_with_token(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<Credential> {
-  credential_from_sources(token, env::var(ENV_TOKEN), || session::load(server))
+  credential_from_sources(env::var(ENV_TOKEN), || session::load(server))
 }
 
 #[doc(hidden)]
 pub fn credential_from_sources<F>(
-  token: Option<String>,
   environment: Result<String, env::VarError>,
   saved: F,
 ) -> Result<Credential>
 where
   F: FnOnce() -> Result<Option<session::StoredSession>>,
 {
-  if let Some(token) = token {
-    validate_runner_token(&token)?;
-    return Ok(Credential {
-      token: Some(token),
-      source: CredentialSource::Argument,
-      email: None,
-    });
-  }
   match environment {
     Ok(token) => {
       if token.is_empty() {
@@ -728,11 +710,8 @@ async fn prompt_password_confirmation() -> Result<String> {
     }
   }
 }
-pub async fn any_authenticated_client(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<ApiClient> {
-  let credential = credential_with_token(server, token)?;
+pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
   authenticated_client(server, credential)
 }
 
