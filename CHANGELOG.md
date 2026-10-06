@@ -105,11 +105,11 @@ server commands, and some setup responses change in this release.
   and environment workflow.
 
 - `dopbase server up` and `dopbase server down` have been replaced by
-  `server start --background` and `server stop`. The old commands show an
-  informational migration notice and exit with status 1 without changing server
-  state. JSON mode returns `COMMAND_REPLACED` information on stdout.
-  Servers started before this change need one manual stop/start before restart
-  is available. Update scripts that use the previous commands.
+  `server start --background` or `server start -b` and `server stop`.
+  The old commands show an informational migration notice and exit with
+  status 1 without changing server state. JSON mode returns `COMMAND_REPLACED`
+  information on stdout. Servers started before this change need one manual
+  stop/start before restart is available. Update scripts that use the previous commands.
 
 ### Fixed
 
