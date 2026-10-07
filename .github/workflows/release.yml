@@ -4,12 +4,13 @@ on:
   push:
     tags:
       - "*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}-${{ github.sha }}
+  group: release-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -23,6 +24,8 @@ jobs:
     name: Verify release source
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,39 +43,46 @@ jobs:
           rustup default "${RUST_VERSION}"
 
       - name: Validate release version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag must match MAJOR.MINOR.PATCH. Got ${GITHUB_REF_NAME}" >&2
-            exit 1
+          version="$GITHUB_REF_NAME"
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            version=$(jq -r '.version' package.json)
           fi
-
-          release_version="${GITHUB_REF_NAME}"
-          package_version="$(cargo metadata \
-            --manifest-path app/Cargo.toml \
-            --locked \
-            --no-deps \
-            --format-version 1 | jq -r '.packages[] | select(.name == "app") | .version')"
-          frontend_version="$(jq -r '.version' package.json)"
-
-          if [[ "${release_version}" != "${package_version}" ]]; then
-            echo "Tag version ${release_version} does not match app version ${package_version}" >&2
-            exit 1
-          fi
-          if [[ "${release_version}" != "${frontend_version}" ]]; then
-            echo "Tag version ${release_version} does not match frontend version ${frontend_version}" >&2
-            exit 1
-          fi
-          if ! grep --fixed-strings --quiet "## ${release_version} -" CHANGELOG.md; then
-            echo "CHANGELOG.md has no release heading for ${release_version}" >&2
-            exit 1
-          fi
+          bash scripts/release/validate-source.sh "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        with:
+          workspaces: app -> target
+          key: prepare
+          cache-workspace-crates: false
+
+      - name: Check release scripts
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
+          bash "$RUNNER_TEMP/download-actionlint.bash" 1.7.12 "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint" .github/workflows/release.yml
+          shellcheck scripts/release/*.sh
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
@@ -99,14 +109,16 @@ jobs:
           retention-days: 1
 
       - name: Prepare release notes
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
           previous_version="$(node scripts/github-templates.mjs previous-version \
-            --version "${GITHUB_REF_NAME}" \
+            --version "${RELEASE_VERSION}" \
             --commit "${GITHUB_SHA}")"
           node scripts/github-templates.mjs render-release \
-            --version "${GITHUB_REF_NAME}" \
+            --version "${RELEASE_VERSION}" \
             --previous-version "${previous_version}" \
             --repository "${GITHUB_REPOSITORY}" \
             --output release-notes.md
@@ -144,6 +156,11 @@ jobs:
             asset_os: darwin
             asset_arch: arm64
     runs-on: ${{ matrix.runner }}
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TARGET: ${{ matrix.target }}
+      ASSET_OS: ${{ matrix.asset_os }}
+      ASSET_ARCH: ${{ matrix.asset_arch }}
     timeout-minutes: 45
     steps:
       - name: Check out release tag
@@ -156,6 +173,13 @@ jobs:
         run: |
           rustup toolchain install "${RUST_VERSION}" --profile minimal --target "${{ matrix.target }}"
           rustup default "${RUST_VERSION}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        with:
+          workspaces: app -> target
+          key: release-${{ matrix.target }}
+          cache-workspace-crates: false
 
       - name: Install musl compiler
         if: matrix.asset_os == 'linux'
@@ -171,227 +195,75 @@ jobs:
 
       - name: Build release binary
         shell: bash
-        run: |
-          set -euo pipefail
-          target="${{ matrix.target }}"
-          if [[ "${{ matrix.asset_os }}" == "linux" ]]; then
-            cc_var="CC_${target//-/_}"
-            linker_var="CARGO_TARGET_${target//-/_}_LINKER"
-            export "${cc_var}=musl-gcc"
-            export "${linker_var^^}=musl-gcc"
-          fi
-          cargo build \
-            --manifest-path app/Cargo.toml \
-            --locked \
-            --release \
-            --target "${target}"
+        run: bash scripts/release/build-binary.sh "$RELEASE_TARGET"
 
       - name: Smoke-test release binary
         shell: bash
-        run: |
-          set -euo pipefail
-          binary="app/target/${{ matrix.target }}/release/dopbase"
-          version="${GITHUB_REF_NAME}"
-          bind_address="127.0.0.1:${SMOKE_PORT}"
-          public_url="http://${bind_address}"
-          test "$("${binary}" --version)" = "v${version}"
-
-          runtime_root="$(mktemp -d)"
-          data_dir="${runtime_root}/data"
-          server_log="${runtime_root}/server.log"
-          server_pid=""
-          cleanup() {
-            if [[ -n "${server_pid}" ]] && kill -0 "${server_pid}" 2>/dev/null; then
-              kill -TERM "${server_pid}" 2>/dev/null || true
-              wait "${server_pid}" 2>/dev/null || true
-            fi
-            rm -rf "${runtime_root}"
-          }
-          trap cleanup EXIT
-
-          # A fresh instance with a disabled UI and no root email needs explicit setup.
-          if "${binary}" --data-dir "${data_dir}" server start --no-web-ui >"${runtime_root}/fresh-start.out" 2>&1; then
-            echo "error: fresh startup unexpectedly succeeded" >&2
-            exit 1
-          fi
-          grep --quiet 'dopbase server setup' "${runtime_root}/fresh-start.out"
-          test ! -e "${data_dir}"
-
-          DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" server start \
-            --docs \
-            --host 127.0.0.1 \
-            --port "${SMOKE_PORT}" \
-            --public-url "${public_url}" \
-            >"${server_log}" 2>&1 &
-          server_pid=$!
-
-          ready=false
-          for _ in $(seq 1 60); do
-            if curl --fail --silent "${public_url}/api/v1/health" >/dev/null; then
-              ready=true
-              break
-            fi
-            if ! kill -0 "${server_pid}" 2>/dev/null; then
-              cat "${server_log}"
-              exit 1
-            fi
-            sleep 0.25
-          done
-          if [[ "${ready}" != "true" ]]; then
-            cat "${server_log}"
-            exit 1
-          fi
-
-          health="$(curl --fail --silent "${public_url}/api/v1/health")"
-          grep --quiet '"success":true' <<<"${health}"
-          grep --quiet '"product":"dopbase"' <<<"${health}"
-          grep --quiet "\"version\":\"${version}\"" <<<"${health}"
-          grep --quiet '"apiVersion":"v1"' <<<"${health}"
-          grep --quiet '"status":"ok"' <<<"${health}"
-          curl --fail --silent "${public_url}/" | grep --quiet '<div id="app"></div>'
-          curl --fail --silent "${public_url}/api/v1/openapi.json" | grep --quiet '"openapi"'
-          curl --fail --silent --location "${public_url}/api/docs/" >/dev/null
-
-          grep --quiet 'Password (shown once):' "${server_log}"
-          test -f "${data_dir}/dopbase.db"
-          test -f "${data_dir}/master.key"
-          test -f "${data_dir}/dopbase.db.lock"
-          test ! -e "${runtime_root}/dopbase.db"
-          grep --fixed-strings --quiet "Config:     ${data_dir}" "${server_log}"
-
-          kill -TERM "${server_pid}"
-          wait "${server_pid}"
-          server_pid=""
+        run: bash scripts/release/smoke-test.sh "app/target/$RELEASE_TARGET/release/dopbase" "$RELEASE_VERSION"
 
       - name: Package release archive
         shell: bash
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME}"
-          archive="dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
-          package_dir="$(mktemp -d)"
-          cp "app/target/${{ matrix.target }}/release/dopbase" "${package_dir}/dopbase"
-          cp CHANGELOG.md LICENSE NOTICE "${package_dir}/"
-          chmod 755 "${package_dir}/dopbase"
-          (cd "${package_dir}" && zip -9 --quiet "${GITHUB_WORKSPACE}/${archive}" dopbase CHANGELOG.md LICENSE NOTICE)
-          unzip -Z1 "${archive}" | sort
+        run: bash scripts/release/package-archive.sh "app/target/$RELEASE_TARGET/release/dopbase" "$RELEASE_VERSION" "$ASSET_OS" "$ASSET_ARCH" "$GITHUB_WORKSPACE"
 
       - name: Upload release archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.asset_os }}-${{ matrix.asset_arch }}
-          path: dopbase_*.zip
+          path: dopbase_*.tar.gz
+          compression-level: 0
           if-no-files-found: error
           retention-days: 1
 
-  publish:
-    name: Publish GitHub release
-    needs: build
+  verify:
+    name: Verify release assets
+    needs: [prepare, build]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
+    timeout-minutes: 10
     steps:
-      - name: Download release archives
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
           path: release/
           merge-multiple: true
+      - name: Verify archives and generate checksums
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: bash scripts/release/verify-assets.sh "$RELEASE_VERSION" release
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-release
+          path: release/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Verify assets and generate checksums
-        shell: bash
-        working-directory: release
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME}"
-          expected=(
-            "dopbase_${version}_darwin_amd64.zip"
-            "dopbase_${version}_darwin_arm64.zip"
-            "dopbase_${version}_linux_amd64.zip"
-            "dopbase_${version}_linux_arm64.zip"
-          )
-          for archive in "${expected[@]}"; do
-            test -f "${archive}"
-          done
-          test "$(find . -maxdepth 1 -name 'dopbase_*.zip' -type f | wc -l | tr -d ' ')" = "4"
-          sha256sum "${expected[@]}" | sort -k2 > checksums.txt
-          sha256sum --check checksums.txt
-
+  publish:
+    name: Publish GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [prepare, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download verified release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-release
+          path: release/
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          api_url="https://api.github.com/repos/${GH_REPO}"
-          release_notes_file="release/release-notes.md"
-          test -f "${release_notes_file}"
-          release_notes="$(<"${release_notes_file}")"
-          api_headers=(
-            --header "Authorization: Bearer ${GH_TOKEN}"
-            --header 'Accept: application/vnd.github+json'
-            --header 'X-GitHub-Api-Version: 2022-11-28'
-          )
-
-          curl --fail --silent --show-error \
-            "${api_headers[@]}" \
-            "${api_url}/git/ref/tags/${GITHUB_REF_NAME}" >/dev/null
-
-          release_json="$(curl --silent --show-error \
-            "${api_headers[@]}" \
-            "${api_url}/releases/tags/${GITHUB_REF_NAME}" || true)"
-          if jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"; then
-            release_id="$(jq -r '.id' <<<"${release_json}")"
-            release_json="$(curl --fail --silent --show-error \
-              "${api_headers[@]}" \
-              --request PATCH \
-              --header 'Content-Type: application/json' \
-              --data "$(jq -n \
-                --arg name "Dopbase ${GITHUB_REF_NAME}" \
-                --arg body "${release_notes}" \
-                '{name: $name, body: $body}')" \
-              "${api_url}/releases/${release_id}")"
-          else
-            release_json="$(curl --fail --silent --show-error \
-              "${api_headers[@]}" \
-              --request POST \
-              --header 'Content-Type: application/json' \
-              --data "$(jq -n \
-                --arg tag "${GITHUB_REF_NAME}" \
-                --arg target "${GITHUB_SHA}" \
-                --arg name "Dopbase ${GITHUB_REF_NAME}" \
-                --arg body "${release_notes}" \
-                '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, generate_release_notes: false}')" \
-              "${api_url}/releases")"
-          fi
-          jq -e '.id and .upload_url' >/dev/null <<<"${release_json}"
-
-          assets=(
-            "release/checksums.txt"
-            "release/dopbase_${GITHUB_REF_NAME}_darwin_amd64.zip"
-            "release/dopbase_${GITHUB_REF_NAME}_darwin_arm64.zip"
-            "release/dopbase_${GITHUB_REF_NAME}_linux_amd64.zip"
-            "release/dopbase_${GITHUB_REF_NAME}_linux_arm64.zip"
-          )
-          for asset in "${assets[@]}"; do
-            test -f "${asset}"
-            uploaded=false
-            for attempt in 1 2 3; do
-              if gh release upload \
-                "${GITHUB_REF_NAME}" \
-                "${asset}" \
-                --repo "${GH_REPO}" \
-                --clobber; then
-                uploaded=true
-                break
-              fi
-              if [[ "${attempt}" != 3 ]]; then
-                sleep 5
-              fi
-            done
-            if [[ "${uploaded}" != true ]]; then
-              echo "Failed to upload ${asset} after three attempts" >&2
-              exit 1
-            fi
-          done
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: bash scripts/release/publish.sh "$RELEASE_VERSION" release
