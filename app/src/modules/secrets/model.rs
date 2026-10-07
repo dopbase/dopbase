@@ -37,8 +37,8 @@ pub struct ImportSecretsRequest {
   /// editor view survives reloads.
   #[serde(default)]
   pub env_layout: Option<String>,
-  /// Collection revision returned by a dry run. When supplied, apply fails
-  /// if the environment changed after the preview was generated.
+  /// Collection revision returned by export or a dry run. Preview and apply
+  /// fail if the environment has changed since that snapshot.
   #[serde(default)]
   pub expected_revision: Option<String>,
 }
@@ -61,8 +61,13 @@ pub struct ImportSecretsResponse {
   pub revision: String,
 }
 #[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportSecretsResponse {
   pub entries: Vec<SecretInput>,
+  /// Revision of the same snapshot as the exported values and layout.
+  pub revision: String,
+  /// Comments and empty key slots. Contains no values.
+  pub env_layout: Option<String>,
 }
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

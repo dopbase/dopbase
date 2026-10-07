@@ -216,9 +216,12 @@ The effective server is resolved in this order:
 
 Authentication is resolved in this order:
 
-1. `-t <TOKEN>` or `--token <TOKEN>` on `dopbase run`
-2. `DOPBASE_TOKEN`
-3. The encrypted credential matching the normalized active server
+1. `DOPBASE_TOKEN`
+2. The encrypted credential matching the normalized active server
+
+An empty or invalid `DOPBASE_TOKEN` stops the command instead of falling back.
+Runner exports use the same precedence and require a live server response;
+they never use the encrypted run cache.
 
 The environment used by `dopbase run` is resolved in this order:
 

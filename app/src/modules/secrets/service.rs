@@ -248,6 +248,14 @@ fn validate_import(request: &ImportSecretsRequest) -> Result<(), HttpError> {
       "The .env layout may contain at most 64 KiB.",
     ));
   }
+  if let Some(layout) = &request.env_layout {
+    crate::utils::env_layout::validate(layout).map_err(|_| {
+      HttpError::validation(BTreeMap::from([(
+        "ENV_LAYOUT_INVALID".into(),
+        "The .env layout must contain only comments, blank lines, and empty KEY= slots.".into(),
+      )]))
+    })?;
+  }
   Ok(())
 }
 pub async fn import(
@@ -305,6 +313,16 @@ pub async fn import(
   updated.sort();
   unchanged.sort();
   deleted.sort();
+  if request
+    .expected_revision
+    .as_deref()
+    .is_some_and(|expected| expected != revision)
+  {
+    return Err(HttpError::conflict(
+      "IMPORT_PREVIEW_STALE",
+      "The secrets changed after the preview. Run the dry run again.",
+    ));
+  }
   if request.dry_run {
     tx.rollback().await?;
     return Ok(ImportSecretsResponse {
@@ -320,16 +338,6 @@ pub async fn import(
     return Err(HttpError::conflict(
       "IMPORT_PREVIEW_REQUIRED",
       "Run a dry run before applying a replace import.",
-    ));
-  }
-  if request
-    .expected_revision
-    .as_deref()
-    .is_some_and(|expected| expected != revision)
-  {
-    return Err(HttpError::conflict(
-      "IMPORT_PREVIEW_STALE",
-      "The secrets changed after the preview. Run the dry run again.",
     ));
   }
   let now = Utc::now().to_rfc3339();
@@ -434,15 +442,54 @@ pub async fn export(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<ExportSecretsResponse, HttpError> {
-  require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (actor_type, actor_id, actor_label) = match identity {
+    AuthIdentity::Admin { .. } => {
+      require_recent_browser_auth(identity)?;
+      let (admin_id, email) = require_project_manager(identity)?;
+      ("admin", admin_id, Some(email))
+    }
+    AuthIdentity::Runner {
+      token_id,
+      environment_id,
+    } if environment_id == id => ("runner", token_id.as_str(), None),
+    AuthIdentity::Runner { .. } => {
+      return Err(HttpError::forbidden(
+        TOKEN_SCOPE_INVALID,
+        "The runner token cannot access this environment.",
+      ));
+    }
+    AuthIdentity::ServiceAccount { .. } => {
+      return Err(HttpError::forbidden(
+        crate::constants::errors::AUTHORIZATION_DENIED,
+        "AI agents may access secret metadata but never secret values.",
+      ));
+    }
+  };
   let env = environment(state, id).await?;
-  let entries = decrypt_all(state, id).await?;
+  let mut tx = state.db.pool().begin().await?;
+  let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
+    .bind(id).fetch_all(&mut *tx).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  let revision = collection_revision(id, rows.iter(), env_layout.as_deref());
+  let entries = rows
+    .iter()
+    .map(|row| {
+      decrypt_row(state, id, row).map(|value| SecretInput {
+        key: row.key.clone(),
+        value,
+      })
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+  tx.rollback().await?;
   common::audit(
     state.db.pool(),
-    "admin",
-    Some(admin_id),
-    Some(email),
+    actor_type,
+    Some(actor_id),
+    actor_label,
     "secret.exported",
     Some(&env.project_id),
     Some(id),
@@ -451,7 +498,11 @@ pub async fn export(
     serde_json::json!({"count":entries.len()}),
   )
   .await?;
-  Ok(ExportSecretsResponse { entries })
+  Ok(ExportSecretsResponse {
+    entries,
+    revision,
+    env_layout,
+  })
 }
 pub async fn runtime(
   state: &AppState,

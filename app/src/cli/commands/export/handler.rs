@@ -28,7 +28,7 @@ pub(crate) async fn execute(
     bail!("--stdout and --json cannot be combined");
   }
   let format = ExportFormat::for_output(output.as_deref(), format);
-  let api = client::recently_authenticated_client(server).await?;
+  let api = client::export_client(server).await?;
   let env = environment::resolve_environment(&api, &environment).await?;
   let data = api
     .request(

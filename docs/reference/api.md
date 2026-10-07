@@ -71,13 +71,35 @@ correlation is returned in the `X-Request-Id` header. Errors never include
 request bodies, plaintext secrets, tokens, key material, SQL, or filesystem
 details.
 
+## Secret editor snapshots
+
+`POST /api/v1/environments/{id}/secrets/export` returns `entries`, `revision`,
+and nullable `envLayout` from one snapshot. Export retains its existing human
+access requirements and audit event. Layout contains comments and empty key
+slots; comments are unencrypted metadata.
+
+Pass `expectedRevision` to the import endpoint for both the dry run and apply.
+A stale revision returns `409` with `IMPORT_PREVIEW_STALE`, including during a
+dry run. Replace apply requires a revision. Invalid layout slots, including
+slots containing values, return `422` with `ENV_LAYOUT_INVALID`.
+
+Existing export clients can ignore the added fields. `env edit` requires a
+server that supplies the snapshot revision and fails safely when it is missing.
+
 ## Authentication
 
 - Browser sessions use an HttpOnly, SameSite Strict cookie and require the
   server-issued `X-Dopbase-CSRF` header for mutations.
 - CLI sessions, runner identities, and AI service accounts use `Authorization: Bearer <token>`.
-- A runner token can retrieve runtime secrets only from its assigned
-  environment. It cannot list metadata, mutate secrets, reveal, or export.
+- A runner token can retrieve runtime secrets and export the snapshot of its
+  assigned environment. It cannot list secret metadata, mutate secrets, reveal
+  individual values, or access another environment. Export retains the existing
+  `entries`, `revision`, and `envLayout` response fields and records the runner
+  token ID in the audit log. Browser exports still require recent password
+  authentication and a valid CSRF header.
+
+Runner exports require server support for runner access to the export endpoint.
+Update the server before or alongside the CLI; older servers reject the request.
 
 The OpenAPI document declares the `cookieAuth`, `bearerAuth`, and `csrfHeader`
 security schemes.

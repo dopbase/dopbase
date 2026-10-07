@@ -66,7 +66,7 @@ machine identities come from:
 - **Revoke** a token when a server is decommissioned or a token may have
   leaked. Revocation is immediate.
 
-A runner token can read the values of its one environment so `dopbase run` can
-inject them. It cannot change secrets, export them, or see any other
-environment. Give each deployed workload its own token. See
+A runner token can read and export the values of its assigned environment.
+Use `dopbase run` to inject them or `dopbase export` to write a file. It cannot
+change secrets or access another environment. Give each deployed workload its own token. See
 [identity and tokens](/reference/identity) for the full rules.

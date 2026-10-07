@@ -31,51 +31,40 @@ fn factory_reset_parses_no_backup() {
 }
 
 #[test]
-fn run_token_must_appear_before_the_child_command_separator() {
-  let cli = Cli::try_parse_from([
-    "dopbase",
-    "run",
-    "env_482731",
-    "--token",
-    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    "--",
-    "printenv",
-    "--token",
-    "child-value",
-  ])
-  .unwrap();
-  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
-    panic!("expected run command");
-  };
-  assert_eq!(
-    token.as_deref(),
-    Some("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-  );
-  assert_eq!(command, ["printenv", "--token", "child-value"]);
+fn run_rejects_token_flags_before_the_child_separator() {
+  for flag in ["-t", "--token"] {
+    assert!(
+      Cli::try_parse_from([
+        "dopbase",
+        "run",
+        "env_482731",
+        flag,
+        "private-token",
+        "--",
+        "printenv",
+      ])
+      .is_err()
+    );
+  }
 }
 
 #[test]
-fn run_accepts_the_short_token_flag() {
+fn run_preserves_child_token_flags_after_the_separator() {
   let cli = Cli::try_parse_from([
     "dopbase",
     "run",
     "env_482731",
-    "-t",
-    "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "--",
     "printenv",
-    "-t",
+    "--token",
     "child-value",
+    "-t",
   ])
   .unwrap();
-  let Command::Run(RunArgs { token, command, .. }) = cli.command else {
+  let Command::Run(RunArgs { command, .. }) = cli.command else {
     panic!("expected run command");
   };
-  assert_eq!(
-    token.as_deref(),
-    Some("dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-  );
-  assert_eq!(command, ["printenv", "-t", "child-value"]);
+  assert_eq!(command, ["printenv", "--token", "child-value", "-t"]);
 }
 
 #[test]
@@ -693,6 +682,7 @@ fn resource_parameters_use_consistent_value_names() {
       "<ENVIRONMENT_REF> <NEW_ENVIRONMENT_NAME>",
     ),
     (&["dopbase", "env", "delete", "--help"], "<ENVIRONMENT_REF>"),
+    (&["dopbase", "env", "edit", "--help"], "<ENVIRONMENT_REF>"),
     (
       &["dopbase", "secret", "list", "--help"],
       "<ENVIRONMENT_REF>",
@@ -822,6 +812,7 @@ fn binary_prints_contextual_help_and_keeps_the_usage_error_exit_code() {
 
 #[test]
 fn parses_each_public_command_and_detects_missing_cases() {
+  assert!(Cli::try_parse_from(["dopbase", "secret", "edit", "billing/local"]).is_err());
   fn leaves(
     command: &clap::Command,
     parent: &str,
@@ -876,6 +867,15 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "env", "show", "billing/local"],
     &["dopbase", "env", "rename", "billing/local", "production"],
     &["dopbase", "env", "delete", "billing/local"],
+    &[
+      "dopbase",
+      "env",
+      "edit",
+      "billing/local",
+      "--editor",
+      "hx",
+      "--dry-run",
+    ],
     &["dopbase", "secret", "list", "billing/local"],
     &["dopbase", "secret", "set", "billing/local", "API_KEY"],
     &["dopbase", "secret", "get", "billing/local", "API_KEY"],

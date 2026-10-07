@@ -148,7 +148,8 @@ Repository utilities:
 
 ```bash
 bun run test:github
-bun run test:installer
+actionlint .github/workflows/release.yml
+shellcheck scripts/release/*.sh
 ```
 
 If an existing unrelated failure prevents a check from passing, describe the failure and the command output in the pull request. Do not hide or silently skip it.
@@ -157,8 +158,10 @@ If an existing unrelated failure prevents a check from passing, describe the fai
 
 Releases use annotated semantic-version tags. Before tagging, update the
 version in `package.json` and `app/Cargo.toml`, refresh `app/Cargo.lock`, and
-move the release notes from `Unreleased` to a dated version section in
-`CHANGELOG.md`. Merge those changes into `main`, then create and push the tag
+keep draft release notes under the planned version in `CHANGELOG.md`, such as
+`## 0.1.9 - Unreleased`. Replace `Unreleased` with the release date before
+publishing; release generation requires a dated heading. Merge those changes
+into `main`, then create and push the tag
 from the release commit:
 
 Start each release section with one short summary paragraph. Add only the
@@ -175,8 +178,14 @@ git push origin "$version"
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
-matches the Rust package version, builds the Linux and macOS archives, creates
+matches both package versions, builds the Linux and macOS tar.gz archives, creates
 `checksums.txt`, and publishes the release only after all four targets succeed.
+Release scripts live in `scripts/release/`.
+
+A manual Release workflow run executes all checks and builds without publishing. 
+Tag runs publish only after all uploads are verified.
+Published assets are preserved on reruns.
+
 The release body comes from `.github/RELEASE_TEMPLATE.md`. It includes the
 summary, the populated optional sections, and a full changelog link comparing
 the previous version with the new one.

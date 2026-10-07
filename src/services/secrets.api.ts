@@ -41,6 +41,8 @@ export interface ImportSecretsResponse {
 
 export interface ExportSecretsResponse {
   entries: SecretEntry[];
+  revision: string;
+  envLayout: string | null;
 }
 
 const base = (environmentId: string): string =>

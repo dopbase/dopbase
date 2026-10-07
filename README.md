@@ -194,9 +194,11 @@ SQLite database, lock files, configuration, and local master key live under
 
 Read the [public documentation](./docs/) for the product model, CLI, self-hosting guidance, security design, and roadmap.
 
-Dopbase 0.1.8 includes environment cloning, configurable token expiry, guided
-`.env` setup, four roles, user management, read-only AI accounts, an instance
-overview, encrypted backups, and crash-safe factory reset.
+Dopbase 0.1.9 adds guided server setup, automatic first-run initialization,
+optional web UI, and background server restart. It includes environment cloning,
+configurable token expiry, guided `.env` setup, four roles, user management,
+read-only AI accounts, an instance overview, encrypted backups, and crash-safe
+factory reset.
 
 See [users and AI agents](./docs/ui/users.md) and [role permissions](./docs/reference/identity.md) for how access works.
 Version 0.1.0 starts with a fresh data directory. Databases and backups from
@@ -228,7 +230,7 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 | Path         | Purpose                                         | Current state                 |
 | ------------ | ----------------------------------------------- | ----------------------------- |
-| `app/`       | Rust service and command-line application       | v0.1.8 backend implementation |
+| `app/`       | Rust service and command-line application       | v0.1.9 backend implementation |
 | `app/tests/` | Rust integration tests                          | Backend and CLI test suite    |
 | `src/`       | Vue administration interface and frontend tests | Embedded Admin UI             |
 | `docs/`      | VitePress product documentation                 | Active public specification   |

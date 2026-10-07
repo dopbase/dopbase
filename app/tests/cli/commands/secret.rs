@@ -80,3 +80,40 @@ async fn masked_secret_input_and_reveal_use_the_terminal() {
   assert!(terminal.transcript.contains("masked-secret-marker"));
   assert!(!terminal.transcript.contains(PASSWORD));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_metadata_secret_commands_return_metadata_without_values() {
+  use super::support::{Fixture, output, success};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  fixture
+    .request(
+      reqwest::Method::PUT,
+      &format!("/api/v1/environments/{id}/secrets/API_KEY"),
+      Some(serde_json::json!({"value":"agent-secret-private-marker"})),
+    )
+    .await;
+  let created = fixture.agent_token().await;
+  let token = created["plaintextToken"].as_str().unwrap();
+  for arguments in [
+    vec!["secret", "list", "fixture/local"],
+    vec!["secret", "get", &id, "API_KEY"],
+  ] {
+    let mut command = fixture.command();
+    command
+      .env("DOPBASE_TOKEN", token)
+      .args(["--json"])
+      .args(arguments);
+    let result = output(command, None).await;
+    let value = success(&result);
+    let metadata = if value.is_array() { &value[0] } else { &value };
+    assert_eq!(metadata["key"], "API_KEY");
+    assert_eq!(metadata["version"], 1);
+    assert!(metadata["createdAt"].is_string());
+    assert!(metadata["updatedAt"].is_string());
+    assert!(metadata.get("value").is_none());
+    assert!(!String::from_utf8_lossy(&result.stdout).contains("agent-secret-private-marker"));
+    assert!(!String::from_utf8_lossy(&result.stderr).contains("agent-secret-private-marker"));
+    assert!(!String::from_utf8_lossy(&result.stdout).contains(token));
+  }
+}

@@ -12,6 +12,7 @@ use std::{
   io::{self, IsTerminal},
   time::Duration,
 };
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug)]
 pub enum CliCancelled {
@@ -104,7 +105,6 @@ pub fn is_conflict_error(error: &anyhow::Error) -> bool {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CredentialSource {
-  Argument,
   Environment,
   EncryptedSession,
   None,
@@ -113,7 +113,6 @@ pub enum CredentialSource {
 impl CredentialSource {
   pub fn as_str(self) -> &'static str {
     match self {
-      Self::Argument => "argument",
       Self::Environment => "environment",
       Self::EncryptedSession => "encrypted_session",
       Self::None => "none",
@@ -239,7 +238,8 @@ impl ApiClient {
         .context("failed to read server response body")?
         .to_vec()
     };
-    let value: Value = match serde_json::from_slice(&bytes) {
+    let bytes = Zeroizing::new(bytes);
+    let mut value: Value = match serde_json::from_slice(&bytes) {
       Ok(value) => value,
       Err(_) if !status.is_success() => {
         return Err(
@@ -274,7 +274,12 @@ impl ApiClient {
         .into(),
       );
     }
-    Ok(value.get("data").cloned().unwrap_or(Value::Null))
+    Ok(
+      value
+        .get_mut("data")
+        .map(Value::take)
+        .unwrap_or(Value::Null),
+    )
   }
   pub async fn health(&self) -> Result<Value> {
     self.request(Method::GET, api::health::ROOT, None).await
@@ -469,33 +474,17 @@ async fn read_limited_response(
   Ok(body)
 }
 pub fn credential(server: &ResolvedServer) -> Result<Credential> {
-  credential_with_token(server, None)
-}
-
-pub fn credential_with_token(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<Credential> {
-  credential_from_sources(token, env::var(ENV_TOKEN), || session::load(server))
+  credential_from_sources(env::var(ENV_TOKEN), || session::load(server))
 }
 
 #[doc(hidden)]
 pub fn credential_from_sources<F>(
-  token: Option<String>,
   environment: Result<String, env::VarError>,
   saved: F,
 ) -> Result<Credential>
 where
   F: FnOnce() -> Result<Option<session::StoredSession>>,
 {
-  if let Some(token) = token {
-    validate_runner_token(&token)?;
-    return Ok(Credential {
-      token: Some(token),
-      source: CredentialSource::Argument,
-      email: None,
-    });
-  }
   match environment {
     Ok(token) => {
       if token.is_empty() {
@@ -609,13 +598,19 @@ pub fn normalize_login_email(value: &str) -> Result<String> {
   crate::modules::common::validate_email(value)
     .map_err(|_| anyhow::anyhow!("Enter a valid email address."))
 }
-enum HumanClient {
+pub(crate) enum HumanClient {
   Existing(ApiClient),
   NewlyAuthenticated(ApiClient),
 }
 
-async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
-  let credential = credential(server)?;
+pub(crate) async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
+  acquire_human_client_with_credential(server, credential(server)?).await
+}
+
+async fn acquire_human_client_with_credential(
+  server: &ResolvedServer,
+  credential: Credential,
+) -> Result<HumanClient> {
   if let Some(token) = credential.token {
     let client = ApiClient::new(server, Some(token))?;
     if client
@@ -640,29 +635,83 @@ pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   })
 }
 
+pub(crate) async fn metadata_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
+  if credential
+    .token
+    .as_deref()
+    .is_some_and(|token| token.starts_with(crate::constants::tokens::AGENT_TOKEN_PREFIX))
+  {
+    return authenticated_client(server, credential);
+  }
+  Ok(
+    match acquire_human_client_with_credential(server, credential).await? {
+      HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
+    },
+  )
+}
+
+impl HumanClient {
+  pub(crate) fn client(&self) -> &ApiClient {
+    match self {
+      Self::Existing(client) | Self::NewlyAuthenticated(client) => client,
+    }
+  }
+
+  pub(crate) async fn confirm_plaintext_access(self) -> Result<ApiClient> {
+    match self {
+      HumanClient::NewlyAuthenticated(client) => Ok(client),
+      HumanClient::Existing(client) => {
+        let password = prompt_password_confirmation().await?;
+        let request = client.request(
+          Method::POST,
+          api::auth::REAUTHENTICATE,
+          Some(json!({"password":password})),
+        );
+        tokio::select! {
+          result = request => { result?; }
+          signal = tokio::signal::ctrl_c() => {
+            signal?;
+            return Err(CliCancelled::PasswordConfirmation.into());
+          }
+        }
+        Ok(client)
+      }
+    }
+  }
+}
+
 pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
   if !io::stdin().is_terminal() {
     bail!("interactive password confirmation is required for plaintext secret access");
   }
-  match acquire_human_client(server).await? {
-    HumanClient::NewlyAuthenticated(client) => Ok(client),
-    HumanClient::Existing(client) => {
-      let password = prompt_password_confirmation().await?;
-      let request = client.request(
-        Method::POST,
-        api::auth::REAUTHENTICATE,
-        Some(json!({"password":password})),
-      );
-      tokio::select! {
-        result = request => { result?; }
-        signal = tokio::signal::ctrl_c() => {
-          signal?;
-          return Err(CliCancelled::PasswordConfirmation.into());
-        }
-      }
-      Ok(client)
+  acquire_human_client(server)
+    .await?
+    .confirm_plaintext_access()
+    .await
+}
+
+pub(crate) async fn export_client(server: &ResolvedServer) -> Result<ApiClient> {
+  use crate::constants::tokens::{AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX};
+
+  let credential = credential(server)?;
+  match credential.token.as_deref() {
+    Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => {
+      validate_runner_token(token)?;
+      return authenticated_client(server, credential);
     }
+    Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => {
+      bail!("AI agents may access secret metadata but never secret values");
+    }
+    _ => {}
   }
+  if !io::stdin().is_terminal() {
+    bail!("interactive password confirmation is required for plaintext secret access");
+  }
+  acquire_human_client_with_credential(server, credential)
+    .await?
+    .confirm_plaintext_access()
+    .await
 }
 
 pub(crate) async fn ensure_recent_authentication(client: &ApiClient) -> Result<()> {
@@ -706,11 +755,8 @@ async fn prompt_password_confirmation() -> Result<String> {
     }
   }
 }
-pub async fn any_authenticated_client(
-  server: &ResolvedServer,
-  token: Option<String>,
-) -> Result<ApiClient> {
-  let credential = credential_with_token(server, token)?;
+pub async fn any_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
   authenticated_client(server, credential)
 }
 

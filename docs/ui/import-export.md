@@ -59,7 +59,8 @@ dopbase export payment-service/staging --output secrets.toml
 ```
 
 The command reference covers the CLI flags, including `--dry-run`,
-`--replace`, `--stdout`, and `--format`. CLI export also requires interactive
-password confirmation for each invocation. The browser remains dotenv-only.
+`--replace`, `--stdout`, and `--format`. Human CLI exports require interactive
+password confirmation for each invocation. Runner tokens can export their
+assigned environment without a prompt. The browser remains dotenv-only.
 See [CLI commands](/cli/commands). Both interfaces write the same records and
 create audit events.

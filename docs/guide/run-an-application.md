@@ -37,15 +37,21 @@ dopbase run env_482731 -- ./payment-service
 
 This stores one encrypted credential for the selected server. Saving another
 human login or runner token replaces it. CI systems can set `DOPBASE_TOKEN`
-instead. For a one-off override, use:
+instead:
 
 ```bash
-dopbase run env_482731 -t "$RUNNER_TOKEN" -- ./payment-service
+# The pipeline injects DOPBASE_TOKEN from its secret store.
+dopbase run env_482731 -- ./payment-service
 ```
 
-Credential priority is `-t` or `--token`, then `DOPBASE_TOKEN`, then the saved
-credential. Command-line tokens may appear in shell history or process
-inspection, so prefer a saved token for a long-running server.
+Credential priority is `DOPBASE_TOKEN`, then the saved credential. A saved
+runner token works for a persistent server; an injected token works for a CI
+job without writing local credentials.
+
+If a deployment command needs a file, use the same runner credential with
+`dopbase export env_482731 --output .env`. Export requires a live server and
+never uses cached values. See [AWS CodeBuild exports](/cli/commands#export-in-aws-codebuild)
+for a pipeline example.
 
 `dopbase run` never opens a login prompt. If no credential is available, it
 stops and asks you to run `dopbase login` or set `DOPBASE_TOKEN`. Invalid,

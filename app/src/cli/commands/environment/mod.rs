@@ -1,4 +1,5 @@
 mod args;
+mod edit;
 mod handler;
 
 pub use args::EnvCommand;

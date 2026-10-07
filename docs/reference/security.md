@@ -56,23 +56,67 @@ Networked clients need an authenticated, encrypted connection to the server. Loc
 
 Authorized users may need to reveal or export a value. These operations should be explicit, permission-controlled, and audited. Secret names can also disclose information, so access to metadata still needs authorization.
 
+## Terminal editor sessions
+
+`dopbase env edit` checks environment and secret metadata before password
+confirmation. Missing targets and declined empty environments do not export
+values.
+
+Existing sessions require confirmation on every invocation, a login
+completed during the command counts as confirmation. Plaintext export follows
+that confirmation.
+
+Its protected editor profiles disable user and project configuration, plugins,
+language servers, persistent history, backups, and swap files where applicable.
+Custom editor commands require acknowledgement of their exposure before export.
+A profile reduces accidental retention; it does not sandbox the executable.
+
+Session directories and files are owner-only. Dopbase rejects unsafe edited
+files, excludes credentials from the editor environment, disables core dumps
+for the editing command, and removes the session on completion or handled
+interruption.
+
+Abandoned sessions are removed on a later edit invocation without
+touching active sessions. Forced termination and power loss can leave files
+behind.
+
+Deleting a file does not guarantee erasure from storage or snapshots.
+Processes running as the same user, privileged processes, compromised editors,
+and terminal recording remain outside this protection.
+
+Previews list key names and counts. Revision checks cover both the editing
+period and the time between preview and apply, and saving uses one atomic
+import. Editor files are removed before submitting a confirmed draft. A dry run validates syntax and Dopbase's limits; it cannot establish
+whether credentials work with another service.
+
+Editor comments are unencrypted layout metadata, visible wherever that
+metadata is available. Values are stripped before layout persistence, and the
+server rejects layout slots containing values. Comments must never contain
+credentials.
+
 ## Offline runtime cache
 
 Successful `dopbase run` operations cache their runtime payload locally using
 XChaCha20-Poly1305 with a fresh nonce. A separate local cache key and the exact
 credential that fetched the payload are both required to derive the decryption
-key. Cache files, metadata, key names, and values are encrypted. Logs expose
+key.
+
+Cache files, metadata, key names, and values are encrypted. Logs expose
 only safe runtime metadata, cache source, fetch time, age, and key count.
 
 After unlocking the local document, `dopbase cache list` and `dopbase cache
 clean --dry-run` parse only the server, environment metadata, fetch time, age,
-and aliases. Their human and JSON output omits secret names, values, cache keys,
+and aliases.
+
+Their human and JSON output omits secret names, values, cache keys,
 nonces, and ciphertext. Cleanup holds the cache lock and replaces a partially
 retained document atomically.
 
 An unavailable server cannot confirm whether a credential or secret was later
 revoked. Offline fallback therefore deliberately favors availability and may
-inject stale values. It is limited to connection failures, timeouts, and server
+inject stale values.
+
+It is limited to connection failures, timeouts, and server
 5xx responses. An explicit authentication, authorization, or not-found response
 always fails closed.
 
