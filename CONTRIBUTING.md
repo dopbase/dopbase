@@ -180,13 +180,11 @@ git push origin "$version"
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
 matches both package versions, builds the Linux and macOS tar.gz archives, creates
 `checksums.txt`, and publishes the release only after all four targets succeed.
-Release scripts live in `scripts/release/`. A manual Release workflow run
-executes all checks and builds without publishing. Tag runs publish only after
-all uploads are verified. Published assets are preserved on reruns.
+Release scripts live in `scripts/release/`.
 
-Installer tests live in the website repository. Run
-`bun test scripts/install.test.ts` there when changing `public/install.sh`,
-then run its required `bun run validate` check.
+A manual Release workflow run executes all checks and builds without publishing. 
+Tag runs publish only after all uploads are verified.
+Published assets are preserved on reruns.
 
 The release body comes from `.github/RELEASE_TEMPLATE.md`. It includes the
 summary, the populated optional sections, and a full changelog link comparing
