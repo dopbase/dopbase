@@ -62,14 +62,14 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache Bun downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: app -> target
           key: prepare
@@ -175,7 +175,7 @@ jobs:
           rustup default "${RUST_VERSION}"
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: app -> target
           key: release-${{ matrix.target }}
