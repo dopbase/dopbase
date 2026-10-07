@@ -2,7 +2,7 @@
 
 All notable changes to Dopbase are documented in this file.
 
-## 0.1.9 - Unreleased
+## 0.1.9 - 2026-10-07
 
 [Dopbase](https://dopbase.com) 0.1.9 adds guided server setup, optional web UI,
 background server management, terminal secret editing, and runner exports for
@@ -104,7 +104,7 @@ server commands, and some setup responses change in this release.
   restoration keep their existing behavior. `dopbase init` retains its project
   and environment workflow.
 
-- `dopbase server up` and `dopbase server down` have been replaced by
+- **Breaking:** `dopbase server up` and `dopbase server down` have been replaced by
   `server start --background` or `server start -b` and `server stop`.
   The old commands show an informational migration notice and exit with
   status 1 without changing server state. JSON mode returns `COMMAND_REPLACED`
