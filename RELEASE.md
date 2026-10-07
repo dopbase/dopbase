@@ -210,7 +210,7 @@ Watch the `Release` GitHub Actions workflow triggered by the tag. It must:
 - publish the GitHub release and all five assets.
 
 The release is complete only when the workflow succeeds and the GitHub release
-named `Dopbase <version>` is visible with its notes, four ZIP archives, and
+named `Dopbase <version>` is visible with its notes, four tar.gz archives, and
 `checksums.txt`. Report the release URL and workflow result to the owner.
 
 If the workflow fails, diagnose the failure and prepare a normal reviewed fix.

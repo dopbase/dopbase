@@ -62,6 +62,16 @@ server commands, and some setup responses change in this release.
 
 ### Improvement
 
+- Linux and macOS release downloads use tar.gz archives with gzip level 9.
+  Release steps run through tested Bash scripts, cache dependencies, and support
+  a manual build run without publishing. Releases stay drafts until uploads are
+  verified; reruns preserve published assets.
+
+- The public shell installer shows download progress, verifies SHA-256, and
+  checks the new binary with `--version` before replacing an existing install.
+  It reports the installed path and current server commands. It requires
+  tar/gzip and supports tar.gz releases only.
+
 - `dopbase env list` and the list printed after `env clone` show a single
   `ENVIRONMENT` column with `project/environment` values. IDs, update times,
   and JSON output keep their existing format.

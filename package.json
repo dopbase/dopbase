@@ -18,7 +18,7 @@
     "test:ui": "bunx vitest run --configLoader runner",
     "test:app": "bun run prepare:app && cargo test --manifest-path app/Cargo.toml --locked --all-targets --all-features",
     "test:docs": "bun scripts/docs-tests.mjs",
-    "test:github": "node --test scripts/github-templates.test.mjs",
+    "test:github": "node --test scripts/github-templates.test.mjs scripts/release.test.mjs",
     "clean:docs": "rm -rf ./docs/.vitepress/dist/",
     "clean:ui": "rm -rf ./dist",
     "clean:app": "cargo clean --manifest-path app/Cargo.toml",
