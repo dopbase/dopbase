@@ -166,19 +166,6 @@ the version, changelog summary, compatibility impact, and every verification
 command and result. The pull request is ready when its template check and all
 required CI checks pass.
 
-Before tagging, run the Release workflow manually against the release branch
-once the workflow with `workflow_dispatch` is on the default branch:
-
-```bash
-gh workflow run release.yml --ref release/<version>
-```
-
-The manual run validates the checked-out package version, runs the existing
-checks, builds and smoke-tests all four targets, and uploads a verified bundle
-with checksums. It never creates or publishes a GitHub release. Record the run
-URL and result. Locally, use `bun run test:github`, `actionlint`, and
-`shellcheck scripts/release/*.sh` to check release tooling.
-
 ## 6. Owner review and merge
 
 A repository owner manually reviews the release pull request, requests any
@@ -225,16 +212,6 @@ Watch the `Release` GitHub Actions workflow triggered by the tag. It must:
 The release is complete only when the workflow succeeds and the GitHub release
 named `Dopbase <version>` is visible with its notes, four tar.gz archives, and
 `checksums.txt`. Report the release URL and workflow result to the owner.
-
-New GitHub releases remain drafts until all assets have been uploaded and
-verified. A failed draft can be resumed. For an already published release,
-a rerun succeeds only when its assets match the generated checksums; it never
-replaces published files.
-
-For the first tar.gz release, publish and verify the core release before
-deploying the updated installer from the website repository. Then verify
-`https://dopbase.com/install.sh` with both latest and pinned-version installs.
-The updated installer does not support ZIP-only releases.
 
 If the workflow fails, diagnose the failure and prepare a normal reviewed fix.
 Never move, delete, or replace a published tag unless the owner explicitly

@@ -19,7 +19,7 @@ migration; already initialized instances do not need setup again.
 The shell installer downloads the matching tar.gz archive from GitHub Releases,
 shows download progress, verifies its SHA-256 checksum, and checks the binary's
 version before installing it. It requires curl, tar/gzip, and either sha256sum
-or shasum. ZIP-only releases are not supported.
+or shasum.
 
 On macOS or Linux, install to `~/.local/bin`:
 
