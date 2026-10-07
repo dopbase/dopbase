@@ -16,8 +16,10 @@ migration; already initialized instances do not need setup again.
 
 ## 1. Install Dopbase
 
-The installers download the correct release archive from GitHub Releases and
-verify its SHA-256 checksum.
+The shell installer downloads the matching tar.gz archive from GitHub Releases,
+shows download progress, verifies its SHA-256 checksum, and checks the binary's
+version before installing it. It requires curl, tar/gzip, and either sha256sum
+or shasum. ZIP-only releases are not supported.
 
 On macOS or Linux, install to `~/.local/bin`:
 

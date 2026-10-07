@@ -148,7 +148,8 @@ Repository utilities:
 
 ```bash
 bun run test:github
-bun run test:installer
+actionlint .github/workflows/release.yml
+shellcheck scripts/release/*.sh
 ```
 
 If an existing unrelated failure prevents a check from passing, describe the failure and the command output in the pull request. Do not hide or silently skip it.
@@ -177,8 +178,16 @@ git push origin "$version"
 ```
 
 Pushing the tag starts the GitHub release workflow. It verifies that the tag
-matches the Rust package version, builds the Linux and macOS archives, creates
+matches both package versions, builds the Linux and macOS tar.gz archives, creates
 `checksums.txt`, and publishes the release only after all four targets succeed.
+Release scripts live in `scripts/release/`. A manual Release workflow run
+executes all checks and builds without publishing. Tag runs publish only after
+all uploads are verified. Published assets are preserved on reruns.
+
+Installer tests live in the website repository. Run
+`bun test scripts/install.test.ts` there when changing `public/install.sh`,
+then run its required `bun run validate` check.
+
 The release body comes from `.github/RELEASE_TEMPLATE.md`. It includes the
 summary, the populated optional sections, and a full changelog link comparing
 the previous version with the new one.
