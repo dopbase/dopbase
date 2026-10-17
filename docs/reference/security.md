@@ -52,6 +52,17 @@ verified before the HTTP listener starts.
 
 Networked clients need an authenticated, encrypted connection to the server. Local development may use localhost, but a production deployment must not send credentials over an unprotected network.
 
+## OIDC assertions
+
+Dopbase can trust external OIDC identity providers. It verifies an assertion
+before using any claim: the `iss` must match a configured provider, the
+signature must verify against that provider's published JWKS, the algorithm
+must be one the provider allows, the `aud` must contain a configured audience,
+and `exp`, and `nbf` when present, must be current. Verification fails closed.
+It rejects an untrusted issuer, an unknown key, a bad signature, and every
+symmetric algorithm, and it reports a rejection with a stable code without
+echoing the assertion.
+
 ## Data exposure
 
 Authorized users may need to reveal or export a value. These operations should be explicit, permission-controlled, and audited. Secret names can also disclose information, so access to metadata still needs authorization.

@@ -66,6 +66,13 @@ configurable retention archives expired records before deleting them.
   that writes a record.
   Back up `audit-archive/` separately: snapshots store the database only.
 
+- `server.toml` accepts an `[oidc]` trust policy that lists the OIDC identity
+  providers whose assertions Dopbase accepts. The server verifies the issuer,
+  signature (against the provider's JWKS), algorithm, audience, expiry, and
+  not-before time before trusting a claim, and rejects symmetric algorithms,
+  unknown keys, and untrusted issuers. This is the shared foundation for OIDC
+  sign-in and workload authentication.
+
 ### Changed
 
 - The unused `user_agent` column is removed from `audit_events`; nothing

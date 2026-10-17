@@ -56,6 +56,30 @@ audit_retention_days = 365
 # Environment: DOPBASE_DOCS
 # docs = false
 
+# Trusted OIDC identity providers (optional). A token is accepted only from a
+# listed issuer, only for a listed audience, and only when the signature
+# verifies against the provider's published JWKS.
+# Uncomment the table header before enabling providers below.
+# [oidc]
+
+# A trusted provider. Repeat the table header for each issuer.
+# [[oidc.issuers]]
+
+# Exact "iss" value the provider puts in its tokens. Must be an absolute
+# HTTPS URL; HTTP is accepted for a loopback host during development.
+# issuer = "https://auth.example.com"
+
+# Accepted audiences. A token must list at least one of these in "aud".
+# audiences = ["dopbase"]
+
+# Accepted signature algorithms. Default: ["RS256"].
+# Symmetric algorithms (HS256, HS384, HS512) are rejected.
+# algorithms = ["RS256"]
+
+# JWKS endpoint. Default: discovered from the issuer's
+# /.well-known/openid-configuration document.
+# jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+
 # Master encryption key settings.
 # Uncomment the table header before enabling settings below.
 # [master_key]
