@@ -1,4 +1,4 @@
-use super::{error::AuthError, model::*, service};
+use super::{error::AuthError, model::*, oidc, service};
 use crate::{
   extractors::require_mutation,
   http::{HttpResponse, HttpResponseFormat},
@@ -6,9 +6,40 @@ use crate::{
   state::AppState,
 };
 use axum::{
-  extract::State,
-  http::{HeaderMap, HeaderName, HeaderValue},
+  extract::{Query, State},
+  http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
+  response::{IntoResponse, Response},
 };
+
+/// Build the browser session cookie for a raw session token.
+fn session_cookie(
+  state: &AppState,
+  raw: &str,
+) -> Result<HeaderValue, AuthError> {
+  let secure = if state.config.public_url.starts_with("https://") {
+    "; Secure"
+  } else {
+    ""
+  };
+  let cookie =
+    format!("dopbase_session={raw}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400{secure}");
+  HeaderValue::from_str(&cookie).map_err(|_| crate::http::HttpError::internal())
+}
+
+/// Build a redirect response, optionally setting the session cookie.
+fn redirect_response(
+  location: &str,
+  cookie: Option<HeaderValue>,
+) -> Response {
+  let mut response = StatusCode::SEE_OTHER.into_response();
+  if let Ok(value) = HeaderValue::from_str(location) {
+    response.headers_mut().insert(header::LOCATION, value);
+  }
+  if let Some(cookie) = cookie {
+    response.headers_mut().insert(header::SET_COOKIE, cookie);
+  }
+  response
+}
 
 /// Log in
 ///
@@ -34,16 +65,9 @@ pub async fn login(
   let result = service::login(&state, request).await?;
   let mut response = HttpResponse::ok(result.response, "LOGIN_SUCCEEDED");
   if let Some(raw) = result.cookie_token {
-    let secure = if state.config.public_url.starts_with("https://") {
-      "; Secure"
-    } else {
-      ""
-    };
-    let cookie =
-      format!("dopbase_session={raw}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400{secure}");
     response = response.with_header(
       HeaderName::from_static("set-cookie"),
-      HeaderValue::from_str(&cookie).map_err(|_| crate::http::HttpError::internal())?,
+      session_cookie(&state, &raw)?,
     );
   }
   Ok(response)
@@ -157,4 +181,81 @@ pub async fn change_password(
     HeaderName::from_static("set-cookie"),
     HeaderValue::from_static("dopbase_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"),
   ))
+}
+
+/// Report single sign-on availability
+///
+/// Tell the login screen whether an operator configured OIDC sign-in. This
+/// endpoint is public so the unauthenticated login page can read it.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::auth::OIDC_CONFIG,
+  tag = "authentication",
+  responses(
+    (status = 200, description = "Single sign-on availability", body = inline(HttpResponseFormat<OidcConfigResponse>)),
+  ),
+)]
+pub async fn oidc_config(State(state): State<AppState>) -> HttpResponse<OidcConfigResponse> {
+  HttpResponse::ok(oidc::config(&state), "OIDC_CONFIG_FETCHED")
+}
+
+/// Start single sign-on
+///
+/// Redirect the browser to the configured identity provider with a single-use
+/// `state` and a PKCE challenge. The optional `redirect` query parameter names
+/// the in-app path to return to; only relative paths are honored.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::auth::OIDC_START,
+  tag = "authentication",
+  params(("redirect" = Option<String>, Query, description = "In-app path to return to after sign-in")),
+  responses(
+    (status = 303, description = "Redirects to the identity provider"),
+    (status = 404, description = "Single sign-on is not configured", body = crate::http::ErrorBody),
+    (status = 502, description = "The identity provider could not be reached", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn oidc_start(
+  State(state): State<AppState>,
+  Query(query): Query<OidcStartQuery>,
+) -> Result<Response, AuthError> {
+  let location = oidc::start(&state, query.redirect.as_deref()).await?;
+  Ok(redirect_response(&location, None))
+}
+
+/// Complete single sign-on
+///
+/// Verify the provider's response, link the identity to an existing account on
+/// first sign-in, apply the mapped role, and start a browser session. Every
+/// outcome is a redirect: success returns to the app, failure returns to the
+/// login screen with a generic notice.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::auth::OIDC_CALLBACK,
+  tag = "authentication",
+  params(
+    ("code" = Option<String>, Query, description = "Authorization code from the provider"),
+    ("state" = Option<String>, Query, description = "Single-use state value"),
+    ("error" = Option<String>, Query, description = "Provider error code, when sign-in failed"),
+  ),
+  responses(
+    (status = 303, description = "Redirects back into the app or to the login screen"),
+  ),
+)]
+pub async fn oidc_callback(
+  State(state): State<AppState>,
+  Query(query): Query<OidcCallbackQuery>,
+) -> Result<Response, AuthError> {
+  let redirect = match oidc::callback(&state, query).await {
+    Ok(redirect) => redirect,
+    Err(error) => {
+      tracing::warn!(?error, "OIDC callback failed");
+      return Ok(redirect_response("/login?notice=oidc-failed", None));
+    }
+  };
+  let cookie = match redirect.cookie_token {
+    Some(raw) => Some(session_cookie(&state, &raw)?),
+    None => None,
+  };
+  Ok(redirect_response(&redirect.location, cookie))
 }

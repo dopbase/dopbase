@@ -118,4 +118,33 @@ describe("useLoginController", () => {
     await c.submit();
     expect(c.formError.value).toContain("Too many login attempts");
   });
+
+  it("enables single sign-on when the server offers it", async () => {
+    vi.mocked(authApi.fetchOidcConfig).mockResolvedValueOnce({
+      enabled: true,
+      issuer: "https://auth.example.com",
+    });
+    const c = useLoginController();
+    await c.loadSsoConfig();
+    expect(c.ssoEnabled.value).toBe(true);
+  });
+
+  it("keeps single sign-on hidden when not offered", async () => {
+    vi.mocked(authApi.fetchOidcConfig).mockResolvedValueOnce({
+      enabled: false,
+      issuer: null,
+    });
+    const c = useLoginController();
+    await c.loadSsoConfig();
+    expect(c.ssoEnabled.value).toBe(false);
+  });
+
+  it("keeps single sign-on hidden when the check fails", async () => {
+    vi.mocked(authApi.fetchOidcConfig).mockRejectedValueOnce(
+      new Error("offline"),
+    );
+    const c = useLoginController();
+    await c.loadSsoConfig();
+    expect(c.ssoEnabled.value).toBe(false);
+  });
 });

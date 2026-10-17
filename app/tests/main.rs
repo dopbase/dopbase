@@ -1486,17 +1486,19 @@ async fn state_holds_an_oidc_verifier_only_when_providers_are_trusted() {
       provider: "file".into(),
       path: directory.path().join("master.key"),
     },
-    oidc: app::services::oidc::TrustPolicy {
+    oidc: app::services::oidc::OidcConfig {
       issuers: vec![app::services::oidc::TrustedIssuer {
         issuer: "https://auth.example.com".into(),
         audiences: vec!["dopbase".into()],
         algorithms: vec![app::services::oidc::Algorithm::RS256],
         jwks_uri: None,
       }],
+      login: None,
     },
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();
   assert!(state.oidc.is_some());
+  assert!(state.oidc_login.is_none());
   state.db.close().await;
 }

@@ -19,7 +19,7 @@
 //! so callers can audit or report a failure without leaking the assertion.
 
 use std::{
-  collections::HashMap,
+  collections::{BTreeMap, HashMap},
   sync::Arc,
   time::{Duration, Instant},
 };
@@ -39,6 +39,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::sync::RwLock;
 use url::{Host, Url};
+
+use crate::{constants::api, models::AdminRole};
 
 /// Time a fetched JWKS document is reused before it is fetched again.
 const JWKS_CACHE_TTL: Duration = Duration::from_secs(600);
@@ -128,6 +130,210 @@ impl TrustPolicy {
   }
 }
 
+/// The `[oidc]` server configuration: the trusted issuers used to verify
+/// assertions, plus the optional browser sign-in flow for human operators.
+///
+/// The trust policy is reusable on its own (for example by a non-browser
+/// workload exchange); the login block is only consulted by the browser SSO
+/// endpoints.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct OidcConfig {
+  #[serde(default)]
+  pub issuers: Vec<TrustedIssuer>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub login: Option<OidcLogin>,
+}
+
+impl OidcConfig {
+  /// The trust policy that a verifier enforces.
+  pub fn trust_policy(&self) -> TrustPolicy {
+    TrustPolicy {
+      issuers: self.issuers.clone(),
+    }
+  }
+
+  /// Reject a configuration that can never complete verification or a login.
+  pub fn validate(&self) -> Result<()> {
+    self.trust_policy().validate()?;
+    if let Some(login) = &self.login {
+      if self
+        .issuers
+        .iter()
+        .all(|issuer| issuer.issuer != login.issuer)
+      {
+        bail!(
+          "oidc.login.issuer \"{}\" does not match any idp in oidc.issuers",
+          login.issuer
+        );
+      }
+      login.validate().context("oidc.login")?;
+    }
+    Ok(())
+  }
+}
+
+/// How the client authenticates at the provider's token endpoint.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenEndpointAuthMethod {
+  /// Send the secret with HTTP basic authentication (the RFC 6749 default).
+  ClientSecretBasic,
+  /// Send the secret as a form field.
+  ClientSecretPost,
+  /// No secret; rely on PKCE alone (a public client).
+  None,
+}
+
+impl TokenEndpointAuthMethod {
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::ClientSecretBasic => "client_secret_basic",
+      Self::ClientSecretPost => "client_secret_post",
+      Self::None => "none",
+    }
+  }
+}
+
+/// Browser sign-in configuration for a single trusted issuer.
+///
+/// An administrator creates the account and the link happens on first sign-in:
+/// a provider identity is matched to an existing account by verified email, and
+/// unmatched identities are refused. The mapped group decides the account role.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OidcLogin {
+  /// Exact `issuer` from `oidc.issuers` that hosts the sign-in.
+  pub issuer: String,
+  /// OAuth client identifier registered with the provider.
+  pub client_id: String,
+  /// Client secret. Omit it for a public client that relies on PKCE alone.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub client_secret: Option<String>,
+  /// Callback the provider redirects to. Defaults to
+  /// `{public_url}/api/v1/auth/oidc/callback`.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub redirect_uri: Option<String>,
+  /// Scopes requested from the provider. Must include `openid`.
+  #[serde(default = "default_scopes")]
+  pub scopes: Vec<String>,
+  /// Claim that carries the groups used for role mapping.
+  #[serde(default = "default_groups_claim")]
+  pub groups_claim: String,
+  /// Claim that carries the account email address.
+  #[serde(default = "default_email_claim")]
+  pub email_claim: String,
+  /// Require the provider to assert `email_verified` before linking by email.
+  #[serde(default = "default_true")]
+  pub require_email_verified: bool,
+  /// Token endpoint client authentication. Defaults to `client_secret_basic`
+  /// when a secret is set, and to `none` otherwise.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub token_endpoint_auth_method: Option<TokenEndpointAuthMethod>,
+  /// Group-to-role mapping. A sign-in must match at least one entry; only
+  /// `admin` and `member` can be granted this way.
+  #[serde(default)]
+  pub roles: BTreeMap<String, AdminRole>,
+}
+
+fn default_scopes() -> Vec<String> {
+  vec!["openid".into(), "profile".into(), "email".into()]
+}
+
+fn default_groups_claim() -> String {
+  "groups".into()
+}
+
+fn default_email_claim() -> String {
+  "email".into()
+}
+
+fn default_true() -> bool {
+  true
+}
+
+impl OidcLogin {
+  /// Reject a login configuration that can never complete a sign-in.
+  pub fn validate(&self) -> Result<()> {
+    if self.client_id.trim().is_empty() {
+      bail!("client_id must not be blank");
+    }
+    if let Some(uri) = &self.redirect_uri {
+      validate_provider_url(uri).context("redirect_uri")?;
+    }
+    if self.scopes.is_empty() {
+      bail!("scopes must not be empty");
+    }
+    if !self.scopes.iter().any(|scope| scope == "openid") {
+      bail!("scopes must include \"openid\"");
+    }
+    if self.groups_claim.trim().is_empty() {
+      bail!("groups_claim must not be blank");
+    }
+    if self.email_claim.trim().is_empty() {
+      bail!("email_claim must not be blank");
+    }
+    if self.roles.is_empty() {
+      bail!("roles must map at least one group to a role");
+    }
+    for (group, role) in &self.roles {
+      if group.trim().is_empty() {
+        bail!("roles contains a blank group name");
+      }
+      if !matches!(role, AdminRole::Admin | AdminRole::Member) {
+        bail!(
+          "roles maps \"{group}\" to \"{}\": only admin and member can be granted over OIDC",
+          role.as_str()
+        );
+      }
+    }
+    match self.auth_method() {
+      TokenEndpointAuthMethod::None => {
+        if self.client_secret.is_some() {
+          bail!("client_secret is set but token_endpoint_auth_method is \"none\"");
+        }
+      }
+      method => {
+        if self
+          .client_secret
+          .as_deref()
+          .map(str::is_empty)
+          .unwrap_or(true)
+        {
+          bail!(
+            "client_secret is required for token_endpoint_auth_method \"{}\"",
+            method.as_str()
+          );
+        }
+      }
+    }
+    Ok(())
+  }
+
+  /// The resolved token endpoint client authentication method.
+  pub fn auth_method(&self) -> TokenEndpointAuthMethod {
+    self.token_endpoint_auth_method.unwrap_or({
+      if self.client_secret.is_some() {
+        TokenEndpointAuthMethod::ClientSecretBasic
+      } else {
+        TokenEndpointAuthMethod::None
+      }
+    })
+  }
+
+  /// The callback URL registered with the provider.
+  pub fn callback_url(
+    &self,
+    public_url: &str,
+  ) -> String {
+    self.redirect_uri.clone().unwrap_or_else(|| {
+      format!(
+        "{}{}",
+        public_url.trim_end_matches('/'),
+        api::auth::OIDC_CALLBACK
+      )
+    })
+  }
+}
+
 /// Claims read from an assertion after its signature and registered claims were
 /// verified. Values are available for callers that map claims to roles or to an
 /// environment scope.
@@ -200,6 +406,23 @@ impl VerifiedClaims {
   ) -> Vec<&str> {
     self.strings(claim)
   }
+
+  /// Read a claim that holds a boolean, accepting the string form some
+  /// providers use (`"true"`/`"false"`). Absent or unreadable values are `None`.
+  pub fn boolean(
+    &self,
+    name: &str,
+  ) -> Option<bool> {
+    match self.claims.get(name) {
+      Some(Value::Bool(value)) => Some(*value),
+      Some(Value::String(value)) => match value.as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+      },
+      _ => None,
+    }
+  }
 }
 
 /// Why an assertion was rejected. Codes are stable so callers can audit or
@@ -226,6 +449,8 @@ pub enum OidcError {
   BadIssuer,
   /// The provider's metadata or signing keys could not be fetched.
   ProviderUnavailable,
+  /// The token endpoint rejected the authorization-code exchange.
+  ExchangeFailed,
 }
 
 impl OidcError {
@@ -242,6 +467,7 @@ impl OidcError {
       OidcError::BadAudience => "oidc_invalid_audience",
       OidcError::BadIssuer => "oidc_invalid_issuer",
       OidcError::ProviderUnavailable => "oidc_provider_unavailable",
+      OidcError::ExchangeFailed => "oidc_exchange_failed",
     }
   }
 }
@@ -262,6 +488,7 @@ impl std::fmt::Display for OidcError {
       OidcError::BadAudience => "the assertion audience is not accepted",
       OidcError::BadIssuer => "the assertion issuer does not match the configured provider",
       OidcError::ProviderUnavailable => "the identity provider's signing keys are unavailable",
+      OidcError::ExchangeFailed => "the token endpoint rejected the authorization code",
     };
     formatter.write_str(message)
   }
@@ -295,10 +522,16 @@ pub struct OidcVerifier {
   policy: Arc<TrustPolicy>,
   client: reqwest::Client,
   cache: Arc<RwLock<HashMap<String, CachedJwks>>>,
+  metadata_cache: Arc<RwLock<HashMap<String, CachedMetadata>>>,
 }
 
 struct CachedJwks {
   keys: JwkSet,
+  fetched_at: Instant,
+}
+
+struct CachedMetadata {
+  metadata: IssuerMetadata,
   fetched_at: Instant,
 }
 
@@ -322,12 +555,71 @@ impl OidcVerifier {
       policy: Arc::new(policy),
       client,
       cache: Arc::new(RwLock::new(HashMap::new())),
+      metadata_cache: Arc::new(RwLock::new(HashMap::new())),
     }
   }
 
   /// The trust policy this verifier enforces.
   pub fn policy(&self) -> &TrustPolicy {
     &self.policy
+  }
+
+  /// The provider's discovery document, resolved from the configured issuer.
+  ///
+  /// The document is cached; callers that need the authorization or token
+  /// endpoints read them from the returned metadata. The `issuer` must be one of
+  /// the trusted issuers, so callers cannot be pointed at an arbitrary URL.
+  pub async fn metadata(
+    &self,
+    issuer: &str,
+  ) -> Result<IssuerMetadata, OidcError> {
+    let trusted = self.policy.find(issuer).ok_or(OidcError::UntrustedIssuer)?;
+    self.fetch_metadata(trusted).await
+  }
+
+  /// Exchange an authorization code for tokens at the provider's token
+  /// endpoint, authenticating as configured by the login block.
+  pub async fn exchange_code(
+    &self,
+    login: &OidcLogin,
+    code: &str,
+    redirect_uri: &str,
+    code_verifier: &str,
+  ) -> Result<TokenResponse, OidcError> {
+    let metadata = self.metadata(&login.issuer).await?;
+    let token_endpoint = metadata
+      .token_endpoint
+      .ok_or(OidcError::ProviderUnavailable)?;
+    validate_provider_url(&token_endpoint).map_err(|_| OidcError::ProviderUnavailable)?;
+
+    let mut form = vec![
+      ("grant_type".to_owned(), "authorization_code".to_owned()),
+      ("code".to_owned(), code.to_owned()),
+      ("redirect_uri".to_owned(), redirect_uri.to_owned()),
+      ("client_id".to_owned(), login.client_id.clone()),
+      ("code_verifier".to_owned(), code_verifier.to_owned()),
+    ];
+    let method = login.auth_method();
+    if method == TokenEndpointAuthMethod::ClientSecretPost
+      && let Some(secret) = &login.client_secret
+    {
+      form.push(("client_secret".to_owned(), secret.clone()));
+    }
+    let mut request = self.client.post(&token_endpoint).form(&form);
+    if method == TokenEndpointAuthMethod::ClientSecretBasic {
+      request = request.basic_auth(&login.client_id, login.client_secret.as_deref());
+    }
+    let response = request
+      .send()
+      .await
+      .map_err(|_| OidcError::ExchangeFailed)?;
+    if !response.status().is_success() {
+      return Err(OidcError::ExchangeFailed);
+    }
+    response
+      .json::<TokenResponse>()
+      .await
+      .map_err(|_| OidcError::ExchangeFailed)
   }
 
   /// Verify an assertion and return its claims. Returns [`OidcError`] when the
@@ -435,19 +727,35 @@ impl OidcVerifier {
   ) -> Result<Url, OidcError> {
     let raw = match &trusted.jwks_uri {
       Some(uri) => uri.clone(),
-      None => self.discover_jwks_uri(trusted).await?,
+      None => self
+        .fetch_metadata(trusted)
+        .await?
+        .jwks_uri
+        .ok_or(OidcError::ProviderUnavailable)?,
     };
     validate_provider_url(&raw).map_err(|_| OidcError::ProviderUnavailable)?;
     Url::parse(&raw).map_err(|_| OidcError::ProviderUnavailable)
   }
 
-  async fn discover_jwks_uri(
+  /// Fetch and cache a provider's discovery document. The `issuer` field, when
+  /// present, must match the configured issuer so a misconfigured or hostile
+  /// endpoint cannot redirect trust to a different provider.
+  async fn fetch_metadata(
     &self,
     trusted: &TrustedIssuer,
-  ) -> Result<String, OidcError> {
+  ) -> Result<IssuerMetadata, OidcError> {
+    {
+      let cache = self.metadata_cache.read().await;
+      if let Some(entry) = cache.get(&trusted.issuer)
+        && entry.fetched_at.elapsed() < JWKS_CACHE_TTL
+      {
+        return Ok(entry.metadata.clone());
+      }
+    }
     let base = trusted.issuer.trim_end_matches('/');
     let metadata_url = Url::parse(&format!("{base}/{DISCOVERY_PATH}"))
       .map_err(|_| OidcError::ProviderUnavailable)?;
+    validate_provider_url(metadata_url.as_str()).map_err(|_| OidcError::ProviderUnavailable)?;
     let response = self
       .client
       .get(metadata_url)
@@ -461,22 +769,50 @@ impl OidcVerifier {
       .json::<IssuerMetadata>()
       .await
       .map_err(|_| OidcError::ProviderUnavailable)?;
-    if let Some(issuer) = metadata.issuer
-      && issuer != trusted.issuer
+    if let Some(issuer) = &metadata.issuer
+      && issuer != &trusted.issuer
     {
       return Err(OidcError::ProviderUnavailable);
     }
-    metadata.jwks_uri.ok_or(OidcError::ProviderUnavailable)
+    let mut cache = self.metadata_cache.write().await;
+    cache.insert(
+      trusted.issuer.clone(),
+      CachedMetadata {
+        metadata: metadata.clone(),
+        fetched_at: Instant::now(),
+      },
+    );
+    Ok(metadata)
   }
 }
 
 /// The subset of the OpenID Connect discovery document Dopbase needs.
-#[derive(Debug, Deserialize)]
-struct IssuerMetadata {
+#[derive(Clone, Debug, Deserialize)]
+pub struct IssuerMetadata {
   #[serde(default)]
-  issuer: Option<String>,
+  pub issuer: Option<String>,
   #[serde(default)]
-  jwks_uri: Option<String>,
+  pub authorization_endpoint: Option<String>,
+  #[serde(default)]
+  pub token_endpoint: Option<String>,
+  #[serde(default)]
+  pub userinfo_endpoint: Option<String>,
+  #[serde(default)]
+  pub jwks_uri: Option<String>,
+}
+
+/// The tokens returned by the provider's token endpoint. Only the ID token is
+/// consumed today; the rest is kept so callers do not need another type.
+#[derive(Clone, Debug, Deserialize)]
+pub struct TokenResponse {
+  #[serde(default)]
+  pub id_token: Option<String>,
+  #[serde(default)]
+  pub access_token: Option<String>,
+  #[serde(default)]
+  pub token_type: Option<String>,
+  #[serde(default)]
+  pub expires_in: Option<i64>,
 }
 
 /// Select the keys to try for a token: the key named by `kid`, or every key

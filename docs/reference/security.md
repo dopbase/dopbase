@@ -63,6 +63,19 @@ It rejects an untrusted issuer, an unknown key, a bad signature, and every
 symmetric algorithm, and it reports a rejection with a stable code without
 echoing the assertion.
 
+## Single sign-on
+
+An operator can enable browser single sign-on for the admin UI. It uses the
+OpenID Connect authorization code flow with PKCE. The sign-in binds a provider
+identity to an existing account; it never creates one. On the first sign-in the
+provider's verified email is matched against an account, and the pair of issuer
+and subject is stored so later sign-ins do not depend on the email. An email
+that matches no account, a group that maps to no role, and an unverified email
+are all refused. The role comes from the configured group mapping, so a
+provider group can grant `admin` or `member` but never `root`. The single-use
+`state`, the PKCE verifier, and the nonce are checked on every callback, and the
+provider's tokens are used only to read claims and are never persisted.
+
 ## Data exposure
 
 Authorized users may need to reveal or export a value. These operations should be explicit, permission-controlled, and audited. Secret names can also disclose information, so access to metadata still needs authorization.

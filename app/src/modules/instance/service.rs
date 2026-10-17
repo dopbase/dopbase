@@ -178,6 +178,8 @@ pub async fn factory_reset(
       "environments",
       "projects",
       "sessions",
+      "oidc_login_flows",
+      "oidc_identities",
       "admins",
     ] {
       sqlx::query(&format!("DELETE FROM {table}"))

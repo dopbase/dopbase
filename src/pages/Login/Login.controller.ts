@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { fetchOidcConfig, oidcStartUrl } from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 import { isSafeRedirect, isValidEmail } from "~/utils/validation";
@@ -19,6 +20,15 @@ export function useLoginController() {
   const fieldErrors = ref<{ email?: string; password?: string }>({});
   const formError = ref<string | null>(null);
   const submitting = ref(false);
+  const ssoEnabled = ref(false);
+
+  /** The in-app destination to return to after any successful sign-in. */
+  function targetPath(): string {
+    const redirect = route.query.redirect;
+    return typeof redirect === "string" && isSafeRedirect(redirect)
+      ? redirect
+      : "/";
+  }
 
   function validate(): boolean {
     const errors: { email?: string; password?: string } = {};
@@ -71,12 +81,33 @@ export function useLoginController() {
     }
   }
 
+  /**
+   * Read whether the server offers single sign-on. A failure leaves the button
+   * hidden: password login always remains available.
+   */
+  async function loadSsoConfig(): Promise<void> {
+    try {
+      const config = await fetchOidcConfig();
+      ssoEnabled.value = config?.enabled === true;
+    } catch {
+      ssoEnabled.value = false;
+    }
+  }
+
+  /** Leave the SPA and let the server start the provider redirect. */
+  function ssoSignIn(): void {
+    window.location.assign(oidcStartUrl(targetPath()));
+  }
+
   return {
     email,
     password,
     fieldErrors,
     formError,
     submitting,
+    ssoEnabled,
     submit,
+    loadSsoConfig,
+    ssoSignIn,
   };
 }

@@ -16,6 +16,7 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 | Environments          | `environment.created`, `environment.renamed`, `environment.deleted`                                                                                                 |
 | Runner tokens         | `token.created`, `token.revoked`                                                                                                                                    |
 | Authentication        | `login.succeeded`, `login.failed`, `logout.succeeded`                                                                                                               |
+| Single sign-on        | `oidc.login.succeeded`, `oidc.login.failed`, `oidc.identity.linked`                                                                                                 |
 | Administrator & users | `admin.bootstrapped`, `admin.created`, `admin.updated`, `admin.deleted`, `admin.reauthenticated`, `admin.password_changed`                                          |
 | AI service accounts   | `service_account.created`, `service_account.deleted`, `service_account.token_created`, `service_account.token_revoked`                                              |
 | Backups               | `backup.created`, `backup.downloaded`, `backup.uploaded`, `backup.restored`, `backup.deleted`, `master_key.downloaded`, `backup.restored_bootstrap`                 |

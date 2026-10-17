@@ -32,6 +32,13 @@ export interface SessionResponse {
   lastLoginAt?: string | null;
 }
 
+export interface OidcConfig {
+  /** True when an operator enabled single sign-on. */
+  enabled: boolean;
+  /** The trusted issuer hosting the sign-in, when enabled. */
+  issuer: string | null;
+}
+
 const BASE = "/api/v1/auth";
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
@@ -73,4 +80,21 @@ export async function changePassword(
     body: { currentPassword, newPassword },
     notifyAuthEvents: false,
   });
+}
+
+/** Read whether single sign-on is available. Public, safe before login. */
+export async function fetchOidcConfig(): Promise<OidcConfig> {
+  const { data } = await apiRequest<OidcConfig>(`${BASE}/oidc/config`, {
+    anonymous: true,
+    notifyAuthEvents: false,
+  });
+  return data;
+}
+
+/**
+ * Build the URL that starts the single sign-on redirect. The server validates
+ * the return path, so callers may pass an in-app path it already trusts.
+ */
+export function oidcStartUrl(redirect: string): string {
+  return `${BASE}/oidc/start?redirect=${encodeURIComponent(redirect)}`;
 }

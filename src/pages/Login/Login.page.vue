@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useLoginController } from "./Login.controller";
 import { AuthLayout } from "~/layouts";
 import { DbAlert, DbButton, DbCode, DbInput } from "~/components/ui";
 import { TerminalIcon, InfoIcon } from "~/assets/icons";
 
-const { email, password, fieldErrors, formError, submitting, submit } =
-  useLoginController();
+const {
+  email,
+  password,
+  fieldErrors,
+  formError,
+  submitting,
+  ssoEnabled,
+  submit,
+  loadSsoConfig,
+  ssoSignIn,
+} = useLoginController();
 const route = useRoute();
 const notice = computed(() => {
   if (route.query.notice === "password-changed") {
@@ -16,8 +25,16 @@ const notice = computed(() => {
   if (route.query.notice === "backup-restored") {
     return "Backup restored successfully. Sign in with an administrator account from the backup.";
   }
+  if (route.query.notice === "oidc-failed") {
+    return "Single sign-on failed. Try again, or sign in with your password.";
+  }
+  if (route.query.notice === "oidc-denied") {
+    return "Your single sign-on account is not authorized for this instance.";
+  }
   return null;
 });
+
+onMounted(loadSsoConfig);
 </script>
 
 <template>
@@ -58,6 +75,21 @@ const notice = computed(() => {
           Sign in
         </DbButton>
       </form>
+
+      <template v-if="ssoEnabled">
+        <div class="my-5 flex items-center gap-3 text-xs text-ink-faint">
+          <span class="h-px flex-1 bg-line-soft" />
+          or
+          <span class="h-px flex-1 bg-line-soft" />
+        </div>
+        <DbButton
+          variant="secondary"
+          type="button"
+          data-testid="sso-sign-in"
+          @click="ssoSignIn">
+          Sign in with single sign-on
+        </DbButton>
+      </template>
 
       <details class="group mt-6 rounded-control border border-line bg-panel">
         <summary

@@ -49,6 +49,9 @@ pub mod auth {
   pub const SESSION: &str = api_path!("/auth/session");
   pub const REAUTHENTICATE: &str = api_path!("/auth/reauthenticate");
   pub const CHANGE_PASSWORD: &str = api_path!("/auth/change-password");
+  pub const OIDC_CONFIG: &str = api_path!("/auth/oidc/config");
+  pub const OIDC_START: &str = api_path!("/auth/oidc/start");
+  pub const OIDC_CALLBACK: &str = api_path!("/auth/oidc/callback");
 }
 
 pub mod projects {
