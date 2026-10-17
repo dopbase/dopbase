@@ -2,7 +2,8 @@
 //!
 //! The flow reuses the shared OIDC verifier for discovery, the code exchange,
 //! and ID-token verification. It adds the browser-facing pieces: a single-use
-//! `state`, a PKCE verifier, the account link, and the role mapping.
+//! `state` that is also bound to the browser that started the sign-in, a PKCE
+//! verifier, the account link, and the role mapping.
 //!
 //! Accounts are provisioned by an administrator. The first sign-in links the
 //! provider identity to an existing account matched by verified email; an email
@@ -24,12 +25,21 @@ use serde_json::json;
 use url::Url;
 
 /// How long a browser sign-in may stay pending before the `state` expires.
-const FLOW_TTL: Duration = Duration::minutes(10);
+/// The controller reuses it for the lifetime of the binding cookie.
+pub(crate) const FLOW_TTL: Duration = Duration::minutes(10);
 
 /// Notice shown on the login screen when sign-in fails before authorization.
 const NOTICE_FAILED: &str = "/login?notice=oidc-failed";
 /// Notice shown when the provider identity is not authorized for this instance.
 const NOTICE_DENIED: &str = "/login?notice=oidc-denied";
+
+/// Where the browser should go to authorize the sign-in, and the `state` it
+/// must present again on the callback. The controller sets the `state` as a
+/// short-lived cookie so the callback can be bound to this browser.
+pub struct StartRedirect {
+  pub location: String,
+  pub state: String,
+}
 
 /// Where the browser should go next after the callback, and the cookie to set.
 pub struct LoginRedirect {
@@ -71,7 +81,7 @@ pub fn config(state: &AppState) -> OidcConfigResponse {
 pub async fn start(
   state: &AppState,
   redirect: Option<&str>,
-) -> Result<String, HttpError> {
+) -> Result<StartRedirect, HttpError> {
   let login = state.oidc_login.as_ref().ok_or_else(oidc_disabled)?;
   let verifier = state.oidc.as_ref().ok_or_else(HttpError::internal)?;
   let metadata = verifier
@@ -80,7 +90,7 @@ pub async fn start(
     .map_err(|_| provider_unavailable())?;
   let authorization_endpoint = metadata
     .authorization_endpoint
-    .ok_or_else(|| HttpError::internal())?;
+    .ok_or_else(HttpError::internal)?;
 
   let state_value = token::generate("").map_err(|_| HttpError::internal())?;
   let nonce = token::generate("").map_err(|_| HttpError::internal())?;
@@ -113,10 +123,17 @@ pub async fn start(
     .append_pair("nonce", &nonce)
     .append_pair("code_challenge", &challenge)
     .append_pair("code_challenge_method", "S256");
-  Ok(url.to_string())
+  Ok(StartRedirect {
+    location: url.to_string(),
+    state: state_value,
+  })
 }
 
 /// Complete a sign-in from the provider's callback.
+///
+/// `browser_state` is the `state` value the browser presents as the binding
+/// cookie set when the sign-in started; it must equal the callback's `state`,
+/// so a callback URL replayed into another browser is refused.
 ///
 /// Every outcome is a redirect: the browser never sees a JSON error from this
 /// endpoint. Failures are audited with a stable reason and then shown as a
@@ -124,6 +141,7 @@ pub async fn start(
 pub async fn callback(
   state: &AppState,
   query: OidcCallbackQuery,
+  browser_state: Option<&str>,
 ) -> Result<LoginRedirect, HttpError> {
   let Some(login) = state.oidc_login.as_ref() else {
     return Ok(LoginRedirect::failed());
@@ -133,6 +151,12 @@ pub async fn callback(
     audit_failure(state, login, "state_missing", None).await;
     return Ok(LoginRedirect::failed());
   };
+  // Check the browser binding before touching the database: an unbound
+  // callback can neither consume the flow nor probe whether its state exists.
+  if browser_state != Some(state_value) {
+    audit_failure(state, login, "state_unbound", None).await;
+    return Ok(LoginRedirect::failed());
+  }
   let Some((flow, created_at)) =
     repository::consume_login_flow(state.db.pool(), state_value).await?
   else {

@@ -122,34 +122,27 @@ pub async fn create_login_flow(
 }
 
 /// Consume a login flow by its single-use `state`, returning it if it existed.
-/// The row is deleted in the same transaction whether or not it is used again.
+/// The delete and the read are one statement, so two callbacks racing on the
+/// same `state` cannot both consume it.
 pub async fn consume_login_flow(
   pool: &SqlitePool,
   state: &str,
 ) -> Result<Option<(LoginFlow, String)>, sqlx::Error> {
-  let mut tx = pool.begin().await?;
   let row: Option<(String, String, Option<String>, String)> = sqlx::query_as(
-    "SELECT nonce,code_verifier,redirect_to,created_at FROM oidc_login_flows WHERE state = ?",
+    "DELETE FROM oidc_login_flows WHERE state = ? RETURNING nonce,code_verifier,redirect_to,created_at",
   )
   .bind(state)
-  .fetch_optional(&mut *tx)
+  .fetch_optional(pool)
   .await?;
-  let Some((nonce, code_verifier, redirect_to, created_at)) = row else {
-    tx.rollback().await?;
-    return Ok(None);
-  };
-  sqlx::query("DELETE FROM oidc_login_flows WHERE state = ?")
-    .bind(state)
-    .execute(&mut *tx)
-    .await?;
-  tx.commit().await?;
-  Ok(Some((
-    LoginFlow {
-      state: state.to_owned(),
-      nonce,
-      code_verifier,
-      redirect_to,
-    },
-    created_at,
-  )))
+  Ok(row.map(|(nonce, code_verifier, redirect_to, created_at)| {
+    (
+      LoginFlow {
+        state: state.to_owned(),
+        nonce,
+        code_verifier,
+        redirect_to,
+      },
+      created_at,
+    )
+  }))
 }

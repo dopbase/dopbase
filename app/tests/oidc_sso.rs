@@ -310,14 +310,33 @@ fn location(headers: &HeaderMap) -> String {
 }
 
 fn session_cookie(headers: &HeaderMap) -> String {
+  named_cookie(headers, "dopbase_session").expect("session cookie")
+}
+
+/// The sign-in binding cookie the start response sets.
+fn binding_cookie(headers: &HeaderMap) -> String {
+  named_cookie(headers, "dopbase_sso_state").expect("binding cookie")
+}
+
+/// The first `Set-Cookie` value that starts with `name=`, as a bare pair.
+fn named_cookie(
+  headers: &HeaderMap,
+  name: &str,
+) -> Option<String> {
   headers
-    .get(header::SET_COOKIE)
-    .and_then(|value| value.to_str().ok())
-    .expect("session cookie")
-    .split(';')
-    .next()
-    .unwrap()
-    .to_owned()
+    .get_all(header::SET_COOKIE)
+    .iter()
+    .filter_map(|value| value.to_str().ok())
+    .find_map(|value| {
+      let pair = value.split(';').next().unwrap_or_default();
+      pair
+        .starts_with(&format!("{name}="))
+        .then(|| pair.to_owned())
+    })
+}
+
+fn has_session_cookie(headers: &HeaderMap) -> bool {
+  named_cookie(headers, "dopbase_session").is_some()
 }
 
 fn query_param(
@@ -335,11 +354,12 @@ fn query_param(
   panic!("missing {name} in {url}");
 }
 
-/// Start a sign-in and return the provider state and the flow nonce.
+/// Start a sign-in and return the provider state, the flow nonce, and the
+/// binding cookie the browser must present on the callback.
 async fn begin(
   router: &Router,
   redirect: Option<&str>,
-) -> (String, String) {
+) -> (String, String, String) {
   let path = match redirect {
     Some(redirect) => format!("/api/v1/auth/oidc/start?redirect={redirect}"),
     None => "/api/v1/auth/oidc/start".to_owned(),
@@ -347,7 +367,11 @@ async fn begin(
   let (status, headers) = send(router, "GET", &path, None).await;
   assert_eq!(status, 303, "start redirects to the provider");
   let url = location(&headers);
-  (query_param(&url, "state"), query_param(&url, "nonce"))
+  (
+    query_param(&url, "state"),
+    query_param(&url, "nonce"),
+    binding_cookie(&headers),
+  )
 }
 
 async fn audit_events(state: &AppState) -> Vec<(String, Value)> {
@@ -411,9 +435,9 @@ async fn first_sign_in_links_the_account_and_applies_the_mapped_role() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, Some("%2Fprojects")).await;
+  let (flow_state, nonce, binding) = begin(&router, Some("%2Fprojects")).await;
   let url = format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}");
-  let (status, headers) = send(&router, "GET", &url, None).await;
+  let (status, headers) = send(&router, "GET", &url, Some(&binding)).await;
   assert_eq!(status, 303);
   assert_eq!(location(&headers), "/projects");
   let cookie = session_cookie(&headers);
@@ -468,12 +492,12 @@ async fn linked_identity_signs_in_again_without_a_new_email_match() {
     }))
     .await;
 
-  let (first_state, nonce) = begin(&router, None).await;
+  let (first_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={first_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -488,12 +512,12 @@ async fn linked_identity_signs_in_again_without_a_new_email_match() {
       "groups": ["dopbase-members"],
     }))
     .await;
-  let (second_state, nonce) = begin(&router, None).await;
+  let (second_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={second_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -536,17 +560,17 @@ async fn unknown_email_is_denied_without_provisioning() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
   assert_eq!(location(&headers), "/login?notice=oidc-denied");
-  assert!(headers.get(header::SET_COOKIE).is_none());
+  assert!(!has_session_cookie(&headers));
 
   let accounts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admins")
     .fetch_one(state.db.pool())
@@ -574,12 +598,12 @@ async fn unmapped_group_is_denied() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -609,12 +633,12 @@ async fn unverified_email_is_denied() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -634,7 +658,7 @@ async fn unknown_state_returns_to_the_login_screen() {
     &router,
     "GET",
     "/api/v1/auth/oidc/callback?code=x&state=unknown",
-    None,
+    Some("dopbase_sso_state=unknown"),
   )
   .await;
   assert_eq!(status, 303);
@@ -661,16 +685,73 @@ async fn a_replayed_state_cannot_sign_in_twice() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let path = format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}");
-  let (status, headers) = send(&router, "GET", &path, None).await;
+  let (status, headers) = send(&router, "GET", &path, Some(&binding)).await;
   assert_eq!(status, 303);
   assert_eq!(location(&headers), "/");
 
   // The single-use state is gone: the same URL fails and mints no session.
+  let (status, headers) = send(&router, "GET", &path, Some(&binding)).await;
+  assert_eq!(status, 303);
+  assert_eq!(location(&headers), "/login?notice=oidc-failed");
+  let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(sessions, 1);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn the_pending_sign_in_is_bound_to_its_browser() {
+  let provider = start_provider().await;
+  let (_directory, state, router) = app_with(login_config(&provider)).await;
+  insert_account(&state, "usr_ivan", "ivan@example.com", "member").await;
+  provider
+    .set_claims(json!({
+      "sub": "ivan-provider-id",
+      "email": "ivan@example.com",
+      "email_verified": true,
+      "groups": ["dopbase-members"],
+    }))
+    .await;
+
+  let (flow_state, nonce, binding) = begin(&router, None).await;
+  let path = format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}");
+
+  // A callback without the binding cookie cannot sign any browser in: it is a
+  // completed provider response replayed into a different browser.
   let (status, headers) = send(&router, "GET", &path, None).await;
   assert_eq!(status, 303);
   assert_eq!(location(&headers), "/login?notice=oidc-failed");
+  assert!(!has_session_cookie(&headers));
+
+  // Neither can a callback that presents a different binding value.
+  let (status, headers) = send(&router, "GET", &path, Some("dopbase_sso_state=other")).await;
+  assert_eq!(status, 303);
+  assert_eq!(location(&headers), "/login?notice=oidc-failed");
+  assert!(!has_session_cookie(&headers));
+
+  let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(sessions, 0);
+  let events = audit_events(&state).await;
+  assert!(
+    events.iter().all(
+      |(action, metadata)| action == "oidc.login.failed" && metadata["reason"] == "state_unbound"
+    ),
+    "{events:?}"
+  );
+
+  // The unbound attempts did not burn the flow: the browser that started the
+  // sign-in still completes it with its own cookie.
+  let (status, headers) = send(&router, "GET", &path, Some(&binding)).await;
+  assert_eq!(status, 303);
+  assert_eq!(location(&headers), "/");
+  assert!(has_session_cookie(&headers));
   let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
     .fetch_one(state.db.pool())
     .await
@@ -693,12 +774,12 @@ async fn an_external_redirect_is_ignored() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, Some("https%3A%2F%2Fevil.example")).await;
+  let (flow_state, nonce, binding) = begin(&router, Some("https%3A%2F%2Fevil.example")).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -720,12 +801,12 @@ async fn root_account_keeps_its_role_across_sign_in() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, _) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -743,12 +824,12 @@ async fn a_provider_error_is_reported_as_a_failure() {
   let provider = start_provider().await;
   let (_directory, state, router) = app_with(login_config(&provider)).await;
 
-  let (flow_state, _) = begin(&router, None).await;
+  let (flow_state, _, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?error=access_denied&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -765,12 +846,12 @@ async fn a_provider_failure_does_not_leak_a_token() {
   let (_directory, state, router) = app_with(login_config(&provider)).await;
   *provider.token_status.write().await = 400;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -795,13 +876,13 @@ async fn a_wrong_nonce_is_rejected() {
     }))
     .await;
 
-  let (flow_state, _nonce) = begin(&router, None).await;
+  let (flow_state, _nonce, binding) = begin(&router, None).await;
   // Present a code that is not the flow's nonce.
   let (status, headers) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code=not-the-nonce&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);
@@ -826,12 +907,12 @@ async fn sign_in_never_persists_the_provider_tokens() {
     }))
     .await;
 
-  let (flow_state, nonce) = begin(&router, None).await;
+  let (flow_state, nonce, binding) = begin(&router, None).await;
   let (status, _) = send(
     &router,
     "GET",
     &format!("/api/v1/auth/oidc/callback?code={nonce}&state={flow_state}"),
-    None,
+    Some(&binding),
   )
   .await;
   assert_eq!(status, 303);

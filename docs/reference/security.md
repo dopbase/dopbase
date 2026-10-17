@@ -73,7 +73,9 @@ and subject is stored so later sign-ins do not depend on the email. An email
 that matches no account, a group that maps to no role, and an unverified email
 are all refused. The role comes from the configured group mapping, so a
 provider group can grant `admin` or `member` but never `root`. The single-use
-`state`, the PKCE verifier, and the nonce are checked on every callback, and the
+`state`, the PKCE verifier, and the nonce are checked on every callback, the
+pending sign-in is bound to the browser that started it with a short-lived
+cookie so a callback URL cannot be replayed into another browser, and the
 provider's tokens are used only to read claims and are never persisted.
 
 ## Data exposure
