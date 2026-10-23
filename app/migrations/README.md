@@ -22,6 +22,7 @@ version. The current pre-release schema is assembled in this order:
 0015_audit_chain_anchor.up.sql
 0016_audit_chain_integrity.up.sql
 0017_audit_drop_user_agent.up.sql
+0018_oidc_login.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -32,7 +33,8 @@ expiry. Version 0014 adds the hash-chain columns on `audit_events`. Version
 so verification continues where the pruned chain stops. Version 0016 records
 the chain's genesis time, so records written before it are reported as legacy
 and never sealed, and adds a trigger that rejects updates of sealed records. Version 0017 drops
-the `user_agent` column from `audit_events`, which nothing ever filled. Runtime startup
+the `user_agent` column from `audit_events`, which nothing ever filled. Version 0018 adds the OIDC identity link and the
+pending browser sign-in tables. Runtime startup
 applies up migrations only. Rollback is a maintenance and test
 operation, not a public Dopbase CLI command.
 

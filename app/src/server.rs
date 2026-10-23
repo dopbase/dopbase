@@ -37,7 +37,7 @@ use crate::{
   },
   http::HttpError,
   middlewares, modules,
-  services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, token},
+  services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, oidc::OidcVerifier, token},
   state::{AppState, SetupState},
 };
 
@@ -124,10 +124,21 @@ async fn build_instance_state(
   } else {
     None
   };
+  let oidc = if config.oidc.issuers.is_empty() {
+    None
+  } else {
+    Some(
+      OidcVerifier::new(config.oidc.trust_policy())
+        .context("failed to initialize the OIDC verifier")?,
+    )
+  };
+  let oidc_login = config.oidc.login.clone();
   Ok(AppState {
     config: Arc::new(config),
     db,
     crypto,
+    oidc,
+    oidc_login,
     setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
     maintenance: Arc::new(std::sync::atomic::AtomicBool::new(false)),

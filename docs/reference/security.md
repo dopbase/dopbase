@@ -52,6 +52,32 @@ verified before the HTTP listener starts.
 
 Networked clients need an authenticated, encrypted connection to the server. Local development may use localhost, but a production deployment must not send credentials over an unprotected network.
 
+## OIDC assertions
+
+Dopbase can trust external OIDC identity providers. It verifies an assertion
+before using any claim: the `iss` must match a configured provider, the
+signature must verify against that provider's published JWKS, the algorithm
+must be one the provider allows, the `aud` must contain a configured audience,
+and `exp`, and `nbf` when present, must be current. Verification fails closed.
+It rejects an untrusted issuer, an unknown key, a bad signature, and every
+symmetric algorithm, and it reports a rejection with a stable code without
+echoing the assertion.
+
+## Single sign-on
+
+An operator can enable browser single sign-on for the admin UI. It uses the
+OpenID Connect authorization code flow with PKCE. The sign-in binds a provider
+identity to an existing account; it never creates one. On the first sign-in the
+provider's verified email is matched against an account, and the pair of issuer
+and subject is stored so later sign-ins do not depend on the email. An email
+that matches no account, a group that maps to no role, and an unverified email
+are all refused. The role comes from the configured group mapping, so a
+provider group can grant `admin` or `member` but never `root`. The single-use
+`state`, the PKCE verifier, and the nonce are checked on every callback, the
+pending sign-in is bound to the browser that started it with a short-lived
+cookie so a callback URL cannot be replayed into another browser, and the
+provider's tokens are used only to read claims and are never persisted.
+
 ## Data exposure
 
 Authorized users may need to reveal or export a value. These operations should be explicit, permission-controlled, and audited. Secret names can also disclose information, so access to metadata still needs authorization.

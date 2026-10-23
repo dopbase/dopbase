@@ -21,6 +21,15 @@ and 24-hour absolute lifetime. CLI sessions are opaque bearer tokens with a
 session file. Offline password recovery verifies the master key, requires
 the server to be stopped, and revokes every human session.
 
+An instance can also delegate browser sign-in to an external OIDC provider.
+The first sign-in links a provider identity to an existing account by verified
+email; later sign-ins use the stored issuer and subject. Sign-in never creates
+an account. A group mapped in the server configuration sets the account role,
+so a provider group can grant `admin` or `member` but never `root`. An unknown
+email, an unmapped group, or an unverified email is refused and audited. Local
+password login stays available, so administrators can still reach the instance
+when the provider is down.
+
 ## Machine identities
 
 CI jobs, servers, containers, deployment systems, and automation use

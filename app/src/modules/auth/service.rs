@@ -15,11 +15,108 @@ use crate::{
   services::token,
   state::AppState,
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
+
 pub struct LoginResult {
   pub response: LoginResponse,
   pub cookie_token: Option<String>,
 }
+
+/// A freshly generated session that has not been stored yet. Shared by password
+/// login and OIDC sign-in so both constrain browser and CLI lifetimes alike.
+pub(crate) struct NewSession {
+  pub id: String,
+  pub raw_token: String,
+  pub csrf_token: Option<String>,
+  pub created_at: DateTime<Utc>,
+  pub idle_expires_at: DateTime<Utc>,
+  pub absolute_expires_at: DateTime<Utc>,
+}
+
+pub(crate) fn prepare_session(kind: SessionKind) -> Result<NewSession, HttpError> {
+  let raw_token = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;
+  let csrf_token = if kind == SessionKind::Browser {
+    Some(token::generate(CSRF_TOKEN_PREFIX).map_err(|_| HttpError::internal())?)
+  } else {
+    None
+  };
+  let now = Utc::now();
+  let (idle, absolute) = if kind == SessionKind::Browser {
+    (
+      now + Duration::hours(BROWSER_SESSION_IDLE_HOURS),
+      now + Duration::hours(BROWSER_SESSION_ABSOLUTE_HOURS),
+    )
+  } else {
+    (
+      now + Duration::days(CLI_SESSION_IDLE_DAYS),
+      now + Duration::days(CLI_SESSION_ABSOLUTE_DAYS),
+    )
+  };
+  Ok(NewSession {
+    id: token::public_id(SESSION_ID_PREFIX),
+    raw_token,
+    csrf_token,
+    created_at: now,
+    idle_expires_at: idle,
+    absolute_expires_at: absolute,
+  })
+}
+
+/// Prune expired session history and insert a session row inside the caller's
+/// transaction, so the session and its audit event commit together.
+pub(crate) async fn insert_session(
+  tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+  session: &NewSession,
+  admin_id: &str,
+  kind: SessionKind,
+) -> Result<(), HttpError> {
+  // Keep revoked/expired session history for 30 days for operational
+  // diagnosis, then prune it during the naturally recurring login path.
+  let retention_cutoff = (session.created_at - Duration::days(30)).to_rfc3339();
+  sqlx::query("DELETE FROM sessions WHERE (revoked_at IS NOT NULL AND revoked_at < ?) OR (absolute_expires_at < ?) OR (idle_expires_at < ?)")
+    .bind(&retention_cutoff)
+    .bind(&retention_cutoff)
+    .bind(&retention_cutoff)
+    .execute(&mut **tx)
+    .await?;
+  sqlx::query("INSERT INTO sessions(id,admin_id,kind,token_hash,csrf_hash,created_at,last_used_at,recent_auth_at,idle_expires_at,absolute_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
+    .bind(&session.id)
+    .bind(admin_id)
+    .bind(kind.as_str())
+    .bind(token::hash(&session.raw_token))
+    .bind(session.csrf_token.as_ref().map(|value| token::hash(value)))
+    .bind(session.created_at.to_rfc3339())
+    .bind(session.created_at.to_rfc3339())
+    .bind(session.created_at.to_rfc3339())
+    .bind(session.idle_expires_at.to_rfc3339())
+    .bind(session.absolute_expires_at.to_rfc3339())
+    .execute(&mut **tx)
+    .await?;
+  Ok(())
+}
+
+/// Build the login response and the cookie value for a stored session.
+pub(crate) fn session_grant(
+  admin_id: &str,
+  email: &str,
+  role: AdminRole,
+  kind: SessionKind,
+  session: &NewSession,
+) -> LoginResult {
+  LoginResult {
+    response: LoginResponse {
+      admin_id: admin_id.to_owned(),
+      email: email.to_owned(),
+      role,
+      session_kind: kind,
+      token: (kind == SessionKind::Cli).then(|| session.raw_token.clone()),
+      csrf_token: session.csrf_token.clone(),
+      last_login_at: Some(session.created_at.to_rfc3339()),
+    },
+    cookie_token: (kind == SessionKind::Browser).then(|| session.raw_token.clone()),
+  }
+}
+
 pub async fn login(
   state: &AppState,
   request: LoginRequest,
@@ -67,36 +164,9 @@ pub async fn login(
     "member" => AdminRole::Member,
     _ => return Err(HttpError::internal()),
   };
-  let raw = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;
-  let csrf = if request.session_kind == SessionKind::Browser {
-    Some(token::generate(CSRF_TOKEN_PREFIX).map_err(|_| HttpError::internal())?)
-  } else {
-    None
-  };
-  let now = Utc::now();
-  let (idle, absolute) = if request.session_kind == SessionKind::Browser {
-    (
-      now + Duration::hours(BROWSER_SESSION_IDLE_HOURS),
-      now + Duration::hours(BROWSER_SESSION_ABSOLUTE_HOURS),
-    )
-  } else {
-    (
-      now + Duration::days(CLI_SESSION_IDLE_DAYS),
-      now + Duration::days(CLI_SESSION_ABSOLUTE_DAYS),
-    )
-  };
-  let session_id = token::public_id(SESSION_ID_PREFIX);
+  let session = prepare_session(request.session_kind)?;
   let mut tx = state.db.pool().begin().await?;
-  // Keep revoked/expired session history for 30 days for operational
-  // diagnosis, then prune it during the naturally recurring login path.
-  let retention_cutoff = (now - Duration::days(30)).to_rfc3339();
-  sqlx::query("DELETE FROM sessions WHERE (revoked_at IS NOT NULL AND revoked_at < ?) OR (absolute_expires_at < ?) OR (idle_expires_at < ?)")
-    .bind(&retention_cutoff)
-    .bind(&retention_cutoff)
-    .bind(&retention_cutoff)
-    .execute(&mut *tx)
-    .await?;
-  sqlx::query("INSERT INTO sessions(id,admin_id,kind,token_hash,csrf_hash,created_at,last_used_at,recent_auth_at,idle_expires_at,absolute_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(&session_id).bind(&admin_id).bind(request.session_kind.as_str()).bind(token::hash(&raw)).bind(csrf.as_ref().map(|v|token::hash(v))).bind(now.to_rfc3339()).bind(now.to_rfc3339()).bind(now.to_rfc3339()).bind(idle.to_rfc3339()).bind(absolute.to_rfc3339()).execute(&mut *tx).await?;
+  insert_session(&mut tx, &session, &admin_id, request.session_kind).await?;
   common::audit(
     &mut tx,
     role.audit_actor_type(),
@@ -106,24 +176,18 @@ pub async fn login(
     None,
     None,
     Some("session"),
-    Some(&session_id),
+    Some(&session.id),
     serde_json::json!({"kind":request.session_kind.as_str()}),
   )
   .await?;
   tx.commit().await?;
-  let response = LoginResponse {
-    admin_id,
-    email,
+  Ok(session_grant(
+    &admin_id,
+    &email,
     role,
-    session_kind: request.session_kind,
-    token: (request.session_kind == SessionKind::Cli).then(|| raw.clone()),
-    csrf_token: csrf,
-    last_login_at: Some(now.to_rfc3339()),
-  };
-  Ok(LoginResult {
-    response,
-    cookie_token: (request.session_kind == SessionKind::Browser).then_some(raw),
-  })
+    request.session_kind,
+    &session,
+  ))
 }
 pub fn session(identity: &AuthIdentity) -> Result<SessionResponse, HttpError> {
   match identity {

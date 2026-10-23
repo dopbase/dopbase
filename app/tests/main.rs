@@ -1470,3 +1470,35 @@ async fn audit_records_store_the_client_ip_through_trusted_proxies_only() {
   assert!(report.ok, "chain broke: {:?}", report.broken);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn state_holds_an_oidc_verifier_only_when_providers_are_trusted() {
+  let (_directory, state, _router) = test_app().await;
+  assert!(state.oidc.is_none());
+  state.db.close().await;
+
+  let directory = TempDir::new().unwrap();
+  let database = directory.path().join("dopbase.db");
+  let config = ServerConfig {
+    data_dir: directory.path().to_path_buf(),
+    database_url: format!("sqlite://{}", database.display()),
+    master_key: app::config::MasterKeyConfig {
+      provider: "file".into(),
+      path: directory.path().join("master.key"),
+    },
+    oidc: app::services::oidc::OidcConfig {
+      issuers: vec![app::services::oidc::TrustedIssuer {
+        issuer: "https://auth.example.com".into(),
+        audiences: vec!["dopbase".into()],
+        algorithms: vec![app::services::oidc::Algorithm::RS256],
+        jwks_uri: None,
+      }],
+      login: None,
+    },
+    ..ServerConfig::default()
+  };
+  let state = server::build_setup_state(config).await.unwrap();
+  assert!(state.oidc.is_some());
+  assert!(state.oidc_login.is_none());
+  state.db.close().await;
+}

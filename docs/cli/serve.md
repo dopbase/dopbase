@@ -96,6 +96,63 @@ apply to the current run and are not saved into the examples. `--data-dir` or
 `DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
 server config path while the client config stays in the data directory.
 
+## Trusted OIDC providers
+
+`server.toml` can list the OIDC identity providers whose signed assertions
+Dopbase accepts:
+
+```toml
+[oidc]
+
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = ["dopbase"]
+algorithms = ["RS256"]
+```
+
+A provider's token is trusted only when its `iss` matches the configured
+`issuer`, its signature verifies against the provider's published JWKS, its
+algorithm is allowed, its `aud` contains a configured audience, and its `exp`
+and `nbf` are current.
+
+`algorithms` defaults to `["RS256"]`. Symmetric algorithms are rejected. Omit
+`jwks_uri` to discover it from the issuer's
+`/.well-known/openid-configuration` document. The issuer and an explicit
+`jwks_uri` must be absolute HTTPS URLs; HTTP is accepted only for a loopback
+host during development. This trust policy is the shared foundation for OIDC
+sign-in and workload authentication.
+
+## Single sign-on for the admin UI
+
+Add an `[oidc.login]` block to let administrators sign in through a trusted
+provider above. The `issuer` must match one of the providers:
+
+```toml
+[oidc.login]
+issuer = "https://auth.example.com"
+client_id = "dopbase"
+client_secret = "..."
+
+[oidc.login.roles]
+dopbase-admins = "admin"
+dopbase-members = "member"
+```
+
+Register `{public_url}/api/v1/auth/oidc/callback` as the client's redirect URL,
+or set `redirect_uri` explicitly. The flow requests the `openid` scope by
+default and always adds a PKCE challenge. Set `token_endpoint_auth_method` to
+`client_secret_post` if the provider rejects HTTP basic authentication, or
+leave `client_secret` unset with `token_endpoint_auth_method = "none"` for a
+public client that relies on PKCE alone.
+
+Accounts are created by an administrator, not by signing in. On the first
+sign-in Dopbase matches the provider's verified email to an account and stores
+the issuer and subject pair; later sign-ins use that link. An unknown email, a
+group outside the mapping, or an unverified email is refused. The role a mapped
+group grants is applied on each sign-in, except that the protected `root`
+account keeps its role. When sign-in is enabled, local password login still
+works, so administrators retain a way in if the provider is unavailable.
+
 ## Disable the web UI
 
 The web UI is enabled by default. To use only the CLI and REST API, set this

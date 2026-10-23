@@ -56,6 +56,73 @@ audit_retention_days = 365
 # Environment: DOPBASE_DOCS
 # docs = false
 
+# Trusted OIDC identity providers (optional). A token is accepted only from a
+# listed issuer, only for a listed audience, and only when the signature
+# verifies against the provider's published JWKS.
+# Uncomment the table header before enabling providers below.
+# [oidc]
+
+# A trusted provider. Repeat the table header for each issuer.
+# [[oidc.issuers]]
+
+# Exact "iss" value the provider puts in its tokens. Must be an absolute
+# HTTPS URL; HTTP is accepted for a loopback host during development.
+# issuer = "https://auth.example.com"
+
+# Accepted audiences. A token must list at least one of these in "aud".
+# audiences = ["dopbase"]
+
+# Accepted signature algorithms. Default: ["RS256"].
+# Symmetric algorithms (HS256, HS384, HS512) are rejected.
+# algorithms = ["RS256"]
+
+# JWKS endpoint. Default: discovered from the issuer's
+# /.well-known/openid-configuration document.
+# jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+
+# Browser single sign-on for the admin UI (optional). Requires an issuer listed
+# above. Accounts are created by an administrator and linked to the provider on
+# first sign-in by verified email; unknown emails are refused.
+# Uncomment the table header before enabling it below.
+# [oidc.login]
+
+# Exact "issuer" from a trusted provider above.
+# issuer = "https://auth.example.com"
+
+# OAuth client registered with the provider.
+# client_id = "dopbase"
+
+# Client secret. Omit it (with token_endpoint_auth_method = "none") for a public
+# client that relies on PKCE alone.
+# client_secret = ""
+
+# Callback URL. Default: "{public_url}/api/v1/auth/oidc/callback".
+# redirect_uri = "https://dopbase.example.com/api/v1/auth/oidc/callback"
+
+# Requested scopes. Default: ["openid", "profile", "email"]. Must include "openid".
+# scopes = ["openid", "profile", "email"]
+
+# Claim that carries group membership. Default: "groups".
+# groups_claim = "groups"
+
+# Claim that carries the account email. Default: "email".
+# email_claim = "email"
+
+# Require the provider to assert "email_verified". Default: true.
+# require_email_verified = true
+
+# Token endpoint client authentication. Accepts client_secret_basic,
+# client_secret_post, or none. Default: basic when a secret is set, and
+# none (PKCE only) otherwise.
+# token_endpoint_auth_method = "client_secret_basic"
+
+# Group-to-role mapping. A sign-in must match one entry. Only the admin and
+# member roles can be granted this way. Quote a group name that contains spaces
+# or punctuation.
+# [oidc.login.roles]
+# dopbase-admins = "admin"
+# dopbase-members = "member"
+
 # Master encryption key settings.
 # Uncomment the table header before enabling settings below.
 # [master_key]
