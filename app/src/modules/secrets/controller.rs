@@ -6,7 +6,7 @@ use crate::{
   state::AppState,
 };
 use axum::{
-  extract::{Path, State},
+  extract::{Path, Query, State},
   http::HeaderMap,
 };
 
@@ -130,13 +130,14 @@ pub async fn delete(
 ///
 /// Decrypt and return a secret value. Requires recent password
 /// authentication and the CSRF header for browser sessions. The access is
-/// recorded in the audit log.
+/// recorded in the audit log. Pass `includePrevious` to also receive the
+/// value replaced by the latest rotation while its grace period lasts.
 #[utoipa::path(
   post,
   path = crate::constants::api::secrets::REVEAL,
   tag = "secrets",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
-  params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
+  params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key"), ("include_previous" = Option<bool>, Query, description = "Also return the previous value while its rotation grace period lasts")),
   responses(
     (status = 200, description = "Secret value revealed", body = inline(HttpResponseFormat<RevealedSecret>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
@@ -149,11 +150,78 @@ pub async fn reveal(
   headers: HeaderMap,
   identity: AuthIdentity,
   Path((id, key)): Path<(String, String)>,
+  Query(query): Query<RevealQuery>,
 ) -> Result<HttpResponse<RevealedSecret>, SecretError> {
   require_mutation(&identity, &headers)?;
   Ok(HttpResponse::ok(
-    service::reveal(&state, &identity, &id, &key).await?,
+    service::reveal(&state, &identity, &id, &key, query.include_previous).await?,
     "SECRET_REVEALED",
+  ))
+}
+
+/// Rotate a secret
+///
+/// Store a new value and keep the one it replaced readable until the grace
+/// period ends, so consumers that have not picked up the new value keep
+/// working. Requires the CSRF header for browser sessions.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::secrets::ROTATE,
+  tag = "secrets",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
+  request_body = RotateSecretRequest,
+  responses(
+    (status = 200, description = "Secret rotated. The new metadata names the previous version and its retire deadline", body = inline(HttpResponseFormat<SecretMetadata>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The secret or environment was not found", body = crate::http::ErrorBody),
+    (status = 422, description = "The key, value, or grace period is invalid", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn rotate(
+  State(state): State<AppState>,
+  headers: HeaderMap,
+  identity: AuthIdentity,
+  Path((id, key)): Path<(String, String)>,
+  axum::Json(request): axum::Json<RotateSecretRequest>,
+) -> Result<HttpResponse<SecretMetadata>, SecretError> {
+  require_mutation(&identity, &headers)?;
+  Ok(HttpResponse::ok(
+    service::rotate(&state, &identity, &id, key, request).await?,
+    "SECRET_ROTATED",
+  ))
+}
+
+/// Promote the previous value of a secret
+///
+/// Roll a secret back by swapping the current and previous values. Both keep
+/// the version they were encrypted with, and the demoted value stays readable
+/// until the deadline the rotation recorded. Requires the CSRF header for
+/// browser sessions.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::secrets::PROMOTE,
+  tag = "secrets",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "Environment id"), ("key" = String, Path, description = "Secret key")),
+  responses(
+    (status = 200, description = "Previous value promoted. The new metadata names the demoted version and its retire deadline", body = inline(HttpResponseFormat<SecretMetadata>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The secret, its previous value, or the environment was not found", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn promote(
+  State(state): State<AppState>,
+  headers: HeaderMap,
+  identity: AuthIdentity,
+  Path((id, key)): Path<(String, String)>,
+) -> Result<HttpResponse<SecretMetadata>, SecretError> {
+  require_mutation(&identity, &headers)?;
+  Ok(HttpResponse::ok(
+    service::promote(&state, &identity, &id, &key).await?,
+    "SECRET_PROMOTED",
   ))
 }
 

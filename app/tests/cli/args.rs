@@ -1,6 +1,6 @@
 use app::cli::args::{
   AdminCommand, AuditCommand, AuditFilters, Cli, Command, ExportArgs, ImportArgs, InitArgs,
-  RunArgs, ServerCommand,
+  RunArgs, SecretCommand, ServerCommand,
 };
 use app::cli::secret_format::{ExportFormat, SecretFormat};
 use app::constants::config::executable_environment_names;
@@ -777,6 +777,76 @@ fn audit_export_parses_its_filters_and_output() {
 }
 
 #[test]
+fn secret_rotate_grace_accepts_zero_hours_and_days() {
+  for value in ["0", "1h", "24h", "7d"] {
+    assert!(
+      Cli::try_parse_from([
+        "dopbase",
+        "secret",
+        "rotate",
+        "env_123456",
+        "API_KEY",
+        "--grace",
+        value
+      ])
+      .is_ok(),
+      "rejected {value}"
+    );
+  }
+  for value in ["30m", "1d1h", "-1h", "0h", "31d", "never"] {
+    assert!(
+      Cli::try_parse_from([
+        "dopbase",
+        "secret",
+        "rotate",
+        "env_123456",
+        "API_KEY",
+        "--grace",
+        value
+      ])
+      .is_err(),
+      "accepted {value}"
+    );
+  }
+}
+
+#[test]
+fn secret_grace_defaults_to_a_day_and_include_previous_requires_reveal() {
+  let parsed = Cli::try_parse_from(["dopbase", "secret", "rotate", "env_123456", "API_KEY"])
+    .expect("rotation without a grace period parses");
+  let Command::Secret {
+    command: SecretCommand::Rotate { grace, .. },
+  } = parsed.command
+  else {
+    panic!("expected a secret rotation");
+  };
+  assert_eq!(grace, "24h");
+  assert!(
+    Cli::try_parse_from([
+      "dopbase",
+      "secret",
+      "get",
+      "env_123456",
+      "API_KEY",
+      "--include-previous"
+    ])
+    .is_err()
+  );
+  assert!(
+    Cli::try_parse_from([
+      "dopbase",
+      "secret",
+      "get",
+      "env_123456",
+      "API_KEY",
+      "--reveal",
+      "--include-previous"
+    ])
+    .is_ok()
+  );
+}
+
+#[test]
 fn incomplete_secret_commands_show_examples_and_environment_help() {
   let cases: &[(&[&str], &[&str])] = &[
     (
@@ -808,6 +878,22 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
       &[
         "Usage: dopbase secret get",
         "dopbase secret get payment-service/production API_KEY --reveal",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "rotate"],
+      &[
+        "Usage: dopbase secret rotate",
+        "dopbase secret rotate payment-service/production API_KEY",
+        "dopbase secret rotate payment-service/production API_KEY --grace 72h",
+      ],
+    ),
+    (
+      &["dopbase", "secret", "promote"],
+      &[
+        "Usage: dopbase secret promote",
+        "dopbase secret promote payment-service/production API_KEY",
+        "dopbase secret promote payment-service/production API_KEY --yes",
       ],
     ),
     (
@@ -879,6 +965,14 @@ fn resource_parameters_use_consistent_value_names() {
     ),
     (
       &["dopbase", "secret", "get", "--help"],
+      "<ENVIRONMENT_REF> <KEY>",
+    ),
+    (
+      &["dopbase", "secret", "rotate", "--help"],
+      "<ENVIRONMENT_REF> <KEY>",
+    ),
+    (
+      &["dopbase", "secret", "promote", "--help"],
       "<ENVIRONMENT_REF> <KEY>",
     ),
     (
@@ -1065,6 +1159,8 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "secret", "list", "billing/local"],
     &["dopbase", "secret", "set", "billing/local", "API_KEY"],
     &["dopbase", "secret", "get", "billing/local", "API_KEY"],
+    &["dopbase", "secret", "rotate", "billing/local", "API_KEY"],
+    &["dopbase", "secret", "promote", "billing/local", "API_KEY"],
     &["dopbase", "secret", "delete", "billing/local", "API_KEY"],
     &["dopbase", "import", "billing/local", ".env"],
     &["dopbase", "export", "billing/local", "--stdout"],

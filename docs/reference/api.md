@@ -21,20 +21,20 @@ in your installed version.
 
 ## Resource areas
 
-| Area                                               | Base paths                                           |
-| -------------------------------------------------- | ---------------------------------------------------- |
-| Health and compatibility                           | `/api/v1/health`                                     |
-| Initial administrator                              | `/api/v1/bootstrap`                                  |
-| Login and sessions                                 | `/api/v1/auth`                                       |
-| Projects                                           | `/api/v1/projects`                                   |
-| Environments                                       | `/api/v1/environments`                               |
-| Secrets, import, export, and runtime values        | `/api/v1/environments/{id}/secrets`                  |
-| Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
-| System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
-| Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
-| Human users                                        | `/api/v1/users`                                      |
-| AI service accounts                                | `/api/v1/service-accounts`                           |
-| Instance summary                                   | `/api/v1/status`                                     |
+| Area                                                  | Base paths                                           |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| Health and compatibility                              | `/api/v1/health`                                     |
+| Initial administrator                                 | `/api/v1/bootstrap`                                  |
+| Login and sessions                                    | `/api/v1/auth`                                       |
+| Projects                                              | `/api/v1/projects`                                   |
+| Environments                                          | `/api/v1/environments`                               |
+| Secrets, rotation, import, export, and runtime values | `/api/v1/environments/{id}/secrets`                  |
+| Runner tokens                                         | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
+| System backups and restoration                        | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
+| Audit log, chain verification, and instance status    | `/api/v1/audit-events`, `/api/v1/instance`           |
+| Human users                                           | `/api/v1/users`                                      |
+| AI service accounts                                   | `/api/v1/service-accounts`                           |
+| Instance summary                                      | `/api/v1/status`                                     |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
 the responses supported by each operation.
@@ -131,6 +131,23 @@ supported yet: the list returns metadata re-serialized, so it does not match
 the stored bytes the hash covers. Verification reads no secret values. `dopbase audit
 verify` runs the same check from the terminal, and `dopbase audit export`
 streams the filtered list as JSON lines.
+
+## Secret rotation
+
+`POST /api/v1/environments/{id}/secrets/{key}/rotate` stores a new value while
+keeping the replaced one available for a grace period: `graceSeconds` selects
+the window, an omitted field means 24 hours, and `0` retires the previous value
+immediately. An out-of-range grace returns `422` with `SECRET_GRACE_INVALID`.
+`POST /api/v1/environments/{id}/secrets/{key}/promote` swaps the two values
+back without re-encrypting them; a secret with no live previous value returns
+`404` with `SECRET_PREVIOUS_NOT_FOUND`.
+
+While a grace period runs, secret metadata carries `previousVersion` and
+`previousExpiresAt`, and both fields disappear once the value is retired.
+`GET .../secrets/{key}/reveal?includePrevious=true` returns the previous value
+alongside the current one for verification tooling; without the parameter the
+response keeps its original shape. Rotation never changes the current value, so
+runtime consumers and older clients are unaffected.
 
 ## Authentication
 

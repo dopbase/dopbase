@@ -337,13 +337,15 @@ deletion does not guarantee forensic erasure. Read the
 
 ## Secret commands
 
-| Command                                               | Purpose                     |
-| ----------------------------------------------------- | --------------------------- |
-| `dopbase secret list <ENVIRONMENT_REF>`               | List keys and safe metadata |
-| `dopbase secret set <ENVIRONMENT_REF> <KEY>`          | Create or update a value    |
-| `dopbase secret get <ENVIRONMENT_REF> <KEY>`          | Read safe metadata          |
-| `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal` | Explicitly reveal a value   |
-| `dopbase secret delete <ENVIRONMENT_REF> <KEY>`       | Delete one secret           |
+| Command                                               | Purpose                                      |
+| ----------------------------------------------------- | -------------------------------------------- |
+| `dopbase secret list <ENVIRONMENT_REF>`               | List keys and safe metadata                  |
+| `dopbase secret set <ENVIRONMENT_REF> <KEY>`          | Create or update a value                     |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY>`          | Read safe metadata                           |
+| `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal` | Explicitly reveal a value                    |
+| `dopbase secret rotate <ENVIRONMENT_REF> <KEY>`       | Store a new value and keep the old one valid |
+| `dopbase secret promote <ENVIRONMENT_REF> <KEY>`      | Roll back to the previous value              |
+| `dopbase secret delete <ENVIRONMENT_REF> <KEY>`       | Delete one secret                            |
 
 `secret set` securely prompts for a value when attached to a terminal. Use
 `--stdin` for automation:
@@ -358,6 +360,39 @@ interactive password confirmation on every invocation and cannot be bypassed
 with `--json`, stdin, or a confirmation flag. Reveal and deletion operations
 are explicit, permission-controlled, and audited. Normal human and JSON output
 never contains a value.
+
+### Rotation with a grace period
+
+Replacing a value outright breaks every consumer that has not read the new one
+yet. `secret rotate` keeps both values active so a deployment can roll out the
+new credential at its own pace:
+
+```bash
+printf '%s' "$NEW_API_KEY" | \
+  dopbase secret rotate payment-service/production API_KEY --stdin --grace 72h
+```
+
+Rotation writes the new value and keeps the one it replaced readable until the
+grace period ends. Runtime reads — `dopbase run`, runner tokens, and exports —
+return the current value only, so nothing changes for consumers until they read
+the key again. `--grace` defaults to `24h` and accepts `0`, or a whole number of
+hours or days up to `30d`. `--grace 0` retires the previous value immediately.
+Rotation requires an existing secret; use `secret set` to create one.
+
+While the grace period runs, `secret get` metadata names the previous version
+and its retire deadline, and verification tooling can read both values:
+
+```bash
+dopbase secret get payment-service/production API_KEY --reveal --include-previous
+```
+
+`secret promote <ENVIRONMENT_REF> <KEY>` swaps the two values back, so a rotation
+that turns out to be wrong can be rolled back without a new credential. The
+demoted value stays readable until the deadline the rotation recorded, which
+makes the rollback reversible in the same way. Once a grace period ends, the
+next access to the secret retires the previous value and records the retirement
+in the audit log. Overwriting a secret with `secret set` or an import ends its
+rotation: only the stored value stays valid.
 
 ## Import and export
 

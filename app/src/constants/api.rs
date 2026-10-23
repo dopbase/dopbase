@@ -95,6 +95,8 @@ pub mod secrets {
   pub const RUNTIME: &str = api_path!("/environments/{environment_id}/secrets/runtime");
   pub const ITEM: &str = api_path!("/environments/{environment_id}/secrets/{key}");
   pub const REVEAL: &str = api_path!("/environments/{environment_id}/secrets/{key}/reveal");
+  pub const ROTATE: &str = api_path!("/environments/{environment_id}/secrets/{key}/rotate");
+  pub const PROMOTE: &str = api_path!("/environments/{environment_id}/secrets/{key}/promote");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
@@ -126,8 +128,28 @@ pub mod secrets {
   pub fn reveal(
     environment_id: &str,
     key: &str,
+    include_previous: bool,
   ) -> String {
-    super::render(REVEAL, &[("environment_id", environment_id), ("key", key)])
+    let path = super::render(REVEAL, &[("environment_id", environment_id), ("key", key)]);
+    if include_previous {
+      super::with_query(&path, "includePrevious", "true")
+    } else {
+      path
+    }
+  }
+
+  pub fn rotate(
+    environment_id: &str,
+    key: &str,
+  ) -> String {
+    super::render(ROTATE, &[("environment_id", environment_id), ("key", key)])
+  }
+
+  pub fn promote(
+    environment_id: &str,
+    key: &str,
+  ) -> String {
+    super::render(PROMOTE, &[("environment_id", environment_id), ("key", key)])
   }
 }
 

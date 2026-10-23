@@ -91,6 +91,37 @@ Reading metadata does not reveal a value. Reveal operations are explicit,
 permission-controlled, and audited. The official CLI requires interactive
 password confirmation every time `--reveal` is used.
 
+## Rotating a secret
+
+Replacing a database password or API key outright breaks every consumer that
+has not read the new value yet. Rotation keeps both values active for a while,
+so a deployment can roll out the new credential without a coordinated cutover:
+
+```bash
+printf '%s' "$NEW_API_KEY" | \
+  dopbase secret rotate payment-service/production API_KEY --stdin --grace 72h
+```
+
+The rotation writes the new value and keeps the one it replaced readable until
+the grace period ends. Consumers keep reading the same key and receive the
+current value, so nothing changes for them until they read it again. After the
+deadline, the next access retires the previous value and records the retirement
+in the audit log.
+
+```bash
+dopbase secret get payment-service/production API_KEY
+dopbase secret get payment-service/production API_KEY --reveal --include-previous
+dopbase secret promote payment-service/production API_KEY --yes
+```
+
+Metadata names the previous version and its retire deadline. `--reveal
+--include-previous` prints both values, which lets verification tooling check a
+rotation before the old credential is retired. `secret promote` swaps the two
+values back, so a rotation that turns out to be wrong is rolled back without
+creating another credential; the demoted value stays readable until the same
+deadline. Use `secret set` or an import when you do not need the old value any
+more: overwriting a secret ends its rotation.
+
 ## Deletion
 
 Deleting an environment also removes its secrets and scoped tokens. Deleting a

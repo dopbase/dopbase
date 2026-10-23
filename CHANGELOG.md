@@ -8,6 +8,9 @@ All notable changes to Dopbase are documented in this file.
 becomes tamper-evident: every record joins a hash chain that `dopbase audit
 verify` checks, `dopbase audit export` ships the log as JSON lines, and a
 configurable retention archives expired records before deleting them.
+Overlapping secret rotation keeps the value a secret replaced valid for a
+grace period, so consumers pick up the new credential at their own pace
+instead of at a coordinated cutover.
 
 ### Added
 
@@ -65,6 +68,39 @@ configurable retention archives expired records before deleting them.
   Retention runs at startup and then once a day, never inside the request
   that writes a record.
   Back up `audit-archive/` separately: snapshots store the database only.
+
+- `dopbase secret rotate <ENVIRONMENT_REF> <KEY>` stores a new value and keeps
+  the one it replaced readable until the grace period ends. `--grace` defaults
+  to `24h` and accepts `0`, or a whole number of hours or days up to `30d`;
+  `--grace 0` retires the previous value immediately. `--stdin` reads the new
+  value from standard input, otherwise Dopbase uses a masked prompt. Rotation
+  requires an existing secret.
+
+  Runtime reads keep returning the current value only, so `dopbase run`, runner
+  tokens, and exports are unchanged until a consumer reads the key again.
+
+- `dopbase secret get <ENVIRONMENT_REF> <KEY> --reveal --include-previous`
+  prints the current and previous values with the retire deadline, so a
+  rotation can be verified before the old credential is retired. Secret
+  metadata and listings name the previous version and its retire deadline
+  without disclosing either value.
+
+- `dopbase secret promote <ENVIRONMENT_REF> <KEY>` rolls a rotation back by
+  swapping the current and previous values. Both keep the version they were
+  encrypted with, and the demoted value stays readable until the deadline the
+  rotation recorded.
+
+  When a grace period ends, the next access to the secret retires the previous
+  value. Overwriting a secret with `dopbase secret set` or an import ends its
+  rotation, so only the stored value stays valid.
+
+  Rotation adds `secret.rotated`, `secret.promoted`, and `secret.retired` audit
+  events that name versions and deadlines but never a value. The REST API adds
+  `POST /api/v1/environments/{id}/secrets/{key}/rotate`,
+  `POST /api/v1/environments/{id}/secrets/{key}/promote`, and the
+  `includePrevious` query parameter on the reveal endpoint. The migration adds
+  nullable previous-value columns to `secrets`; existing secrets keep no
+  previous value.
 
 ### Changed
 

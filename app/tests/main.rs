@@ -499,6 +499,422 @@ async fn import_rejects_stale_revisions_during_preview_and_apply() {
 }
 
 #[tokio::test]
+async fn rotation_keeps_the_previous_value_until_its_grace_ends() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let secrets = format!("/api/v1/environments/{environment_id}/secrets");
+  let (status, _, _) = call(
+    &router,
+    "PUT",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    Some(json!({"value":"previous-marker"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  let (status, rotated, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(&token),
+    Some(json!({"value":"current-marker","graceSeconds":3600})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(rotated["data"]["version"], 2);
+  assert_eq!(rotated["data"]["previousVersion"], 1);
+  let deadline = rotated["data"]["previousExpiresAt"].as_str().unwrap();
+  assert!(chrono::DateTime::parse_from_rfc3339(deadline).is_ok());
+  // Runtime reads keep returning the current value only.
+  let (status, runtime, _) = call(
+    &router,
+    "GET",
+    &format!("{secrets}/runtime"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(runtime["data"]["entries"][0]["value"], "current-marker");
+  // Verification tooling can read both values while the grace period runs.
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/reveal?includePrevious=true"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(revealed["data"]["value"], "current-marker");
+  assert_eq!(revealed["data"]["previous"]["value"], "previous-marker");
+  assert_eq!(revealed["data"]["previous"]["version"], 1);
+  assert_eq!(revealed["data"]["previous"]["expiresAt"], deadline);
+  // Without the flag, the previous value stays private.
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/reveal"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert!(revealed["data"].get("previous").is_none());
+  let (status, listed, _) = call(&router, "GET", &secrets, Some(&token), None).await;
+  assert_eq!(status, 200);
+  assert_eq!(listed["data"][0]["previousVersion"], 1);
+  assert_eq!(listed["data"][0]["previousExpiresAt"], deadline);
+  // Once the grace period ends, the next read retires the previous value.
+  sqlx::query("UPDATE secrets SET previous_expires_at=? WHERE environment_id=? AND key=?")
+    .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
+    .bind(&environment_id)
+    .bind("API_KEY")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let (status, metadata, _) = call(
+    &router,
+    "GET",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert!(metadata["data"].get("previousVersion").is_none());
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/reveal?includePrevious=true"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert!(revealed["data"].get("previous").is_none());
+  assert_eq!(revealed["data"]["value"], "current-marker");
+  let previous_version: Option<i64> =
+    sqlx::query_scalar("SELECT previous_version FROM secrets WHERE environment_id=? AND key=?")
+      .bind(&environment_id)
+      .bind("API_KEY")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert!(previous_version.is_none());
+  async fn audit_count(
+    state: &app::state::AppState,
+    action: &str,
+    environment_id: &str,
+  ) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action=? AND environment_id=?")
+      .bind(action)
+      .bind(environment_id)
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap()
+  }
+  assert_eq!(
+    audit_count(&state, "secret.rotated", &environment_id).await,
+    1
+  );
+  assert_eq!(
+    audit_count(&state, "secret.retired", &environment_id).await,
+    1
+  );
+  // Reading again retires nothing and audits nothing new.
+  let (status, _, _) = call(
+    &router,
+    "GET",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(
+    audit_count(&state, "secret.retired", &environment_id).await,
+    1
+  );
+  let audited = sqlx::query_scalar::<_, String>(
+    "SELECT metadata FROM audit_events WHERE action='secret.rotated'",
+  )
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert!(!audited.contains("current-marker"));
+  // Retirement during a read joins the audit hash chain like any other write.
+  let report = app::services::audit_chain::verify(state.db.pool())
+    .await
+    .unwrap();
+  assert!(report.ok, "chain broke: {:?}", report.broken);
+  assert!(!audited.contains("previous-marker"));
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn promoting_the_previous_value_rolls_a_rotation_back() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let secrets = format!("/api/v1/environments/{environment_id}/secrets");
+  call(
+    &router,
+    "PUT",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    Some(json!({"value":"rollback-marker"})),
+  )
+  .await;
+  let (_, rotated, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(&token),
+    Some(json!({"value":"mistake-marker","graceSeconds":3600})),
+  )
+  .await;
+  let deadline = rotated["data"]["previousExpiresAt"].as_str().unwrap();
+  let (status, promoted, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/promote"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(promoted["data"]["version"], 1);
+  assert_eq!(promoted["data"]["previousVersion"], 2);
+  assert_eq!(promoted["data"]["previousExpiresAt"], deadline);
+  let (status, runtime, _) = call(
+    &router,
+    "GET",
+    &format!("{secrets}/runtime"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(runtime["data"]["entries"][0]["value"], "rollback-marker");
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/reveal?includePrevious=true"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(revealed["data"]["value"], "rollback-marker");
+  assert_eq!(revealed["data"]["previous"]["value"], "mistake-marker");
+  // A rollback can be rolled back while the same deadline has not passed.
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/promote"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  let (status, runtime, _) = call(
+    &router,
+    "GET",
+    &format!("{secrets}/runtime"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(runtime["data"]["entries"][0]["value"], "mistake-marker");
+  // After the deadline, a read retires the demoted value, and the promotion
+  // that follows finds nothing to promote.
+  sqlx::query("UPDATE secrets SET previous_expires_at=? WHERE environment_id=? AND key=?")
+    .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
+    .bind(&environment_id)
+    .bind("API_KEY")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let (status, exported, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/export"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(exported["data"]["entries"][0]["value"], "mistake-marker");
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/promote"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 404);
+  assert!(body["error"]["SECRET_PREVIOUS_NOT_FOUND"].is_string());
+  let promoted_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='secret.promoted'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(promoted_count, 2);
+  let retired_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='secret.retired'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(retired_count, 1);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn rotation_requires_an_existing_secret_a_valid_grace_and_a_human_account() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let secrets = format!("/api/v1/environments/{environment_id}/secrets");
+  let (status, body, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/MISSING/rotate"),
+    Some(&token),
+    Some(json!({"value":"new"})),
+  )
+  .await;
+  assert_eq!(status, 404);
+  assert!(body["error"]["SECRET_NOT_FOUND"].is_string());
+  for grace in [-1, 30 * 24 * 60 * 60 + 1] {
+    let (status, _, _) = call(
+      &router,
+      "PUT",
+      &format!("{secrets}/API_KEY"),
+      Some(&token),
+      Some(json!({"value":"current-marker"})),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (status, body, _) = call(
+      &router,
+      "POST",
+      &format!("{secrets}/API_KEY/rotate"),
+      Some(&token),
+      Some(json!({"value":"new","graceSeconds":grace})),
+    )
+    .await;
+    assert_eq!(status, 422);
+    assert!(
+      body["error"]["SECRET_GRACE_INVALID"].is_string(),
+      "{grace}: {body}"
+    );
+  }
+  // A zero grace retires the previous value at once.
+  let (status, rotated, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(&token),
+    Some(json!({"value":"immediate-marker","graceSeconds":0})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert!(rotated["data"].get("previousVersion").is_none());
+  assert!(rotated["data"].get("previousExpiresAt").is_none());
+  // Runner tokens cannot rotate: they read secrets but never change them.
+  let (status, created, _) = call(
+    &router,
+    "POST",
+    &format!("/api/v1/environments/{environment_id}/tokens"),
+    Some(&token),
+    Some(json!({"name":"deploy","role":"runner"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let runner = created["data"]["plaintextToken"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(runner),
+    Some(json!({"value":"nope"})),
+  )
+  .await;
+  assert_eq!(status, 403);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn overwriting_a_secret_ends_its_rotation() {
+  let (_directory, state, router, token, environment_id) = admin_environment().await;
+  let secrets = format!("/api/v1/environments/{environment_id}/secrets");
+  call(
+    &router,
+    "PUT",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    Some(json!({"value":"before-marker"})),
+  )
+  .await;
+  call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(&token),
+    Some(json!({"value":"after-marker","graceSeconds":3600})),
+  )
+  .await;
+  let (status, saved, _) = call(
+    &router,
+    "PUT",
+    &format!("{secrets}/API_KEY"),
+    Some(&token),
+    Some(json!({"value":"overwrite-marker"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(saved["data"]["version"], 3);
+  assert!(saved["data"].get("previousVersion").is_none());
+  let (status, revealed, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/reveal?includePrevious=true"),
+    Some(&token),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(revealed["data"]["value"], "overwrite-marker");
+  assert!(revealed["data"].get("previous").is_none());
+  // An import that updates a key ends its rotation the same way.
+  call(
+    &router,
+    "POST",
+    &format!("{secrets}/API_KEY/rotate"),
+    Some(&token),
+    Some(json!({"value":"imported-marker","graceSeconds":3600})),
+  )
+  .await;
+  let (status, imported, _) = call(
+    &router,
+    "POST",
+    &format!("{secrets}/import"),
+    Some(&token),
+    Some(json!({"mode":"merge","entries":[{"key":"API_KEY","value":"merge-marker"}]})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(imported["data"]["updatedKeys"][0], "API_KEY");
+  let previous_version: Option<i64> =
+    sqlx::query_scalar("SELECT previous_version FROM secrets WHERE environment_id=? AND key=?")
+      .bind(&environment_id)
+      .bind("API_KEY")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert!(previous_version.is_none());
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn failed_audit_insert_rolls_back_project_rename() {
   let (_directory, state, router, token, _environment_id) = admin_environment().await;
   sqlx::query(

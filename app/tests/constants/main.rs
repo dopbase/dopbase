@@ -23,6 +23,8 @@ fn route_templates_match_the_public_contract() {
     api::secrets::COLLECTION,
     api::secrets::ITEM,
     api::secrets::REVEAL,
+    api::secrets::ROTATE,
+    api::secrets::PROMOTE,
     api::secrets::IMPORT,
     api::secrets::LAYOUT,
     api::secrets::EXPORT,
@@ -66,6 +68,8 @@ fn route_templates_match_the_public_contract() {
     "/api/v1/environments/{environment_id}/secrets",
     "/api/v1/environments/{environment_id}/secrets/{key}",
     "/api/v1/environments/{environment_id}/secrets/{key}/reveal",
+    "/api/v1/environments/{environment_id}/secrets/{key}/rotate",
+    "/api/v1/environments/{environment_id}/secrets/{key}/promote",
     "/api/v1/environments/{environment_id}/secrets/import",
     "/api/v1/environments/{environment_id}/secrets/layout",
     "/api/v1/environments/{environment_id}/secrets/export",
@@ -100,8 +104,20 @@ fn route_templates_match_the_public_contract() {
 fn path_builders_match_the_previous_format_output() {
   assert_eq!(api::projects::item("payments"), "/api/v1/projects/payments");
   assert_eq!(
-    api::secrets::reveal("env_01", "API_KEY"),
+    api::secrets::reveal("env_01", "API_KEY", false),
     "/api/v1/environments/env_01/secrets/API_KEY/reveal"
+  );
+  assert_eq!(
+    api::secrets::reveal("env_01", "API_KEY", true),
+    "/api/v1/environments/env_01/secrets/API_KEY/reveal?includePrevious=true"
+  );
+  assert_eq!(
+    api::secrets::rotate("env_01", "API_KEY"),
+    "/api/v1/environments/env_01/secrets/API_KEY/rotate"
+  );
+  assert_eq!(
+    api::secrets::promote("env_01", "API_KEY"),
+    "/api/v1/environments/env_01/secrets/API_KEY/promote"
   );
   assert_eq!(
     api::service_accounts::revoke_token("svc_01", "tok_01"),

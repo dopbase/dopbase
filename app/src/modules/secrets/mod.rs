@@ -41,4 +41,12 @@ pub fn routes() -> Router<AppState> {
       crate::constants::api::secrets::REVEAL,
       post(controller::reveal),
     )
+    .route(
+      crate::constants::api::secrets::ROTATE,
+      post(controller::rotate),
+    )
+    .route(
+      crate::constants::api::secrets::PROMOTE,
+      post(controller::promote),
+    )
 }
