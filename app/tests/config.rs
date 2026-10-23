@@ -768,3 +768,134 @@ fn trusted_proxies_read_from_file_and_environment() {
     "{error}"
   );
 }
+
+fn load_with_server_config(contents: &str) -> anyhow::Result<ServerConfig> {
+  let directory = tempfile::TempDir::new().unwrap();
+  let data_dir = directory.path().join("data");
+  fs::create_dir_all(&data_dir).unwrap();
+  fs::write(data_dir.join(SERVER_CONFIG_FILENAME), contents).unwrap();
+  ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(data_dir),
+      ..Default::default()
+    },
+    EnvironmentOverrides::default(),
+  )
+}
+
+#[test]
+fn oidc_is_empty_by_default() {
+  assert!(ServerConfig::default().oidc.issuers.is_empty());
+}
+
+#[test]
+fn oidc_trust_policy_reads_issuers_from_server_toml() {
+  let config = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = ["dopbase", "dopbase-cli"]
+algorithms = ["RS256", "ES256"]
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+"#,
+  )
+  .unwrap();
+
+  assert_eq!(config.oidc.issuers.len(), 1);
+  let issuer = &config.oidc.issuers[0];
+  assert_eq!(issuer.issuer, "https://auth.example.com");
+  assert_eq!(issuer.audiences, ["dopbase", "dopbase-cli"]);
+  assert_eq!(
+    issuer.algorithms,
+    [
+      app::services::oidc::Algorithm::RS256,
+      app::services::oidc::Algorithm::ES256
+    ]
+  );
+  assert_eq!(
+    issuer.jwks_uri.as_deref(),
+    Some("https://auth.example.com/.well-known/jwks.json")
+  );
+}
+
+#[test]
+fn oidc_defaults_algorithms_when_omitted() {
+  let config = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = ["dopbase"]
+"#,
+  )
+  .unwrap();
+
+  assert_eq!(
+    config.oidc.issuers[0].algorithms,
+    [app::services::oidc::Algorithm::RS256]
+  );
+  assert!(config.oidc.issuers[0].jwks_uri.is_none());
+}
+
+#[test]
+fn oidc_accepts_a_loopback_http_issuer() {
+  let config = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "http://localhost:8080"
+audiences = ["dopbase"]
+"#,
+  );
+  assert!(
+    config.is_ok(),
+    "{:?}",
+    config.err().map(|e| format!("{e:#}"))
+  );
+}
+
+#[test]
+fn oidc_rejects_a_remote_http_issuer() {
+  let error = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "http://auth.example.com"
+audiences = ["dopbase"]
+"#,
+  )
+  .unwrap_err();
+  let message = format!("{error:#}");
+  assert!(message.contains("invalid OIDC trust policy"), "{message}");
+  assert!(message.contains("HTTPS"), "{message}");
+}
+
+#[test]
+fn oidc_rejects_symmetric_algorithms() {
+  let error = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = ["dopbase"]
+algorithms = ["HS256"]
+"#,
+  )
+  .unwrap_err();
+  assert!(format!("{error:#}").contains("symmetric"), "{error:#}");
+}
+
+#[test]
+fn oidc_rejects_a_blank_audience_list() {
+  let error = load_with_server_config(
+    r#"
+[oidc]
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = []
+"#,
+  )
+  .unwrap_err();
+  assert!(format!("{error:#}").contains("audience"), "{error:#}");
+}

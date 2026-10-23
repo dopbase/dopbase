@@ -96,6 +96,32 @@ apply to the current run and are not saved into the examples. `--data-dir` or
 `DOPBASE_DATA_DIR` relocates both files; `--config <FILE>` selects a different
 server config path while the client config stays in the data directory.
 
+## Trusted OIDC providers
+
+`server.toml` can list the OIDC identity providers whose signed assertions
+Dopbase accepts:
+
+```toml
+[oidc]
+
+[[oidc.issuers]]
+issuer = "https://auth.example.com"
+audiences = ["dopbase"]
+algorithms = ["RS256"]
+```
+
+A provider's token is trusted only when its `iss` matches the configured
+`issuer`, its signature verifies against the provider's published JWKS, its
+algorithm is allowed, its `aud` contains a configured audience, and its `exp`
+and `nbf` are current.
+
+`algorithms` defaults to `["RS256"]`. Symmetric algorithms are rejected. Omit
+`jwks_uri` to discover it from the issuer's
+`/.well-known/openid-configuration` document. The issuer and an explicit
+`jwks_uri` must be absolute HTTPS URLs; HTTP is accepted only for a loopback
+host during development. This trust policy is the shared foundation for OIDC
+sign-in and workload authentication.
+
 ## Disable the web UI
 
 The web UI is enabled by default. To use only the CLI and REST API, set this
