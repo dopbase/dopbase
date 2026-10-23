@@ -89,6 +89,7 @@ nix = { version = "0.30", features = ["signal", "process", "fs"] }
 nix = { version = "0.30", features = ["term"] }
 
 [dev-dependencies]
+proptest = "1"
 tower = { version = "0.5", features = ["util"] }
 
 [profile.release]
