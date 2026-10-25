@@ -2,6 +2,22 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+[Dopbase](https://dopbase.com) Unreleased. The roadmap now covers the road to
+1.0, with security and trust work planned for every release.
+
+### Improvement
+
+- The roadmap gives each version a summary and adds a trust and security
+  track that runs through every release: signed releases with an SBOM, a
+  published threat model, and an independent security review before 1.0.
+  Version 0.2 adds SAML and SCIM to the team features, 0.3 adds Kubernetes,
+  Terraform, SDKs, PostgreSQL, and Windows binaries, and 0.4 brings high
+  availability and SIEM streaming. A new 1.0 section covers stable
+  interfaces, long-term support, and Dopbase Cloud with EU and US data
+  regions.
+
 ## 0.1.10 - 2026-10-26
 
 [Dopbase](https://dopbase.com) 0.1.10 adds single sign-on for the Admin UI
