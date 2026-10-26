@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectsController } from "~/pages/Projects/Projects.controller";
 import ProjectRail from "./ProjectRail.vue";
 
+vi.mock("~/stores/auth.store", () => ({
+  useAuthStore: () => ({ can: () => true }),
+}));
+
 const mountedApps: Array<ReturnType<typeof createApp>> = [];
 
 const billing = {

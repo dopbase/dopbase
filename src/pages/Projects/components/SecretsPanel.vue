@@ -29,6 +29,8 @@ import {
   TrashIcon,
 } from "~/assets/icons";
 import { formatRelativeTime } from "~/utils/format";
+import { reaches } from "~/services/access.api";
+import type { Level } from "~/services/access.api";
 import { ApiError } from "~/services/http.client";
 import { isValidSecretKey } from "~/utils/validation";
 import type { SecretMetadata } from "~/services";
@@ -48,7 +50,12 @@ const props = defineProps<{
   environmentId: string;
   environmentName: string;
   projectName: string;
+  /** Your level here. Without one, every action shows. */
+  level?: Level;
 }>();
+// The server checks every action; this only hides what would be refused.
+const canRead = computed(() => !props.level || reaches(props.level, "read"));
+const canWrite = computed(() => !props.level || reaches(props.level, "write"));
 
 const environmentIdRef = computed(() => props.environmentId);
 const controller = useSecretsPanelController(environmentIdRef);
@@ -295,6 +302,7 @@ async function confirmDelete(): Promise<void> {
           Table
         </button>
         <button
+          v-if="canWrite"
           type="button"
           role="tab"
           :aria-selected="view === 'editor'"
@@ -312,15 +320,21 @@ async function confirmDelete(): Promise<void> {
       <div
         v-if="view === 'table'"
         class="flex w-full flex-wrap items-center gap-2 @2xl:w-auto">
-        <DbButton size="sm" variant="secondary" @click="showExport = true">
+        <DbButton
+          v-if="canRead"
+          size="sm"
+          variant="secondary"
+          @click="showExport = true">
           Export
         </DbButton>
-        <DbButton size="sm" variant="secondary" @click="showImport = true">
-          Import .env
-        </DbButton>
-        <DbButton size="sm" variant="primary" @click="openCreate">
-          Add secret
-        </DbButton>
+        <template v-if="canWrite">
+          <DbButton size="sm" variant="secondary" @click="showImport = true">
+            Import .env
+          </DbButton>
+          <DbButton size="sm" variant="primary" @click="openCreate">
+            Add secret
+          </DbButton>
+        </template>
       </div>
     </header>
 
@@ -388,11 +402,15 @@ async function confirmDelete(): Promise<void> {
       <DbEmptyState
         v-else-if="secrets && secrets.length === 0"
         title="No secrets in this environment"
-        description="Add a single key, or import an existing .env file, values are encrypted before they are stored.">
+        :description="
+          canWrite
+            ? 'Add a single key, or import an existing .env file, values are encrypted before they are stored.'
+            : 'Nobody has stored a secret here yet.'
+        ">
         <template #icon>
           <KeyIcon class="h-5 w-5" />
         </template>
-        <template #actions>
+        <template v-if="canWrite" #actions>
           <DbButton variant="secondary" size="sm" @click="showImport = true">
             Import .env
           </DbButton>
@@ -451,7 +469,7 @@ async function confirmDelete(): Promise<void> {
                 <td class="px-4 py-2.5">
                   <div class="flex items-center justify-end gap-1">
                     <button
-                      v-if="revealedKey !== secret.key"
+                      v-if="canRead && revealedKey !== secret.key"
                       type="button"
                       class="cursor-pointer rounded border border-line bg-raised px-2 py-1 font-mono text-xs text-ink transition-colors hover:border-accent/50 hover:text-ink-strong pointer-coarse:p-2"
                       :aria-label="`Reveal ${secret.key}`"
@@ -462,7 +480,7 @@ async function confirmDelete(): Promise<void> {
                       </span>
                     </button>
                     <button
-                      v-else
+                      v-else-if="canRead"
                       type="button"
                       class="cursor-pointer rounded border border-accent/50 bg-accent-soft px-2 py-1 font-mono text-xs text-accent-strong pointer-coarse:p-2"
                       :aria-label="`Hide ${secret.key}`"
@@ -480,6 +498,7 @@ async function confirmDelete(): Promise<void> {
                       <HistoryIcon class="h-3.5 w-3.5" />
                     </button>
                     <button
+                      v-if="canWrite"
                       type="button"
                       class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong pointer-coarse:p-2.5"
                       :aria-label="`Edit ${secret.key}`"
@@ -487,6 +506,7 @@ async function confirmDelete(): Promise<void> {
                       <PencilIcon class="h-3.5 w-3.5" />
                     </button>
                     <button
+                      v-if="canWrite"
                       type="button"
                       class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-crit pointer-coarse:p-2.5"
                       :aria-label="`Delete ${secret.key}`"
