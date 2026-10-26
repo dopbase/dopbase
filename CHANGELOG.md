@@ -104,6 +104,12 @@ All notable changes to Dopbase are documented in this file.
 - `PATCH /api/v1/environments/{id}` answers `ENVIRONMENT_UPDATED` instead of
   `ENVIRONMENT_RENAMED`, and its `name` is optional.
 
+### Fixed
+
+- Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
+  pool` while loading `sqlx-macros`. The release profile now strips only the
+  final binary and leaves proc-macro libraries unstripped.
+
 ## 0.1.10 - 2026-10-26
 
 [Dopbase](https://dopbase.com) 0.1.10 adds single sign-on for the Admin UI
