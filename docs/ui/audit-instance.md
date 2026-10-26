@@ -10,7 +10,15 @@ of what is stored on your instance.
 
 ## The audit log
 
-The Audit page is available to root and admin.
+Everyone can open the Audit page. What it lists depends on your role:
+
+| Role             | Sees                                                            |
+| ---------------- | --------------------------------------------------------------- |
+| Root and Auditor | Every event (`audit.read_all`)                                  |
+| Admin            | Settings events and events on projects you reach (`audit.read`) |
+| Everyone else    | Your own actions                                                |
+
+The line under the page title says which applies to you.
 
 Dopbase records sensitive actions such as secret changes, imports, exports,
 reveals, token creation and revocation, deletions, and sign-ins. The Audit page
@@ -19,12 +27,12 @@ control for the next page.
 
 Four filters narrow the list:
 
-| Filter      | Answers                                      |
-| ----------- | -------------------------------------------- |
-| Action      | "Show me every reveal" or every delete       |
-| Project     | Everything that happened inside one project  |
-| Environment | One environment only                         |
-| Actor       | The administrator or runner token that acted |
+| Filter      | Answers                                          |
+| ----------- | ------------------------------------------------ |
+| Action      | "Show me every reveal" or every delete           |
+| Project     | Everything that happened inside one project      |
+| Environment | One environment only                             |
+| Actor       | The person, AI agent, or runner token that acted |
 
 Changing any filter reloads the list from the start.
 
@@ -43,9 +51,8 @@ The Instance page reports:
   problem, nothing that needs encryption or decryption will work, and the
   fix lives on the host, not in the browser.
 
-The page reports project, environment, secret, human-user, AI-agent, active
-runner-token, active agent-token, and backup counts. All human roles can view
-it. AI accounts also have read-only access to the summary.
+The page reports project, environment, secret, people, AI-agent, active
+runner-token, active AI-agent-token, and backup counts.
 
 Configuration still loads at startup and requires a restart to change. See
 [self-hosting operations](/self-hosting/operations).

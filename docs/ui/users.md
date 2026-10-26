@@ -1,65 +1,81 @@
 ---
 title: "Admin UI: users and AI agents"
-description: "Add teammates to Dopbase, choose root, admin, or member roles, edit or remove accounts, and create read-only AI agent accounts in the Admin UI."
+description: "Add people and AI agents to Dopbase, give each one a role, and see where their access to projects comes from in the Admin UI."
 ---
 
 # Users and AI agents
 
-Root and admin can open **Users** to manage who uses the instance. Add accounts
-from the Admin UI. There is no CLI command for creating users.
+Open **Users** to see everyone on the instance. Anyone with `users.view`, such
+as an admin or an auditor, can open it. Adding, changing, and removing accounts
+needs `users.manage`, and happens in the Admin UI only. There is no CLI command
+for it.
 
-## Choose a role
+## Roles
 
-- **Root** is the account created during setup. It has full access, including
-  full-instance backups and factory reset. Other users cannot change or delete it.
-- **Admin** manages projects and other users, including other admins.
-- **Member** manages projects, environments, secrets, and runner tokens, but
-  cannot manage users.
-- **AI agent** can read project and environment details and secret names, but
-  cannot read secret values or make changes.
+Every account except root holds one role. The role decides what it may do on
+the instance and how deep into project data it can ever reach. Which projects
+it actually reaches comes from grants, given on each project's
+[Access](./project-access) page.
 
-All roles can see every project. Assigning users to individual projects and
-customizing permissions are not available yet.
+- **Root** is the account created during setup. It can do everything, and
+  nobody else can change or delete it.
+- **Admin** manages people, groups, and the projects they manage, and creates
+  projects.
+- **Member** works on the projects and environments they are given.
+- **Auditor** reads the whole audit log and who has access, and never sees a
+  secret value.
+- **AI agent** uses tokens only and never reaches more than its owner.
 
-## Add a teammate
+Root can add [custom roles](./roles). The role picker lists only roles within
+your own: an admin can't make someone an auditor, because auditors read the
+whole audit log and admins don't.
 
-1. Open **Users** and choose **Add User**.
-2. Enter the teammate's email and a password.
-3. Choose **Member** or **Admin**.
-4. Save the account and share the sign-in details securely.
+## Add a person
 
-Members can work with projects immediately. Choose Admin only when the person
-also needs to manage accounts. Dopbase does not send invitation emails.
+1. Choose **Add User**.
+2. Enter their email and a password. With single sign-on on, you can leave the
+   password empty and they sign in through the provider.
+3. Pick a role.
+4. Save and share the sign-in details securely.
 
-## Edit or remove a user
+A new member reaches no project until someone gives them access. An admin that
+root adds starts as project manager of every project; an admin that another
+admin adds starts with nothing. Dopbase doesn't send invitation emails.
 
-Choose **Edit** to change a user's email, role, or password. Leave the password
-field empty to keep the existing password. After an update, the user needs to
-sign in again.
+## Edit or remove someone
 
-Choose **Delete** and type the user's email to confirm before removing an account.
-You cannot delete your own account or change your own role. Use
-[Account settings](/ui/setup-and-sign-in#your-account) to change your own password.
+Choose **Edit** to change an email, role, or password. Leave the password empty
+to keep it. Changing someone signs them out everywhere, and changing their role
+drops their access to every project at once; their per-project grants stay.
+
+Choose **Delete** and type the email to confirm. You can't delete or change
+your own role, and you can only manage people whose role and access are within
+your own. Someone who owns AI agents can't be deleted until the agents are
+deleted or given another owner.
+
+## See where access comes from
+
+Choose **Access** beside someone to see their role's ceiling, their groups, and
+every grant that reaches them, their own and their groups'. Grants are changed
+on each project's [Access](./project-access) page.
 
 ## AI agents
 
-Choose **Add AI agent** and give it a recognizable name. AI accounts use access
-tokens instead of an email and password.
+Choose **Add AI agent** and give it a name. AI agents have no email and no
+password, and you become the agent's owner. It reaches only what it is granted,
+never past Read, and never more than you do. If you are disabled, so is the
+agent.
 
-Choose **Get token** beside an agent to generate a credential. This prompts for
-your administrator password to confirm your identity. Each confirmation issues
-a fresh token and revokes any prior active token for that agent. Choose no
-expiry, a preset lifetime, or a custom number of hours or days up to three
-years. The default is 30 days. The
-plaintext token is shown once: copy and store it immediately, as it cannot be
-recovered later.
+Choose **Get token** beside an agent to create its personal token. Pick whether
+the token reads names only or values too, and when it expires, at most 90 days
+from now. If you have a password, you confirm it. A new token revokes the
+agent's previous one. Dopbase shows the token once, so copy it straight into a
+secret store.
 
-AI access is read-only and does not include secret values. Secret names and
-project details can still be sensitive, so create accounts only for agents you
-trust. The [AI agent access guide](/guide/ai-agent-access) shows how to pass the
-token to an agent, inspect metadata, and choose tasks that fit this role.
+Give the agent access on a project's Access page before handing it the token.
+The [AI agent access guide](/guide/ai-agent-access) shows how to pass the token
+to an agent and what it can do with it.
 
-Deleting an AI account also removes its access tokens. Choose **Delete** and
-type the agent's name to confirm.
+Choose **Delete** and type the agent's name to remove it with its tokens.
 
-See [identity and tokens](/reference/identity) for the permissions of each role.
+See [identity and access](/reference/identity) for every rule.
