@@ -36,10 +36,8 @@ fn route_templates_match_the_public_contract() {
     api::instance::FACTORY_RESET,
     api::users::COLLECTION,
     api::users::ITEM,
-    api::service_accounts::COLLECTION,
-    api::service_accounts::ITEM,
-    api::service_accounts::TOKENS,
-    api::service_accounts::REVOKE_TOKEN,
+    api::users::TOKENS,
+    api::users::TOKEN_REVOKE,
     api::backups::COLLECTION,
     api::backups::MASTER_KEY,
     api::backups::UPLOAD,
@@ -79,10 +77,8 @@ fn route_templates_match_the_public_contract() {
     "/api/v1/instance/factory-reset",
     "/api/v1/users",
     "/api/v1/users/{id}",
-    "/api/v1/service-accounts",
-    "/api/v1/service-accounts/{id}",
-    "/api/v1/service-accounts/{id}/tokens",
-    "/api/v1/service-accounts/{id}/tokens/{token_id}/revoke",
+    "/api/v1/users/{id}/tokens",
+    "/api/v1/users/{id}/tokens/{token_id}/revoke",
     "/api/v1/backups",
     "/api/v1/backups/master-key",
     "/api/v1/backups/upload",
@@ -104,8 +100,8 @@ fn path_builders_match_the_previous_format_output() {
     "/api/v1/environments/env_01/secrets/API_KEY/reveal"
   );
   assert_eq!(
-    api::service_accounts::revoke_token("svc_01", "tok_01"),
-    "/api/v1/service-accounts/svc_01/tokens/tok_01/revoke"
+    api::users::token_revoke("usr_01", "ptk_01"),
+    "/api/v1/users/usr_01/tokens/ptk_01/revoke"
   );
   assert_eq!(
     api::backups::restore("snapshot.dop"),

@@ -118,12 +118,31 @@ pub struct GroupRef {
   pub name: String,
 }
 
+/// What a personal token adds on top of its account's access.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenLimit {
+  pub name: String,
+  pub scope_type: ScopeType,
+  pub scope_id: String,
+  /// `project` or `project/environment`. Empty for all projects.
+  pub scope_label: String,
+  pub level: Level,
+}
+
 /// Where an account's data access comes from.
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserAccessResponse {
+  pub user_id: String,
+  /// The account's email, or an AI agent's name.
+  pub email: String,
+  /// The account's role. `Root` for root.
+  pub role_name: String,
   /// The deepest level the account's role allows.
   pub max_level: Level,
+  /// The limit of the personal token that asked, when one did.
+  pub token: Option<TokenLimit>,
   pub groups: Vec<GroupRef>,
   /// The account's own grants and those of its groups. A group grant has
   /// the group as its principal.
