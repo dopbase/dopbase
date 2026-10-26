@@ -10,8 +10,10 @@ import {
   ServerIcon,
   UserIcon,
   UsersIcon,
+  ShieldIcon,
   LogOutIcon,
 } from "~/assets/icons";
+import type { Capability } from "~/services/access.api";
 import { DbSpinner } from "~/components/ui";
 
 /**
@@ -35,6 +37,12 @@ const navItems = [
     label: "Users",
     icon: UsersIcon,
     match: (r: string) => r.startsWith("/users"),
+  },
+  {
+    name: "groups",
+    label: "Groups",
+    icon: ShieldIcon,
+    match: (r: string) => r.startsWith("/groups"),
   },
   {
     name: "projects",
@@ -76,14 +84,19 @@ const navItems = [
 
 const isActive = (item: (typeof navItems)[number]): boolean =>
   item.match(route.path);
+/** The capabilities that show each item. Items without an entry always show. */
+const needs: Partial<Record<(typeof navItems)[number]["name"], Capability[]>> =
+  {
+    users: ["users.view"],
+    groups: ["users.view", "groups.manage"],
+    backups: ["instance.backup"],
+    sso: ["sso.manage"],
+    audit: ["audit.read"],
+  };
 const visibleNavItems = computed(() =>
   navItems.filter((item) => {
-    if (item.name === "sso") return auth.isRoot;
-    return item.name === "backups" ||
-      item.name === "users" ||
-      item.name === "audit"
-      ? auth.isAdmin
-      : true;
+    const capabilities = needs[item.name];
+    return !capabilities || auth.can(...capabilities);
   }),
 );
 </script>

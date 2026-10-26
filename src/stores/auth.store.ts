@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { bootstrapAdmin, fetchBootstrapStatus } from "~/services/bootstrap.api";
 import * as authApi from "~/services/auth.api";
 import type { AccountRole, SessionKind } from "~/services/auth.api";
+import type { Capability, Level } from "~/services/access.api";
 import {
   onSessionExpired,
   onUnauthorized,
@@ -16,6 +17,10 @@ export interface AdminSession {
   /** True when the password was confirmed within the last ten minutes. */
   recentAuthentication: boolean;
   role: AccountRole;
+  roleName?: string;
+  /** Unknown (undefined or empty) until the session is fetched. */
+  capabilities?: Capability[];
+  maxLevel?: Level;
   lastLoginAt?: string | null;
   /** Unknown (undefined) until the session is fetched from the server. */
   hasPassword?: boolean;
@@ -78,6 +83,14 @@ export const useAuthStore = defineStore("auth", () => {
     () => session.value?.role === "root" || session.value?.role === "admin",
   );
 
+  /** Whether the account holds any of `capabilities`. Root holds them all. */
+  function can(...capabilities: Capability[]): boolean {
+    if (isRoot.value) return true;
+    return capabilities.some((capability) =>
+      session.value?.capabilities?.includes(capability),
+    );
+  }
+
   function setCsrf(token: string | null): void {
     csrfToken.value = token;
     persistCsrf(token);
@@ -127,6 +140,8 @@ export const useAuthStore = defineStore("auth", () => {
         sessionKind: "browser",
       }),
     );
+    // The login response has no capabilities; the session endpoint does.
+    await fetchSession().catch(() => undefined);
   }
 
   /**
@@ -171,6 +186,9 @@ export const useAuthStore = defineStore("auth", () => {
       sessionKind: response.sessionKind,
       recentAuthentication: response.recentAuthentication,
       role: response.role ?? "admin",
+      roleName: response.roleName,
+      capabilities: response.capabilities,
+      maxLevel: response.maxLevel,
       lastLoginAt: response.lastLoginAt ?? null,
       hasPassword: response.hasPassword,
       passwordConfirmation: response.passwordConfirmation,
@@ -231,6 +249,7 @@ export const useAuthStore = defineStore("auth", () => {
     isAuthenticated,
     isRoot,
     isAdmin,
+    can,
     setCsrf,
     loadBootstrapStatus,
     completeSso,

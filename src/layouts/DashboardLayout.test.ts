@@ -24,6 +24,7 @@ vi.mock("./DashboardLayout.controller", () => ({
 vi.mock("~/stores/auth.store", () => ({
   useAuthStore: () => ({
     isAdmin: true,
+    can: () => true,
     session: { role: "root" },
   }),
 }));
