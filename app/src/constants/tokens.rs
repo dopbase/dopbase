@@ -6,6 +6,7 @@ pub const CSRF_TOKEN_PREFIX: &str = "csrf_";
 pub const DEVICE_CODE_PREFIX: &str = "dbd_";
 pub const DEVICE_REQUEST_ID_PREFIX: &str = "dvr_";
 pub const ENVIRONMENT_ID_PREFIX: &str = "env_";
+pub const GRANT_ID_PREFIX: &str = "grt_";
 pub const PROJECT_ID_PREFIX: &str = "prj_";
 pub const RUNNER_TOKEN_ID_PREFIX: &str = "tok_";
 pub const RUNNER_TOKEN_PREFIX: &str = "dbs_";

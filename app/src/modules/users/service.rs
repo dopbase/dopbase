@@ -4,11 +4,11 @@ use super::{
 };
 use crate::{
   constants::errors::PASSWORD_REQUIRED,
-  extractors::{require_admin_browser, require_mutation, require_recent_browser_auth},
+  extractors::{require_capability_browser, require_mutation, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity},
   modules::common,
-  services::token,
+  services::{authx::Capability, token},
   state::AppState,
 };
 use axum::http::HeaderMap;
@@ -37,6 +37,18 @@ fn human_role(role: Option<AdminRole>) -> Result<AdminRole, HttpError> {
       "AI agents must be created as service accounts.",
     )),
     value => Ok(value),
+  }
+}
+
+/// The role row and the all-projects grant that keep a fixed role's access
+/// as it was: admins manage every project and members change them all.
+// TODO(rbac): maps the fixed admin and member roles to their built-in role
+// rows and shared grants. Take the role id from the request and grant
+// access per project once grants can be managed.
+fn role_access(role: AdminRole) -> (&'static str, &'static str) {
+  match role {
+    AdminRole::Admin => ("rol_admin", "project_manager"),
+    _ => ("rol_member", "write"),
   }
 }
 
@@ -72,7 +84,7 @@ pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<Vec<UserResponse>, HttpError> {
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersView)?;
   repository::list(state.db.pool())
     .await?
     .into_iter()
@@ -85,7 +97,7 @@ pub async fn get(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<UserResponse, HttpError> {
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersView)?;
   fetch_user(state, id).await
 }
 
@@ -97,7 +109,7 @@ pub async fn create(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let email = common::validate_email(&request.email)?;
   let requested_role = human_role(request.role)?;
   let password = request.password.filter(|password| !password.is_empty());
@@ -125,6 +137,8 @@ pub async fn create(
   };
   let id = token::public_id("usr_");
   let now = Utc::now().to_rfc3339();
+  let (actor_id, actor_email) = actor(identity);
+  let (role_id, level) = role_access(requested_role);
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,
@@ -133,6 +147,8 @@ pub async fn create(
       email: &email,
       password_hash: &hash,
       role: requested_role.as_str(),
+      role_id,
+      created_by: actor_id,
       now: &now,
     },
   )
@@ -146,7 +162,7 @@ pub async fn create(
     }
     return Err(error.into());
   }
-  let (actor_id, actor_email) = actor(identity);
+  repository::set_all_projects_grant(&mut tx, &id, level, actor_id, &now).await?;
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
@@ -173,7 +189,7 @@ pub async fn update(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let (old_email, old_role) = repository::account(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
@@ -220,15 +236,36 @@ pub async fn update(
   };
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  let result = repository::update(
-    &mut tx,
-    id,
-    &email,
-    password_hash.as_deref(),
-    new_role.as_str(),
-    &now,
-  )
-  .await;
+  let result = if new_role == AdminRole::Root {
+    repository::update(
+      &mut tx,
+      id,
+      &email,
+      password_hash.as_deref(),
+      new_role.as_str(),
+      None,
+      &now,
+    )
+    .await
+  } else {
+    let (role_id, level) = role_access(new_role);
+    let updated = repository::update(
+      &mut tx,
+      id,
+      &email,
+      password_hash.as_deref(),
+      new_role.as_str(),
+      Some(role_id),
+      &now,
+    )
+    .await;
+    match updated {
+      Ok(()) if old_role != new_role.as_str() => {
+        repository::set_all_projects_grant(&mut tx, id, level, actor_id, &now).await
+      }
+      other => other,
+    }
+  };
   if let Err(error) = result {
     if error.to_string().contains("UNIQUE") {
       return Err(HttpError::conflict(
@@ -265,7 +302,7 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let (actor_id, actor_email) = actor(identity);
   if id == actor_id {
     return Err(HttpError::forbidden(
@@ -320,7 +357,7 @@ pub async fn unlink_sso(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let target = fetch_user(state, id).await?;
   let (actor_id, _) = actor(identity);
   // TODO(rbac): only root may change root. Check a permission instead once

@@ -176,6 +176,129 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
 }
 
 #[tokio::test]
+async fn accounts_keep_their_role_row_and_shared_grant_in_step() {
+  let (_dir, state, router) = fixture().await;
+  let setup = state.setup.read().await.token.clone().unwrap();
+  let (status, bootstrap, headers) = call(
+    &router,
+    "POST",
+    "/api/v1/bootstrap/admin",
+    None,
+    None,
+    Some(json!({"setupToken": setup, "email":"root@example.com", "password":"correct-horse-123"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let cookie = headers
+    .get(header::SET_COOKIE)
+    .unwrap()
+    .to_str()
+    .unwrap()
+    .split(';')
+    .next()
+    .unwrap()
+    .to_string();
+  let csrf = bootstrap["data"]["csrfToken"].as_str().unwrap().to_string();
+  let (status, created, _) = call(
+    &router,
+    "POST",
+    "/api/v1/users",
+    Some(&cookie),
+    Some(&csrf),
+    Some(json!({"email":"teammate@example.com","password":"correct-horse-456","role":"member"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let id = created["data"]["id"].as_str().unwrap().to_owned();
+
+  let (status, session, _) = call(
+    &router,
+    "GET",
+    "/api/v1/auth/session",
+    Some(&cookie),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(session["data"]["roleName"], "Root");
+  assert_eq!(session["data"]["maxLevel"], "project_manager");
+  assert!(
+    session["data"]["capabilities"]
+      .as_array()
+      .unwrap()
+      .contains(&json!("instance.backup"))
+  );
+
+  let account = |id: String| {
+    let pool = state.db.pool().clone();
+    async move {
+      let row: (i64, Option<String>, Option<String>) =
+        sqlx::query_as("SELECT is_root, role_id, created_by FROM admins WHERE id = ?")
+          .bind(&id)
+          .fetch_one(&pool)
+          .await
+          .unwrap();
+      let grants: Vec<(String, String)> = sqlx::query_as(
+        "SELECT scope_type, level FROM grants WHERE principal_type = 'user' AND principal_id = ?",
+      )
+      .bind(&id)
+      .fetch_all(&pool)
+      .await
+      .unwrap();
+      (row, grants)
+    }
+  };
+  let root_id: String = sqlx::query_scalar("SELECT id FROM admins WHERE is_root = 1")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(account(root_id.clone()).await, ((1, None, None), vec![]));
+  assert_eq!(
+    account(id.clone()).await,
+    (
+      (0, Some("rol_member".into()), Some(root_id.clone())),
+      vec![("all".into(), "write".into())]
+    )
+  );
+
+  let (status, _, _) = call(
+    &router,
+    "PATCH",
+    &format!("/api/v1/users/{id}"),
+    Some(&cookie),
+    Some(&csrf),
+    Some(json!({"role":"admin"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(
+    account(id.clone()).await,
+    (
+      (0, Some("rol_admin".into()), Some(root_id)),
+      vec![("all".into(), "project_manager".into())]
+    )
+  );
+
+  let (status, _, _) = call(
+    &router,
+    "DELETE",
+    &format!("/api/v1/users/{id}"),
+    Some(&cookie),
+    Some(&csrf),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM grants")
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap();
+  assert_eq!(left, 0);
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn member_manages_projects_and_agent_is_metadata_only() {
   let (_dir, state, router) = fixture().await;
   let setup = state.setup.read().await.token.clone().unwrap();

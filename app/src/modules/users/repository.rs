@@ -1,5 +1,7 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
+use crate::{constants::tokens::GRANT_ID_PREFIX, services::token};
+
 const USER_COLUMNS: &str = "a.id,a.email,a.role,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked";
 
 /// id, email, role, created_at, updated_at, has_password, sso_linked.
@@ -52,6 +54,8 @@ pub struct NewUser<'a> {
   pub email: &'a str,
   pub password_hash: &'a str,
   pub role: &'a str,
+  pub role_id: &'a str,
+  pub created_by: &'a str,
   pub now: &'a str,
 }
 
@@ -61,12 +65,14 @@ pub async fn insert(
   user: NewUser<'_>,
 ) -> Result<(), sqlx::Error> {
   sqlx::query(
-    "INSERT INTO admins(id,email,password_hash,role,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+    "INSERT INTO admins(id,email,password_hash,role,role_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
   )
   .bind(user.id)
   .bind(user.email)
   .bind(user.password_hash)
   .bind(user.role)
+  .bind(user.role_id)
+  .bind(user.created_by)
   .bind(user.now)
   .bind(user.now)
   .execute(conn)
@@ -82,29 +88,59 @@ pub async fn update(
   email: &str,
   password_hash: Option<&str>,
   role: &str,
+  role_id: Option<&str>,
   now: &str,
 ) -> Result<(), sqlx::Error> {
   match password_hash {
     Some(hash) => {
-      sqlx::query("UPDATE admins SET email=?,password_hash=?,role=?,updated_at=? WHERE id=?")
-        .bind(email)
-        .bind(hash)
-        .bind(role)
-        .bind(now)
-        .bind(id)
-        .execute(conn)
-        .await?
+      sqlx::query(
+        "UPDATE admins SET email=?,password_hash=?,role=?,role_id=?,updated_at=? WHERE id=?",
+      )
+      .bind(email)
+      .bind(hash)
+      .bind(role)
+      .bind(role_id)
+      .bind(now)
+      .bind(id)
+      .execute(conn)
+      .await?
     }
     None => {
-      sqlx::query("UPDATE admins SET email=?,role=?,updated_at=? WHERE id=?")
+      sqlx::query("UPDATE admins SET email=?,role=?,role_id=?,updated_at=? WHERE id=?")
         .bind(email)
         .bind(role)
+        .bind(role_id)
         .bind(now)
         .bind(id)
         .execute(conn)
         .await?
     }
   };
+  Ok(())
+}
+
+/// Replaces the account's all-projects grant with `level`.
+pub async fn set_all_projects_grant(
+  conn: &mut SqliteConnection,
+  id: &str,
+  level: &str,
+  granted_by: &str,
+  now: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query(
+    "DELETE FROM grants WHERE principal_type='user' AND principal_id=? AND scope_type='all'",
+  )
+  .bind(id)
+  .execute(&mut *conn)
+  .await?;
+  sqlx::query("INSERT INTO grants(id,principal_type,principal_id,scope_type,scope_id,level,granted_by,created_at) VALUES(?,'user',?,'all','',?,?,?)")
+    .bind(token::public_id(GRANT_ID_PREFIX))
+    .bind(id)
+    .bind(level)
+    .bind(granted_by)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?;
   Ok(())
 }
 
