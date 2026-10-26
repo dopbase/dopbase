@@ -123,43 +123,51 @@ pub async fn show(
 ) -> Result<HttpResponse<EnvironmentResponse>, EnvironmentError> {
   crate::extractors::require_metadata_access(&identity)?;
   Ok(HttpResponse::ok(
-    service::show(&state, &id).await?,
+    service::authorize(
+      &state,
+      &identity,
+      &id,
+      crate::services::authx::Level::Metadata,
+    )
+    .await?,
     "ENVIRONMENT_FETCHED",
   ))
 }
 
-/// Rename an environment
+/// Update an environment
 ///
-/// Change the name of an environment. Names must be lowercase slugs and
-/// unique within the project. Requires the CSRF header for browser
-/// sessions.
+/// Rename an environment or turn its protection on or off. Names must be
+/// lowercase slugs and unique within the project. A protected environment
+/// is reached only through a grant on the environment itself or a project
+/// manager grant. Needs the manage level on the environment and the CSRF
+/// header for browser sessions.
 #[utoipa::path(
   patch,
   path = crate::constants::api::environments::ITEM,
   tag = "environments",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
   params(("environment_id" = String, Path, description = "Environment id")),
-  request_body = RenameEnvironmentRequest,
+  request_body = UpdateEnvironmentRequest,
   responses(
-    (status = 200, description = "Environment renamed", body = inline(HttpResponseFormat<EnvironmentResponse>)),
+    (status = 200, description = "Environment updated", body = inline(HttpResponseFormat<EnvironmentResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 403, description = "The manage level and a valid CSRF token are required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
     (status = 409, description = "An environment with this name already exists in the project", body = crate::http::ErrorBody),
     (status = 422, description = "The environment name is invalid", body = crate::http::ErrorBody),
   ),
 )]
-pub async fn rename(
+pub async fn update(
   State(state): State<AppState>,
   headers: HeaderMap,
   identity: AuthIdentity,
   Path(id): Path<String>,
-  axum::Json(request): axum::Json<RenameEnvironmentRequest>,
+  axum::Json(request): axum::Json<UpdateEnvironmentRequest>,
 ) -> Result<HttpResponse<EnvironmentResponse>, EnvironmentError> {
   require_mutation(&identity, &headers)?;
   Ok(HttpResponse::ok(
-    service::rename(&state, &identity, &id, request).await?,
-    "ENVIRONMENT_RENAMED",
+    service::update(&state, &identity, &id, request).await?,
+    "ENVIRONMENT_UPDATED",
   ))
 }
 

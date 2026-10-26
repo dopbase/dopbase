@@ -5,10 +5,11 @@ use crate::{
     errors::TOKEN_SCOPE_INVALID,
     tokens::{RUNNER_TOKEN_ID_PREFIX, RUNNER_TOKEN_PREFIX},
   },
-  extractors::require_project_manager,
+  extractors::require_person,
   http::HttpError,
   models::AuthIdentity,
-  services::token,
+  modules::environments::service::authorize,
+  services::{authx::Level, token},
   state::AppState,
 };
 use chrono::Utc;
@@ -17,8 +18,8 @@ pub async fn list(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<Vec<TokenMetadata>, HttpError> {
-  require_project_manager(identity)?;
-  crate::modules::environments::service::show(state, id).await?;
+  require_person(identity)?;
+  authorize(state, identity, id, Level::Manage).await?;
   Ok(repository::list(state.db.pool(), id).await?)
 }
 pub async fn create(
@@ -27,7 +28,7 @@ pub async fn create(
   id: &str,
   request: CreateTokenRequest,
 ) -> Result<CreatedTokenResponse, HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   if request.role != "runner" {
     return Err(HttpError::validation(std::collections::BTreeMap::from([(
       TOKEN_SCOPE_INVALID.into(),
@@ -41,7 +42,7 @@ pub async fn create(
       "Token names must contain between 1 and 64 characters.".into(),
     )])));
   }
-  let env = crate::modules::environments::service::show(state, id).await?;
+  let env = authorize(state, identity, id, Level::Manage).await?;
   let now = Utc::now();
   let expires_at = request.expires_in.as_deref().unwrap_or("never");
   let expires_at = token::expiry_duration(expires_at)
@@ -103,17 +104,27 @@ pub async fn revoke(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<TokenMetadata, HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   let token = repository::find(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::not_found("TOKEN_NOT_FOUND", "The requested token was not found."))?;
+  let env = authorize(state, identity, &token.environment_id, Level::Manage)
+    .await
+    .map_err(|error| {
+      // A token in an environment the caller cannot see does not exist
+      // for them either.
+      if error.status == axum::http::StatusCode::NOT_FOUND {
+        HttpError::not_found("TOKEN_NOT_FOUND", "The requested token was not found.")
+      } else {
+        error
+      }
+    })?;
   if token.revoked_at.is_some() {
     return Err(HttpError::conflict(
       "TOKEN_REVOKED",
       "The token has already been revoked.",
     ));
   }
-  let env = crate::modules::environments::service::show(state, &token.environment_id).await?;
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let updated =

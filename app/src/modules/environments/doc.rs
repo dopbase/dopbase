@@ -5,7 +5,7 @@ use crate::{
 };
 use utoipa::OpenApi;
 #[derive(OpenApi)]
-#[openapi(paths(controller::list,controller::resolve,controller::create,controller::show,controller::rename,controller::delete),components(schemas(EnvironmentResponse,CreateEnvironmentRequest,RenameEnvironmentRequest,DeleteEnvironmentResponse,AffectedCounts,ErrorBody,HttpResponseFormat<Vec<EnvironmentResponse>>,HttpResponseFormat<EnvironmentResponse>,HttpResponseFormat<DeleteEnvironmentResponse>)),tags((name="environments")))]
+#[openapi(paths(controller::list,controller::resolve,controller::create,controller::show,controller::update,controller::delete),components(schemas(EnvironmentResponse,CreateEnvironmentRequest,UpdateEnvironmentRequest,DeleteEnvironmentResponse,AffectedCounts,ErrorBody,HttpResponseFormat<Vec<EnvironmentResponse>>,HttpResponseFormat<EnvironmentResponse>,HttpResponseFormat<DeleteEnvironmentResponse>)),tags((name="environments")))]
 struct EnvironmentsApi;
 pub fn build() -> utoipa::openapi::OpenApi {
   EnvironmentsApi::openapi()

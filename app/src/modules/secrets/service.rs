@@ -8,9 +8,10 @@ use crate::{
     },
     limits::{MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
   },
-  extractors::{require_metadata_access, require_project_manager, require_recent_browser_auth},
+  extractors::{require_metadata_access, require_person, require_recent_browser_auth},
   http::HttpError,
   models::{AuthIdentity, SecretInput},
+  services::authx::Level,
   state::AppState,
 };
 use chrono::Utc;
@@ -43,9 +44,11 @@ pub fn validate_entry(entry: &SecretInput) -> Result<(), HttpError> {
 }
 async fn environment(
   state: &AppState,
+  identity: &AuthIdentity,
   id: &str,
+  needed: Level,
 ) -> Result<crate::modules::environments::model::EnvironmentResponse, HttpError> {
-  crate::modules::environments::service::show(state, id).await
+  crate::modules::environments::service::authorize(state, identity, id, needed).await
 }
 pub async fn list(
   state: &AppState,
@@ -53,7 +56,7 @@ pub async fn list(
   id: &str,
 ) -> Result<Vec<SecretMetadata>, HttpError> {
   require_metadata_access(identity)?;
-  environment(state, id).await?;
+  environment(state, identity, id, Level::Metadata).await?;
   Ok(repository::list(state.db.pool(), id).await?)
 }
 pub async fn get(
@@ -63,7 +66,7 @@ pub async fn get(
   key: &str,
 ) -> Result<SecretMetadata, HttpError> {
   require_metadata_access(identity)?;
-  environment(state, id).await?;
+  environment(state, identity, id, Level::Metadata).await?;
   repository::find(state.db.pool(), id, key)
     .await?
     .map(|row| row.metadata())
@@ -81,8 +84,8 @@ pub async fn set(
     value: request.value,
   };
   validate_entry(&input)?;
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Write).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let existing: Option<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key=?")
     .bind(id).bind(&key).fetch_optional(&mut *tx).await?;
@@ -152,8 +155,8 @@ pub async fn delete(
   id: &str,
   key: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Write).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   // The version history goes with it through the foreign key cascade.
   let deleted = sqlx::query("DELETE FROM secrets WHERE environment_id=? AND key=?")
@@ -204,8 +207,8 @@ pub async fn reveal(
   key: &str,
 ) -> Result<RevealedSecret, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Read).await?;
   let row = repository::find(state.db.pool(), id, key)
     .await?
     .ok_or_else(|| {
@@ -276,7 +279,7 @@ pub async fn versions(
   query: SecretVersionQuery,
 ) -> Result<SecretVersionPage, HttpError> {
   require_metadata_access(identity)?;
-  environment(state, id).await?;
+  environment(state, identity, id, Level::Metadata).await?;
   let current = repository::find(state.db.pool(), id, key)
     .await?
     .ok_or_else(secret_not_found)?;
@@ -315,8 +318,8 @@ pub async fn reveal_version(
   version: i64,
 ) -> Result<RevealedSecret, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Read).await?;
   let mut conn = state.db.pool().acquire().await?;
   let stored = repository::find_version(&mut conn, id, key, version)
     .await?
@@ -352,8 +355,8 @@ pub async fn rollback(
   request: RollbackSecretRequest,
 ) -> Result<RollbackSecretResponse, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Write).await?;
   // The write reservation is taken before reading, so the version check,
   // the new version number, and the write are one state transition.
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
@@ -492,8 +495,8 @@ pub async fn import(
 ) -> Result<ImportSecretsResponse, HttpError> {
   require_recent_browser_auth(identity)?;
   validate_import(&request)?;
-  let (admin_id, email) = require_project_manager(identity)?;
-  let env = environment(state, id).await?;
+  let (admin_id, email) = require_person(identity)?;
+  let env = environment(state, identity, id, Level::Write).await?;
   // Applying takes the SQLite write reservation before reading. This makes
   // the diff, version selection, replacement deletes, layout, and audit one
   // serializable state transition. Previews only write their audit event.
@@ -696,7 +699,7 @@ pub async fn layout(
   id: &str,
 ) -> Result<EnvLayoutResponse, HttpError> {
   require_metadata_access(identity)?;
-  environment(state, id).await?;
+  environment(state, identity, id, Level::Metadata).await?;
   Ok(EnvLayoutResponse {
     layout: repository::layout(state.db.pool(), id).await?,
   })
@@ -709,7 +712,7 @@ pub async fn export(
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin { .. } => {
       require_recent_browser_auth(identity)?;
-      let (admin_id, email) = require_project_manager(identity)?;
+      let (admin_id, email) = require_person(identity)?;
       (identity.audit_actor_type(), admin_id, Some(email))
     }
     AuthIdentity::Runner {
@@ -729,7 +732,7 @@ pub async fn export(
       ));
     }
   };
-  let env = environment(state, id).await?;
+  let env = environment(state, identity, id, Level::Read).await?;
   let mut tx = state.db.pool().begin().await?;
   let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
     .bind(id).fetch_all(&mut *tx).await?;
@@ -773,7 +776,7 @@ pub async fn runtime(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<RuntimeSecretsResponse, HttpError> {
-  let env = environment(state, id).await?;
+  crate::modules::environments::service::show(state, id).await?;
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin {
       admin_id, email, ..
@@ -799,6 +802,7 @@ pub async fn runtime(
       ));
     }
   };
+  let env = environment(state, identity, id, Level::Read).await?;
   let entries = decrypt_all(state, id).await?;
   common::audit_standalone(
     state.db.pool(),

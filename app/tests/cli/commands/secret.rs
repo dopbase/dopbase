@@ -356,11 +356,24 @@ async fn reveal_asks_for_browser_confirmation_when_the_account_has_no_password()
     .await;
   let (root_cookie, root_csrf) = browser_credentials(&fixture).await;
   let api = reqwest::Client::new();
-  api
+  let member: Value = api
     .post(format!("{}/api/v1/users", fixture.url))
     .header("cookie", &root_cookie)
     .header("x-dopbase-csrf", &root_csrf)
     .json(&json!({"email":"member@example.com","password":"correct-horse-456","role":"member"}))
+    .send()
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+  api
+    .put(format!("{}/api/v1/grants", fixture.url))
+    .header("cookie", &root_cookie)
+    .header("x-dopbase-csrf", &root_csrf)
+    .json(&json!({"principalType":"user","principalId":member["data"]["id"],"scopeType":"environment","scope":id,"level":"read"}))
     .send()
     .await
     .unwrap()
