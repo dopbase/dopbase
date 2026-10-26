@@ -12,6 +12,8 @@ const PROBE_MIGRATION: &str = "20261024091600_upgrade_probe";
 const PROBE_VERSION: i64 = 20_261_024_091_600;
 /// The last version before roles and grants replaced the fixed roles.
 const BEFORE_ROLES: i64 = 20_261_024_132_208;
+/// The last version before service accounts became AI agent accounts.
+const BEFORE_PERSONAL_TOKENS: i64 = 20_261_026_065_132;
 /// Highest version recorded before migrations were renamed.
 const LEGACY_HEAD: i64 = 18;
 
@@ -332,4 +334,80 @@ async fn assert_table(
   .await
   .unwrap();
   assert_eq!(exists, expected, "unexpected state for table {name}");
+}
+
+#[tokio::test]
+async fn service_accounts_become_ai_agent_accounts_whose_tokens_keep_working() {
+  let database_dir = tempfile::TempDir::new().unwrap();
+  let db = DbClient::connect(&sqlite_url(&database_dir.path().join("agents.db")))
+    .await
+    .unwrap();
+  MIGRATOR.run(db.pool()).await.unwrap();
+  MIGRATOR
+    .undo(db.pool(), BEFORE_PERSONAL_TOKENS)
+    .await
+    .unwrap();
+  assert_table(&db, "personal_tokens", false).await;
+  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_root','root@example.com','','root',NULL,1,'t','t')")
+    .execute(db.pool())
+    .await
+    .unwrap();
+  sqlx::query("INSERT INTO service_accounts(id,name,role,created_at,updated_at) VALUES('aia_build','build-agent','ai_agent','t','t')")
+    .execute(db.pool())
+    .await
+    .unwrap();
+  let hash = app::services::token::hash("dpa_existing");
+  sqlx::query("INSERT INTO agent_tokens(id,service_account_id,name,token_hash,created_at,expires_at) VALUES('ait_build','aia_build','ci',?,'t',NULL)")
+    .bind(&hash)
+    .execute(db.pool())
+    .await
+    .unwrap();
+
+  MIGRATOR.run(db.pool()).await.unwrap();
+
+  assert_table(&db, "service_accounts", false).await;
+  assert_table(&db, "agent_tokens", false).await;
+  let agent: (String, String, Option<String>, String) = sqlx::query_as(
+    "SELECT email, role_id, owner_id, password_hash FROM admins WHERE id = 'aia_build'",
+  )
+  .fetch_one(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(
+    agent,
+    (
+      "build-agent".into(),
+      "rol_ai_agent".into(),
+      Some("usr_root".into()),
+      String::new()
+    )
+  );
+  let grant: (String, String) = sqlx::query_as(
+    "SELECT scope_type, level FROM grants WHERE principal_type = 'user' AND principal_id = 'aia_build'",
+  )
+  .fetch_one(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(grant, ("all".into(), "metadata".into()));
+  let token: (String, String, String) =
+    sqlx::query_as("SELECT user_id, scope_type, level FROM personal_tokens WHERE token_hash = ?")
+      .bind(&hash)
+      .fetch_one(db.pool())
+      .await
+      .unwrap();
+  assert_eq!(token, ("aia_build".into(), "all".into(), "metadata".into()));
+
+  // And back: the agent is a service account again with its token.
+  MIGRATOR
+    .undo(db.pool(), BEFORE_PERSONAL_TOKENS)
+    .await
+    .unwrap();
+  let restored: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM agent_tokens t JOIN service_accounts s ON s.id = t.service_account_id WHERE s.name = 'build-agent'",
+  )
+  .fetch_one(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(restored, 1);
+  db.close().await;
 }

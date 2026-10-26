@@ -68,8 +68,8 @@ async fn migrations_apply_rollback_and_reapply() {
     "runner_tokens",
     "audit_events",
     "environment_env_layout",
-    "service_accounts",
-    "agent_tokens",
+    "personal_tokens",
+    "grants",
     "audit_chain_anchor",
     "audit_chain_genesis",
     "secret_versions",
@@ -84,8 +84,8 @@ async fn migrations_apply_rollback_and_reapply() {
     "sessions_revoked_retention_idx",
     "sessions_idle_retention_idx",
     "sessions_absolute_retention_idx",
-    "agent_tokens_hash_idx",
-    "agent_tokens_account_idx",
+    "personal_tokens_user_idx",
+    "grants_scope_idx",
     "admins_root_idx",
   ];
 
