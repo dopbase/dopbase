@@ -93,6 +93,7 @@ pub mod projects {
   pub const INIT: &str = api_path!("/projects/init");
   pub const ITEM: &str = api_path!("/projects/{project_ref}");
   pub const ENVIRONMENTS: &str = api_path!("/projects/{project_ref}/environments");
+  pub const ACCESS: &str = api_path!("/projects/{project_ref}/access");
 
   pub fn item(project_ref: &str) -> String {
     super::render(ITEM, &[("project_ref", project_ref)])
@@ -272,10 +273,22 @@ pub mod users {
   pub const COLLECTION: &str = api_path!("/users");
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
+  pub const ACCESS: &str = api_path!("/users/{id}/access");
 
   pub fn item(id: &str) -> String {
     super::render(ITEM, &[("id", id)])
   }
+}
+
+pub mod grants {
+  pub const COLLECTION: &str = api_path!("/grants");
+  pub const ITEM: &str = api_path!("/grants/{id}");
+}
+
+pub mod groups {
+  pub const COLLECTION: &str = api_path!("/groups");
+  pub const ITEM: &str = api_path!("/groups/{id}");
+  pub const MEMBER: &str = api_path!("/groups/{id}/members/{user_id}");
 }
 
 pub mod service_accounts {

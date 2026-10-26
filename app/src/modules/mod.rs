@@ -9,6 +9,8 @@ pub mod backups;
 pub mod bootstrap;
 pub(crate) mod common;
 pub mod environments;
+pub mod grants;
+pub mod groups;
 pub mod health;
 pub mod instance;
 pub mod projects;
@@ -33,6 +35,8 @@ pub fn routes() -> Router<AppState> {
     .merge(backups::routes())
     .merge(users::routes())
     .merge(sso::routes())
+    .merge(grants::routes())
+    .merge(groups::routes())
 }
 
 pub fn openapi() -> OpenApi {
@@ -49,5 +53,7 @@ pub fn openapi() -> OpenApi {
   doc.merge(backups::doc::build());
   doc.merge(users::doc::build());
   doc.merge(sso::doc::build());
+  doc.merge(grants::doc::build());
+  doc.merge(groups::doc::build());
   doc
 }
