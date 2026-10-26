@@ -230,7 +230,7 @@ pub async fn revoke_non_root_sessions(
   // TODO(rbac): root is the fixed break-glass role. Exempt whichever roles
   // may keep password sign-in once roles are configurable.
   Ok(
-    sqlx::query("UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL AND admin_id IN (SELECT id FROM admins WHERE role<>'root')")
+    sqlx::query("UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL AND admin_id IN (SELECT id FROM admins WHERE is_root=0)")
       .bind(now)
       .execute(conn)
       .await?

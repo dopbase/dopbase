@@ -33,7 +33,7 @@ use crate::{
       SSO_PROVIDER_ID_PREFIX,
     },
   },
-  extractors::{require_project_manager, require_recent_browser_auth, require_root_browser},
+  extractors::{require_capability_browser, require_person, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
   modules::{
@@ -41,6 +41,7 @@ use crate::{
     common,
   },
   services::{
+    authx::Capability,
     client_ip,
     crypto::sso_client_secret_aad,
     oidc::{self, Freshness, ProviderSettings, VerifiedIdentity},
@@ -176,7 +177,7 @@ async fn discover_issuer(issuer: &str) -> Option<String> {
 /// Changing single sign-on decides who can reach the instance, so it takes
 /// the root account in the Admin UI with a fresh password.
 fn require_root_change(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
-  let result = require_root_browser(identity)?;
+  let result = require_capability_browser(identity, Capability::SsoManage)?;
   require_recent_browser_auth(identity)?;
   Ok(result)
 }
@@ -206,7 +207,7 @@ pub async fn get_provider(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<ProviderSettingsResponse, HttpError> {
-  require_root_browser(identity)?;
+  require_capability_browser(identity, Capability::SsoManage)?;
   let provider = match provider_row(state).await? {
     Some(row) => {
       let linked = repository::linked_count(state.db.pool(), &row.id).await?;
@@ -608,7 +609,7 @@ pub async fn start_link(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<StartedFlow, HttpError> {
-  let (admin_id, _) = require_project_manager(identity)?;
+  let (admin_id, _) = require_person(identity)?;
   let AuthIdentity::Admin {
     kind: SessionKind::Browser,
     session_id,
@@ -635,7 +636,7 @@ pub async fn start_reauth(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<StartedFlow, HttpError> {
-  let (admin_id, _) = require_project_manager(identity)?;
+  let (admin_id, _) = require_person(identity)?;
   let AuthIdentity::Admin {
     kind: SessionKind::Browser,
     session_id,
@@ -1173,7 +1174,7 @@ pub async fn identity_status(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<IdentityResponse, HttpError> {
-  let (admin_id, _) = require_project_manager(identity)?;
+  let (admin_id, _) = require_person(identity)?;
   let provider = provider_row(state).await?;
   let linked = match &provider {
     Some(row) => repository::identity_of(state.db.pool(), admin_id, &row.id).await?,
@@ -1194,7 +1195,7 @@ pub async fn unlink_self(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   if !matches!(
     identity,
     AuthIdentity::Admin {
@@ -1227,7 +1228,7 @@ pub async fn unlink(
   admin_id: &str,
   target_email: &str,
 ) -> Result<(), HttpError> {
-  let (actor_id, actor_email) = require_project_manager(identity)?;
+  let (actor_id, actor_email) = require_person(identity)?;
   let mut tx = state.db.pool().begin().await?;
   let removed = repository::delete_identities_of(&mut tx, admin_id).await?;
   if removed == 0 {

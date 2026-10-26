@@ -680,6 +680,6 @@ async fn audit_list_is_for_administrators_only() {
   )
   .unwrap();
   let result = fixture.run(&["audit", "list"]).await;
-  failure(&result, "This operation requires an administrator.");
+  failure(&result, "Your role does not allow this operation.");
   assert!(result.stdout.is_empty());
 }

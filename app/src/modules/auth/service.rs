@@ -12,7 +12,7 @@ use crate::{
     },
     tokens::{ADMIN_SESSION_PREFIX, CSRF_TOKEN_PREFIX, SESSION_ID_PREFIX},
   },
-  extractors::{require_project_manager, require_recent_browser_auth},
+  extractors::{require_person, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
   services::token,
@@ -231,11 +231,15 @@ fn session_summary(identity: &AuthIdentity) -> Result<SessionResponse, HttpError
       recent_auth_at,
       created_at,
       csrf_hash,
+      access,
       ..
     } => Ok(SessionResponse {
       admin_id: admin_id.clone(),
       email: email.clone(),
       role: *role,
+      role_name: access.role_name.clone(),
+      capabilities: access.capabilities().collect(),
+      max_level: access.max_level,
       session_kind: *kind,
       recent_authentication: Utc::now() - *recent_auth_at
         <= Duration::minutes(RECENT_AUTHENTICATION_MINUTES),
@@ -261,7 +265,7 @@ pub async fn logout(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   let session_id = match identity {
     AuthIdentity::Admin { session_id, .. } => session_id,
     _ => unreachable!(),
@@ -290,7 +294,7 @@ pub async fn reauthenticate(
   identity: &AuthIdentity,
   password: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   // Password re-verification is brute-forceable through a hijacked session,
   // so it shares the login limiter's budget for this account.
   let limit_key = format!("password_verify:{admin_id}");
@@ -355,7 +359,7 @@ pub async fn change_password(
   identity: &AuthIdentity,
   request: ChangePasswordRequest,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   // Verifying the current password is the same brute-force surface as
   // reauthentication, so it shares that limiter budget.
   let limit_key = format!("password_verify:{admin_id}");

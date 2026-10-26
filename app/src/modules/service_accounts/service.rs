@@ -1,11 +1,11 @@
 use super::model::*;
 use crate::{
   constants::tokens::{AGENT_TOKEN_ID_PREFIX, AGENT_TOKEN_PREFIX},
-  extractors::{require_admin_browser, require_mutation, require_recent_browser_auth},
+  extractors::{require_capability_browser, require_mutation, require_recent_browser_auth},
   http::HttpError,
   models::AuthIdentity,
   modules::common,
-  services::token,
+  services::{authx::Capability, token},
   state::AppState,
 };
 use axum::http::HeaderMap;
@@ -113,7 +113,7 @@ pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<Vec<ServiceAccountResponse>, HttpError> {
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersView)?;
   let rows = sqlx::query_as::<_, (String, String, String, String, String)>(
     "SELECT id,name,role,created_at,updated_at FROM service_accounts ORDER BY name",
   )
@@ -137,7 +137,7 @@ pub async fn get(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<ServiceAccountResponse, HttpError> {
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersView)?;
   account(state, id).await
 }
 pub async fn create(
@@ -148,7 +148,7 @@ pub async fn create(
 ) -> Result<ServiceAccountResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let name = validate_name(&request.name)?;
   let id = token::public_id("aia_");
   let now = Utc::now().to_rfc3339();
@@ -202,7 +202,7 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let _ = account(state, id).await?;
   let (aid, email) = actor(identity);
   let mut tx = state.db.pool().begin().await?;
@@ -231,7 +231,7 @@ pub async fn tokens(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<Vec<AgentTokenResponse>, HttpError> {
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersView)?;
   let _ = account(state, id).await?;
   let rows=sqlx::query_as::<_,(String,String,String,String,Option<String>,Option<String>,Option<String>)>("SELECT id,service_account_id,name,created_at,expires_at,last_used_at,revoked_at FROM agent_tokens WHERE service_account_id=? ORDER BY created_at DESC").bind(id).fetch_all(state.db.pool()).await?;
   Ok(rows.into_iter().map(map_token).collect())
@@ -245,7 +245,7 @@ pub async fn create_token(
 ) -> Result<CreatedAgentTokenResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let _ = account(state, id).await?;
   let name = validate_name(&request.name)?;
   let now = Utc::now();
@@ -301,7 +301,7 @@ pub async fn revoke_token(
 ) -> Result<AgentTokenResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_admin_browser(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
   let mut tx = state.db.pool().begin().await?;
   let now = Utc::now().to_rfc3339();
   let result=sqlx::query("UPDATE agent_tokens SET revoked_at=? WHERE id=? AND service_account_id=? AND revoked_at IS NULL").bind(&now).bind(token_id).bind(id).execute(&mut *tx).await?;
