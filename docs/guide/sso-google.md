@@ -142,8 +142,8 @@ Select **Turn on**. The sign-in page now shows **Sign in with Google** next to
 the password form.
 
 To check it, open the sign-in page in a private window, select **Sign in with
-Google**, and pick a Google account whose email matches an admin or member
-account in Dopbase. The first sign-in links that Google identity to the account.
+Google**, and pick a Google account whose email matches a person's account in
+Dopbase, other than root. The first sign-in links that Google identity to the account.
 After that, Dopbase recognizes the person by Google's subject identifier, so the
 link survives an email change at Google.
 
@@ -167,7 +167,7 @@ for the details.
 
 ### Confirming sensitive actions
 
-Revealing or exporting secrets, managing users, and creating agent tokens ask
+Revealing or exporting secrets, managing users, and creating personal tokens ask
 you to confirm it's you. An account linked to Google confirms in a small Google
 window. Google rejects `prompt=login`, so Dopbase sends only `max_age=0` and
 checks the sign-in time Google returns. If Google reuses your session without

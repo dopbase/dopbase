@@ -200,7 +200,9 @@ metadata. The health probe times out after three seconds.
 
 The stable server-source values are `argument`, `environment`, `config`, and
 `default`. Authentication is `environment`, `encrypted_session`, or `none`.
-Identity is `admin`, `human`, `runner`, `ai_agent`, `unknown`, or `none`. Dopbase
+Identity is `admin`, `human`, `runner`, `personal_token`, `ai_agent` (an agent
+token from before personal tokens), `unknown`, or `none`. Run `dopbase access`
+to see what a personal token reaches. Dopbase
 identifies environment credentials from their token prefix, so this field does
 not confirm that the token is valid. Environment credentials have no email in
 status output.

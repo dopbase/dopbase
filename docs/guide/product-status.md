@@ -25,8 +25,15 @@ documentation, and SQLite storage in one executable.
 - Human authentication and environment-scoped runner tokens
 - Single sign-on for the Admin UI through one OpenID Connect provider, and
   browser approval for `dopbase login`
-- Root, admin, member, and AI agent identities with role-aware permissions
-- User and AI account management, account metadata, and last-sign-in details
+- Roles that are data: Admin, Member, Auditor, and AI agent built in, and
+  custom roles that root creates
+- Access granted per project and per environment, to people and to groups,
+  with protected environments
+- Personal tokens for scripts and AI agents, and AI agent accounts with an
+  accountable owner
+- An audit log each reader sees according to their role, and audit tokens for
+  a SIEM
+- User and AI agent management, account metadata, and last-sign-in details
 - Instance status, resource health, and a root-only factory reset
 - Root-only full-instance encrypted backups with account-aware restore
 - Audit records in a hash chain, with `dopbase audit verify`, `list`, and

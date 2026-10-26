@@ -1,96 +1,110 @@
 ---
-title: "Give AI agents scoped access to secrets"
-description: "Give an AI coding agent access to Dopbase project structure and secret metadata without exposing secret values."
+title: "Give AI agents scoped access to projects"
+description: "Let an AI coding agent read Dopbase projects with a personal token or a shared AI agent account, limited to the projects, environments, and level it needs."
 ---
 
 # AI agent access
 
-An AI agent account lets a coding assistant inspect how projects are configured
-without giving it the credentials stored in those projects. The agent can see
-project and environment names, secret names, versions, timestamps, editor
-layouts, and instance counts. It cannot read a secret value or change Dopbase
-data.
+An AI coding agent often needs to know how a project is configured: which
+variables exist in each environment, which ones the code references but nobody
+has set, what belongs in `.env.example`. Dopbase gives it that with a token it
+uses through `DOPBASE_TOKEN`, limited to the projects and level you choose.
 
-This access is useful when an agent needs configuration context to work on a
-repository. It is not a credential for running the application.
+There are two ways to do it:
 
-## When to use an AI agent
+| Use                                                         | When                                                             |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Your own personal token](#use-your-personal-token)         | An agent on your machine works on your projects, as you          |
+| [A shared AI agent account](#use-a-shared-ai-agent-account) | A team bot or a CI job needs its own identity, owned by a person |
 
-Use an AI agent token for tasks such as:
+Either way, the token never reaches more than its account does, and you can
+revoke it at any time.
 
-- checking whether variables referenced by the code exist in Dopbase;
-- comparing the secret names in development, staging, and production;
-- finding a missing or renamed variable without exposing its value
-- creating an `.env.example` file with empty placeholders
-- reviewing deployment files that refer to environment variables.
+## What an agent should get
 
-An agent token cannot verify whether a stored credential works, run integration
-tests that need secret values, deploy an application, or diagnose a malformed
-value. Use an environment-scoped [runner token](./run-an-application) when a
-process needs runtime secrets.
+Start with **Names only** (`metadata`). The agent can then list projects,
+environments, secret names, versions, timestamps, and the `.env` layout, which
+covers tasks such as:
 
-::: warning Metadata is still sensitive
-Secret names and project structure can reveal details about your infrastructure.
-AI agents can currently see every project and environment on the Dopbase
-instance. Create an account only for an agent you trust.
+- checking that every variable the code references exists in Dopbase;
+- comparing secret names across development, staging, and production;
+- finding a missing or renamed variable;
+- writing an `.env.example` with empty placeholders.
+
+Give **Read** only when the agent must run something with real values, such as
+integration tests, and only on the environment it needs. An AI agent account
+never goes past Read. For a deployed application, use an environment-scoped
+[runner token](./run-an-application) instead.
+
+::: warning Names are sensitive too
+Secret names and project structure say a lot about your infrastructure. Scope
+the token to the project or environment the task needs.
 :::
 
-## Create an account and token
+## Use your personal token
 
-Root and admin users create AI accounts from the Admin UI:
+1. Open **Account** and choose **New token** under **Personal tokens**.
+2. Name it after the agent or machine, such as `laptop-agent`.
+3. Pick **Names only** and the project it needs, then a short expiry.
+4. Copy the token when it appears. Dopbase shows it once.
 
-1. Open **Users** and choose **Add AI agent**.
-2. Give the account a name that identifies the tool or job using it.
-3. Choose **Get token** beside the new account.
-4. Confirm your password and copy the token when it appears.
+Or from the CLI, signed in as yourself:
 
-Agent tokens start with `dpa_`. The Admin UI defaults to 30 days and lets you
-choose no expiry or a lifetime up to three years in whole hours or days. It
-revokes any previous active token for that account. Dopbase shows
-the plaintext token once, so put it in a password manager, CI secret store, or
-another protected credential store.
+```bash
+dopbase token personal create --name laptop-agent --level metadata \
+  --project payment-service --expires-in 7d
+```
 
-Do not commit the token, add it to an `.env` file in the repository, paste it
-into an agent prompt, or include it in logs.
+Personal tokens start with `dpp_`. The token acts as you: if you lose access to
+the project, so does the token.
 
-## Give the token to an agent
+## Use a shared AI agent account
 
-Dopbase reads an agent token from `DOPBASE_TOKEN`. Populate
-`AI_AGENT_TOKEN` from your credential store before starting the agent, then set
-the server and token in its shell environment:
+An AI agent account has a name instead of an email, no password, and an owner:
+the person who created it. It reaches only what it has been granted, and never
+more than its owner. Disabling the owner disables the agent.
+
+1. Open **Users** and choose **Add AI agent**. You become its owner.
+2. Open the project's **Access** page and give the agent **Names only**, on the
+   whole project or one environment.
+3. Back on **Users**, choose **Get token** beside the agent, pick what the token
+   can do and when it expires, and confirm it's you.
+4. Copy the token when it appears.
+
+Agent tokens last at most 90 days. Getting a new token revokes the agent's
+previous one. Before deleting yourself, delete your agents or give them another
+owner.
+
+## Give the token to the agent
+
+Keep the token in a password manager or a secret store, and load it into the
+agent's shell before it starts, outside the conversation:
 
 ```bash
 export DOPBASE_URL=https://dopbase.example.com
 export DOPBASE_TOKEN="$AI_AGENT_TOKEN"
 
-dopbase client status
+dopbase access
 ```
 
-`client status` reports the identity as `ai_agent` without printing the token.
-Use `DOPBASE_TOKEN` for agent credentials. `login --token` saves runner tokens
-for runtime secrets and pipeline exports.
+`dopbase access` shows the account, its grants, and the token's own limit, so
+you can check what the agent will reach. Don't commit the token, put it in a
+repository `.env` file, paste it into a prompt, or log it.
 
-Run this setup outside the agent conversation so the token never becomes part
-of its prompt.
+## Inspect configuration
 
-## Inspect configuration metadata
-
-The agent can use normal CLI commands. JSON output is easier for automated
-tools to parse:
+The agent uses normal CLI commands. JSON output is easier for tools to parse:
 
 ```bash
 dopbase --json project list
-dopbase --json project show payment-service
 dopbase --json env list payment-service
-dopbase --json env show payment-service/staging
 dopbase --json secret list payment-service/staging
 dopbase --json secret get payment-service/staging DATABASE_URL
 ```
 
-These commands return identifiers, names, versions, and timestamps. They never
-return the value of `DATABASE_URL` or any other secret. The server validates
-agent tokens on each metadata request. Invalid, expired, or revoked tokens fail
-without using a saved human credential.
+With Names only, these return identifiers, names, versions, and timestamps,
+never a value. An invalid, expired, or revoked token fails without falling back
+to a saved human session.
 
 For example, ask a coding agent:
 
@@ -100,32 +114,26 @@ names with payment-service/staging in Dopbase and report missing or unused
 names. Use metadata commands only. Do not attempt to reveal or change secrets.
 ```
 
-The agent can inspect the repository, call `dopbase secret list`, and compare
-the two sets of names. A human can then decide whether any missing secrets
-should be added.
+## What the agent can't do
 
-## Operations that are denied
-
-An AI agent token cannot reveal values, change secrets, or load runtime values
-into a process. These commands fail authorization when the active credential is
-an agent token:
+A Names only token is refused when it tries to read or change values:
 
 ```bash
 dopbase secret get payment-service/staging DATABASE_URL --reveal
+dopbase run payment-service/staging -- npm test
 printf '%s' 'replacement' | \
   dopbase secret set payment-service/staging DATABASE_URL --stdin
-dopbase run payment-service/staging -- npm test
 ```
 
-Do not replace the agent token with a human session to bypass these checks. If
-the task needs to run an application, create a runner token for that specific
-environment and follow [Run an application](./run-an-application).
+No personal token manages people, grants, projects, or other tokens, whatever
+its level. Don't swap in a human session to get around these limits.
 
 ## Revoke access
 
-Return to **Users** and delete the AI account to remove the account and its
-tokens. Generating another token from the Admin UI also revokes the account's
-previous active token. Revoke access as soon as a token may have been exposed.
+Revoke your own tokens on the **Account** page or with
+`dopbase token personal revoke`. Revoke an agent's by getting it a new token or
+deleting the agent on **Users**. Removing a grant cuts the token off on its next
+request. Revoke a token as soon as it may have been exposed.
 
-See [Identity and tokens](/reference/identity#ai-agents) for the complete
-permission matrix.
+See [identity and access](/reference/identity#personal-tokens) for the full
+rules.

@@ -100,8 +100,9 @@ people sign in with Google through Firebase, choose the Google preset.
 
 The first time someone signs in, Dopbase looks for an account with the same
 email. It links the provider identity to that account only if the provider
-marks the email as verified and the account is an admin or member. The root
-account is never linked by email; it is linked by the test sign-in.
+marks the email as verified and the account is an active person. Root is never
+linked by email; it is linked by the test sign-in. AI agents never sign in, so
+they never link.
 
 After the first link, Dopbase recognizes the person by the provider's subject
 identifier and ignores the email. If the email changes at the provider, the
@@ -147,7 +148,7 @@ is the setting that turns them off. Root can still open the form at
 
 ### Confirming sensitive actions
 
-Revealing or exporting secrets, managing users, and creating agent tokens ask
+Revealing or exporting secrets, managing users, and creating personal tokens ask
 you to confirm it's you. An account linked to single sign-on can confirm at the
 provider: Dopbase opens a small window that asks the provider for a fresh
 sign-in and checks the `auth_time` it returns. If the provider reuses an older

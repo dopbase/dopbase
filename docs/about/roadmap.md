@@ -38,9 +38,9 @@ what they need to run, audit, and recover an instance.
 - Secret version history and rollback
 - Single sign-on for the Admin UI through OpenID Connect, and browser
   approval for CLI login
-- Environment-scoped runner tokens, AI service accounts, and audit records in
-  a verifiable hash chain
-- User and AI account management
+- Environment-scoped runner tokens, AI agent access, and audit records in a
+  verifiable hash chain
+- User and AI agent management
 - Instance status and server log management
 - Encrypted full-instance backups and recovery-aware factory reset
 - Self-hosted binaries for macOS and Linux on AMD64 and ARM64
@@ -51,14 +51,20 @@ what they need to run, audit, and recover an instance.
 Version 0.2 is for teams. It makes bringing people in easier and lets admins
 decide what each person can see and change, down to a single environment.
 
+Done so far:
+
+- Groups that receive access together
+- Roles as data, with custom roles in place of the four fixed ones, and an
+  Auditor role that reads the whole audit log
+- Access granted per project and per environment, with protected environments
+- Personal tokens, and AI agent accounts with an accountable owner in place of
+  service accounts
+
+Still to come:
+
 - User invitations, so new members set their own password or sign in through
   single sign-on
-- Teams that group users and receive access together
-- Improved role-based access control, with custom roles in place of the four
-  fixed ones
-- Access granted per project and per environment
 - Account identity
-- Broader service-account automation
 - Restoring deleted secrets, environments, and projects
 
 ## v0.3.0: Integrations and key management
