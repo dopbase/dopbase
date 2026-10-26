@@ -634,25 +634,25 @@ async fn audit_list_prints_stored_text_without_terminal_controls() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn audit_list_is_for_administrators_only() {
+async fn audit_list_shows_people_without_audit_read_only_their_own_actions() {
   use super::support::{browser_credentials, failure};
   let fixture = Fixture::new().await;
   fixture.environment().await;
 
-  // An agent token never reaches the audit log.
+  // A data token never reaches the audit log.
   let created = fixture.agent_token().await;
   let token = created["plaintextToken"].as_str().unwrap();
   let mut command = fixture.command();
   command.env("DOPBASE_TOKEN", token).args(["audit", "list"]);
   let result = output(command, None).await;
-  assert!(!result.status.success());
+  failure(&result, "This token reads project data, not the audit log.");
   assert!(result.stdout.is_empty());
   assert!(!String::from_utf8_lossy(&result.stderr).contains(token));
 
-  // A signed-in member gets the server's authorization error.
+  // A signed-in member sees their own actions and nothing else.
   let (cookie, csrf) = browser_credentials(&fixture).await;
   let api = reqwest::Client::new();
-  api
+  let member: Value = api
     .post(format!("{}/api/v1/users", fixture.url))
     .header("cookie", &cookie)
     .header("x-dopbase-csrf", &csrf)
@@ -661,6 +661,9 @@ async fn audit_list_is_for_administrators_only() {
     .await
     .unwrap()
     .error_for_status()
+    .unwrap()
+    .json()
+    .await
     .unwrap();
   let login: Value = api
     .post(format!("{}/api/v1/auth/login", fixture.url))
@@ -679,7 +682,13 @@ async fn audit_list_is_for_administrators_only() {
     Some("member@example.com"),
   )
   .unwrap();
-  let result = fixture.run(&["audit", "list"]).await;
-  failure(&result, "Your role does not allow this operation.");
-  assert!(result.stdout.is_empty());
+  let events = fixture.json(&["audit", "list"]).await;
+  let items = events["items"].as_array().unwrap();
+  assert!(!items.is_empty(), "{events}");
+  assert!(
+    items
+      .iter()
+      .all(|event| event["actorId"] == member["data"]["id"]),
+    "{events}"
+  );
 }

@@ -80,6 +80,9 @@ pub enum Capability {
   ProjectsCreate,
   #[serde(rename = "audit.read")]
   AuditRead,
+  /// Read every audit event, not only those on projects the reader reaches.
+  #[serde(rename = "audit.read_all")]
+  AuditReadAll,
   #[serde(rename = "audit.verify")]
   AuditVerify,
   #[serde(rename = "access.report")]
@@ -101,7 +104,7 @@ pub enum Capability {
 }
 
 impl Capability {
-  pub const ALL: [Self; 17] = [
+  pub const ALL: [Self; 18] = [
     Self::UsersView,
     Self::UsersManage,
     Self::RolesManage,
@@ -110,6 +113,7 @@ impl Capability {
     Self::GrantsAllProjects,
     Self::ProjectsCreate,
     Self::AuditRead,
+    Self::AuditReadAll,
     Self::AuditVerify,
     Self::AccessReport,
     Self::TokensPersonal,
@@ -141,6 +145,7 @@ impl Capability {
       Self::GrantsAllProjects => "grants.all_projects",
       Self::ProjectsCreate => "projects.create",
       Self::AuditRead => "audit.read",
+      Self::AuditReadAll => "audit.read_all",
       Self::AuditVerify => "audit.verify",
       Self::AccessReport => "access.report",
       Self::TokensPersonal => "tokens.personal",
