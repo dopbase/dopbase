@@ -10,8 +10,14 @@ pub struct UserResponse {
   pub id: String,
   /// User email address.
   pub email: String,
-  /// Account role: `root`, `admin`, `member`, or `ai_agent`.
+  /// The fixed role closest to the account's role: `root`, `admin`,
+  /// `member`, or `ai_agent`. Custom roles show as `member`, or `ai_agent`
+  /// when they sign in with tokens only. Prefer `roleId` and `roleName`.
   pub role: AdminRole,
+  /// The account's role. Empty for root, which has no role.
+  pub role_id: Option<String>,
+  /// The role's name, `Root` for root.
+  pub role_name: String,
   /// ISO 8601 creation timestamp.
   pub created_at: String,
   /// ISO 8601 last update timestamp.
@@ -35,6 +41,10 @@ pub struct CreateUserRequest {
   /// account that signs in only through single sign-on, which must be on.
   #[serde(default)]
   pub password: Option<String>,
+  /// A role id from `GET /api/v1/roles`, built-in or custom. Takes
+  /// precedence over `role`.
+  #[serde(default)]
+  pub role_id: Option<String>,
   /// Account role (`admin`, `member`, or `ai_agent`). Defaults to `admin`.
   /// An AI agent has no password, signs in with personal tokens only, and
   /// the person who creates it becomes its owner.
@@ -52,6 +62,9 @@ pub struct UpdateUserRequest {
   pub password: Option<String>,
   /// Updated account role (`admin` or `member`).
   pub role: Option<AdminRole>,
+  /// A role id from `GET /api/v1/roles`. Takes precedence over `role`.
+  #[serde(default)]
+  pub role_id: Option<String>,
   /// A new owner for an AI agent account: a person who signs in.
   #[serde(default)]
   pub owner_id: Option<String>,

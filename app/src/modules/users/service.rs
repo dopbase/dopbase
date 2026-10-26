@@ -26,27 +26,45 @@ fn actor(identity: &AuthIdentity) -> (&str, &str) {
   }
 }
 
-// TODO(rbac): only the built-in roles can be given out here. Accept any
-// assignable role from the role tables once roles are configurable.
-fn requested_role(role: Option<AdminRole>) -> Result<AdminRole, HttpError> {
-  match role.unwrap_or(AdminRole::Admin) {
-    AdminRole::Root => Err(HttpError::forbidden(
-      "ROOT_PROTECTED",
-      "The root role is reserved for the setup account.",
-    )),
-    value => Ok(value),
-  }
+/// The role an account gets, picked by id or by its fixed name.
+struct ChosenRole {
+  id: String,
+  /// The legacy `admins.role` value.
+  legacy: AdminRole,
+  /// Holders sign in with personal tokens only, like AI agents.
+  token_only: bool,
 }
 
-/// The built-in role row behind a fixed role.
-// TODO(rbac): maps the fixed roles to their built-in role rows. Take the
-// role id from the request once roles can be picked.
-fn role_id(role: AdminRole) -> &'static str {
-  match role {
-    AdminRole::Admin => "rol_admin",
-    AdminRole::AiAgent => "rol_ai_agent",
-    _ => "rol_member",
-  }
+async fn choose_role(
+  state: &AppState,
+  role: Option<AdminRole>,
+  role_id: Option<&str>,
+) -> Result<ChosenRole, HttpError> {
+  let id = match (role_id, role.unwrap_or(AdminRole::Admin)) {
+    (Some(id), _) => id,
+    (None, AdminRole::Root) => {
+      return Err(HttpError::forbidden(
+        "ROOT_PROTECTED",
+        "The root role is reserved for the setup account.",
+      ));
+    }
+    (None, AdminRole::Admin) => "rol_admin",
+    (None, AdminRole::Member) => "rol_member",
+    (None, AdminRole::AiAgent) => "rol_ai_agent",
+  };
+  let token_only = repository::role_sign_in(state.db.pool(), id)
+    .await?
+    .ok_or_else(|| HttpError::bad_request("ROLE_INVALID", "The role was not found."))?;
+  let legacy = match id {
+    "rol_admin" => AdminRole::Admin,
+    _ if token_only => AdminRole::AiAgent,
+    _ => AdminRole::Member,
+  };
+  Ok(ChosenRole {
+    id: id.to_owned(),
+    legacy,
+    token_only,
+  })
 }
 
 /// An AI agent's name, which is its handle where people have an email.
@@ -143,11 +161,10 @@ pub(crate) async fn require_within(
 /// and gets grants per project.
 fn starting_grant(
   identity: &AuthIdentity,
-  role: AdminRole,
+  role_id: &str,
 ) -> Option<&'static str> {
   let (_, access) = caller(identity).ok()?;
-  (role == AdminRole::Admin && access.has(Capability::GrantsAllProjects))
-    .then_some("project_manager")
+  (role_id == "rol_admin" && access.has(Capability::GrantsAllProjects)).then_some("project_manager")
 }
 
 fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
@@ -158,16 +175,17 @@ fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
 }
 
 fn user(row: UserRow) -> Result<UserResponse, HttpError> {
-  let (id, email, role, created_at, updated_at, has_password, sso_linked, owner_id) = row;
   Ok(UserResponse {
-    id,
-    email,
-    role: parse_role(&role)?,
-    created_at,
-    updated_at,
-    has_password,
-    sso_linked,
-    owner_id,
+    role: parse_role(&row.role)?,
+    id: row.id,
+    email: row.email,
+    role_id: row.role_id,
+    role_name: row.role_name,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    has_password: row.has_password,
+    sso_linked: row.sso_linked,
+    owner_id: row.owner_id,
   })
 }
 
@@ -212,8 +230,8 @@ pub async fn create(
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
   require_capability_browser(identity, Capability::UsersManage)?;
-  let requested_role = requested_role(request.role)?;
-  let agent = requested_role == AdminRole::AiAgent;
+  let chosen = choose_role(state, request.role, request.role_id.as_deref()).await?;
+  let agent = chosen.token_only;
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -253,8 +271,7 @@ pub async fn create(
   let id = token::public_id("usr_");
   let now = Utc::now().to_rfc3339();
   let (actor_id, actor_email) = actor(identity);
-  let role_id = role_id(requested_role);
-  require_assignable(state, identity, role_id).await?;
+  require_assignable(state, identity, &chosen.id).await?;
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,
@@ -262,8 +279,8 @@ pub async fn create(
       id: &id,
       email: &email,
       password_hash: &hash,
-      role: requested_role.as_str(),
-      role_id,
+      role: chosen.legacy.as_str(),
+      role_id: &chosen.id,
       // The person who creates an AI agent answers for it.
       owner_id: agent.then_some(actor_id),
       created_by: actor_id,
@@ -280,7 +297,7 @@ pub async fn create(
     }
     return Err(error.into());
   }
-  if let Some(level) = starting_grant(identity, requested_role) {
+  if let Some(level) = starting_grant(identity, &chosen.id) {
     repository::set_all_projects_grant(&mut tx, &id, Some(level), actor_id, &now).await?;
   }
   common::audit(
@@ -293,7 +310,7 @@ pub async fn create(
     None,
     Some("admin"),
     Some(&id),
-    serde_json::json!({"email":email,"role":requested_role.as_str(),"password":has_password}),
+    serde_json::json!({"email":email,"role":chosen.id,"password":has_password}),
   )
   .await?;
   tx.commit().await?;
@@ -310,30 +327,44 @@ pub async fn update(
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
   require_capability_browser(identity, Capability::UsersManage)?;
-  let (old_email, old_role) = repository::account(state.db.pool(), id)
+  let (old_email, is_root, old_role_id, agent) = repository::account(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
   let (actor_id, _) = actor(identity);
-  // TODO(rbac): root is protected by its fixed role name here and below.
-  // Check permissions instead once roles are configurable.
-  if old_role == "root" && id != actor_id {
+  let changes_role = request.role.is_some() || request.role_id.is_some();
+  if is_root && id != actor_id {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",
       "The root administrator cannot be modified.",
     ));
   }
-  if id == actor_id && request.role.is_some() {
+  if id == actor_id && changes_role {
     return Err(HttpError::forbidden(
       "SELF_ROLE_CHANGE",
       "You cannot change your own role.",
     ));
   }
-  let new_role = match request.role {
-    Some(value) => requested_role(Some(value))?,
-    None => parse_role(&old_role)?,
+  if is_root && changes_role {
+    return Err(HttpError::forbidden(
+      "ROOT_PROTECTED",
+      "The root role cannot be changed.",
+    ));
+  }
+  if is_root && request.password.is_some() {
+    return Err(HttpError::forbidden(
+      "ROOT_PROTECTED",
+      "Use the root password change flow to change the root password.",
+    ));
+  }
+  let new_role = if changes_role {
+    Some(choose_role(state, request.role, request.role_id.as_deref()).await?)
+  } else {
+    None
   };
-  let agent = old_role == AdminRole::AiAgent.as_str();
-  if agent != (new_role == AdminRole::AiAgent) {
+  if new_role
+    .as_ref()
+    .is_some_and(|role| role.token_only != agent)
+  {
     return Err(agents_stay_agents());
   }
   if agent && request.password.is_some() {
@@ -348,23 +379,13 @@ pub async fn update(
       "Only AI agents have an owner.",
     ));
   }
-  if old_role == "root" && new_role != AdminRole::Root {
-    return Err(HttpError::forbidden(
-      "ROOT_PROTECTED",
-      "The root role cannot be changed.",
-    ));
-  }
-  if old_role == "root" && request.password.is_some() {
-    return Err(HttpError::forbidden(
-      "ROOT_PROTECTED",
-      "Use the root password change flow to change the root password.",
-    ));
-  }
-  if old_role != "root" {
+  if !is_root {
     require_within(state, identity, id).await?;
   }
-  if new_role != AdminRole::Root && old_role != new_role.as_str() {
-    require_assignable(state, identity, role_id(new_role)).await?;
+  // Keeping the same role changes nothing.
+  let new_role = new_role.filter(|role| old_role_id.as_deref() != Some(role.id.as_str()));
+  if let Some(role) = &new_role {
+    require_assignable(state, identity, &role.id).await?;
   }
   let email = match request.email {
     Some(value) if agent => validate_agent_name(&value)?,
@@ -379,43 +400,31 @@ pub async fn update(
   };
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  let result = if new_role == AdminRole::Root {
-    repository::update(
-      &mut tx,
-      id,
-      &email,
-      password_hash.as_deref(),
-      new_role.as_str(),
-      None,
-      &now,
-    )
-    .await
-  } else {
-    let updated = repository::update(
-      &mut tx,
-      id,
-      &email,
-      password_hash.as_deref(),
-      new_role.as_str(),
-      Some(role_id(new_role)),
-      &now,
-    )
-    .await;
-    // A new role starts over on all projects; project grants stay and are
-    // capped by the new role's ceiling.
-    match updated {
-      Ok(()) if old_role != new_role.as_str() => {
-        repository::set_all_projects_grant(
-          &mut tx,
-          id,
-          starting_grant(identity, new_role),
-          actor_id,
-          &now,
-        )
-        .await
-      }
-      other => other,
+  let updated = repository::update(
+    &mut tx,
+    id,
+    &email,
+    password_hash.as_deref(),
+    new_role
+      .as_ref()
+      .map(|role| (role.legacy.as_str(), role.id.as_str())),
+    &now,
+  )
+  .await;
+  // A new role starts over on all projects; project grants stay and are
+  // capped by the new role's ceiling.
+  let result = match (updated, &new_role) {
+    (Ok(()), Some(role)) => {
+      repository::set_all_projects_grant(
+        &mut tx,
+        id,
+        starting_grant(identity, &role.id),
+        actor_id,
+        &now,
+      )
+      .await
     }
+    (other, _) => other,
   };
   if let Err(error) = result {
     if error.to_string().contains("UNIQUE") {
@@ -447,7 +456,7 @@ pub async fn update(
     None,
     Some("admin"),
     Some(id),
-    serde_json::json!({"email":email,"role":new_role.as_str(),"ownerId":request.owner_id}),
+    serde_json::json!({"email":email,"role":new_role.as_ref().map(|role| &role.id),"ownerId":request.owner_id}),
   )
   .await?;
   tx.commit().await?;
@@ -470,22 +479,14 @@ pub async fn delete(
       "You cannot delete your own account.",
     ));
   }
-  let target_role = repository::role(state.db.pool(), id).await?;
-  match target_role.as_deref() {
-    None => {
-      return Err(HttpError::not_found(
-        "USER_NOT_FOUND",
-        "The user was not found.",
-      ));
-    }
-    Some("root") => {
-      return Err(HttpError::forbidden(
-        "ROOT_PROTECTED",
-        "The root administrator cannot be deleted.",
-      ));
-    }
-    Some("admin") | Some("member") | Some("ai_agent") => {}
-    _ => return Err(HttpError::internal()),
+  let (_, is_root, _, _) = repository::account(state.db.pool(), id)
+    .await?
+    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
+  if is_root {
+    return Err(HttpError::forbidden(
+      "ROOT_PROTECTED",
+      "The root administrator cannot be deleted.",
+    ));
   }
   require_within(state, identity, id).await?;
   if repository::owned_count(state.db.pool(), id).await? > 0 {

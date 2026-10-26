@@ -98,6 +98,11 @@ pub(crate) async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient,
         .await
         .with_context(|| format!("failed to resume factory reset for {table}"))?;
     }
+    // Built-in roles come from migrations and stay; custom roles go.
+    sqlx::query("DELETE FROM roles WHERE builtin = 0")
+      .execute(&mut *tx)
+      .await
+      .context("failed to resume factory reset for roles")?;
     tx.commit()
       .await
       .context("failed to commit resumed factory reset")?;

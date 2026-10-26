@@ -301,6 +301,11 @@ pub mod users {
   }
 }
 
+pub mod roles {
+  pub const COLLECTION: &str = api_path!("/roles");
+  pub const ITEM: &str = api_path!("/roles/{id}");
+}
+
 pub mod grants {
   pub const COLLECTION: &str = api_path!("/grants");
   pub const ITEM: &str = api_path!("/grants/{id}");

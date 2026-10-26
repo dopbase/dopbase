@@ -197,6 +197,10 @@ pub async fn factory_reset(
         .execute(&mut *tx)
         .await?;
     }
+    // Built-in roles come from migrations and stay; custom roles go.
+    sqlx::query("DELETE FROM roles WHERE builtin = 0")
+      .execute(&mut *tx)
+      .await?;
     tx.commit().await?;
     // Best-effort scrub: deleted secret ciphertext must not linger in the
     // database file or WAL after a reset.

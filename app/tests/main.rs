@@ -1370,6 +1370,8 @@ async fn disabled_web_ui_blocks_pages_and_assets_but_keeps_cli_api_and_optional_
   }
 }
 
+#[path = "modules/audit/scope.rs"]
+mod audit_scope;
 #[path = "modules/auth/cli_device.rs"]
 mod auth_cli_device;
 #[path = "modules/grants/access.rs"]
@@ -1378,6 +1380,8 @@ mod grants_access;
 mod groups_members;
 #[path = "modules/personal_tokens/tokens.rs"]
 mod personal_tokens_tokens;
+#[path = "modules/roles/custom.rs"]
+mod roles_custom;
 #[path = "modules/secrets/import.rs"]
 mod secrets_import;
 #[path = "modules/secrets/versions.rs"]
