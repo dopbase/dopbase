@@ -39,13 +39,13 @@ pub struct StatusResponse {
   pub environments: i64,
   /// Total count of stored secrets across all environments.
   pub secrets: i64,
-  /// Total count of administrator and member user accounts.
+  /// Accounts that sign in, root included.
   pub human_users: i64,
-  /// Total count of service accounts.
+  /// Accounts that use tokens only, such as AI agents.
   pub ai_agents: i64,
   /// Count of active unrevoked runner tokens.
   pub active_runner_tokens: i64,
-  /// Count of active unexpired and unrevoked agent tokens.
+  /// Active, unexpired personal tokens of AI agent accounts.
   pub active_agent_tokens: i64,
   /// Count of backup archives on disk.
   pub backups: i64,
@@ -57,7 +57,7 @@ pub struct StatusResponse {
 #[derive(serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FactoryResetPreview {
-  /// Number of user accounts to be deleted.
+  /// Number of accounts to be deleted, AI agents included.
   pub users: i64,
   /// Number of projects to be deleted.
   pub projects: i64,
@@ -69,9 +69,9 @@ pub struct FactoryResetPreview {
   pub runner_tokens: i64,
   /// Number of backup archives to be deleted.
   pub backups: i64,
-  /// Number of service accounts to be deleted.
+  /// Number of AI agent accounts to be deleted.
   pub ai_agents: i64,
-  /// Number of agent tokens to be deleted.
+  /// Number of personal tokens to be deleted.
   pub agent_tokens: i64,
 }
 

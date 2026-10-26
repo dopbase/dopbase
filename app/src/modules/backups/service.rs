@@ -753,8 +753,7 @@ pub async fn restore_database_from_archive(
     sqlx::query("DELETE FROM audit_chain_anchor").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM audit_chain_genesis").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM runner_tokens").execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM agent_tokens").execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM service_accounts").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM personal_tokens").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM secret_versions").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM secrets").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM environment_env_layout").execute(&mut *tx).await?;
@@ -784,8 +783,7 @@ pub async fn restore_database_from_archive(
     }
     sqlx::query("INSERT INTO groups SELECT * FROM backup_db.groups").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO group_members SELECT * FROM backup_db.group_members WHERE user_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
-    sqlx::query("INSERT INTO service_accounts SELECT * FROM backup_db.service_accounts").execute(&mut *tx).await?;
-    sqlx::query("INSERT INTO agent_tokens SELECT * FROM backup_db.agent_tokens").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO personal_tokens SELECT * FROM backup_db.personal_tokens WHERE user_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO projects SELECT * FROM backup_db.projects").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO environments SELECT * FROM backup_db.environments").execute(&mut *tx).await?;
     sqlx::query("INSERT OR REPLACE INTO environment_env_layout SELECT * FROM backup_db.environment_env_layout").execute(&mut *tx).await?;
@@ -833,6 +831,10 @@ pub async fn restore_database_from_archive(
         .bind(sess.0).bind(sess.1).bind(sess.2).bind(sess.3).bind(sess.4).bind(sess.5).bind(sess.6).bind(sess.7).bind(sess.8).bind(sess.9)
         .execute(&mut *tx).await?;
     }
+
+    // AI agents owned by a root the restore replaced move to the root that
+    // stays.
+    sqlx::query("UPDATE admins SET owner_id = (SELECT id FROM admins WHERE is_root = 1) WHERE owner_id IS NOT NULL AND owner_id NOT IN (SELECT id FROM admins)").execute(&mut *tx).await?;
 
     if let Some(PreservedAdmin {
       email, actor_type, ..
@@ -898,7 +900,7 @@ fn session_id_from_identity(identity: &AuthIdentity) -> &str {
   match identity {
     AuthIdentity::Admin { session_id, .. } => session_id,
     AuthIdentity::Runner { .. } => "",
-    AuthIdentity::ServiceAccount { .. } => "",
+    AuthIdentity::Token { .. } => "",
   }
 }
 

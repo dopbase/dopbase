@@ -46,14 +46,18 @@ pub async fn public_status(
   let projects = count(state.db.pool(), "SELECT COUNT(*) FROM projects").await?;
   let environments = count(state.db.pool(), "SELECT COUNT(*) FROM environments").await?;
   let secrets = count(state.db.pool(), "SELECT COUNT(*) FROM secrets").await?;
-  let human_users = count(state.db.pool(), "SELECT COUNT(*) FROM admins").await?;
-  let ai_agents = count(state.db.pool(), "SELECT COUNT(*) FROM service_accounts").await?;
+  let human_users = count(state.db.pool(), "SELECT COUNT(*) FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE COALESCE(r.sign_in, 'interactive') = 'interactive'").await?;
+  let ai_agents = count(
+    state.db.pool(),
+    "SELECT COUNT(*) FROM admins a JOIN roles r ON r.id = a.role_id WHERE r.sign_in = 'token_only'",
+  )
+  .await?;
   let active_runner_tokens =
     sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM runner_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)")
       .bind(chrono::Utc::now().to_rfc3339())
       .fetch_one(state.db.pool())
       .await?;
-  let active_agent_tokens = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)").bind(chrono::Utc::now().to_rfc3339()).fetch_one(state.db.pool()).await?;
+  let active_agent_tokens = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM personal_tokens t JOIN admins a ON a.id = t.user_id JOIN roles r ON r.id = a.role_id WHERE r.sign_in = 'token_only' AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > ?)").bind(chrono::Utc::now().to_rfc3339()).fetch_one(state.db.pool()).await?;
   let backups = std::fs::read_dir(state.config.data_dir.join("backups"))
     .map(|entries| {
       entries
@@ -112,8 +116,10 @@ pub async fn preview(
     secrets: count(state.db.pool(), "secrets").await?,
     runner_tokens: count(state.db.pool(), "runner_tokens").await?,
     backups,
-    ai_agents: count(state.db.pool(), "service_accounts").await?,
-    agent_tokens: count(state.db.pool(), "agent_tokens").await?,
+    ai_agents: sqlx::query_scalar("SELECT COUNT(*) FROM admins WHERE role_id = 'rol_ai_agent'")
+      .fetch_one(state.db.pool())
+      .await?,
+    agent_tokens: count(state.db.pool(), "personal_tokens").await?,
   })
 }
 
@@ -172,8 +178,10 @@ pub async fn factory_reset(
       "audit_chain_anchor",
       "audit_chain_genesis",
       "runner_tokens",
-      "agent_tokens",
-      "service_accounts",
+      "personal_tokens",
+      "grants",
+      "group_members",
+      "groups",
       "secrets",
       "environment_env_layout",
       "environments",
