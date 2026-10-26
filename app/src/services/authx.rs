@@ -240,43 +240,36 @@ impl Access {
   pub fn capabilities(&self) -> impl Iterator<Item = Capability> + '_ {
     self.capabilities.iter().copied()
   }
-}
 
-#[derive(sqlx::FromRow)]
-struct RoleRow {
-  is_root: i64,
-  role_id: Option<String>,
-  name: Option<String>,
-  max_level: Option<String>,
-  sign_in: Option<String>,
-}
-
-/// The access of an account by id, or `None` when it does not exist or is
-/// disabled.
-pub async fn load_access(
-  conn: &mut SqliteConnection,
-  admin_id: &str,
-) -> Result<Option<Access>, sqlx::Error> {
-  let row: Option<RoleRow> = sqlx::query_as(
-    "SELECT a.is_root, r.id AS role_id, r.name, r.max_level, r.sign_in FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active'",
-  )
-  .bind(admin_id)
-  .fetch_optional(&mut *conn)
-  .await?;
-  let Some(row) = row else {
-    return Ok(None);
-  };
-  if row.is_root == 1 {
-    return Ok(Some(Access::root()));
+  /// Whether this access holds every capability of `other` and a ceiling at
+  /// least as deep. Nobody but root includes root.
+  pub fn includes(
+    &self,
+    other: &Self,
+  ) -> bool {
+    self.is_root
+      || (!other.is_root
+        && other.capabilities().all(|capability| self.has(capability))
+        && other.max_level <= self.max_level)
   }
-  let (Some(role_id), Some(name), Some(max_level), Some(sign_in)) =
-    (row.role_id, row.name, row.max_level, row.sign_in)
-  else {
-    return Ok(Some(Access::none()));
+}
+
+/// The access a role gives, or `None` when there is no such role.
+pub async fn role_access(
+  conn: &mut SqliteConnection,
+  role_id: &str,
+) -> Result<Option<Access>, sqlx::Error> {
+  let row: Option<(String, String, String)> =
+    sqlx::query_as("SELECT name, max_level, sign_in FROM roles WHERE id = ?")
+      .bind(role_id)
+      .fetch_optional(&mut *conn)
+      .await?;
+  let Some((name, max_level, sign_in)) = row else {
+    return Ok(None);
   };
   let capabilities: Vec<String> =
     sqlx::query_scalar("SELECT capability FROM role_capabilities WHERE role_id = ?")
-      .bind(&role_id)
+      .bind(role_id)
       .fetch_all(&mut *conn)
       .await?;
   Ok(Some(Access::role(
@@ -292,6 +285,29 @@ pub async fn load_access(
       SignIn::Interactive
     },
   )))
+}
+
+/// The access of an account by id, or `None` when it does not exist or is
+/// disabled.
+pub async fn load_access(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+) -> Result<Option<Access>, sqlx::Error> {
+  let row: Option<(i64, Option<String>)> =
+    sqlx::query_as("SELECT is_root, role_id FROM admins WHERE id = ? AND status = 'active'")
+      .bind(admin_id)
+      .fetch_optional(&mut *conn)
+      .await?;
+  match row {
+    None => Ok(None),
+    Some((1, _)) => Ok(Some(Access::root())),
+    Some((_, None)) => Ok(Some(Access::none())),
+    Some((_, Some(role_id))) => Ok(Some(
+      role_access(conn, &role_id)
+        .await?
+        .unwrap_or_else(Access::none),
+    )),
+  }
 }
 
 /// What a grant covers.
@@ -447,17 +463,165 @@ pub async fn level_on_environment(
   let Some((project_id, protected)) = row else {
     return Ok(None);
   };
-  if access.is_root {
-    return Ok(Some(Level::Manage));
+  let data = account_data_access(conn, admin_id, access).await?;
+  Ok(Some(data.environment(EnvironmentTarget {
+    project_id: &project_id,
+    environment_id,
+    protected: protected == 1,
+  })))
+}
+
+/// Everything one principal can reach in projects and environments, loaded
+/// once per request and then asked about each resource.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DataAccess {
+  /// Root reaches every project and environment.
+  Everything,
+  /// The same level everywhere. AI agent service accounts read metadata
+  /// this way until they become accounts with grants.
+  Uniform(Level),
+  /// A runner token reads values of its one environment.
+  Runner(String),
+  /// An account's own and group grants, capped by its role ceiling.
+  Grants { grants: Vec<Grant>, ceiling: Level },
+}
+
+impl DataAccess {
+  /// The level on one environment.
+  pub fn environment(
+    &self,
+    target: EnvironmentTarget<'_>,
+  ) -> Level {
+    match self {
+      Self::Everything => Level::Manage,
+      Self::Uniform(level) => (*level).min(Level::Manage),
+      Self::Runner(id) if id == target.environment_id => Level::Read,
+      Self::Runner(_) => Level::None,
+      Self::Grants { grants, ceiling } => environment_level(grants, target, *ceiling),
+    }
   }
-  let grants = grants_for(conn, admin_id).await?;
-  Ok(Some(environment_level(
-    &grants,
-    EnvironmentTarget {
-      project_id: &project_id,
-      environment_id,
-      protected: protected == 1,
-    },
-    access.max_level,
-  )))
+
+  /// The level on a project itself: renaming, deleting, adding
+  /// environments, and granting it to others.
+  pub fn project(
+    &self,
+    project_id: &str,
+  ) -> Level {
+    match self {
+      Self::Everything => Level::ProjectManager,
+      Self::Uniform(level) => *level,
+      Self::Runner(_) => Level::None,
+      Self::Grants { grants, ceiling } => project_level(grants, project_id, *ceiling),
+    }
+  }
+
+  /// Whether a project shows up at all: a grant on the project or on any of
+  /// its environments makes it visible.
+  pub fn sees_project<'a>(
+    &self,
+    project_id: &str,
+    mut environments: impl Iterator<Item = EnvironmentTarget<'a>>,
+  ) -> bool {
+    self.project(project_id) > Level::None
+      || environments.any(|target| self.environment(target) > Level::None)
+  }
+
+  /// Whether this access reaches at least as far as `other` everywhere.
+  /// Used to stop an account from managing someone with more access.
+  pub fn covers(
+    &self,
+    other: &Self,
+    projects: &[String],
+    environments: &[EnvironmentTarget<'_>],
+  ) -> bool {
+    projects
+      .iter()
+      .all(|id| self.project(id) >= other.project(id))
+      && environments
+        .iter()
+        .all(|target| self.environment(*target) >= other.environment(*target))
+  }
+}
+
+/// The data access of an account, from its role ceiling and grants.
+pub async fn account_data_access(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+  access: &Access,
+) -> Result<DataAccess, sqlx::Error> {
+  if access.is_root {
+    return Ok(DataAccess::Everything);
+  }
+  Ok(DataAccess::Grants {
+    grants: grants_for(conn, admin_id).await?,
+    ceiling: access.max_level,
+  })
+}
+
+/// The data access of whoever made the request.
+pub async fn data_access(
+  conn: &mut SqliteConnection,
+  identity: &crate::models::AuthIdentity,
+) -> Result<DataAccess, sqlx::Error> {
+  use crate::models::AuthIdentity;
+  match identity {
+    AuthIdentity::Admin {
+      admin_id, access, ..
+    } => account_data_access(conn, admin_id, access).await,
+    AuthIdentity::ServiceAccount { .. } => Ok(DataAccess::Uniform(Level::Metadata)),
+    AuthIdentity::Runner { environment_id, .. } => Ok(DataAccess::Runner(environment_id.clone())),
+  }
+}
+
+/// Every project id, and every environment as a decision target, in a
+/// form [`DataAccess::covers`] and list filters can walk.
+pub struct Catalog {
+  pub projects: Vec<String>,
+  environments: Vec<(String, String, bool)>,
+}
+
+impl Catalog {
+  pub async fn load(conn: &mut SqliteConnection) -> Result<Self, sqlx::Error> {
+    let projects = sqlx::query_scalar("SELECT id FROM projects")
+      .fetch_all(&mut *conn)
+      .await?;
+    let environments = sqlx::query_as("SELECT project_id, id, protected FROM environments")
+      .fetch_all(&mut *conn)
+      .await?;
+    Ok(Self {
+      projects,
+      environments,
+    })
+  }
+
+  pub fn environments(&self) -> Vec<EnvironmentTarget<'_>> {
+    self
+      .environments
+      .iter()
+      .map(
+        |(project_id, environment_id, protected)| EnvironmentTarget {
+          project_id,
+          environment_id,
+          protected: *protected,
+        },
+      )
+      .collect()
+  }
+
+  pub fn environments_of<'a>(
+    &'a self,
+    project_id: &'a str,
+  ) -> impl Iterator<Item = EnvironmentTarget<'a>> {
+    self
+      .environments
+      .iter()
+      .filter(move |(project, _, _)| project == project_id)
+      .map(
+        |(project_id, environment_id, protected)| EnvironmentTarget {
+          project_id,
+          environment_id,
+          protected: *protected,
+        },
+      )
+  }
 }
