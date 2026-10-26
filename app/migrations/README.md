@@ -64,6 +64,11 @@ The current pre-release schema is assembled in this order:
 20261024132206_sso_require.up.sql
 20261024132207_sso_flows_reauth.up.sql
 20261024132208_cli_device_reauth.up.sql
+20261026065127_roles.up.sql
+20261026065129_admin_roles.up.sql
+20261026065130_grants.up.sql
+20261026065131_groups.up.sql
+20261026065132_environment_protection.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -81,6 +86,15 @@ updates of sealed records. `audit_drop_user_agent` (formerly 0017) drops the
 encrypted row per secret version, and copies every existing secret into it as a
 `legacy` version. Rows cascade from `secrets`, so deleting a secret also
 deletes its history.
+`roles` adds the role and capability tables and seeds the built-in Admin,
+Member, Auditor, and AI agent roles. `admin_roles` links each account to a
+role and adds the `is_root` flag, an account status, an owner for roles that
+need one, and the account's creator, filled in from `admins.role`. `grants`
+adds grants for a user or a group on all projects, a project, or an
+environment. Its triggers delete a grant together with the account, project,
+or environment it names, and it gives existing admins and members the
+all-projects access they already had. `groups` adds groups and their
+members. `environment_protection` adds the `protected` flag to environments.
 
 The database test suite applies all migrations, rolls back to version zero,
 and reapplies them.
