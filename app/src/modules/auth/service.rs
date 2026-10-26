@@ -255,9 +255,9 @@ fn session_summary(identity: &AuthIdentity) -> Result<SessionResponse, HttpError
       AUTHORIZATION_DENIED,
       "A runner token has no human session.",
     )),
-    AuthIdentity::ServiceAccount { .. } => Err(HttpError::forbidden(
+    AuthIdentity::Token { .. } => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
-      "An AI service account has no human session.",
+      "A personal token has no session.",
     )),
   }
 }

@@ -34,6 +34,18 @@ struct SessionRow {
   absolute_expires_at: String,
 }
 
+#[derive(sqlx::FromRow)]
+struct PersonalTokenRow {
+  token_id: String,
+  token_name: String,
+  scope_type: String,
+  scope_id: String,
+  level: String,
+  admin_id: String,
+  email: String,
+  owner_id: Option<String>,
+}
+
 fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
   match value {
     "root" => Ok(AdminRole::Root),
@@ -114,6 +126,12 @@ impl FromRequestParts<AppState> for AuthIdentity {
         .ok_or_else(|| {
           HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.")
         })?;
+      if access.sign_in == authx::SignIn::TokenOnly {
+        return Err(HttpError::unauthorized(
+          AUTHENTICATION_INVALID,
+          "This account signs in with tokens only.",
+        ));
+      }
       return Ok(AuthIdentity::Admin {
         access,
         admin_id: session.admin_id,
@@ -127,25 +145,49 @@ impl FromRequestParts<AppState> for AuthIdentity {
       });
     }
 
-    let agent: Option<(String, String, String)> = sqlx::query_as(
-      "SELECT t.id, a.id, a.name FROM agent_tokens t JOIN service_accounts a ON a.id=t.service_account_id WHERE t.token_hash=? AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at>?)",
+    let personal: Option<PersonalTokenRow> = sqlx::query_as(
+      "SELECT t.id AS token_id, t.name AS token_name, t.scope_type, t.scope_id, t.level, a.id AS admin_id, a.email, a.owner_id FROM personal_tokens t JOIN admins a ON a.id = t.user_id WHERE t.token_hash = ? AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > ?)",
     )
     .bind(&hash)
     .bind(now.to_rfc3339())
     .fetch_optional(state.db.pool())
     .await
     .map_err(HttpError::from)?;
-    if let Some((token_id, service_account_id, name)) = agent {
-      sqlx::query("UPDATE agent_tokens SET last_used_at=? WHERE id=?")
+    if let Some(token) = personal {
+      let mut conn = state.db.pool().acquire().await.map_err(HttpError::from)?;
+      let disabled = || HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.");
+      let access = authx::load_access(&mut conn, &token.admin_id)
+        .await
+        .map_err(HttpError::from)?
+        .ok_or_else(disabled)?;
+      if let Some(owner_id) = &token.owner_id
+        && authx::load_access(&mut conn, owner_id)
+          .await
+          .map_err(HttpError::from)?
+          .is_none()
+      {
+        return Err(disabled());
+      }
+      sqlx::query("UPDATE personal_tokens SET last_used_at = ? WHERE id = ?")
         .bind(now.to_rfc3339())
-        .bind(&token_id)
-        .execute(state.db.pool())
+        .bind(&token.token_id)
+        .execute(&mut *conn)
         .await
         .map_err(HttpError::from)?;
-      return Ok(AuthIdentity::ServiceAccount {
-        service_account_id,
-        name,
-        token_id,
+      // Audit tokens reach no project data.
+      let (scope, level) = match authx::Scope::from_row(&token.scope_type, token.scope_id) {
+        Some(scope) => (scope, authx::Level::parse(&token.level).unwrap_or_default()),
+        None => (authx::Scope::All, authx::Level::None),
+      };
+      return Ok(AuthIdentity::Token {
+        admin_id: token.admin_id,
+        email: token.email,
+        token_id: token.token_id,
+        token_name: token.token_name,
+        access,
+        scope,
+        level,
+        owner_id: token.owner_id,
       });
     }
 
@@ -258,9 +300,26 @@ pub fn require_capability_browser(
   Ok(result)
 }
 
+/// The account behind a person's session or a personal token, for actions
+/// both may take, such as changing secrets their level allows.
+pub fn require_account(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  match identity {
+    AuthIdentity::Admin {
+      admin_id, email, ..
+    }
+    | AuthIdentity::Token {
+      admin_id, email, ..
+    } => Ok((admin_id, email)),
+    AuthIdentity::Runner { .. } => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation is not available to runner tokens.",
+    )),
+  }
+}
+
 pub fn require_read_access(identity: &AuthIdentity) -> Result<(), HttpError> {
   match identity {
-    AuthIdentity::Admin { .. } | AuthIdentity::ServiceAccount { .. } => Ok(()),
+    AuthIdentity::Admin { .. } | AuthIdentity::Token { .. } => Ok(()),
     AuthIdentity::Runner { .. } => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "This operation is not available to runner tokens.",
@@ -270,7 +329,7 @@ pub fn require_read_access(identity: &AuthIdentity) -> Result<(), HttpError> {
 
 pub fn require_metadata_access(identity: &AuthIdentity) -> Result<(), HttpError> {
   match identity {
-    AuthIdentity::Admin { .. } | AuthIdentity::ServiceAccount { .. } => Ok(()),
+    AuthIdentity::Admin { .. } | AuthIdentity::Token { .. } => Ok(()),
     _ => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "This operation requires an authenticated account.",
@@ -282,7 +341,7 @@ pub fn require_mutation(
   identity: &AuthIdentity,
   headers: &HeaderMap,
 ) -> Result<(), HttpError> {
-  require_person(identity)?;
+  require_account(identity)?;
   if let AuthIdentity::Admin {
     kind: SessionKind::Browser,
     csrf_hash,
@@ -320,7 +379,7 @@ pub fn require_recent_browser_auth(identity: &AuthIdentity) -> Result<(), HttpEr
       "Please confirm your password before continuing.",
     ));
   }
-  require_person(identity).map(|_| ())
+  require_account(identity).map(|_| ())
 }
 
 pub struct OptionalIdentity(pub Option<AuthIdentity>);

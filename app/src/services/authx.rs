@@ -319,7 +319,7 @@ pub enum Scope {
 }
 
 impl Scope {
-  fn from_row(
+  pub fn from_row(
     scope_type: &str,
     scope_id: String,
   ) -> Option<Self> {
@@ -477,13 +477,17 @@ pub async fn level_on_environment(
 pub enum DataAccess {
   /// Root reaches every project and environment.
   Everything,
-  /// The same level everywhere. AI agent service accounts read metadata
-  /// this way until they become accounts with grants.
+  /// The same level everywhere.
   Uniform(Level),
   /// A runner token reads values of its one environment.
   Runner(String),
   /// An account's own and group grants, capped by its role ceiling.
   Grants { grants: Vec<Grant>, ceiling: Level },
+  /// What a personal token's scope covers, up to its level.
+  Limit { scope: Scope, level: Level },
+  /// The lower of two accesses everywhere: a token and its account, or an
+  /// AI agent and its owner.
+  Both(Box<DataAccess>, Box<DataAccess>),
 }
 
 impl DataAccess {
@@ -498,6 +502,13 @@ impl DataAccess {
       Self::Runner(id) if id == target.environment_id => Level::Read,
       Self::Runner(_) => Level::None,
       Self::Grants { grants, ceiling } => environment_level(grants, target, *ceiling),
+      Self::Limit { scope, level } => match scope {
+        Scope::All => *level,
+        Scope::Project(id) if id == target.project_id => *level,
+        Scope::Environment(id) if id == target.environment_id => *level,
+        _ => Level::None,
+      },
+      Self::Both(first, second) => first.environment(target).min(second.environment(target)),
     }
   }
 
@@ -512,6 +523,12 @@ impl DataAccess {
       Self::Uniform(level) => *level,
       Self::Runner(_) => Level::None,
       Self::Grants { grants, ceiling } => project_level(grants, project_id, *ceiling),
+      Self::Limit { scope, level } => match scope {
+        Scope::All => *level,
+        Scope::Project(id) if id == project_id => *level,
+        _ => Level::None,
+      },
+      Self::Both(first, second) => first.project(project_id).min(second.project(project_id)),
     }
   }
 
@@ -568,7 +585,31 @@ pub async fn data_access(
     AuthIdentity::Admin {
       admin_id, access, ..
     } => account_data_access(conn, admin_id, access).await,
-    AuthIdentity::ServiceAccount { .. } => Ok(DataAccess::Uniform(Level::Metadata)),
+    AuthIdentity::Token {
+      admin_id,
+      access,
+      scope,
+      level,
+      owner_id,
+      ..
+    } => {
+      let mut reach = account_data_access(conn, admin_id, access).await?;
+      if let Some(owner_id) = owner_id {
+        // A missing or disabled owner leaves the agent nothing.
+        let owner = match load_access(conn, owner_id).await? {
+          Some(owner) => account_data_access(conn, owner_id, &owner).await?,
+          None => DataAccess::Uniform(Level::None),
+        };
+        reach = DataAccess::Both(Box::new(reach), Box::new(owner));
+      }
+      Ok(DataAccess::Both(
+        Box::new(reach),
+        Box::new(DataAccess::Limit {
+          scope: scope.clone(),
+          level: *level,
+        }),
+      ))
+    }
     AuthIdentity::Runner { environment_id, .. } => Ok(DataAccess::Runner(environment_id.clone())),
   }
 }

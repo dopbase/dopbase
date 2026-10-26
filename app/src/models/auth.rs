@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::services::authx::Access;
+use crate::services::authx::{Access, Level, Scope};
 
 #[derive(Clone, Debug)]
 pub enum AuthIdentity {
@@ -22,10 +22,21 @@ pub enum AuthIdentity {
     token_id: String,
     environment_id: String,
   },
-  ServiceAccount {
-    service_account_id: String,
-    name: String,
+  /// A personal token. It acts for its account, within the token's scope
+  /// and level, and never holds the account's instance capabilities.
+  Token {
+    admin_id: String,
+    /// The account's email, or an AI agent's name.
+    email: String,
     token_id: String,
+    token_name: String,
+    /// The account's role, for its level ceiling.
+    access: Access,
+    scope: Scope,
+    level: Level,
+    /// The accountable owner of an AI agent account. The agent never
+    /// reaches more than its owner does.
+    owner_id: Option<String>,
   },
 }
 
@@ -37,7 +48,7 @@ impl AuthIdentity {
     match self {
       Self::Admin { role, .. } => role.audit_actor_type(),
       Self::Runner { .. } => "runner",
-      Self::ServiceAccount { .. } => "service_account",
+      Self::Token { .. } => "personal_token",
     }
   }
 }
@@ -48,6 +59,7 @@ pub enum AdminRole {
   Root,
   Admin,
   Member,
+  #[serde(rename = "ai_agent")]
   AiAgent,
 }
 

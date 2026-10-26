@@ -8,7 +8,7 @@ use crate::{
     },
     limits::{MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
   },
-  extractors::{require_metadata_access, require_person, require_recent_browser_auth},
+  extractors::{require_account, require_metadata_access, require_recent_browser_auth},
   http::HttpError,
   models::{AuthIdentity, SecretInput},
   services::authx::Level,
@@ -84,7 +84,7 @@ pub async fn set(
     value: request.value,
   };
   validate_entry(&input)?;
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Write).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let existing: Option<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key=?")
@@ -155,7 +155,7 @@ pub async fn delete(
   id: &str,
   key: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Write).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   // The version history goes with it through the foreign key cascade.
@@ -207,7 +207,7 @@ pub async fn reveal(
   key: &str,
 ) -> Result<RevealedSecret, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Read).await?;
   let row = repository::find(state.db.pool(), id, key)
     .await?
@@ -318,7 +318,7 @@ pub async fn reveal_version(
   version: i64,
 ) -> Result<RevealedSecret, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Read).await?;
   let mut conn = state.db.pool().acquire().await?;
   let stored = repository::find_version(&mut conn, id, key, version)
@@ -355,7 +355,7 @@ pub async fn rollback(
   request: RollbackSecretRequest,
 ) -> Result<RollbackSecretResponse, HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Write).await?;
   // The write reservation is taken before reading, so the version check,
   // the new version number, and the write are one state transition.
@@ -495,7 +495,7 @@ pub async fn import(
 ) -> Result<ImportSecretsResponse, HttpError> {
   require_recent_browser_auth(identity)?;
   validate_import(&request)?;
-  let (admin_id, email) = require_person(identity)?;
+  let (admin_id, email) = require_account(identity)?;
   let env = environment(state, identity, id, Level::Write).await?;
   // Applying takes the SQLite write reservation before reading. This makes
   // the diff, version selection, replacement deletes, layout, and audit one
@@ -712,7 +712,7 @@ pub async fn export(
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin { .. } => {
       require_recent_browser_auth(identity)?;
-      let (admin_id, email) = require_person(identity)?;
+      let (admin_id, email) = require_account(identity)?;
       (identity.audit_actor_type(), admin_id, Some(email))
     }
     AuthIdentity::Runner {
@@ -725,12 +725,13 @@ pub async fn export(
         "The runner token cannot access this environment.",
       ));
     }
-    AuthIdentity::ServiceAccount { .. } => {
-      return Err(HttpError::forbidden(
-        crate::constants::errors::AUTHORIZATION_DENIED,
-        "AI agents may access secret metadata but never secret values.",
-      ));
-    }
+    AuthIdentity::Token {
+      admin_id, email, ..
+    } => (
+      identity.audit_actor_type(),
+      admin_id.as_str(),
+      Some(email.as_str()),
+    ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
   let mut tx = state.db.pool().begin().await?;
@@ -795,12 +796,13 @@ pub async fn runtime(
         "The runner token cannot access this environment.",
       ));
     }
-    AuthIdentity::ServiceAccount { .. } => {
-      return Err(HttpError::forbidden(
-        crate::constants::errors::AUTHORIZATION_DENIED,
-        "AI agents may access secret metadata but never secret values.",
-      ));
-    }
+    AuthIdentity::Token {
+      admin_id, email, ..
+    } => (
+      identity.audit_actor_type(),
+      admin_id.as_str(),
+      Some(email.as_str()),
+    ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
   let entries = decrypt_all(state, id).await?;
