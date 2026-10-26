@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { useUsersController } from "./Users.controller";
 import * as usersApi from "~/services/users.api";
-import * as serviceAccountsApi from "~/services/service-accounts.api";
+import * as tokensApi from "~/services/personal-tokens.api";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 
@@ -17,7 +17,7 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("~/services/users.api");
-vi.mock("~/services/service-accounts.api");
+vi.mock("~/services/personal-tokens.api");
 vi.mock("~/services/auth.api");
 
 beforeEach(() => {
@@ -34,21 +34,25 @@ beforeEach(() => {
       ssoLinked: false,
     },
   ]);
-  vi.mocked(serviceAccountsApi.fetchServiceAccounts).mockResolvedValue([]);
   vi.mocked(authApi.reauthenticate).mockReset();
 });
 
-function agentFixture(
-  overrides: Partial<serviceAccountsApi.ServiceAccount> & {
-    id: string;
-    name: string;
-  },
-): serviceAccountsApi.ServiceAccount {
+function agentFixture({
+  id,
+  name,
+}: {
+  id: string;
+  name: string;
+}): usersApi.User {
   return {
+    id,
+    email: name,
     role: "ai_agent",
+    ownerId: "usr_root",
     createdAt: "2026-08-01T00:00:00Z",
     updatedAt: "2026-08-01T00:00:00Z",
-    ...overrides,
+    hasPassword: false,
+    ssoLinked: false,
   };
 }
 
@@ -59,14 +63,21 @@ describe("useUsersController", () => {
       id: "sa_agent_2",
       name: "sync-agent",
     });
-    vi.mocked(serviceAccountsApi.fetchServiceAccounts).mockResolvedValueOnce([
+    const root = (await usersApi.fetchUsers())[0];
+    vi.mocked(usersApi.fetchUsers).mockResolvedValueOnce([
+      root,
       agent,
       unavailableAgent,
     ]);
-    vi.mocked(serviceAccountsApi.fetchAgentTokens).mockResolvedValueOnce([
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValueOnce([
       {
         id: "ait_active",
-        serviceAccountId: agent.id,
+        userId: agent.id,
+        scopeType: "all",
+        scopeId: "",
+        scopeLabel: "",
+        level: "metadata",
+        createdBy: null,
         name: "active-token",
         createdAt: "2026-08-01T00:00:00Z",
         expiresAt: "2026-09-01T00:00:00Z",
@@ -75,7 +86,12 @@ describe("useUsersController", () => {
       },
       {
         id: "ait_revoked",
-        serviceAccountId: agent.id,
+        userId: agent.id,
+        scopeType: "all",
+        scopeId: "",
+        scopeLabel: "",
+        level: "metadata",
+        createdBy: null,
         name: "revoked-token",
         createdAt: "2026-07-01T00:00:00Z",
         expiresAt: null,
@@ -83,18 +99,19 @@ describe("useUsersController", () => {
         revokedAt: "2026-07-15T00:00:00Z",
       },
     ]);
-    vi.mocked(serviceAccountsApi.fetchAgentTokens).mockRejectedValueOnce(
+    vi.mocked(tokensApi.listPersonalTokens).mockRejectedValueOnce(
       new Error("Network error"),
     );
 
     const c = useUsersController();
     await c.actions.load();
 
-    expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith(agent.id);
+    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(agent.id);
     expect(c.state.agentTokens[agent.id]?.map((token) => token.id)).toEqual([
       "ait_active",
     ]);
-    expect(c.state.serviceAccounts).toEqual([agent, unavailableAgent]);
+    expect(c.state.agents).toEqual([agent, unavailableAgent]);
+    expect(c.state.users).toEqual([root]);
     expect(c.state.agentTokens[unavailableAgent.id]).toBeNull();
   });
 
@@ -274,13 +291,10 @@ describe("useUsersController", () => {
     window.confirm = vi.fn();
     const c = useUsersController();
 
-    const targetAgent: serviceAccountsApi.ServiceAccount = {
+    const targetAgent = agentFixture({
       id: "sa_to_delete",
       name: "build-agent",
-      role: "ai_agent",
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-    };
+    });
 
     // Prompt sets target
     c.actions.promptDeleteAgent(targetAgent);
@@ -293,31 +307,24 @@ describe("useUsersController", () => {
 
     // Prompt again and confirm
     c.actions.promptDeleteAgent(targetAgent);
-    vi.mocked(serviceAccountsApi.deleteServiceAccount).mockResolvedValueOnce(
-      undefined,
-    );
+    vi.mocked(usersApi.deleteUser).mockResolvedValueOnce(undefined);
 
     await c.actions.confirmDeleteAgent();
 
-    expect(serviceAccountsApi.deleteServiceAccount).toHaveBeenCalledWith(
-      "sa_to_delete",
-    );
+    expect(usersApi.deleteUser).toHaveBeenCalledWith("sa_to_delete");
     expect(c.state.agentToDelete).toBeNull();
     expect(window.confirm).not.toHaveBeenCalled();
   });
 
   it("surfaces delete AI agent error inside confirmation dialog", async () => {
     const c = useUsersController();
-    const targetAgent: serviceAccountsApi.ServiceAccount = {
+    const targetAgent = agentFixture({
       id: "sa_fail",
       name: "failing-agent",
-      role: "ai_agent",
-      createdAt: "",
-      updatedAt: "",
-    };
+    });
 
     c.actions.promptDeleteAgent(targetAgent);
-    vi.mocked(serviceAccountsApi.deleteServiceAccount).mockRejectedValueOnce(
+    vi.mocked(usersApi.deleteUser).mockRejectedValueOnce(
       new ApiError(400, { ERROR: "Cannot delete AI agent." }),
     );
 
@@ -378,7 +385,7 @@ describe("useUsersController", () => {
     expect(c.state.tokenReauthError).toBe("Incorrect password.");
     expect(c.state.showTokenReauth).toBe(true);
     expect(c.state.createdAgentToken).toBeNull();
-    expect(serviceAccountsApi.createAgentToken).not.toHaveBeenCalled();
+    expect(tokensApi.createPersonalToken).not.toHaveBeenCalled();
   });
 
   it("reauthenticates, revokes the active token, generates a new one, and acknowledges it", async () => {
@@ -391,10 +398,15 @@ describe("useUsersController", () => {
     c.actions.promptGetToken(targetAgent);
     c.state.tokenPassword = "correct-password";
     vi.mocked(authApi.reauthenticate).mockResolvedValueOnce(undefined);
-    vi.mocked(serviceAccountsApi.fetchAgentTokens).mockResolvedValueOnce([
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValueOnce([
       {
         id: "ait_old_active",
-        serviceAccountId: "sa_agent_1",
+        userId: "sa_agent_1",
+        scopeType: "all",
+        scopeId: "",
+        scopeLabel: "",
+        level: "metadata",
+        createdBy: null,
         name: "token-1",
         createdAt: "2026-08-01T00:00:00Z",
         expiresAt: "2026-08-31T00:00:00Z",
@@ -403,7 +415,12 @@ describe("useUsersController", () => {
       },
       {
         id: "ait_old_revoked",
-        serviceAccountId: "sa_agent_1",
+        userId: "sa_agent_1",
+        scopeType: "all",
+        scopeId: "",
+        scopeLabel: "",
+        level: "metadata",
+        createdBy: null,
         name: "token-0",
         createdAt: "2026-07-01T00:00:00Z",
         expiresAt: "2026-07-31T00:00:00Z",
@@ -411,49 +428,56 @@ describe("useUsersController", () => {
         revokedAt: "2026-07-15T00:00:00Z",
       },
     ]);
-    vi.mocked(serviceAccountsApi.revokeAgentToken).mockResolvedValueOnce({
+    vi.mocked(tokensApi.revokePersonalToken).mockResolvedValueOnce({
       id: "ait_old_active",
-      serviceAccountId: "sa_agent_1",
+      userId: "sa_agent_1",
+      scopeType: "all",
+      scopeId: "",
+      scopeLabel: "",
+      level: "metadata",
+      createdBy: null,
       name: "token-1",
       createdAt: "2026-08-01T00:00:00Z",
       expiresAt: "2026-08-31T00:00:00Z",
       lastUsedAt: null,
       revokedAt: "2026-08-02T00:00:00Z",
     });
-    const createdResult: serviceAccountsApi.CreatedAgentToken = {
+    const createdResult: tokensApi.CreatedPersonalToken = {
       token: {
         id: "ait_new",
-        serviceAccountId: "sa_agent_1",
+        userId: "sa_agent_1",
+        scopeType: "all",
+        scopeId: "",
+        scopeLabel: "",
+        level: "metadata",
+        createdBy: null,
         name: "token-new",
         createdAt: "2026-08-02T00:00:00Z",
         expiresAt: "2026-09-01T00:00:00Z",
         lastUsedAt: null,
         revokedAt: null,
       },
-      plaintextToken: "dpa_abcdef1234567890",
+      plaintextToken: "dpp_abcdef1234567890",
     };
-    vi.mocked(serviceAccountsApi.createAgentToken).mockResolvedValueOnce(
+    vi.mocked(tokensApi.createPersonalToken).mockResolvedValueOnce(
       createdResult,
     );
 
     await c.actions.confirmTokenReauthAndGenerate();
 
     expect(authApi.reauthenticate).toHaveBeenCalledWith("correct-password");
-    expect(serviceAccountsApi.fetchAgentTokens).toHaveBeenCalledWith(
-      "sa_agent_1",
-    );
+    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("sa_agent_1");
     // Only the unrevoked token should be revoked.
-    expect(serviceAccountsApi.revokeAgentToken).toHaveBeenCalledTimes(1);
-    expect(serviceAccountsApi.revokeAgentToken).toHaveBeenCalledWith(
+    expect(tokensApi.revokePersonalToken).toHaveBeenCalledTimes(1);
+    expect(tokensApi.revokePersonalToken).toHaveBeenCalledWith(
       "sa_agent_1",
       "ait_old_active",
     );
-    expect(serviceAccountsApi.createAgentToken).toHaveBeenCalledWith(
-      "sa_agent_1",
-      expect.stringMatching(/^token-\d+$/),
-      undefined,
-      "30d",
-    );
+    expect(tokensApi.createPersonalToken).toHaveBeenCalledWith("sa_agent_1", {
+      name: expect.stringMatching(/^token-\d+$/),
+      level: "metadata",
+      expiresIn: "30d",
+    });
     expect(c.state.showTokenReauth).toBe(false);
     expect(c.state.createdAgentToken).toEqual(createdResult);
     expect(c.state.agentTokens.sa_agent_1).toEqual([createdResult.token]);
@@ -475,6 +499,6 @@ describe("useUsersController", () => {
     await c.actions.confirmTokenReauthAndGenerate();
     expect(c.state.tokenExpiryError).toContain("1095");
     expect(authApi.reauthenticate).not.toHaveBeenCalled();
-    expect(serviceAccountsApi.revokeAgentToken).not.toHaveBeenCalled();
+    expect(tokensApi.revokePersonalToken).not.toHaveBeenCalled();
   });
 });

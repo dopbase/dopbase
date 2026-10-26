@@ -14,6 +14,7 @@ import {
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon, LockIcon, PlusIcon } from "~/assets/icons";
 import { formatDateTime, formatLevel } from "~/utils/format";
+import type { Level } from "~/services/access.api";
 import {
   MAX_TOKEN_EXPIRY_DAYS,
   MAX_TOKEN_EXPIRY_HOURS,
@@ -132,7 +133,8 @@ const { state, actions } = useUsersController();
           <div>
             <h2 class="text-sm font-semibold text-ink-strong">AI agents</h2>
             <p class="text-xs text-ink-muted">
-              Generating an agent token asks you to confirm it's you.
+              You answer for the agents you add, and they never reach more than
+              you. Share projects with them on a project's Access page.
             </p>
           </div>
           <DbButton
@@ -145,7 +147,7 @@ const { state, actions } = useUsersController();
 
         <!-- AI agents loading skeleton -->
         <div
-          v-if="state.loading && !state.serviceAccounts.length"
+          v-if="state.loading && !state.agents.length"
           class="overflow-hidden rounded-card border border-line bg-panel"
           data-testid="agents-skeleton">
           <div
@@ -166,14 +168,26 @@ const { state, actions } = useUsersController();
           class="overflow-hidden rounded-card border border-line bg-panel"
           data-testid="agents-list">
           <div
-            v-for="account in state.serviceAccounts"
+            v-for="account in state.agents"
             :key="account.id"
             class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-4 py-3 last:border-0">
             <div class="min-w-0 flex-1 basis-full sm:basis-0">
               <p class="truncate font-mono text-sm text-ink-strong">
-                {{ account.name }}
+                {{ account.email }}
               </p>
-              <DbBadge tone="neutral">AI agent</DbBadge>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <DbBadge tone="neutral">AI agent</DbBadge>
+                <span
+                  v-if="account.ownerId"
+                  class="text-xs text-ink-muted"
+                  data-testid="agent-owner">
+                  Owner:
+                  {{
+                    state.users.find((user) => user.id === account.ownerId)
+                      ?.email ?? account.ownerId
+                  }}
+                </span>
+              </div>
               <div class="mt-1 space-y-0.5 text-xs text-ink-muted">
                 <p v-if="state.agentTokens[account.id] === null">
                   Could not load token details.
@@ -184,7 +198,7 @@ const { state, actions } = useUsersController();
                 <p
                   v-for="token in state.agentTokens[account.id] ?? []"
                   :key="token.id">
-                  {{ token.name }} ·
+                  {{ token.name }} · {{ formatLevel(token.level) }} ·
                   {{
                     token.expiresAt
                       ? `Expiry: ${formatDateTime(token.expiresAt)}`
@@ -210,7 +224,7 @@ const { state, actions } = useUsersController();
             </div>
           </div>
           <p
-            v-if="!state.serviceAccounts.length"
+            v-if="!state.agents.length"
             class="px-4 py-5 text-sm text-ink-muted">
             No AI agents configured.
           </p>
@@ -319,8 +333,8 @@ const { state, actions } = useUsersController();
       <DbConfirmDialog
         :open="state.agentToDelete !== null"
         title="Delete AI agent"
-        :description="`Deleting '${state.agentToDelete?.name}' permanently removes it. Its tokens stop working immediately.`"
-        :confirm-word="state.agentToDelete?.name"
+        :description="`Deleting '${state.agentToDelete?.email}' permanently removes it. Its tokens stop working immediately.`"
+        :confirm-word="state.agentToDelete?.email"
         confirm-label="Delete AI agent"
         tone="danger"
         :loading="state.deletingAgent"
@@ -351,12 +365,23 @@ const { state, actions } = useUsersController();
                   : "Generate a new token for"
               }}
               <span class="font-semibold text-ink-strong">{{
-                state.agentForToken?.name
+                state.agentForToken?.email
               }}</span
               >. Any existing active token for this agent will be revoked.
             </p>
           </div>
 
+          <DbSelect
+            :model-value="state.tokenLevel"
+            label="Can"
+            :options="state.tokenLevelOptions"
+            @update:model-value="
+              (value: string) => (state.tokenLevel = value as Level)
+            " />
+          <p class="text-xs text-ink-muted">
+            The agent reaches only projects it has been given, and never more
+            than its owner.
+          </p>
           <DbSelect
             v-model="state.tokenExpiryChoice"
             label="Expires"

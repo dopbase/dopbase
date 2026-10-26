@@ -15,29 +15,37 @@ import { useReauthentication } from "~/composable/reauthentication";
 import type { User } from "~/services/users.api";
 import { useAuthStore } from "~/stores/auth.store";
 import {
-  createAgentToken,
-  createServiceAccount,
-  deleteServiceAccount,
-  fetchAgentTokens,
-  fetchServiceAccounts,
-  revokeAgentToken,
-} from "~/services/service-accounts.api";
+  createPersonalToken,
+  listPersonalTokens,
+  revokePersonalToken,
+} from "~/services/personal-tokens.api";
 import type {
-  AgentToken,
-  CreatedAgentToken,
-  ServiceAccount,
-} from "~/services/service-accounts.api";
+  CreatedPersonalToken,
+  PersonalToken,
+} from "~/services/personal-tokens.api";
+import type { Level } from "~/services/access.api";
 import {
   isValidEmail,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   validatePasswordLength,
 } from "~/utils/validation";
-import {
-  tokenExpiresIn,
-  tokenExpiryOptions,
-  tokenExpiryUnits,
-} from "~/utils/token-expiry";
+import { tokenExpiresIn, tokenExpiryUnits } from "~/utils/token-expiry";
+
+/** AI agent tokens always expire, within 90 days. */
+export const agentTokenExpiryOptions = [
+  { value: "1d", label: "1 day" },
+  { value: "7d", label: "7 days" },
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
+  { value: "custom", label: "Custom" },
+];
+
+/** What an AI agent token can do, within the agent's own grants. */
+export const agentTokenLevelOptions = [
+  { value: "metadata", label: "Names only - list projects and secret keys" },
+  { value: "read", label: "Read - also reveal values and run commands" },
+];
 
 // TODO(rbac): the fixed roles an admin can give out. List assignable roles
 // from the server once roles are configurable.
@@ -57,8 +65,9 @@ export function useUsersController() {
   const tokenNeedsPassword = computed(
     () => authStore.session?.passwordConfirmation !== false,
   );
-  const serviceAccounts = ref<ServiceAccount[]>([]);
-  const agentTokens = ref<Record<string, AgentToken[] | null>>({});
+  /** AI agent accounts, listed apart from people. */
+  const agents = ref<User[]>([]);
+  const agentTokens = ref<Record<string, PersonalToken[] | null>>({});
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -84,17 +93,18 @@ export function useUsersController() {
   const agentFieldError = ref<string | null>(null);
 
   // Agent token generation state
-  const agentForToken = ref<ServiceAccount | null>(null);
+  const agentForToken = ref<User | null>(null);
   const showTokenReauth = ref(false);
   const tokenPassword = ref("");
   const tokenPasswordError = ref<string | null>(null);
   const tokenReauthError = ref<string | null>(null);
   const tokenExpiryError = ref<string | null>(null);
   const tokenExpiryChoice = ref("30d");
+  const tokenLevel = ref<Level>("metadata");
   const tokenCustomAmount = ref("");
   const tokenCustomUnit = ref("h");
   const generatingToken = ref(false);
-  const createdAgentToken = ref<CreatedAgentToken | null>(null);
+  const createdAgentToken = ref<CreatedPersonalToken | null>(null);
 
   // Delete user modal state
   const userToDelete = ref<User | null>(null);
@@ -102,7 +112,7 @@ export function useUsersController() {
   const deleteUserError = ref<string | null>(null);
 
   // Delete agent modal state
-  const agentToDelete = ref<ServiceAccount | null>(null);
+  const agentToDelete = ref<User | null>(null);
   const deletingAgent = ref(false);
   const deleteAgentError = ref<string | null>(null);
 
@@ -129,13 +139,14 @@ export function useUsersController() {
     loading.value = true;
     error.value = null;
     try {
-      const [u, sa] = await Promise.all([fetchUsers(), fetchServiceAccounts()]);
+      const accounts = await fetchUsers();
+      const sa = accounts.filter((account) => account.role === "ai_agent");
 
       const tokenLists = await Promise.allSettled(
-        sa.map((account) => fetchAgentTokens(account.id)),
+        sa.map((account) => listPersonalTokens(account.id)),
       );
-      users.value = u;
-      serviceAccounts.value = sa;
+      users.value = accounts.filter((account) => account.role !== "ai_agent");
+      agents.value = sa;
       agentTokens.value = Object.fromEntries(
         sa.map((account, index) => {
           const result = tokenLists[index];
@@ -348,7 +359,7 @@ export function useUsersController() {
 
     savingAgent.value = true;
     try {
-      await createServiceAccount(trimmed);
+      await createUser(trimmed, "", "ai_agent");
       showAgentCreate.value = false;
       await load();
     } catch (err) {
@@ -361,7 +372,7 @@ export function useUsersController() {
     }
   }
 
-  function promptDeleteAgent(account: ServiceAccount): void {
+  function promptDeleteAgent(account: User): void {
     deleteAgentError.value = null;
     agentToDelete.value = account;
   }
@@ -377,7 +388,7 @@ export function useUsersController() {
     deletingAgent.value = true;
     deleteAgentError.value = null;
     try {
-      await deleteServiceAccount(agentToDelete.value.id);
+      await deleteUser(agentToDelete.value.id);
       agentToDelete.value = null;
       await load();
     } catch (err) {
@@ -390,13 +401,14 @@ export function useUsersController() {
     }
   }
 
-  function promptGetToken(agent: ServiceAccount): void {
+  function promptGetToken(agent: User): void {
     agentForToken.value = agent;
     tokenPassword.value = "";
     tokenPasswordError.value = null;
     tokenReauthError.value = null;
     tokenExpiryError.value = null;
     tokenExpiryChoice.value = "30d";
+    tokenLevel.value = "metadata";
     tokenCustomAmount.value = "";
     tokenCustomUnit.value = "h";
     showTokenReauth.value = true;
@@ -451,21 +463,25 @@ export function useUsersController() {
       const agentId = agentForToken.value.id;
       // Without a password, the shared dialog confirms at the provider when
       // the server asks, then this runs again.
-      const created = await new Promise<CreatedAgentToken>(
+      const created = await new Promise<CreatedPersonalToken>(
         (resolve, reject) => {
           runWithReauth(async () => {
             // Refresh token: revoke any existing active tokens for this agent
-            const existingTokens = await fetchAgentTokens(agentId);
+            const existingTokens = await listPersonalTokens(agentId);
             const activeTokens = existingTokens.filter((t) => !t.revokedAt);
             for (const t of activeTokens) {
-              await revokeAgentToken(agentId, t.id);
+              await revokePersonalToken(agentId, t.id);
             }
             agentTokens.value[agentId] = [];
 
             // Generate the replacement token with the selected lifetime.
             const tokenName = `token-${Date.now()}`;
             resolve(
-              await createAgentToken(agentId, tokenName, undefined, expiresIn),
+              await createPersonalToken(agentId, {
+                name: tokenName,
+                level: tokenLevel.value,
+                expiresIn,
+              }),
             );
           }).catch(reject);
         },
@@ -518,7 +534,7 @@ export function useUsersController() {
     ssoEnabled,
     unlinkingUser,
     tokenNeedsPassword,
-    serviceAccounts,
+    agents,
     agentTokens,
     loading,
     error,
@@ -553,7 +569,9 @@ export function useUsersController() {
     tokenExpiryChoice,
     tokenCustomAmount,
     tokenCustomUnit,
-    tokenExpiryOptions,
+    tokenExpiryOptions: agentTokenExpiryOptions,
+    tokenLevel,
+    tokenLevelOptions: agentTokenLevelOptions,
     tokenExpiryUnits,
     generatingToken,
     createdAgentToken,

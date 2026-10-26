@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAccountController } from "./Account.controller";
 import SsoLinkCard from "./components/SsoLinkCard.vue";
+import PersonalTokensCard from "./components/PersonalTokensCard.vue";
 import { DashboardLayout } from "~/layouts";
 import {
   DbAlert,
@@ -99,6 +100,8 @@ const {
         <!-- Right column: Password Rotation -->
         <div class="space-y-6 lg:col-span-2">
           <SsoLinkCard />
+
+          <PersonalTokensCard />
 
           <!-- Offline Recovery Card -->
           <section
