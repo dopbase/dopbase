@@ -84,6 +84,7 @@ fn status_identifies_environment_token_types_without_exposing_tokens() {
     ("dbc_admin-secret", "human"),
     ("dbs_runner-secret", "runner"),
     ("dpa_agent-secret", "ai_agent"),
+    ("dpp_personal-secret", "personal_token"),
     ("other-secret", "unknown"),
   ] {
     let credential = Credential {

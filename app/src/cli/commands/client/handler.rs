@@ -7,7 +7,9 @@ use crate::{
   config::{ServerConfig, ServerOverrides},
   constants::{
     config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
-    tokens::{ADMIN_SESSION_PREFIX, AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX},
+    tokens::{
+      ADMIN_SESSION_PREFIX, AGENT_TOKEN_PREFIX, PERSONAL_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX,
+    },
   },
   daemon::ManagedDaemonState,
 };
@@ -281,11 +283,13 @@ fn credential_identity(credential: &Credential) -> &'static str {
     CredentialSource::Environment => match credential.token.as_deref() {
       Some(token) if token.starts_with(ADMIN_SESSION_PREFIX) => "human",
       Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
+      Some(token) if token.starts_with(PERSONAL_TOKEN_PREFIX) => "personal_token",
       Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",
       _ => "unknown",
     },
     CredentialSource::EncryptedSession => match credential.token.as_deref() {
       Some(token) if token.starts_with(RUNNER_TOKEN_PREFIX) => "runner",
+      Some(token) if token.starts_with(PERSONAL_TOKEN_PREFIX) => "personal_token",
       Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => "ai_agent",
       _ => "admin",
     },
@@ -294,9 +298,9 @@ fn credential_identity(credential: &Credential) -> &'static str {
 }
 
 fn human_identity(identity: &str) -> &str {
-  if identity == "ai_agent" {
-    "AI agent"
-  } else {
-    identity
+  match identity {
+    "ai_agent" => "AI agent",
+    "personal_token" => "personal token (run dopbase access to see what it reaches)",
+    other => other,
   }
 }
