@@ -141,6 +141,23 @@ async fn backup_and_restore_lifecycle() {
     assert_eq!(status, 200);
   }
 
+  // Groups and grants are part of the snapshot.
+  for statement in [
+    "INSERT INTO admins(id,email,password_hash,role,role_id,created_at,updated_at) VALUES('usr_teammate','teammate@example.com','','member','rol_member','t','t')",
+    "INSERT INTO groups(id,name,created_at,updated_at) VALUES('grp_backend','Backend','t','t')",
+    "INSERT INTO group_members(group_id,user_id,created_at) VALUES('grp_backend','usr_teammate','t')",
+  ] {
+    sqlx::query(statement)
+      .execute(state.db.pool())
+      .await
+      .unwrap();
+  }
+  sqlx::query("INSERT INTO grants(id,principal_type,principal_id,scope_type,scope_id,level,created_at) VALUES('grt_backend','group','grp_backend','environment',?,'read','t')")
+    .bind(env_id)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+
   // 2. Initialize new backup with custom name
   let (status, create_res, _) = call(
     &router,
@@ -205,6 +222,11 @@ async fn backup_and_restore_lifecycle() {
   .await;
   assert_eq!(status, 200);
 
+  sqlx::query("DELETE FROM groups")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+
   // 7. Restore from backup
   let (status, restore_res, _) = call(
     &router,
@@ -262,6 +284,14 @@ async fn backup_and_restore_lifecycle() {
   .await;
   assert_eq!(status, 200);
   assert_eq!(verified["data"]["ok"], true, "{verified}");
+
+  let access: (i64, i64, i64, i64) = sqlx::query_as(
+    "SELECT (SELECT COUNT(*) FROM group_members WHERE group_id='grp_backend'), (SELECT COUNT(*) FROM grants WHERE id='grt_backend'), (SELECT COUNT(*) FROM roles WHERE builtin=1), (SELECT COUNT(*) FROM admins WHERE is_root=1)",
+  )
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(access, (1, 1, 4, 1));
 
   // 8. Verify secrets are restored to their original snapshot state!
   let (status, reveal_res, _) = call(
