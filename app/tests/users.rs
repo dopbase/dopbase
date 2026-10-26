@@ -394,10 +394,10 @@ async fn members_and_agents_cannot_create_projects() {
   let (status, agent, _) = call(
     &router,
     "POST",
-    "/api/v1/service-accounts",
+    "/api/v1/users",
     Some(&root_cookie),
     Some(&root_csrf),
-    Some(json!({"name":"build-agent"})),
+    Some(json!({"email":"build-agent","role":"ai_agent"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -405,10 +405,10 @@ async fn members_and_agents_cannot_create_projects() {
   let (status, token, _) = call(
     &router,
     "POST",
-    &format!("/api/v1/service-accounts/{agent_id}/tokens"),
+    &format!("/api/v1/users/{agent_id}/tokens"),
     Some(&root_cookie),
     Some(&root_csrf),
-    Some(json!({"name":"default"})),
+    Some(json!({"name":"default","level":"metadata"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -437,7 +437,7 @@ async fn members_and_agents_cannot_create_projects() {
 }
 
 #[tokio::test]
-async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
+async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
   let (_dir, state, router) = fixture().await;
   let setup = state.setup.read().await.token.clone().unwrap();
   let (status, bootstrap, headers) = call(
@@ -460,31 +460,64 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
     .unwrap()
     .to_string();
   let csrf = bootstrap["data"]["csrfToken"].as_str().unwrap();
-  let (status, account, _) = call(
-    &router,
-    "POST",
-    "/api/v1/service-accounts",
-    Some(&cookie),
-    Some(csrf),
-    Some(json!({"name":"build-agent"})),
-  )
-  .await;
+  let root_id = bootstrap["data"]["adminId"].as_str().unwrap();
+  let create = |body: Value| {
+    call(
+      &router,
+      "POST",
+      "/api/v1/users",
+      Some(&cookie),
+      Some(csrf),
+      Some(body),
+    )
+  };
+  // Agents have a name, never a password, and the creator as owner.
+  let (status, _, _) =
+    create(json!({"email":"build-agent","role":"ai_agent","password":"correct-horse-123"})).await;
+  assert_eq!(status, 400);
+  let (status, _, _) = create(json!({"email":"agent@example.com","role":"ai_agent"})).await;
+  assert_eq!(status, 422);
+  let (status, account, _) = create(json!({"email":"build-agent","role":"ai_agent"})).await;
   assert_eq!(status, 201);
+  assert_eq!(account["data"]["role"], "ai_agent");
+  assert_eq!(account["data"]["ownerId"], root_id);
   let id = account["data"]["id"].as_str().unwrap();
-  let path = format!("/api/v1/service-accounts/{id}/tokens");
-  let (status, never, _) = call(
-    &router,
-    "POST",
-    &path,
-    Some(&cookie),
-    Some(csrf),
-    Some(json!({"name":"never","expiresIn":"never"})),
-  )
-  .await;
+  let path = format!("/api/v1/users/{id}/tokens");
+  let token = |body: Value| {
+    call(
+      &router,
+      "POST",
+      &path,
+      Some(&cookie),
+      Some(csrf),
+      Some(body),
+    )
+  };
+
+  // Agent tokens always expire, within 90 days, and reach at most read.
+  for (body, status) in [
+    (
+      json!({"name":"never","level":"metadata","expiresIn":"never"}),
+      422,
+    ),
+    (
+      json!({"name":"long","level":"metadata","expiresIn":"91d"}),
+      422,
+    ),
+    (json!({"name":"writer","level":"write"}), 422),
+    (
+      json!({"name":"limit","level":"read","expiresIn":"90d"}),
+      201,
+    ),
+  ] {
+    let (actual, body, _) = token(body).await;
+    assert_eq!(actual, status, "{body}");
+  }
+  let (status, created, _) = token(json!({"name":"default","level":"metadata"})).await;
   assert_eq!(status, 201);
-  assert!(never["data"]["token"]["expiresAt"].is_null());
-  let bearer = never["data"]["plaintextToken"].as_str().unwrap();
-  let token_id = never["data"]["token"]["id"].as_str().unwrap();
+  let bearer = created["data"]["plaintextToken"].as_str().unwrap();
+  assert!(bearer.starts_with("dpp_"));
+  let token_id = created["data"]["token"]["id"].as_str().unwrap();
   let (status, _, _) = call(
     &router,
     "GET",
@@ -495,7 +528,18 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
   )
   .await;
   assert_eq!(status, 200);
-  sqlx::query("UPDATE agent_tokens SET expires_at=? WHERE id=?")
+  // Tokens never manage people or tokens.
+  let (status, _, _) = call(
+    &router,
+    "GET",
+    "/api/v1/users/me/tokens",
+    Some(&format!("Bearer {bearer}")),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 403);
+  sqlx::query("UPDATE personal_tokens SET expires_at=? WHERE id=?")
     .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
     .bind(token_id)
     .execute(state.db.pool())
@@ -511,35 +555,17 @@ async fn agent_token_accepts_no_expiry_and_rejects_over_three_years() {
   )
   .await;
   assert_eq!(status, 401);
+
+  // Root has no tokens of its own.
   let (status, _, _) = call(
     &router,
     "POST",
-    &path,
+    "/api/v1/users/me/tokens",
     Some(&cookie),
     Some(csrf),
-    Some(json!({"name":"limit","expiresIn":"1095d"})),
+    Some(json!({"name":"mine","level":"read"})),
   )
   .await;
-  assert_eq!(status, 201);
-  let (status, _, _) = call(
-    &router,
-    "POST",
-    &path,
-    Some(&cookie),
-    Some(csrf),
-    Some(json!({"name":"invalid","expiresIn":"1096d"})),
-  )
-  .await;
-  assert_eq!(status, 400);
-  let (status, _, _) = call(
-    &router,
-    "POST",
-    &path,
-    Some(&cookie),
-    Some(csrf),
-    Some(json!({"name":"both","expiresIn":"1h","expiresAt":"2026-12-01T00:00:00Z"})),
-  )
-  .await;
-  assert_eq!(status, 400);
+  assert_eq!(status, 403);
   state.db.close().await;
 }

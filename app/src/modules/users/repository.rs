@@ -2,17 +2,25 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::{constants::tokens::GRANT_ID_PREFIX, services::token};
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id";
 
-/// id, email, role, created_at, updated_at, has_password, sso_linked.
-pub type UserRow = (String, String, String, String, String, bool, bool);
+/// id, email, role, created_at, updated_at, has_password, sso_linked,
+/// owner_id.
+pub type UserRow = (
+  String,
+  String,
+  String,
+  String,
+  String,
+  bool,
+  bool,
+  Option<String>,
+);
 
-/// Root first, then admins, then members, each by email.
+/// Root first, then by role rank, each by email.
 pub async fn list(pool: &SqlitePool) -> Result<Vec<UserRow>, sqlx::Error> {
-  // TODO(rbac): orders by the fixed roles. Order by role rank from the role
-  // tables once roles are configurable.
   sqlx::query_as(&format!(
-    "SELECT {USER_COLUMNS} FROM admins a ORDER BY CASE a.role WHEN 'root' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, a.email"
+    "SELECT {USER_COLUMNS} FROM admins a LEFT JOIN roles r ON r.id = a.role_id ORDER BY a.is_root DESC, r.rank, a.email"
   ))
   .fetch_all(pool)
   .await
@@ -55,6 +63,8 @@ pub struct NewUser<'a> {
   pub password_hash: &'a str,
   pub role: &'a str,
   pub role_id: &'a str,
+  /// The accountable person, for roles that need one.
+  pub owner_id: Option<&'a str>,
   pub created_by: &'a str,
   pub now: &'a str,
 }
@@ -65,13 +75,14 @@ pub async fn insert(
   user: NewUser<'_>,
 ) -> Result<(), sqlx::Error> {
   sqlx::query(
-    "INSERT INTO admins(id,email,password_hash,role,role_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+    "INSERT INTO admins(id,email,password_hash,role,role_id,owner_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
   )
   .bind(user.id)
   .bind(user.email)
   .bind(user.password_hash)
   .bind(user.role)
   .bind(user.role_id)
+  .bind(user.owner_id)
   .bind(user.created_by)
   .bind(user.now)
   .bind(user.now)
@@ -160,14 +171,50 @@ pub async fn revoke_sessions(
   Ok(())
 }
 
-/// Only admins and members can be deleted.
+/// Root can never be deleted.
 pub async fn delete(
   conn: &mut SqliteConnection,
   id: &str,
 ) -> Result<(), sqlx::Error> {
-  // TODO(rbac): protects root by its fixed role name. Protect whichever
-  // accounts may not be deleted once roles are configurable.
-  sqlx::query("DELETE FROM admins WHERE id=? AND role IN ('admin','member')")
+  sqlx::query("DELETE FROM admins WHERE id=? AND is_root=0")
+    .bind(id)
+    .execute(conn)
+    .await?;
+  Ok(())
+}
+
+/// How many accounts this account owns, such as AI agents.
+pub async fn owned_count(
+  pool: &SqlitePool,
+  id: &str,
+) -> Result<i64, sqlx::Error> {
+  sqlx::query_scalar("SELECT COUNT(*) FROM admins WHERE owner_id=?")
+    .bind(id)
+    .fetch_one(pool)
+    .await
+}
+
+/// Whether `id` can own an AI agent: an active account that signs in.
+pub async fn can_own(
+  conn: &mut SqliteConnection,
+  id: &str,
+) -> Result<bool, sqlx::Error> {
+  let found: Option<i64> = sqlx::query_scalar(
+    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR r.sign_in = 'interactive')",
+  )
+  .bind(id)
+  .fetch_optional(conn)
+  .await?;
+  Ok(found.is_some())
+}
+
+pub async fn set_owner(
+  conn: &mut SqliteConnection,
+  id: &str,
+  owner_id: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query("UPDATE admins SET owner_id=? WHERE id=?")
+    .bind(owner_id)
     .bind(id)
     .execute(conn)
     .await?;

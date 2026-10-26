@@ -26,31 +26,51 @@ fn actor(identity: &AuthIdentity) -> (&str, &str) {
   }
 }
 
-// TODO(rbac): only the fixed admin and member roles can be given out here.
-// Accept any assignable role from the role tables once roles are
-// configurable.
-fn human_role(role: Option<AdminRole>) -> Result<AdminRole, HttpError> {
+// TODO(rbac): only the built-in roles can be given out here. Accept any
+// assignable role from the role tables once roles are configurable.
+fn requested_role(role: Option<AdminRole>) -> Result<AdminRole, HttpError> {
   match role.unwrap_or(AdminRole::Admin) {
     AdminRole::Root => Err(HttpError::forbidden(
       "ROOT_PROTECTED",
       "The root role is reserved for the setup account.",
-    )),
-    AdminRole::AiAgent => Err(HttpError::bad_request(
-      "ROLE_INVALID",
-      "AI agents must be created as service accounts.",
     )),
     value => Ok(value),
   }
 }
 
 /// The built-in role row behind a fixed role.
-// TODO(rbac): maps the fixed admin and member roles to their built-in role
-// rows. Take the role id from the request once roles can be picked.
+// TODO(rbac): maps the fixed roles to their built-in role rows. Take the
+// role id from the request once roles can be picked.
 fn role_id(role: AdminRole) -> &'static str {
   match role {
     AdminRole::Admin => "rol_admin",
+    AdminRole::AiAgent => "rol_ai_agent",
     _ => "rol_member",
   }
+}
+
+/// An AI agent's name, which is its handle where people have an email.
+/// It never contains an @, so it can never match a person's email.
+fn validate_agent_name(value: &str) -> Result<String, HttpError> {
+  let name = value.trim();
+  let valid = (2..=64).contains(&name.len())
+    && name
+      .bytes()
+      .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'));
+  if !valid {
+    return Err(HttpError::validation(std::collections::BTreeMap::from([(
+      "AGENT_NAME_INVALID".into(),
+      "Use 2 to 64 letters, digits, dots, dashes, or underscores.".into(),
+    )])));
+  }
+  Ok(name.to_owned())
+}
+
+fn agents_stay_agents() -> HttpError {
+  HttpError::bad_request(
+    "ROLE_INVALID",
+    "An AI agent can't become a person, or a person an AI agent. Create a new account instead.",
+  )
 }
 
 fn exceeds_access() -> HttpError {
@@ -93,7 +113,7 @@ async fn require_assignable(
 
 /// A person can manage another account only when that account's role and
 /// data access are within their own. Root manages everyone.
-async fn require_within(
+pub(crate) async fn require_within(
   state: &AppState,
   identity: &AuthIdentity,
   target_id: &str,
@@ -131,11 +151,14 @@ fn starting_grant(
 }
 
 fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
-  AdminRole::parse_human(value).ok_or_else(HttpError::internal)
+  match value {
+    "ai_agent" => Ok(AdminRole::AiAgent),
+    other => AdminRole::parse_human(other).ok_or_else(HttpError::internal),
+  }
 }
 
 fn user(row: UserRow) -> Result<UserResponse, HttpError> {
-  let (id, email, role, created_at, updated_at, has_password, sso_linked) = row;
+  let (id, email, role, created_at, updated_at, has_password, sso_linked, owner_id) = row;
   Ok(UserResponse {
     id,
     email,
@@ -144,6 +167,7 @@ fn user(row: UserRow) -> Result<UserResponse, HttpError> {
     updated_at,
     has_password,
     sso_linked,
+    owner_id,
   })
 }
 
@@ -188,11 +212,24 @@ pub async fn create(
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
   require_capability_browser(identity, Capability::UsersManage)?;
-  let email = common::validate_email(&request.email)?;
-  let requested_role = human_role(request.role)?;
+  let requested_role = requested_role(request.role)?;
+  let agent = requested_role == AdminRole::AiAgent;
+  let email = if agent {
+    validate_agent_name(&request.email)?
+  } else {
+    common::validate_email(&request.email)?
+  };
   let password = request.password.filter(|password| !password.is_empty());
   let has_password = password.is_some();
   let hash = match password {
+    Some(_) if agent => {
+      return Err(HttpError::bad_request(
+        "PASSWORD_NOT_ALLOWED",
+        "AI agents sign in with tokens only, so they have no password.",
+      ));
+    }
+    // An AI agent never signs in, so it never needs a password.
+    None if agent => common::NO_PASSWORD_HASH.to_owned(),
     Some(password) => {
       common::validate_password(&password)?;
       common::hash_password_async(password).await?
@@ -227,6 +264,8 @@ pub async fn create(
       password_hash: &hash,
       role: requested_role.as_str(),
       role_id,
+      // The person who creates an AI agent answers for it.
+      owner_id: agent.then_some(actor_id),
       created_by: actor_id,
       now: &now,
     },
@@ -290,9 +329,25 @@ pub async fn update(
     ));
   }
   let new_role = match request.role {
-    Some(value) => human_role(Some(value))?,
+    Some(value) => requested_role(Some(value))?,
     None => parse_role(&old_role)?,
   };
+  let agent = old_role == AdminRole::AiAgent.as_str();
+  if agent != (new_role == AdminRole::AiAgent) {
+    return Err(agents_stay_agents());
+  }
+  if agent && request.password.is_some() {
+    return Err(HttpError::bad_request(
+      "PASSWORD_NOT_ALLOWED",
+      "AI agents sign in with tokens only, so they have no password.",
+    ));
+  }
+  if request.owner_id.is_some() && !agent {
+    return Err(HttpError::bad_request(
+      "OWNER_INVALID",
+      "Only AI agents have an owner.",
+    ));
+  }
   if old_role == "root" && new_role != AdminRole::Root {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",
@@ -312,6 +367,7 @@ pub async fn update(
     require_assignable(state, identity, role_id(new_role)).await?;
   }
   let email = match request.email {
+    Some(value) if agent => validate_agent_name(&value)?,
     Some(value) => common::validate_email(&value)?,
     None => old_email,
   };
@@ -370,6 +426,15 @@ pub async fn update(
     }
     return Err(error.into());
   }
+  if let Some(owner_id) = &request.owner_id {
+    if !repository::can_own(&mut tx, owner_id).await? {
+      return Err(HttpError::bad_request(
+        "OWNER_INVALID",
+        "The owner must be an active person who signs in.",
+      ));
+    }
+    repository::set_owner(&mut tx, id, owner_id).await?;
+  }
   repository::revoke_sessions(&mut tx, id, &now).await?;
   let (_, actor_email) = actor(identity);
   common::audit(
@@ -382,7 +447,7 @@ pub async fn update(
     None,
     Some("admin"),
     Some(id),
-    serde_json::json!({"email":email,"role":new_role.as_str()}),
+    serde_json::json!({"email":email,"role":new_role.as_str(),"ownerId":request.owner_id}),
   )
   .await?;
   tx.commit().await?;
@@ -419,10 +484,16 @@ pub async fn delete(
         "The root administrator cannot be deleted.",
       ));
     }
-    Some("admin") | Some("member") => {}
+    Some("admin") | Some("member") | Some("ai_agent") => {}
     _ => return Err(HttpError::internal()),
   }
   require_within(state, identity, id).await?;
+  if repository::owned_count(state.db.pool(), id).await? > 0 {
+    return Err(HttpError::conflict(
+      "OWNS_AI_AGENTS",
+      "This person owns AI agents. Delete them or give them another owner first.",
+    ));
+  }
   let mut tx = state.db.pool().begin().await?;
   repository::delete(&mut tx, id).await?;
   common::audit(
