@@ -164,22 +164,26 @@ was removed from the file keeps working and behaves like `generic`. Run
 `cargo test sso_presets` from `app/` to check the file, then rebuild: the file
 is compiled into the binary.
 
-### Mark code that RBAC will replace
+### Check capabilities and levels, never role names
 
-Dopbase has four fixed roles: root, admin, member, and ai_agent. Role-based
-access control (RBAC) will replace them. Until then, mark code that hard-codes a
-role with a `TODO(rbac):` comment. That covers role names, labels for roles,
-and rules about which role may do something.
+Roles are data, so code never asks which role an account has. Ask what it may
+do instead, through `app/src/services/authx.rs`:
+
+- An instance action, such as managing people or reading the audit log,
+  checks a capability with `require_capability` or `Access::has`.
+- An action on a project or environment checks the caller's level with
+  `projects::service::authorize` or `environments::service::authorize`. They
+  answer 404 for anything the caller can't see, so its existence doesn't leak.
 
 ```rust
-// TODO(rbac): only the fixed admin and member roles link by email. Decide by
-// permission once roles are configurable.
+let (admin_id, email) = require_account(identity)?;
+let env = environments::service::authorize(state, identity, id, Level::Write).await?;
 ```
 
-Use the same marker in Rust, TypeScript, SQL, and Vue templates
-(`<!-- TODO(rbac): ... -->`). Put it directly above the code and say what is
-hard-coded and what should replace it. `rg "TODO\(rbac\)"` lists every place
-the RBAC work has to touch, so keep other planned work under a different tag.
+A new kind of power is a new `Capability` variant, given to the built-in roles
+that should have it in a migration. If only root should ever hold it, add it to
+`Capability::ROOT_ONLY`. In the Admin UI, gate on `auth.can(...)` and the
+`level` that project and environment responses carry, never on `role`.
 
 ## Check your work
 
