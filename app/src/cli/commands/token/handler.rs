@@ -1,4 +1,4 @@
-use super::TokenCommand;
+use super::{PersonalTokenCommand, TokenCommand};
 use crate::cli::{commands::environment, output};
 use crate::{
   cli::{client, local_config},
@@ -14,6 +14,9 @@ pub(crate) async fn execute(
   json_output: bool,
 ) -> Result<i32> {
   let api = client::human_client(server).await?;
+  if let TokenCommand::Personal { command } = command {
+    return personal(&api, command, json_output).await;
+  }
   match command {
     TokenCommand::Create {
       environment,
@@ -97,6 +100,7 @@ pub(crate) async fn execute(
         );
       }
     }
+    TokenCommand::Personal { .. } => unreachable!("handled above"),
     TokenCommand::Revoke { token_id } => {
       let data = api
         .request(Method::POST, &api_paths::tokens::revoke(&token_id), None)
@@ -105,6 +109,138 @@ pub(crate) async fn execute(
         output::print_json(&data)?;
       } else {
         output::print_success(&format!("Revoked token {token_id}."));
+      }
+    }
+  }
+  Ok(0)
+}
+
+fn status(token: &serde_json::Value) -> &'static str {
+  if token.get("revokedAt").is_some_and(|value| !value.is_null()) {
+    "revoked"
+  } else if token
+    .get("expiresAt")
+    .and_then(|value| value.as_str())
+    .is_some_and(|expiry| {
+      chrono::DateTime::parse_from_rfc3339(expiry).is_ok_and(|date| date <= chrono::Utc::now())
+    })
+  {
+    "expired"
+  } else {
+    "active"
+  }
+}
+
+fn scope(token: &serde_json::Value) -> String {
+  match token.get("scopeLabel").and_then(|value| value.as_str()) {
+    Some("") | None => "all projects".into(),
+    Some(label) => label.into(),
+  }
+}
+
+async fn personal(
+  api: &client::ApiClient,
+  command: PersonalTokenCommand,
+  json_output: bool,
+) -> Result<i32> {
+  match command {
+    PersonalTokenCommand::Create {
+      name,
+      level,
+      project,
+      env,
+      expires_in,
+    } => {
+      let (scope_type, scope) = match (project, env) {
+        (Some(project), _) => ("project", Some(project)),
+        (None, Some(reference)) => {
+          let resolved = environment::resolve_environment(api, &reference).await?;
+          (
+            "environment",
+            Some(environment::env_id(&resolved)?.to_owned()),
+          )
+        }
+        (None, None) => ("all", None),
+      };
+      let data = api
+        .request(
+          Method::POST,
+          &api_paths::users::tokens("me"),
+          Some(json!({"name":name,"level":level,"scopeType":scope_type,"scope":scope,"expiresIn":expires_in})),
+        )
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let token = data.get("token").unwrap_or(&serde_json::Value::Null);
+        output::print_success(&format!("Created personal token {name}."));
+        output::print_fields(&[
+          ("ID:", output::string(token, "id")),
+          (
+            "Reaches:",
+            format!(
+              "{} on {}",
+              output::string(token, "level"),
+              self::scope(token)
+            ),
+          ),
+          ("Expires:", output::string(token, "expiresAt")),
+          ("Token:", output::string(&data, "plaintextToken")),
+        ]);
+        output::print_warning(
+          "Store this token now. Dopbase will not show it again. Use it as DOPBASE_TOKEN.",
+        );
+      }
+    }
+    PersonalTokenCommand::List => {
+      let data = api
+        .request(Method::GET, &api_paths::users::tokens("me"), None)
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        let rows = output::array(&data)
+          .iter()
+          .map(|token| {
+            vec![
+              output::string(token, "name"),
+              output::string(token, "id"),
+              status(token).into(),
+              output::string(token, "level"),
+              scope(token),
+              output::string(token, "expiresAt"),
+              output::timestamp(token, "lastUsedAt"),
+            ]
+          })
+          .collect::<Vec<_>>();
+        output::print_table(
+          &[
+            "NAME",
+            "ID",
+            "STATUS",
+            "LEVEL",
+            "SCOPE",
+            "EXPIRES",
+            "LAST USED",
+          ],
+          &rows,
+          "You have no personal tokens.",
+          &format!("{} token(s)", rows.len()),
+        );
+      }
+    }
+    PersonalTokenCommand::Revoke { token_id } => {
+      let data = api
+        .request(
+          Method::POST,
+          &api_paths::users::token_revoke("me", &token_id),
+          None,
+        )
+        .await?;
+      if json_output {
+        output::print_json(&data)?;
+      } else {
+        output::print_success(&format!("Revoked personal token {token_id}."));
       }
     }
   }
