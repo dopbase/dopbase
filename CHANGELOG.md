@@ -25,12 +25,34 @@ All notable changes to Dopbase are documented in this file.
 - Groups. The new **Groups** page creates groups and adds or removes members,
   and a grant to a group reaches everyone in it. Leaving a group takes its
   access away on the next request.
+- Personal tokens (`dpp_`). A token acts as its account from a script or an
+  AI agent on another machine. It reaches at most what the account reaches
+  right now, within its own project or environment and level (`metadata`,
+  `read`, or `write`), and always expires within the role's limit. Create
+  them on the Account page, with `dopbase token personal create`, or through
+  `POST /api/v1/users/me/tokens`, and use them as `DOPBASE_TOKEN`.
+- `dopbase access` shows what you, or the token in `DOPBASE_TOKEN`, can reach
+  and where it comes from. `dopbase access --project <ref>` lists who reaches
+  a project.
 - Protected environments. Turn protection on from the Access page or with
   `PATCH /api/v1/environments/{id}` and `{"protected": true}`, and a project
   grant below project manager stops reaching the environment. Only a grant
   on the environment itself or a project manager gets in.
 
 ### Changed
+
+- Service accounts are now accounts with the AI agent role. The upgrade turns
+  each one into an AI agent owned by root that still reads secret names on
+  every project, and its `dpa_` tokens keep working as personal tokens. New
+  agents are added on the Users page with a name and no password, start with
+  no access, and never reach more than the person who owns them. An owner
+  can't be deleted while they own agents; give the agents another owner
+  first. The `/api/v1/service-accounts` endpoints are gone: use
+  `POST /api/v1/users` with `"role": "ai_agent"` and
+  `/api/v1/users/{id}/tokens`.
+- A personal token that reaches values can reveal, export, and run without a
+  password prompt, and a `write` token can change secrets. A `metadata` token
+  is refused with `Your access to this environment does not allow this.`
 
 - Lists of projects and environments show only what your grants reach, and
   anything else answers 404. Reading secret names needs `metadata`, values
