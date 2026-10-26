@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatDuration,
   formatRelativeTime,
+  formatLevel,
   formatRole,
 } from "./format";
 
@@ -83,5 +84,13 @@ describe("formatRole", () => {
     expect(formatRole("member")).toBe("Member");
     expect(formatRole("ai_agent")).toBe("AI Agent");
     expect(formatRole("auditor")).toBe("auditor");
+  });
+});
+
+describe("formatLevel", () => {
+  it("names each access level", () => {
+    expect(formatLevel("metadata")).toBe("Names only");
+    expect(formatLevel("project_manager")).toBe("Project manager");
+    expect(formatLevel("none")).toBe("No access");
   });
 });

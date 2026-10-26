@@ -1,4 +1,5 @@
 import { apiRequest } from "./http.client";
+import type { Capability, Level } from "./access.api";
 
 /** Session kinds supported by the server. Browser UI always sends `"browser"`. */
 export type SessionKind = "browser" | "cli";
@@ -31,6 +32,12 @@ export interface SessionResponse {
   /** True when the password was confirmed within the last ten minutes. */
   recentAuthentication: boolean;
   role?: AccountRole;
+  /** The role's display name. */
+  roleName?: string;
+  /** What the account may do to the instance. Gate the UI on these. */
+  capabilities?: Capability[];
+  /** The deepest level any grant can give the account. */
+  maxLevel?: Level;
   lastLoginAt?: string | null;
   /** The account has a password, whether or not it may use it. */
   hasPassword?: boolean;
