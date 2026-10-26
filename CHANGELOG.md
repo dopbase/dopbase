@@ -31,6 +31,16 @@ All notable changes to Dopbase are documented in this file.
   `read`, or `write`), and always expires within the role's limit. Create
   them on the Account page, with `dopbase token personal create`, or through
   `POST /api/v1/users/me/tokens`, and use them as `DOPBASE_TOKEN`.
+- Custom roles. Root creates them on the new **Roles** page or with
+  `POST /api/v1/roles`: pick capabilities, how deep into project data holders
+  reach, and what their personal tokens may do. A Viewer that reads values
+  but never changes them, or a token-only role for CI bots, needs no code.
+  Built-in roles never change. People are given a role by its id
+  (`roleId` on `POST` and `PATCH /api/v1/users`), and only roles within your
+  own can be given. User responses add `roleId` and `roleName`.
+- Audit tokens. The Auditor role's personal tokens read the audit log and no
+  project data, for a SIEM or another log collector. Create one on the
+  Account page or with `dopbase token personal create --audit`.
 - `dopbase access` shows what you, or the token in `DOPBASE_TOKEN`, can reach
   and where it comes from. `dopbase access --project <ref>` lists who reaches
   a project.
@@ -70,6 +80,13 @@ All notable changes to Dopbase are documented in this file.
 - Nobody can change, delete, or unlink an account whose role or access goes
   beyond their own, give a role they do not hold, or change their own
   grants.
+- The audit log shows each reader what their role allows. Roles with the
+  new `audit.read_all` capability, Auditor and root, read every event.
+  `audit.read` alone, which admins have, shows settings events and events on
+  the projects the reader reaches. Everyone else sees their own actions, so
+  the Audit page is open to all people and members no longer get a 403.
+- The built-in Auditor role gains `audit.read_all` and `tokens.personal`.
+- Factory reset deletes custom roles.
 - User management, the audit log, instance status, backups, single sign-on
   settings, and factory reset now check a capability instead of a role. A
   refused request says `Your role does not allow this operation.` where it
