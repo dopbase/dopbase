@@ -87,6 +87,16 @@ All notable changes to Dopbase are documented in this file.
   the Audit page is open to all people and members no longer get a 403.
 - The built-in Auditor role gains `audit.read_all` and `tokens.personal`.
 - Factory reset deletes custom roles.
+- Signing in with a password refuses disabled accounts and accounts that use
+  tokens only, instead of issuing a session the server then rejects. Keeping
+  password sign-in while single sign-on is required now follows the
+  `password.breakglass` capability, and verifying a provider follows
+  `sso.manage`; both are root's alone.
+- `dopbase client status` reports a `dpp_` token as `personal_token`.
+- The documentation covers roles, grants, groups, protected environments,
+  personal tokens, AI agent accounts, and audit visibility, with new Project
+  access, Groups, and Roles pages. "Identity and tokens" is now "Identity and
+  access".
 - User management, the audit log, instance status, backups, single sign-on
   settings, and factory reset now check a capability instead of a role. A
   refused request says `Your role does not allow this operation.` where it
