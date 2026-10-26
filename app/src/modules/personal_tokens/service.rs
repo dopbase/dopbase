@@ -140,7 +140,7 @@ async fn resolve_scope(
 ) -> Result<String, HttpError> {
   let scope = scope.filter(|value| !value.is_empty());
   match (scope_type, scope) {
-    (ScopeType::All, None) => Ok(String::new()),
+    (ScopeType::All | ScopeType::Audit, None) => Ok(String::new()),
     (ScopeType::Project, Some(reference)) => Ok(
       projects::service::authorize(state, identity, reference, Level::Metadata)
         .await?
@@ -204,28 +204,52 @@ pub async fn create(
       "Token names must contain between 1 and 64 characters.",
     ));
   }
-  if target.holder.token_scope.as_deref() != Some("data") {
+  // The role decides what its tokens are for: project data or the audit
+  // log, never both.
+  if target.holder.token_scope.as_deref() == Some("none") {
     return Err(HttpError::forbidden(
-      "TOKEN_SCOPE_INVALID",
-      "This role's tokens can only read the audit log, which isn't available yet.",
+      "TOKENS_NOT_ALLOWED",
+      "This account's role can't hold personal tokens.",
     ));
   }
-  let max_level = target
-    .holder
-    .token_max_level
-    .as_deref()
-    .and_then(Level::parse)
-    .unwrap_or(Level::Metadata);
-  if request.level == Level::None || request.level > max_level {
+  let audit_role = target.holder.token_scope.as_deref() == Some("audit");
+  let scope_type = request.scope_type.unwrap_or(if audit_role {
+    ScopeType::Audit
+  } else {
+    ScopeType::All
+  });
+  if audit_role != (scope_type == ScopeType::Audit) {
     return Err(invalid(
-      "TOKEN_LEVEL_INVALID",
-      &format!(
-        "This account's tokens reach at most the {} level.",
-        max_level.as_str()
-      ),
+      "TOKEN_SCOPE_INVALID",
+      if audit_role {
+        "This account's tokens read the audit log only. Use the audit scope."
+      } else {
+        "This account's tokens read project data, not the audit log."
+      },
     ));
   }
-  let scope_type = request.scope_type.unwrap_or(ScopeType::All);
+  let level = if audit_role {
+    Level::None
+  } else {
+    let max_level = target
+      .holder
+      .token_max_level
+      .as_deref()
+      .and_then(Level::parse)
+      .unwrap_or(Level::Metadata);
+    match request.level {
+      Some(level) if level != Level::None && level <= max_level => level,
+      _ => {
+        return Err(invalid(
+          "TOKEN_LEVEL_INVALID",
+          &format!(
+            "Choose a level up to {} for this account's tokens.",
+            max_level.as_str()
+          ),
+        ));
+      }
+    }
+  };
   let scope_id = resolve_scope(state, identity, scope_type, request.scope.as_deref()).await?;
   let expires_at = expiry(&target.holder, request.expires_in.as_deref())?;
   let token_id = token::public_id(PERSONAL_TOKEN_ID_PREFIX);
@@ -241,7 +265,7 @@ pub async fn create(
       token_hash: token::hash(&raw),
       scope_type,
       scope_id: &scope_id,
-      level: request.level,
+      level,
       created_by: target.actor_id,
       created_at: &now,
       expires_at: &expires_at,
@@ -273,7 +297,7 @@ pub async fn create(
       "name": name,
       "scopeType": scope_type.as_str(),
       "scopeId": scope_id,
-      "level": request.level.as_str(),
+      "level": level.as_str(),
       "expiresAt": expires_at,
     }),
   )

@@ -320,12 +320,14 @@ pub async fn user_access(
       token_name,
       scope,
       level,
+      audit,
       ..
     } => (
       admin_id.as_str(),
       Some(TokenLimit {
         name: token_name.clone(),
         scope_type: match scope {
+          _ if *audit => ScopeType::Audit,
           authx::Scope::All => ScopeType::All,
           authx::Scope::Project(_) => ScopeType::Project,
           authx::Scope::Environment(_) => ScopeType::Environment,

@@ -132,6 +132,9 @@ fn status(token: &serde_json::Value) -> &'static str {
 }
 
 fn scope(token: &serde_json::Value) -> String {
+  if token.get("scopeType").and_then(|value| value.as_str()) == Some("audit") {
+    return "the audit log".into();
+  }
   match token.get("scopeLabel").and_then(|value| value.as_str()) {
     Some("") | None => "all projects".into(),
     Some(label) => label.into(),
@@ -147,11 +150,13 @@ async fn personal(
     PersonalTokenCommand::Create {
       name,
       level,
+      audit,
       project,
       env,
       expires_in,
     } => {
       let (scope_type, scope) = match (project, env) {
+        _ if audit => ("audit", None),
         (Some(project), _) => ("project", Some(project)),
         (None, Some(reference)) => {
           let resolved = environment::resolve_environment(api, &reference).await?;
@@ -166,7 +171,7 @@ async fn personal(
         .request(
           Method::POST,
           &api_paths::users::tokens("me"),
-          Some(json!({"name":name,"level":level,"scopeType":scope_type,"scope":scope,"expiresIn":expires_in})),
+          Some(json!({"name":name,"level":(!audit).then_some(level),"scopeType":scope_type,"scope":scope,"expiresIn":expires_in})),
         )
         .await?;
       if json_output {

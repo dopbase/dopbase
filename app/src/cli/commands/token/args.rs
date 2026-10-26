@@ -71,6 +71,10 @@ pub enum PersonalTokenCommand {
     /// metadata (names only), read (values), or write (changes).
     #[arg(long, default_value = "read", value_parser = parse_level)]
     level: String,
+    /// Create an audit token, which reads the audit log and no project
+    /// data. For roles such as Auditor.
+    #[arg(long, conflicts_with_all = ["project", "env"])]
+    audit: bool,
     /// Limit the token to one project.
     #[arg(long, value_name = "PROJECT_REF", conflicts_with = "env")]
     project: Option<String>,
@@ -120,6 +124,7 @@ Examples:
   dopbase token personal create --name laptop-agent --level metadata
   dopbase token personal create --name ci --level write --project payment-service --expires-in 30d
   dopbase token personal create --name reader --env payment-service/production --expires-in 12h
+  dopbase token personal create --name siem --audit --expires-in 90d
 ";
 const CREATE_HELP: &str = "\
 Examples:

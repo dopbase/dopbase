@@ -32,14 +32,18 @@ pub struct PersonalTokenResponse {
 pub struct CreatePersonalTokenRequest {
   /// Unique among the account's tokens, at most 64 characters.
   pub name: String,
-  /// `all`, `project`, or `environment`. Defaults to `all`.
+  /// `all`, `project`, or `environment` for a data token, or `audit` for
+  /// an audit token, as the role allows. Defaults to `all`, or to `audit`
+  /// for roles whose tokens read the audit log.
   #[serde(default)]
   pub scope_type: Option<ScopeType>,
   /// Project id or name, or environment id.
   #[serde(default)]
   pub scope: Option<String>,
-  /// `metadata`, `read`, or `write`, within what the role allows.
-  pub level: Level,
+  /// `metadata`, `read`, or `write`, within what the role allows. Audit
+  /// tokens take none.
+  #[serde(default)]
+  pub level: Option<Level>,
   /// Lifetime such as `12h` or `30d`, within the role's limit. Defaults to
   /// the role's default.
   #[serde(default)]

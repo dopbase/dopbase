@@ -35,6 +35,9 @@ pub struct SessionResponse {
   pub capabilities: Vec<Capability>,
   /// The deepest project and environment access any grant can give.
   pub max_level: Level,
+  /// What the role's personal tokens are for: `data`, `audit`, or `none`.
+  /// Root has none.
+  pub token_scope: String,
   pub session_kind: SessionKind,
   pub recent_authentication: bool,
   pub last_login_at: Option<String>,
