@@ -284,7 +284,7 @@ pub async fn poll(
   let (email, role_value) = repository::account(&mut tx, &admin_id)
     .await?
     .ok_or_else(invalid_code)?;
-  let role = AdminRole::parse_human(&role_value).ok_or_else(HttpError::internal)?;
+  let role = AdminRole::parse(&role_value).ok_or_else(HttpError::internal)?;
   if purpose == "reauth" {
     let confirmed = repository::confirm_session_of(
       &mut tx,

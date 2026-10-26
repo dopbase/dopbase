@@ -168,10 +168,7 @@ fn starting_grant(
 }
 
 fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
-  match value {
-    "ai_agent" => Ok(AdminRole::AiAgent),
-    other => AdminRole::parse_human(other).ok_or_else(HttpError::internal),
-  }
+  AdminRole::parse(value).ok_or_else(HttpError::internal)
 }
 
 fn user(row: UserRow) -> Result<UserResponse, HttpError> {
@@ -528,8 +525,7 @@ pub async fn unlink_sso(
   require_capability_browser(identity, Capability::UsersManage)?;
   let target = fetch_user(state, id).await?;
   let (actor_id, _) = actor(identity);
-  // TODO(rbac): only root may change root. Check a permission instead once
-  // roles are configurable.
+  // Only root changes root.
   if target.role == AdminRole::Root && id != actor_id {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",

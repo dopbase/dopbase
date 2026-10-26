@@ -3,8 +3,10 @@ import type { Capability, Level } from "./access.api";
 
 /** Session kinds supported by the server. Browser UI always sends `"browser"`. */
 export type SessionKind = "browser" | "cli";
-// TODO(rbac): the four fixed roles. Read roles from the server once they are
-// configurable.
+/**
+ * The legacy role label. Show `roleName` to people and gate the UI on
+ * `capabilities`; roles themselves come from `GET /api/v1/roles`.
+ */
 export type AccountRole = "root" | "admin" | "member" | "ai_agent";
 
 export interface LoginRequest {

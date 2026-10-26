@@ -76,13 +76,11 @@ pub async fn linked_count(
     .await
 }
 
-/// Admins and members without a password, who can only sign in through
-/// single sign-on.
+/// People without a password, who can only sign in through single sign-on.
+/// Root always has one, and AI agents never sign in.
 pub async fn passwordless_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
-  // TODO(rbac): counts the fixed admin and member roles. Count every role
-  // that may sign in without a password once roles are configurable.
   sqlx::query_scalar(
-    "SELECT COUNT(*) FROM admins WHERE password_hash=? AND role IN ('admin','member')",
+    "SELECT COUNT(*) FROM admins a JOIN roles r ON r.id = a.role_id WHERE a.password_hash=? AND a.is_root=0 AND r.sign_in='interactive'",
   )
   .bind(NO_PASSWORD_HASH)
   .fetch_one(pool)
@@ -222,13 +220,13 @@ pub async fn mark_verified(
   Ok(updated == 1)
 }
 
-/// Signs out every account except root.
+/// Signs out every account except root. Root alone holds
+/// password.breakglass, the capability to keep password sign-in while single
+/// sign-on is required, and no role can be given it.
 pub async fn revoke_non_root_sessions(
   conn: &mut SqliteConnection,
   now: &str,
 ) -> Result<u64, sqlx::Error> {
-  // TODO(rbac): root is the fixed break-glass role. Exempt whichever roles
-  // may keep password sign-in once roles are configurable.
   Ok(
     sqlx::query("UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL AND admin_id IN (SELECT id FROM admins WHERE is_root=0)")
       .bind(now)
