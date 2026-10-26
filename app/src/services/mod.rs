@@ -1,4 +1,5 @@
 pub mod audit_chain;
+pub mod authx;
 pub mod cache;
 pub mod client_ip;
 pub mod crypto;
