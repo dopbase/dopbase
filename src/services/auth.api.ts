@@ -38,6 +38,8 @@ export interface SessionResponse {
   capabilities?: Capability[];
   /** The deepest level any grant can give the account. */
   maxLevel?: Level;
+  /** What the role's personal tokens are for. */
+  tokenScope?: "none" | "data" | "audit";
   lastLoginAt?: string | null;
   /** The account has a password, whether or not it may use it. */
   hasPassword?: boolean;

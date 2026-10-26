@@ -13,7 +13,7 @@ import {
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon, LockIcon, PlusIcon } from "~/assets/icons";
-import { formatDateTime, formatLevel } from "~/utils/format";
+import { formatDateTime, formatLevel, formatRole } from "~/utils/format";
 import type { Level } from "~/services/access.api";
 import {
   MAX_TOKEN_EXPIRY_DAYS,
@@ -73,17 +73,8 @@ const { state, actions } = useUsersController();
               {{ user.email }}
             </p>
             <div class="flex flex-wrap items-center gap-1.5">
-              <!-- TODO(rbac): badge labels for the fixed roles. Show each
-                   role's own name from the server once roles are
-                   configurable. -->
               <DbBadge :tone="user.role === 'root' ? 'accent' : 'neutral'">
-                {{
-                  user.role === "root"
-                    ? "Super admin (root)"
-                    : user.role === "member"
-                      ? "Member"
-                      : "Admin"
-                }}
+                {{ user.roleName || formatRole(user.role) }}
               </DbBadge>
               <DbBadge v-if="!user.hasPassword" tone="warn">
                 No password

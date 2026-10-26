@@ -56,6 +56,24 @@ beforeEach(() => {
 });
 
 describe("usePersonalTokensCardController", () => {
+  it("creates audit tokens for roles whose tokens read the audit log", async () => {
+    signIn("member", ["tokens.personal", "audit.read_all"]);
+    useAuthStore().session!.tokenScope = "audit";
+    vi.mocked(tokensApi.createPersonalToken).mockResolvedValue({
+      token: token({ scopeType: "audit", level: "none" }),
+      plaintextToken: "dpp_audit",
+    });
+    const { controller } = mountController(usePersonalTokensCardController);
+    await settle();
+    expect(projectsApi.listProjects).not.toHaveBeenCalled();
+    await controller.create("siem", "read", "", "90d");
+    expect(tokensApi.createPersonalToken).toHaveBeenCalledWith("me", {
+      name: "siem",
+      scopeType: "audit",
+      expiresIn: "90d",
+    });
+  });
+
   it("shows only active tokens", async () => {
     signIn("member", ["tokens.personal"]);
     const { controller } = mountController(usePersonalTokensCardController);

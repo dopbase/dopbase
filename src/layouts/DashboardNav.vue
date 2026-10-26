@@ -11,6 +11,7 @@ import {
   UserIcon,
   UsersIcon,
   ShieldIcon,
+  SlidersHorizontalIcon,
   LogOutIcon,
 } from "~/assets/icons";
 import type { Capability } from "~/services/access.api";
@@ -43,6 +44,12 @@ const navItems = [
     label: "Groups",
     icon: ShieldIcon,
     match: (r: string) => r.startsWith("/groups"),
+  },
+  {
+    name: "roles",
+    label: "Roles",
+    icon: SlidersHorizontalIcon,
+    match: (r: string) => r.startsWith("/roles"),
   },
   {
     name: "projects",
@@ -91,7 +98,7 @@ const needs: Partial<Record<(typeof navItems)[number]["name"], Capability[]>> =
     groups: ["users.view", "groups.manage"],
     backups: ["instance.backup"],
     sso: ["sso.manage"],
-    audit: ["audit.read"],
+    roles: ["roles.manage"],
   };
 const visibleNavItems = computed(() =>
   navItems.filter((item) => {

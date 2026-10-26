@@ -46,6 +46,8 @@ export function usePersonalTokensCardController() {
   const error = ref<string | null>(null);
   const created = ref<CreatedPersonalToken | null>(null);
   const visible = computed(() => !auth.isRoot && auth.can("tokens.personal"));
+  /** Roles such as Auditor hold tokens that read the audit log only. */
+  const auditOnly = computed(() => auth.session?.tokenScope === "audit");
   const active = computed(() =>
     (tokens.value ?? []).filter(
       (token) =>
@@ -60,7 +62,7 @@ export function usePersonalTokensCardController() {
     try {
       const [mine, shared] = await Promise.all([
         listPersonalTokens(),
-        listProjects(),
+        auditOnly.value ? Promise.resolve([]) : listProjects(),
       ]);
       tokens.value = mine;
       projects.value = shared;
@@ -77,14 +79,19 @@ export function usePersonalTokensCardController() {
     expiresIn: string,
   ): Promise<void> {
     await runWithReauth(async () => {
-      created.value = await createPersonalToken("me", {
-        name,
-        level,
-        expiresIn,
-        ...(project === ALL_PROJECTS
-          ? { scopeType: "all" as const }
-          : { scopeType: "project" as const, scope: project }),
-      });
+      created.value = await createPersonalToken(
+        "me",
+        auditOnly.value
+          ? { name, scopeType: "audit", expiresIn }
+          : {
+              name,
+              level,
+              expiresIn,
+              ...(project === ALL_PROJECTS
+                ? { scopeType: "all" as const }
+                : { scopeType: "project" as const, scope: project }),
+            },
+      );
     });
     await load();
   }
@@ -112,6 +119,7 @@ export function usePersonalTokensCardController() {
     error,
     created,
     visible,
+    auditOnly,
     load,
     create,
     revoke,

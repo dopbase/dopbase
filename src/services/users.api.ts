@@ -5,7 +5,12 @@ export interface User {
   id: string;
   /** An AI agent's name. */
   email: string;
+  /** The fixed role closest to the account's role. Prefer `roleName`. */
   role: "root" | "admin" | "member" | "ai_agent";
+  /** Empty for root. */
+  roleId?: string | null;
+  /** `Root` for root. */
+  roleName?: string;
   /** The person who answers for an AI agent. */
   ownerId?: string | null;
   createdAt: string;
@@ -26,11 +31,12 @@ export async function fetchUsers(): Promise<User[]> {
 export async function createUser(
   email: string,
   password: string,
-  role: Exclude<AccountRole, "root"> = "member",
+  role: Exclude<AccountRole, "root"> | { roleId: string } = "member",
 ): Promise<User> {
+  const chosen = typeof role === "string" ? { role } : role;
   const { data } = await apiRequest<User>(BASE, {
     method: "POST",
-    body: password ? { email, password, role } : { email, role },
+    body: password ? { email, password, ...chosen } : { email, ...chosen },
   });
   return data;
 }
@@ -41,6 +47,8 @@ export async function updateUser(
     email?: string;
     password?: string;
     role?: Exclude<AccountRole, "root" | "ai_agent">;
+    roleId?: string;
+    ownerId?: string;
   },
 ): Promise<User> {
   const { data } = await apiRequest<User>(`${BASE}/${encodeURIComponent(id)}`, {

@@ -21,6 +21,7 @@ export interface AdminSession {
   /** Unknown (undefined or empty) until the session is fetched. */
   capabilities?: Capability[];
   maxLevel?: Level;
+  tokenScope?: "none" | "data" | "audit";
   lastLoginAt?: string | null;
   /** Unknown (undefined) until the session is fetched from the server. */
   hasPassword?: boolean;
@@ -189,6 +190,7 @@ export const useAuthStore = defineStore("auth", () => {
       roleName: response.roleName,
       capabilities: response.capabilities,
       maxLevel: response.maxLevel,
+      tokenScope: response.tokenScope,
       lastLoginAt: response.lastLoginAt ?? null,
       hasPassword: response.hasPassword,
       passwordConfirmation: response.passwordConfirmation,

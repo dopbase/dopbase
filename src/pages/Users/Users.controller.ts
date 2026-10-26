@@ -9,6 +9,8 @@ import {
 } from "~/services/users.api";
 import { fetchAuthMethods } from "~/services/auth.api";
 import { fetchUserAccess } from "~/services/access.api";
+import { fetchRoles } from "~/services/roles.api";
+import type { Role } from "~/services/roles.api";
 import type { UserAccess } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
@@ -47,12 +49,8 @@ export const agentTokenLevelOptions = [
   { value: "read", label: "Read - also reveal values and run commands" },
 ];
 
-// TODO(rbac): the fixed roles an admin can give out. List assignable roles
-// from the server once roles are configurable.
-export const roleOptions = [
-  { value: "member", label: "Member - project management" },
-  { value: "admin", label: "Admin - user management" },
-];
+/** The role a new person gets unless you pick another. */
+const DEFAULT_ROLE = "rol_member";
 
 export function useUsersController() {
   const authStore = useAuthStore();
@@ -75,7 +73,20 @@ export function useUsersController() {
   const editing = ref<User | null>(null);
   const email = ref("");
   const password = ref("");
-  const role = ref<"admin" | "member">("member");
+  /** The picked role's id. */
+  const role = ref(DEFAULT_ROLE);
+  /** Roles you may give people. AI agents are added on their own. */
+  const roles = ref<Role[]>([]);
+  const roleOptions = computed(() =>
+    roles.value
+      .filter((item) => item.assignable && item.signIn === "interactive")
+      .map((item) => ({
+        value: item.id,
+        label: item.description
+          ? `${item.name} - ${item.description}`
+          : item.name,
+      })),
+  );
   const showCreate = ref(false);
   const saving = ref(false);
   const formError = ref<string | null>(null);
@@ -139,7 +150,11 @@ export function useUsersController() {
     loading.value = true;
     error.value = null;
     try {
-      const accounts = await fetchUsers();
+      const [accounts, available] = await Promise.all([
+        fetchUsers(),
+        fetchRoles().catch(() => []),
+      ]);
+      roles.value = available;
       const sa = accounts.filter((account) => account.role === "ai_agent");
 
       const tokenLists = await Promise.allSettled(
@@ -175,7 +190,7 @@ export function useUsersController() {
     editing.value = null;
     email.value = "";
     password.value = "";
-    role.value = "member";
+    role.value = DEFAULT_ROLE;
     showCreate.value = true;
   }
 
@@ -184,7 +199,7 @@ export function useUsersController() {
     editing.value = user;
     email.value = user.email;
     password.value = "";
-    role.value = user.role === "member" ? "member" : "admin";
+    role.value = user.roleId ?? DEFAULT_ROLE;
     showCreate.value = true;
   }
 
@@ -241,11 +256,13 @@ export function useUsersController() {
       if (editing.value) {
         await updateUser(editing.value.id, {
           email: trimmedEmail,
-          role: role.value,
+          ...(role.value !== editing.value.roleId
+            ? { roleId: role.value }
+            : {}),
           ...(password.value ? { password: password.value } : {}),
         });
       } else {
-        await createUser(trimmedEmail, password.value, role.value);
+        await createUser(trimmedEmail, password.value, { roleId: role.value });
       }
       showCreate.value = false;
       await load();

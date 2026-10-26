@@ -21,7 +21,7 @@ import type { Level } from "~/services/access.api";
 import { formatDateTime, formatLevel } from "~/utils/format";
 
 const controller = usePersonalTokensCardController();
-const { active, projects, error, created, visible } = controller;
+const { active, projects, error, created, visible, auditOnly } = controller;
 
 const showCreate = ref(false);
 const name = ref("");
@@ -109,8 +109,14 @@ async function submit(): Promise<void> {
             {{ token.name }}
           </p>
           <p class="text-xs text-ink-muted">
-            {{ formatLevel(token.level) }} on
-            {{ token.scopeLabel || "every project you reach" }} · expires
+            <template v-if="token.scopeType === 'audit'">
+              Reads the audit log
+            </template>
+            <template v-else>
+              {{ formatLevel(token.level) }} on
+              {{ token.scopeLabel || "every project you reach" }}
+            </template>
+            · expires
             {{ token.expiresAt ? formatDateTime(token.expiresAt) : "never" }}
           </p>
         </div>
@@ -131,12 +137,21 @@ async function submit(): Promise<void> {
       @close="showCreate = false">
       <form class="flex flex-col gap-4" @submit.prevent="submit">
         <DbInput v-model="name" label="Name" placeholder="e.g. laptop-agent" />
+        <p v-if="auditOnly" class="text-xs text-ink-muted">
+          Your tokens read the audit log you can see, for tools such as a SIEM.
+          They never reach project data.
+        </p>
         <DbSelect
+          v-if="!auditOnly"
           :model-value="level"
           label="Can"
           :options="TOKEN_LEVEL_OPTIONS"
           @update:model-value="(value: string) => (level = value as Level)" />
-        <DbSelect v-model="project" label="Where" :options="projectOptions" />
+        <DbSelect
+          v-if="!auditOnly"
+          v-model="project"
+          label="Where"
+          :options="projectOptions" />
         <DbSelect
           v-model="expiresIn"
           label="Expires"
