@@ -176,7 +176,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
 }
 
 #[tokio::test]
-async fn accounts_keep_their_role_row_and_shared_grant_in_step() {
+async fn accounts_keep_their_role_row_and_starting_grant_in_step() {
   let (_dir, state, router) = fixture().await;
   let setup = state.setup.read().await.token.clone().unwrap();
   let (status, bootstrap, headers) = call(
@@ -254,11 +254,12 @@ async fn accounts_keep_their_role_row_and_shared_grant_in_step() {
     .await
     .unwrap();
   assert_eq!(account(root_id.clone()).await, ((1, None, None), vec![]));
+  // A new member reaches nothing until someone grants it a project.
   assert_eq!(
     account(id.clone()).await,
     (
       (0, Some("rol_member".into()), Some(root_id.clone())),
-      vec![("all".into(), "write".into())]
+      vec![]
     )
   );
 
@@ -272,12 +273,27 @@ async fn accounts_keep_their_role_row_and_shared_grant_in_step() {
   )
   .await;
   assert_eq!(status, 200);
+  // Root makes admins project managers of everything.
   assert_eq!(
     account(id.clone()).await,
     (
-      (0, Some("rol_admin".into()), Some(root_id)),
+      (0, Some("rol_admin".into()), Some(root_id.clone())),
       vec![("all".into(), "project_manager".into())]
     )
+  );
+  let (status, _, _) = call(
+    &router,
+    "PATCH",
+    &format!("/api/v1/users/{id}"),
+    Some(&cookie),
+    Some(&csrf),
+    Some(json!({"role":"member"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  assert_eq!(
+    account(id.clone()).await,
+    ((0, Some("rol_member".into()), Some(root_id)), vec![])
   );
 
   let (status, _, _) = call(
@@ -299,7 +315,7 @@ async fn accounts_keep_their_role_row_and_shared_grant_in_step() {
 }
 
 #[tokio::test]
-async fn member_manages_projects_and_agent_is_metadata_only() {
+async fn members_and_agents_cannot_create_projects() {
   let (_dir, state, router) = fixture().await;
   let setup = state.setup.read().await.token.clone().unwrap();
   let (status, bootstrap, headers) = call(
@@ -364,7 +380,7 @@ async fn member_manages_projects_and_agent_is_metadata_only() {
     Some(json!({"name":"member-project"})),
   )
   .await;
-  assert_eq!(status, 201);
+  assert_eq!(status, 403);
   let (status, _, _) = call(
     &router,
     "GET",
