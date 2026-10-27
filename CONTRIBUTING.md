@@ -26,6 +26,15 @@ All project interactions must follow the [Code of Conduct](./CODE_OF_CONDUCT.md)
 Conduct concerns should be reported privately through the process described
 there.
 
+
+## an1by fork
+
+This repository is a fork of [dopbase/dopbase](https://github.com/dopbase/dopbase).
+Read [Architecture decision records](./docs/adr/index.md) before changing
+workspaces, Docker/`--container`, Windows packaging, or the migration chain.
+Upstream releases are merged with merge commits; adopt the upstream CLI contract
+and re-apply fork-only behavior documented in [ADR 0001](./docs/adr/0001-an1by-fork.md).
+
 ## Repository layout
 
 | Path    | Purpose                                           |

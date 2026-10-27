@@ -141,9 +141,10 @@ function tokenStatus(token: RunnerToken): {
 </script>
 
 <template>
-  <div class="@container flex flex-col gap-4">
-    <header class="flex flex-wrap items-center gap-2">
-      <div>
+  <div class="flex flex-col gap-4">
+    <header
+      class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
         <h3 class="text-sm font-semibold">
           Runner tokens
           <DbBadge v-if="tokens" class="ml-1">{{ tokens.length }}</DbBadge>
@@ -152,7 +153,11 @@ function tokenStatus(token: RunnerToken): {
           Scoped to this environment only.
         </p>
       </div>
-      <DbButton class="ml-auto" size="sm" variant="primary" @click="openCreate">
+      <DbButton
+        class="w-fit shrink-0 self-start sm:self-auto"
+        size="sm"
+        variant="primary"
+        @click="openCreate">
         New token
       </DbButton>
     </header>
@@ -167,21 +172,24 @@ function tokenStatus(token: RunnerToken): {
       <table class="min-w-full text-left text-sm">
         <thead>
           <tr class="border-b border-line">
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">Name</th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Name
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Created
             </th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Expires
             </th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Last used
             </th>
             <th
-              class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
+              class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
               Actions
             </th>
           </tr>
@@ -194,13 +202,13 @@ function tokenStatus(token: RunnerToken): {
             <td class="px-4 py-3">
               <DbSkeleton class="h-4 w-32" />
             </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
+            <td class="px-4 py-3">
               <DbSkeleton class="h-4 w-20" />
             </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
+            <td class="px-4 py-3">
               <DbSkeleton class="h-4 w-24" />
             </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
+            <td class="px-4 py-3">
               <DbSkeleton class="h-4 w-20" />
             </td>
             <td class="px-4 py-3 text-right">
@@ -235,24 +243,28 @@ function tokenStatus(token: RunnerToken): {
       <table class="min-w-full text-left text-sm" data-testid="tokens-table">
         <thead>
           <tr class="border-b border-line">
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">Name</th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Name
+            </th>
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Created
             </th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Expires
             </th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Last used
             </th>
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
+            <th
+              class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
               Status
             </th>
             <th
-              class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
+              class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
               Actions
             </th>
           </tr>
@@ -262,36 +274,16 @@ function tokenStatus(token: RunnerToken): {
             v-for="token in tokens"
             :key="token.id"
             class="border-b border-line-soft last:border-b-0">
-            <td class="w-full max-w-0 px-4 py-2.5">
-              <p
-                class="truncate font-mono text-sm text-ink-strong"
-                :title="token.name">
-                {{ token.name }}
-              </p>
-              <p class="truncate text-xs text-ink-muted @2xl:hidden">
-                {{
-                  token.expiresAt
-                    ? `Expires ${formatDateTime(token.expiresAt)}`
-                    : "No expiry"
-                }}
-                ·
-                {{
-                  token.lastUsedAt
-                    ? `used ${formatRelativeTime(token.lastUsedAt)}`
-                    : "never used"
-                }}
-              </p>
+            <td class="px-4 py-2.5 font-mono text-sm text-ink-strong">
+              {{ token.name }}
             </td>
-            <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
+            <td class="px-4 py-2.5 text-sm text-ink-muted">
               {{ formatRelativeTime(token.createdAt) }}
             </td>
-            <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
+            <td class="px-4 py-2.5 text-sm text-ink-muted">
               {{ token.expiresAt ? formatDateTime(token.expiresAt) : "never" }}
             </td>
-            <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
+            <td class="px-4 py-2.5 text-sm text-ink-muted">
               {{
                 token.lastUsedAt
                   ? formatRelativeTime(token.lastUsedAt)
@@ -307,7 +299,7 @@ function tokenStatus(token: RunnerToken): {
               <button
                 v-if="!token.revokedAt"
                 type="button"
-                class="cursor-pointer rounded border border-crit/40 bg-crit/10 px-2 py-1 font-mono text-xs text-crit transition-colors hover:bg-crit/20 pointer-coarse:py-2"
+                class="cursor-pointer rounded border border-crit/40 bg-crit/10 px-2 py-1 font-mono text-xs text-crit transition-colors hover:bg-crit/20"
                 @click="revokeTarget = token">
                 revoke
               </button>

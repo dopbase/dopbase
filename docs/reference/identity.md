@@ -112,6 +112,23 @@ use different runner tokens. Runner tokens have no expiry by default. Use
 `--expires-in 12h` or `--expires-in 7d` when creating one for a short job.
 Durations must be whole hours or days, up to 1,095 days.
 
+### Workspace runner tokens
+
+Monorepos and shared CI runners can use a workspace-scoped token instead of
+one token per environment. The token prefix is `dbw_` (token ids use `wtk_`).
+It can call runtime secret export for any environment whose project is linked
+to that workspace on the server. Projects without a `project_locations` row
+are never included, even on the same instance.
+
+```bash
+dopbase token create --workspace default --name ci-runner --role workspace
+dopbase token list --workspace default
+```
+
+Workspace tokens share the same expiry, revocation, and `dopbase login --token`
+behavior as environment runner tokens. They still cannot list metadata, mutate
+secrets, reveal, export through human-only paths, or access audit history.
+
 ## AI agents
 
 The `ai_agent` role belongs to named service accounts with bearer tokens,
@@ -134,7 +151,7 @@ practical workflow and [users and AI agents](/ui/users) for account management.
 
 The four roles are static. All projects are shared across the instance. No
 user-to-project assignments, custom roles, or configurable permissions exist.
-Runner tokens remain a separate environment-scoped credential type.
+Runner tokens remain separate environment- and workspace-scoped credential types.
 
 | Operation                                                                  | Root | Admin | Member | AI agent |
 | -------------------------------------------------------------------------- | ---- | ----- | ------ | -------- |

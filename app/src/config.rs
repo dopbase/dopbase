@@ -547,6 +547,7 @@ pub fn dopbase_home() -> PathBuf {
 }
 
 pub fn ensure_data_dir(path: &Path) -> Result<()> {
+  #[cfg(unix)]
   let existed = path.exists();
   fs::create_dir_all(path)
     .with_context(|| format!("failed to create data directory {}", path.display()))?;
@@ -593,7 +594,7 @@ fn resolve_path_from(
 fn expand_home(path: &Path) -> PathBuf {
   let value = path.to_string_lossy();
   let Some(home) = env::home_dir() else {
-    return path.to_path_buf();
+    return expand_windows_env_vars(path);
   };
   if value == "~" {
     return home;
@@ -601,5 +602,48 @@ fn expand_home(path: &Path) -> PathBuf {
   if let Some(rest) = value.strip_prefix("~/") {
     return home.join(rest);
   }
+  if let Some(rest) = value.strip_prefix("~\\") {
+    return home.join(rest);
+  }
+  expand_windows_env_vars(path)
+}
+
+#[cfg(windows)]
+fn expand_windows_env_vars(path: &Path) -> PathBuf {
+  let value = path.to_string_lossy();
+  if !value.contains('%') {
+    return path.to_path_buf();
+  }
+  let mut expanded = String::new();
+  let mut index = 0;
+  while index < value.len() {
+    let Some(start) = value[index..].find('%') else {
+      expanded.push_str(&value[index..]);
+      break;
+    };
+    let start = index + start;
+    expanded.push_str(&value[index..start]);
+    let remainder = &value[start + 1..];
+    let Some(end) = remainder.find('%') else {
+      expanded.push_str(&value[start..]);
+      break;
+    };
+    let name = &remainder[..end];
+    if name.is_empty() {
+      expanded.push_str("%%");
+    } else if let Ok(value) = env::var(name) {
+      expanded.push_str(&value);
+    } else {
+      expanded.push('%');
+      expanded.push_str(name);
+      expanded.push('%');
+    }
+    index = start + 1 + end + 1;
+  }
+  PathBuf::from(expanded)
+}
+
+#[cfg(not(windows))]
+fn expand_windows_env_vars(path: &Path) -> PathBuf {
   path.to_path_buf()
 }

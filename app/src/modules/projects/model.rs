@@ -6,6 +6,8 @@ use utoipa::ToSchema;
 pub struct ProjectResponse {
   pub id: String,
   pub name: String,
+  pub workspace_id: Option<String>,
+  pub relative_path: Option<String>,
   pub created_at: String,
   pub updated_at: String,
 }
@@ -34,4 +36,11 @@ pub struct InitProjectResponse {
 #[derive(Serialize, ToSchema)]
 pub struct DeleteProjectResponse {
   pub affected: AffectedCounts,
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLocationRequest {
+  pub workspace_id: Option<String>,
+  pub relative_path: Option<String>,
 }

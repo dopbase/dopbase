@@ -1,5 +1,7 @@
 use super::model::EnvironmentResponse;
+use crate::utils::environment_reference::{EnvironmentReference, normalize_path, parse};
 use sqlx::{Sqlite, SqlitePool, Transaction};
+
 const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
 
 pub async fn insert(
@@ -31,36 +33,87 @@ pub async fn find_id(
     .fetch_optional(pool)
     .await
 }
-pub async fn resolve(
+
+pub async fn resolve_all(
   pool: &SqlitePool,
   reference: &str,
-) -> Result<Option<EnvironmentResponse>, sqlx::Error> {
-  if reference.starts_with("env_") {
-    return find_id(pool, reference).await;
+) -> Result<Vec<EnvironmentResponse>, sqlx::Error> {
+  let parsed = parse(reference).ok_or_else(|| sqlx::Error::RowNotFound)?;
+  match parsed {
+    EnvironmentReference::Id(id) => Ok(find_id(pool, &id).await?.into_iter().collect()),
+    EnvironmentReference::Legacy {
+      project,
+      environment,
+    } => {
+      sqlx::query_as(&format!("{SELECT} WHERE (p.id=? OR p.name=?) AND e.name=?"))
+        .bind(&project)
+        .bind(&project)
+        .bind(&environment)
+        .fetch_all(pool)
+        .await
+    }
+    EnvironmentReference::Qualified {
+      workspace,
+      project_path,
+      environment,
+    } => resolve_qualified(pool, &workspace, &project_path, &environment).await,
   }
-  let Some((project, environment)) = reference.split_once('/') else {
-    return Ok(None);
-  };
-  sqlx::query_as(&format!("{SELECT} WHERE (p.id=? OR p.name=?) AND e.name=?"))
-    .bind(project)
-    .bind(project)
-    .bind(environment)
-    .fetch_optional(pool)
-    .await
 }
+
+async fn resolve_qualified(
+  pool: &SqlitePool,
+  workspace: &str,
+  project_path: &str,
+  environment: &str,
+) -> Result<Vec<EnvironmentResponse>, sqlx::Error> {
+  let project_path = normalize_path(project_path);
+  sqlx::query_as(&format!(
+    "{SELECT}
+     JOIN project_locations l ON l.project_id = p.id
+     JOIN workspaces w ON w.id = l.workspace_id
+     WHERE w.name = ?
+       AND e.name = ?
+       AND (p.name = ? OR l.relative_path = ?)"
+  ))
+  .bind(workspace)
+  .bind(environment)
+  .bind(&project_path)
+  .bind(&project_path)
+  .fetch_all(pool)
+  .await
+}
+
 pub async fn list(
   pool: &SqlitePool,
   project: Option<&str>,
 ) -> Result<Vec<EnvironmentResponse>, sqlx::Error> {
   match project {
     Some(value) => {
-      sqlx::query_as(&format!(
-        "{SELECT} WHERE p.id=? OR p.name=? ORDER BY p.name,e.name"
-      ))
-      .bind(value)
-      .bind(value)
-      .fetch_all(pool)
-      .await
+      if let Some((workspace, project_path)) = value.split_once('/') {
+        let project_path = normalize_path(project_path);
+        sqlx::query_as(&format!(
+          "{SELECT}
+           JOIN project_locations l ON l.project_id = p.id
+           JOIN workspaces w ON w.id = l.workspace_id
+           WHERE w.name = ?
+             AND (p.id = ? OR p.name = ? OR l.relative_path = ?)
+           ORDER BY p.name,e.name"
+        ))
+        .bind(workspace)
+        .bind(&project_path)
+        .bind(&project_path)
+        .bind(&project_path)
+        .fetch_all(pool)
+        .await
+      } else {
+        sqlx::query_as(&format!(
+          "{SELECT} WHERE p.id=? OR p.name=? ORDER BY p.name,e.name"
+        ))
+        .bind(value)
+        .bind(value)
+        .fetch_all(pool)
+        .await
+      }
     }
     None => {
       sqlx::query_as(&format!("{SELECT} ORDER BY p.name,e.name"))

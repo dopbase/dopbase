@@ -26,7 +26,7 @@ pub(crate) async fn login(
     output::print_json(&data)?;
   } else {
     let message = if token {
-      format!("Saved a runner token for {}.", server.url)
+      format!("Saved an automation token for {}.", server.url)
     } else {
       format!("Logged in to {}.", server.url)
     };

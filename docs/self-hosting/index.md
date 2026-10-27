@@ -34,6 +34,7 @@ For local evaluation, bind the server to localhost and keep the database and mas
 
 Before a production deployment, read:
 
+- [Run Dopbase in Docker](./docker)
 - [Storage and backups](./storage-backups)
 - [Encryption keys](./encryption-keys)
 - [Operations](./operations)

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { ProjectsController } from "~/pages/Projects/Projects.controller";
 import NameDialog from "./NameDialog.vue";
+import WorkspaceControls from "./WorkspaceControls.vue";
+import DirectoryDialog from "./DirectoryDialog.vue";
 import { DbConfirmDialog, DbSkeleton } from "~/components/ui";
 import {
   BoxIcon,
+  FolderIcon,
   LayersIcon,
   PencilIcon,
   PlusIcon,
@@ -16,11 +19,15 @@ import type { Environment, Project } from "~/services";
  * ProjectRail — the project/environment keyline rail.
  *
  * Renders the hierarchy and selection state plus all project/environment
- * create, rename, and delete interactions. The parent places it (a sticky
- * column on desktop, a sheet on narrow screens) through `class`. Destructive dialogs require
+ * create, rename, and delete interactions. Destructive dialogs require
  * typing the resource name. Environment deletion lists affected counts.
  */
-const props = defineProps<{ controller: ProjectsController }>();
+const props = defineProps<{
+  controller: ProjectsController;
+  mobileOpen?: boolean;
+}>();
+
+const emit = defineEmits<{ close: [] }>();
 
 // Destructure so refs auto-unwrap in the template.
 const {
@@ -39,6 +46,7 @@ type EnvDialogState =
 const projectDialog = ref<ProjectDialogState>(null);
 const envDialog = ref<EnvDialogState>(null);
 const projectDelete = ref<Project | null>(null);
+const projectLocation = ref<Project | null>(null);
 const envDelete = ref<Environment | null>(null);
 const deleteLoading = ref(false);
 const deleteError = ref<string | null>(null);
@@ -47,7 +55,11 @@ const envDeleteCounts = ref<Array<{ label: string; count: number }>>([]);
 const isProjectActive = (project: Project): boolean =>
   props.controller.projectRef.value === project.name ||
   props.controller.projectRef.value === project.id;
+const isProjectOverview = computed(
+  () => props.controller.isProjectOverview.value,
+);
 const isEnvActive = (environment: Environment): boolean =>
+  !isProjectOverview.value &&
   props.controller.environmentId.value === environment.id;
 
 async function openEnvDelete(environment: Environment): Promise<void> {
@@ -93,12 +105,18 @@ async function confirmEnvDelete(): Promise<void> {
 </script>
 
 <template>
-  <aside class="min-h-0">
+  <aside
+    class="fixed inset-y-0 left-0 z-[60] flex h-svh w-[min(100%,18rem)] shrink-0 flex-col border-r border-line bg-panel/95 shadow-xl transition-transform duration-200 ease-out md:sticky md:z-auto md:w-60 md:translate-x-0 md:bg-panel/60 md:shadow-none min-[1120px]:w-72"
+    :class="mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+    aria-label="Projects">
+    <WorkspaceControls :controller="controller" @dismiss-rail="emit('close')" />
     <header class="flex items-center justify-between px-4 py-3.5">
-      <h2 class="text-xs text-ink-muted">Projects</h2>
+      <h2 class="font-mono text-xs uppercase tracking-wider text-ink-faint">
+        projects
+      </h2>
       <button
         type="button"
-        class="cursor-pointer rounded-control bg-raised p-1 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong pointer-coarse:p-2.5"
+        class="cursor-pointer rounded-control bg-raised p-1 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong"
         aria-label="New project"
         data-testid="new-project"
         @click="projectDialog = { mode: 'create' }">
@@ -127,14 +145,17 @@ async function confirmEnvDelete(): Promise<void> {
         <li v-for="project in projects" :key="project.id">
           <!-- Project row -->
           <div
-            class="group flex items-center gap-1 rounded-control px-2 py-1.5 pointer-coarse:py-1"
+            class="group flex items-center gap-1 rounded-control px-2 py-1.5"
             :class="
               isProjectActive(project) ? 'bg-raised' : 'hover:bg-raised/60'
             ">
             <button
               type="button"
-              class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left pointer-coarse:min-h-10"
-              @click="controller.selectProject(project.name)">
+              class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+              @click="
+                controller.selectProject(project.name);
+                emit('close');
+              ">
               <BoxIcon
                 class="h-3.5 w-3.5 shrink-0"
                 :class="
@@ -151,17 +172,18 @@ async function confirmEnvDelete(): Promise<void> {
               </span>
             </button>
             <span
-              class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+              class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <button type="button" class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong" :aria-label="`Directory for ${project.name}`" @click="projectLocation = project"><FolderIcon class="h-3 w-3" /></button>
               <button
                 type="button"
-                class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong pointer-coarse:p-2.5"
+                class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong"
                 :aria-label="`Rename ${project.name}`"
                 @click="projectDialog = { mode: 'rename', project }">
                 <PencilIcon class="h-3 w-3" />
               </button>
               <button
                 type="button"
-                class="cursor-pointer rounded p-1 text-ink-faint hover:text-crit pointer-coarse:p-2.5"
+                class="cursor-pointer rounded p-1 text-ink-faint hover:text-crit"
                 :aria-label="`Delete ${project.name}`"
                 @click="projectDelete = project">
                 <TrashIcon class="h-3 w-3" />
@@ -173,9 +195,25 @@ async function confirmEnvDelete(): Promise<void> {
           <ul
             v-if="isProjectActive(project)"
             class="mb-1 ml-4 flex flex-col gap-0.5 border-l border-line-soft pl-2 pt-0.5">
+            <li>
+              <button
+                type="button"
+                class="w-full cursor-pointer rounded-control px-2 py-1.5 text-left font-mono text-xs"
+                :class="
+                  isProjectOverview
+                    ? 'bg-accent-soft text-ink-strong'
+                    : 'text-accent-strong hover:bg-raised'
+                "
+                @click="
+                  controller.showAllEnvironments();
+                  emit('close');
+                ">
+                All environments
+              </button>
+            </li>
             <li v-for="environment in environments ?? []" :key="environment.id">
               <div
-                class="group flex items-center gap-1 rounded-control px-2 py-1.5 pointer-coarse:py-1"
+                class="group flex items-center gap-1 rounded-control px-2 py-1.5"
                 :class="
                   isEnvActive(environment)
                     ? 'bg-accent-soft'
@@ -183,8 +221,11 @@ async function confirmEnvDelete(): Promise<void> {
                 ">
                 <button
                   type="button"
-                  class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left pointer-coarse:min-h-10"
-                  @click="controller.selectEnvironment(environment.id)">
+                  class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                  @click="
+                    controller.selectEnvironment(environment.id);
+                    emit('close');
+                  ">
                   <LayersIcon
                     class="h-3 w-3 shrink-0"
                     :class="
@@ -203,17 +244,17 @@ async function confirmEnvDelete(): Promise<void> {
                   </span>
                 </button>
                 <span
-                  class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+                  class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                   <button
                     type="button"
-                    class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong pointer-coarse:p-2.5"
+                    class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong"
                     :aria-label="`Rename ${environment.name}`"
                     @click="envDialog = { mode: 'rename', environment }">
                     <PencilIcon class="h-3 w-3" />
                   </button>
                   <button
                     type="button"
-                    class="cursor-pointer rounded p-1 text-ink-faint hover:text-crit pointer-coarse:p-2.5"
+                    class="cursor-pointer rounded p-1 text-ink-faint hover:text-crit"
                     :aria-label="`Delete ${environment.name}`"
                     @click="openEnvDelete(environment)">
                     <TrashIcon class="h-3 w-3" />
@@ -238,7 +279,7 @@ async function confirmEnvDelete(): Promise<void> {
             <li>
               <button
                 type="button"
-                class="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 font-mono text-xs pointer-coarse:min-h-11 text-ink-faint transition-colors hover:bg-raised/60 hover:text-ink"
+                class="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 font-mono text-xs text-ink-faint transition-colors hover:bg-raised/60 hover:text-ink"
                 @click="envDialog = { mode: 'create' }">
                 <PlusIcon class="h-3 w-3" />
                 new environment
@@ -254,6 +295,7 @@ async function confirmEnvDelete(): Promise<void> {
     </div>
 
     <!-- Create / rename project -->
+    <DirectoryDialog :open="projectLocation !== null" kind="project" :title="`Directory for ${projectLocation?.name ?? ''}`" :workspaces="controller.workspaces?.value ?? []" :initial-workspace-id="projectLocation?.workspaceId ?? ''" :initial-path="projectLocation?.relativePath ?? projectLocation?.name" :action="(_name, path, workspaceId) => controller.setProjectLocation(projectLocation!.id, workspaceId || null, workspaceId ? path : null)" @close="projectLocation = null" />
     <NameDialog
       :open="projectDialog !== null"
       :title="

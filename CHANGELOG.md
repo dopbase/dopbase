@@ -2,6 +2,26 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Workspaces group projects, with workspace-qualified references
+  (`workspace/project/environment`) in the CLI and Admin UI.
+- Workspace runner tokens (`dbw_`) can read secrets for linked projects.
+- `dopbase docker` injects an environment into `docker run`, Compose, and
+  `docker exec`. `dopbase --container` runs `server status`, `server logs`, and
+  `admin` in the Dopbase container. Docker Compose starts and stops that
+  container; background server commands stay outside it.
+- Windows installs through `scripts/install.ps1`, and release builds publish a
+  Windows zip alongside the macOS and Linux tar.gz archives.
+
+### Fixed
+
+- `dopbase export --stdout` with a workspace access token (`dbw_…`) uses the
+  runtime secrets API. Environment runner tokens (`dbs_…`) keep the scoped
+  export API from 0.1.9.
+
 ## 0.1.10 - 2026-10-26
 
 [Dopbase](https://dopbase.com) 0.1.10 adds single sign-on for the Admin UI
@@ -348,6 +368,7 @@ now `EMAIL_INVALID`.
   closes. Before, a password typed and then cancelled was still filled in the
   next time the dialog opened.
 
+
 ## 0.1.9 - 2026-10-07
 
 [Dopbase](https://dopbase.com) 0.1.9 adds guided server setup, optional web UI,
@@ -403,6 +424,9 @@ server commands, and some setup responses change in this release.
 
 - Community discussion forms, starter tutorials with verified CLI output, and
   links from the README, documentation, and issue chooser.
+
+### Fixed
+
 - A discussion publication manifest and a maintainer checklist for categories,
   pins, and the first month of community follow-up.
 

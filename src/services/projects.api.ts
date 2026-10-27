@@ -3,6 +3,8 @@ import { apiRequest } from "./http.client";
 export interface Project {
   id: string;
   name: string;
+  workspaceId?: string | null;
+  relativePath?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +34,10 @@ export interface InitProjectResponse {
 }
 
 const BASE = "/api/v1/projects";
+
+export async function setProjectLocation(projectRef: string, workspaceId: string | null, relativePath: string | null): Promise<Project> {
+  return (await apiRequest<Project>(`${BASE}/${encodeURIComponent(projectRef)}/location`, { method: "PATCH", body: { workspaceId, relativePath } })).data;
+}
 
 export async function listProjects(signal?: AbortSignal): Promise<Project[]> {
   const { data } = await apiRequest<Project[]>(BASE, { signal });

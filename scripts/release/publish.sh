@@ -12,12 +12,19 @@ runtime_dir=$(mktemp -d)
 trap 'rm -rf "$runtime_dir"' EXIT
 assets=(checksums.txt)
 while IFS= read -r archive; do assets+=("$archive"); done < <(release_assets "$version")
-manifest_names=$(awk '
+expected_count=$(release_assets "$version" | wc -l | tr -d '[:space:]')
+manifest_names=$(awk -v expected="$expected_count" '
+  { sub(/\r$/, "") }
   NF != 2 || length($1) != 64 || $1 ~ /[^0-9a-f]/ { invalid=1 }
-  { print $2 }
-  END { if (invalid || NR != 4) exit 1 }
+  {
+    name = $2
+    sub(/^\*/, "", name)
+    print name
+  }
+  END { if (invalid || NR != expected + 0) exit 1 }
 ' "$directory/checksums.txt") || release_error "Invalid checksum manifest"
-[[ "$manifest_names" == "$(release_assets "$version")" ]] || release_error "Checksum manifest does not match the expected release assets"
+expected_names=$(release_assets "$version" | tr -d '\r')
+[[ "$manifest_names" == "$expected_names" ]] || release_error "Checksum manifest does not match the expected release assets"
 (cd "$directory" && sha256sum --check checksums.txt)
 gh api "repos/$GH_REPO/git/ref/tags/$version" > /dev/null
 status=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \

@@ -10,5 +10,6 @@ release_assets() {
   local version=$1
   require_version "$version"
   printf 'dopbase_%s_%s.tar.gz\n' "$version" darwin_amd64 "$version" darwin_arm64 "$version" linux_amd64 "$version" linux_arm64
+  printf 'dopbase_%s_windows_amd64.zip\n' "$version"
 }
 archive_members() { printf '%s\n' dopbase CHANGELOG.md LICENSE NOTICE; }

@@ -155,7 +155,30 @@ impl FromRequestParts<AppState> for AuthIdentity {
         .map_err(HttpError::from)?;
       return Ok(AuthIdentity::Runner {
         token_id,
-        environment_id,
+        environment_id: Some(environment_id),
+        workspace_id: None,
+      });
+    }
+
+    let workspace_runner: Option<(String, String)> = sqlx::query_as(
+      "SELECT id, workspace_id FROM workspace_tokens WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+    )
+    .bind(&hash)
+    .bind(now.to_rfc3339())
+    .fetch_optional(state.db.pool())
+    .await
+    .map_err(HttpError::from)?;
+    if let Some((token_id, workspace_id)) = workspace_runner {
+      sqlx::query("UPDATE workspace_tokens SET last_used_at = ? WHERE id = ?")
+        .bind(now.to_rfc3339())
+        .bind(&token_id)
+        .execute(state.db.pool())
+        .await
+        .map_err(HttpError::from)?;
+      return Ok(AuthIdentity::Runner {
+        token_id,
+        environment_id: None,
+        workspace_id: Some(workspace_id),
       });
     }
     Err(HttpError::unauthorized(

@@ -1,6 +1,7 @@
 mod args;
 mod client;
 mod commands;
+mod container;
 mod dotenv;
 mod local_config;
 mod output;

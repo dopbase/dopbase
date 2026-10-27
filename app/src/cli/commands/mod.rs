@@ -10,6 +10,7 @@ pub mod auth;
 pub mod backup;
 pub mod cache;
 pub mod client;
+pub mod docker;
 pub mod environment;
 pub mod export;
 pub mod import;
@@ -21,6 +22,7 @@ pub mod secret;
 pub mod server;
 pub mod token;
 pub mod update;
+pub mod workspace;
 
 #[doc(hidden)]
 pub use super::output::{render_fields, render_table};
@@ -40,6 +42,9 @@ pub async fn execute(cli: Cli) -> Result<i32> {
   let server_argument = cli.server.clone();
   let data_dir = cli.data_dir.clone();
   let json_output = cli.json;
+  if cli.container {
+    return crate::cli::container::execute_in_container(cli);
+  }
   match cli.command {
     Command::Server { command } => {
       if server_argument.is_some() {
@@ -95,6 +100,7 @@ async fn execute_client(
   match command {
     Command::Init(args) => init::execute(server, args, json_output).await,
     Command::Project { command } => project::execute(command, server, json_output).await,
+    Command::Workspace { command } => workspace::execute(command, server, json_output).await,
     Command::Env { command } => environment::execute(command, server, json_output).await,
     Command::Secret { command } => secret::execute(command, server, json_output).await,
     Command::Audit { command } => audit::execute(command, server, json_output).await,
@@ -105,6 +111,7 @@ async fn execute_client(
     Command::Cache { command } => cache::execute(command, server, json_output),
     Command::Backup(args) => backup::execute(server, args, json_output).await,
     Command::Restore(args) => restore::execute(server, args, json_output).await,
+    Command::Docker { command } => docker::execute(server, command, json_output).await,
     _ => bail!("unsupported command"),
   }
 }

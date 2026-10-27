@@ -12,6 +12,10 @@ pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(
+      crate::constants::api::projects::LOCATION,
+      axum::routing::patch(controller::location),
+    )
+    .route(
       crate::constants::api::projects::COLLECTION,
       get(controller::list).post(controller::create),
     )

@@ -8,6 +8,7 @@ import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
+import { DEFAULT_WORKSPACE_ID } from "~/constants/workspaces";
 
 vi.mock("vue", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vue")>()),
@@ -23,6 +24,8 @@ const { routerPush, routerReplace, route } = await vi.hoisted(async () => {
     route: reactive({
       params: {} as Record<string, string | undefined>,
       name: "environment",
+      path: "/projects/default/app/staging",
+      fullPath: "/projects/default/app/staging",
     }),
   };
 });
@@ -36,10 +39,22 @@ vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
 vi.mock("~/services/secrets.api");
 vi.mock("~/services/tokens.api");
+vi.mock("~/services/workspaces.api", () => ({
+  listWorkspaces: vi.fn().mockResolvedValue([
+    {
+      id: "wsp_default",
+      name: "default",
+      rootPath: "/workspace",
+      createdAt: "",
+      updatedAt: "",
+    },
+  ]),
+}));
 
 const project = {
   id: "prj_1",
   name: "app",
+  workspaceId: DEFAULT_WORKSPACE_ID,
   createdAt: "2026-08-28T00:00:00Z",
   updatedAt: "2026-08-28T00:00:00Z",
 };
@@ -47,6 +62,7 @@ const project = {
 const otherProject = {
   id: "prj_2",
   name: "payment",
+  workspaceId: DEFAULT_WORKSPACE_ID,
   createdAt: "2026-08-28T00:00:00Z",
   updatedAt: "2026-08-28T00:00:00Z",
 };
@@ -60,10 +76,14 @@ const environment = (id: string, name: string, projectId = "prj_1") => ({
   updatedAt: "",
 });
 
-// Controllers register watchers on the shared reactive route mock. Each test
-// creates them inside its own detached effect scope so they are disposed
-// afterwards: a stale watcher can then never observe another test's route or
-// consume its queued mock responses.
+function navParams(projectRef: string, environmentName?: string) {
+  return {
+    workspaceSlug: "default",
+    projectRef,
+    ...(environmentName ? { environmentName } : {}),
+  };
+}
+
 let scope: EffectScope;
 
 function createController(): ProjectsController {
@@ -79,9 +99,13 @@ beforeEach(() => {
     otherProject,
   ]);
   vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([]);
+  route.params.workspaceSlug = "default";
   route.params.projectRef = undefined;
+  route.params.environmentName = undefined;
   route.params.environmentId = undefined;
   route.name = "environment";
+  route.path = "/projects/default/app/staging";
+  route.fullPath = route.path;
   routerPush.mockReset();
   routerReplace.mockReset();
 });
@@ -107,12 +131,12 @@ describe("useProjectsController", () => {
       name: "fresh",
     });
     const c = createController();
+    await c.loadWorkspaces();
     await c.createProject("fresh");
-    // `createProject` itself never lists projects: the single call is the reload.
     expect(projectsApi.listProjects).toHaveBeenCalledTimes(1);
     expect(routerPush).toHaveBeenCalledWith({
       name: "project",
-      params: { projectRef: "fresh" },
+      params: navParams("fresh"),
     });
   });
 
@@ -133,13 +157,17 @@ describe("useProjectsController", () => {
 
   it("renames an inactive project without changing the active route", async () => {
     route.params.projectRef = "app";
-    route.params.environmentId = "env_1";
+    route.params.environmentName = "dev";
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
+      environment("env_1", "dev"),
+    ]);
     vi.mocked(projectsApi.renameProject).mockResolvedValueOnce({
       ...otherProject,
       name: "payment-service",
     });
     const c = createController();
     await c.loadProjects();
+    await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
 
     await c.renameProject("prj_2", "payment-service");
 
@@ -152,20 +180,25 @@ describe("useProjectsController", () => {
 
   it("updates the active project URL after renaming it", async () => {
     route.params.projectRef = "app";
-    route.params.environmentId = "env_1";
+    route.params.environmentName = "dev";
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
+      environment("env_1", "dev"),
+    ]);
     vi.mocked(projectsApi.renameProject).mockResolvedValueOnce({
       ...project,
       name: "billing",
     });
     const c = createController();
+    await c.loadWorkspaces();
     await c.loadProjects();
+    await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
 
     await c.renameProject("prj_1", "billing");
 
     expect(projectsApi.renameProject).toHaveBeenCalledWith("prj_1", "billing");
     expect(routerReplace).toHaveBeenCalledWith({
       name: "environment",
-      params: { projectRef: "billing", environmentId: "env_1" },
+      params: navParams("billing", "dev"),
     });
   });
 
@@ -186,13 +219,18 @@ describe("useProjectsController", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("selectEnvironment puts the environment in the URL", () => {
+  it("selectEnvironment puts the environment in the URL", async () => {
     route.params.projectRef = "app";
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
+      environment("env_1", "dev"),
+    ]);
     const c = createController();
+    await c.loadWorkspaces();
+    await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
     c.selectEnvironment("env_1");
     expect(routerPush).toHaveBeenCalledWith({
       name: "environment",
-      params: { projectRef: "app", environmentId: "env_1" },
+      params: navParams("app", "dev"),
     });
   });
 
@@ -207,16 +245,20 @@ describe("useProjectsController", () => {
       updatedAt: "",
     });
     const c = createController();
+    await c.loadWorkspaces();
     await c.createEnvironment("staging");
     expect(routerPush).toHaveBeenCalledWith({
       name: "environment",
-      params: { projectRef: "app", environmentId: "env_9" },
+      params: navParams("app", "staging"),
     });
   });
 
   it("deleteEnvironment returns to the project route", async () => {
     route.params.projectRef = "app";
-    route.params.environmentId = "env_1";
+    route.params.environmentName = "dev";
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
+      environment("env_1", "dev"),
+    ]);
     vi.mocked(environmentsApi.deleteEnvironment).mockResolvedValueOnce({
       projects: 0,
       environments: 1,
@@ -224,10 +266,13 @@ describe("useProjectsController", () => {
       tokens: 0,
     });
     const c = createController();
+    await c.loadWorkspaces();
+    await c.loadProjects();
+    await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
     await c.deleteEnvironment("env_1");
     expect(routerReplace).toHaveBeenCalledWith({
       name: "project",
-      params: { projectRef: "app" },
+      params: navParams("app"),
     });
   });
 
@@ -257,9 +302,6 @@ describe("useProjectsController", () => {
   it("reselects the first environment when switching projects", async () => {
     route.name = "project";
     route.params.projectRef = "app";
-    route.params.environmentId = "env_1";
-    // Keyed by reference so each project's environments are answered
-    // deterministically while the switch is in flight.
     let resolveOther!: (value: ReturnType<typeof environment>[]) => void;
     vi.mocked(environmentsApi.listEnvironments).mockImplementation(
       (reference?: string) =>
@@ -270,23 +312,23 @@ describe("useProjectsController", () => {
             }),
     );
     const c = createController();
+    await c.loadWorkspaces();
+    await c.loadProjects();
     await vi.waitFor(() => expect(c.environments.value).not.toBeNull());
+    routerReplace.mockClear();
 
-    // Switch to another project whose environments load slowly: while the
-    // request is in flight the stale list must not trigger a selection.
-    route.params.projectRef = "other";
-    route.params.environmentId = undefined;
+    route.params.projectRef = "payment";
+    route.params.environmentName = undefined;
     await vi.waitFor(() => expect(c.environments.value).toBeNull());
     expect(routerReplace).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: "environment" }),
     );
 
-    // Once the new list arrives, the first environment is opened.
     resolveOther([environment("env_9", "prod", "prj_2")]);
     await vi.waitFor(() =>
       expect(routerReplace).toHaveBeenCalledWith({
         name: "environment",
-        params: { projectRef: "other", environmentId: "env_9" },
+        params: navParams("payment", "prod"),
       }),
     );
   });

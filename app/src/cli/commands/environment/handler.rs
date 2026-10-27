@@ -142,6 +142,13 @@ pub(crate) async fn execute(
       yes,
     } => clone_environment(&api, source, &new_name, yes, json_output).await?,
     EnvCommand::List { project } => {
+      let project = project
+        .as_deref()
+        .map(|value| {
+          crate::utils::project_reference::to_api_reference(value)
+            .map_err(|error| anyhow::anyhow!(error))
+        })
+        .transpose()?;
       let data = list_environments(&api, project.as_deref()).await?;
       if json_output {
         output::print_json(&data)?;

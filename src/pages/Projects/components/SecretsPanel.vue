@@ -5,7 +5,6 @@ import { useSecretsPanelController } from "./SecretsPanel.controller";
 import EnvFileEditor from "./EnvFileEditor.vue";
 import ImportSecretsDialog from "./ImportSecretsDialog.vue";
 import ExportSecretsDialog from "./ExportSecretsDialog.vue";
-import SecretHistoryDialog from "./SecretHistoryDialog.vue";
 import {
   DbAlert,
   DbBadge,
@@ -18,13 +17,12 @@ import {
   DbModal,
   DbSkeleton,
   DbTextarea,
+  DbCode,
 } from "~/components/ui";
 import {
   EyeIcon,
   EyeOffIcon,
-  HistoryIcon,
   KeyIcon,
-  LockIcon,
   PencilIcon,
   TrashIcon,
 } from "~/assets/icons";
@@ -108,19 +106,6 @@ type FormState =
   | null;
 
 type PanelView = "table" | "editor";
-
-/** The key whose version history is open, if any. */
-const historyKey = ref<string | null>(null);
-
-function openHistory(key: string): void {
-  form.value = null;
-  historyKey.value = key;
-}
-
-function onRolledBack(): void {
-  hideRevealed();
-  void controller.reload();
-}
 
 const view = ref<PanelView>("table");
 /** Pending view switch while an unsaved-editor discard is confirmed. */
@@ -268,59 +253,60 @@ async function confirmDelete(): Promise<void> {
 </script>
 
 <template>
-  <div class="@container flex flex-col gap-4">
-    <header class="flex flex-wrap items-center gap-2">
-      <h3 class="text-sm font-semibold">
+  <div class="flex min-h-0 flex-1 flex-col gap-4">
+    <header
+      class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <h3 class="shrink-0 text-sm font-semibold">
         Secrets
         <DbBadge v-if="secrets" class="ml-1">
           {{ secrets.length }}
         </DbBadge>
       </h3>
-      <div
-        class="ml-auto flex rounded-control border border-line bg-canvas p-0.5"
-        role="tablist"
-        aria-label="Secrets view">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="view === 'table'"
-          data-testid="secrets-view-table"
-          class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:py-2"
-          :class="
-            view === 'table'
-              ? 'bg-raised text-ink-strong'
-              : 'text-ink-muted hover:text-ink'
-          "
-          @click="switchView('table')">
-          Table
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="view === 'editor'"
-          data-testid="secrets-view-editor"
-          class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:py-2"
-          :class="
-            view === 'editor'
-              ? 'bg-raised text-ink-strong'
-              : 'text-ink-muted hover:text-ink'
-          "
-          @click="switchView('editor')">
-          Edit as .env
-        </button>
-      </div>
-      <div
-        v-if="view === 'table'"
-        class="flex w-full flex-wrap items-center gap-2 @2xl:w-auto">
-        <DbButton size="sm" variant="secondary" @click="showExport = true">
-          Export
-        </DbButton>
-        <DbButton size="sm" variant="secondary" @click="showImport = true">
-          Import .env
-        </DbButton>
-        <DbButton size="sm" variant="primary" @click="openCreate">
-          Add secret
-        </DbButton>
+      <div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+        <div
+          class="flex rounded-control border border-line bg-canvas p-0.5"
+          role="tablist"
+          aria-label="Secrets view">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="view === 'table'"
+            data-testid="secrets-view-table"
+            class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors"
+            :class="
+              view === 'table'
+                ? 'bg-raised text-ink-strong'
+                : 'text-ink-muted hover:text-ink'
+            "
+            @click="switchView('table')">
+            Table
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="view === 'editor'"
+            data-testid="secrets-view-editor"
+            class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors"
+            :class="
+              view === 'editor'
+                ? 'bg-raised text-ink-strong'
+                : 'text-ink-muted hover:text-ink'
+            "
+            @click="switchView('editor')">
+            Edit as .env
+          </button>
+        </div>
+        <template v-if="view === 'table'">
+          <DbButton size="sm" variant="secondary" @click="showExport = true">
+            Export
+          </DbButton>
+          <DbButton size="sm" variant="secondary" @click="showImport = true">
+            Import .env
+          </DbButton>
+          <DbButton size="sm" variant="primary" @click="openCreate">
+            Add secret
+          </DbButton>
+        </template>
       </div>
     </header>
 
@@ -338,19 +324,20 @@ async function confirmDelete(): Promise<void> {
         <table class="min-w-full text-left text-sm">
           <thead>
             <tr class="border-b border-line">
-              <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Key
               </th>
               <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Version
               </th>
               <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Updated
               </th>
               <th
-                class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
+                class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Actions
               </th>
             </tr>
@@ -363,10 +350,10 @@ async function confirmDelete(): Promise<void> {
               <td class="px-4 py-3">
                 <DbSkeleton class="h-4 w-36" />
               </td>
-              <td class="hidden px-4 py-3 @xl:table-cell">
+              <td class="px-4 py-3">
                 <DbSkeleton class="h-4 w-10 rounded-control" />
               </td>
-              <td class="hidden px-4 py-3 @xl:table-cell">
+              <td class="px-4 py-3">
                 <DbSkeleton class="h-4 w-20" />
               </td>
               <td class="px-4 py-3 text-right">
@@ -408,19 +395,20 @@ async function confirmDelete(): Promise<void> {
         <table class="min-w-full text-left text-sm" data-testid="secrets-table">
           <thead>
             <tr class="border-b border-line">
-              <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
+              <th
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Key
               </th>
               <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Version
               </th>
               <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
+                class="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Updated
               </th>
               <th
-                class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
+                class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Actions
               </th>
             </tr>
@@ -429,23 +417,13 @@ async function confirmDelete(): Promise<void> {
             <template v-for="secret in secrets" :key="secret.key">
               <tr
                 class="border-b border-line-soft transition-colors last:border-b-0 hover:bg-raised/60">
-                <td class="w-full max-w-0 px-4 py-2.5">
-                  <p
-                    class="truncate font-mono text-sm text-ink-strong"
-                    :title="secret.key">
-                    {{ secret.key }}
-                  </p>
-                  <p
-                    class="whitespace-nowrap text-xs text-ink-muted @xl:hidden">
-                    v{{ secret.version }} ·
-                    {{ formatRelativeTime(secret.updatedAt) }}
-                  </p>
+                <td class="px-4 py-2.5 font-mono text-sm text-ink-strong">
+                  {{ secret.key }}
                 </td>
-                <td class="hidden px-4 py-2.5 @xl:table-cell">
+                <td class="px-4 py-2.5">
                   <DbBadge>v{{ secret.version }}</DbBadge>
                 </td>
-                <td
-                  class="hidden whitespace-nowrap px-4 py-2.5 text-sm text-ink-muted @xl:table-cell">
+                <td class="px-4 py-2.5 text-sm text-ink-muted">
                   {{ formatRelativeTime(secret.updatedAt) }}
                 </td>
                 <td class="px-4 py-2.5">
@@ -453,42 +431,33 @@ async function confirmDelete(): Promise<void> {
                     <button
                       v-if="revealedKey !== secret.key"
                       type="button"
-                      class="cursor-pointer rounded border border-line bg-raised px-2 py-1 font-mono text-xs text-ink transition-colors hover:border-accent/50 hover:text-ink-strong pointer-coarse:p-2"
-                      :aria-label="`Reveal ${secret.key}`"
+                      class="cursor-pointer rounded border border-line bg-raised px-2 py-1 font-mono text-xs text-ink transition-colors hover:border-accent/50 hover:text-ink-strong"
                       @click="reveal(secret.key)">
                       <span class="flex items-center gap-1.5">
                         <EyeIcon class="h-3.5 w-3.5" />
-                        <span class="hidden @xl:inline">reveal</span>
+                        reveal
                       </span>
                     </button>
                     <button
                       v-else
                       type="button"
-                      class="cursor-pointer rounded border border-accent/50 bg-accent-soft px-2 py-1 font-mono text-xs text-accent-strong pointer-coarse:p-2"
-                      :aria-label="`Hide ${secret.key}`"
+                      class="cursor-pointer rounded border border-accent/50 bg-accent-soft px-2 py-1 font-mono text-xs text-accent-strong"
                       @click="hideRevealed()">
                       <span class="flex items-center gap-1.5">
                         <EyeOffIcon class="h-3.5 w-3.5" />
-                        <span class="hidden @xl:inline">hide</span>
+                        hide
                       </span>
                     </button>
                     <button
                       type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong pointer-coarse:p-2.5"
-                      :aria-label="`History ${secret.key}`"
-                      @click="openHistory(secret.key)">
-                      <HistoryIcon class="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong pointer-coarse:p-2.5"
+                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong"
                       :aria-label="`Edit ${secret.key}`"
                       @click="openEdit(secret)">
                       <PencilIcon class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-crit pointer-coarse:p-2.5"
+                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-crit"
                       :aria-label="`Delete ${secret.key}`"
                       @click="deleteTarget = secret">
                       <TrashIcon class="h-3.5 w-3.5" />
@@ -523,10 +492,10 @@ async function confirmDelete(): Promise<void> {
     </template>
 
     <!-- Editor view -->
-    <template v-else>
+    <div v-else class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <!-- Slim toolbar: state badge + actions. Key/issue counts live in
            the editor's own status bar now. -->
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <DbBadge v-if="editorDirty" tone="warn">unsaved changes</DbBadge>
         <DbBadge v-else-if="editorContent !== null" tone="ok"> saved </DbBadge>
         <div class="ml-auto flex items-center gap-2">
@@ -552,12 +521,14 @@ async function confirmDelete(): Promise<void> {
 
       <div
         v-if="editorLoading"
-        class="space-y-3"
+        class="flex min-h-0 flex-1 flex-col"
         data-testid="env-editor-skeleton">
-        <DbSkeleton class="h-64 w-full rounded-card" />
+        <DbSkeleton class="min-h-0 flex-1 w-full rounded-card" />
       </div>
 
-      <div v-else-if="editorLoadError" class="flex flex-col items-start gap-3">
+      <div
+        v-else-if="editorLoadError"
+        class="flex shrink-0 flex-col items-start gap-3">
         <DbAlert>{{ editorLoadError }}</DbAlert>
         <DbButton size="sm" variant="secondary" @click="openEditor">
           Try again
@@ -566,7 +537,7 @@ async function confirmDelete(): Promise<void> {
 
       <div
         v-else-if="editorAwaitingReauth"
-        class="flex flex-col items-start gap-3"
+        class="flex shrink-0 flex-col items-start gap-3"
         data-testid="env-editor-awaiting-reauth">
         <DbAlert tone="info">
           Confirm your password in the dialog to load the secrets for editing.
@@ -576,16 +547,19 @@ async function confirmDelete(): Promise<void> {
         </DbButton>
       </div>
 
-      <template v-else-if="editorContent !== null">
+      <div
+        v-else-if="editorContent !== null"
+        class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         <EnvFileEditor
           v-model="editorContent"
+          fill-height
           :issues="editorIssues"
           :disabled="editorSaving"
           :dirty="editorDirty"
           :subtitle="environmentName"
           @save="saveDraft" />
 
-        <DbAlert v-if="editorError">
+        <DbAlert v-if="editorError" class="shrink-0">
           {{ editorError }}
         </DbAlert>
 
@@ -593,8 +567,8 @@ async function confirmDelete(): Promise<void> {
         <div
           v-if="editorDiff"
           data-testid="env-editor-diff"
-          class="flex flex-col gap-3 rounded-card border border-line bg-panel p-4">
-          <div class="flex flex-wrap items-center gap-2">
+          class="flex shrink-0 flex-col gap-3 rounded-card border border-line bg-panel p-4">
+          <div class="flex items-center gap-2">
             <DbBadge tone="accent">Validate changes is ok</DbBadge>
             <span class="text-xs text-ink-muted">
               nothing stored yet, review the effect
@@ -610,11 +584,11 @@ async function confirmDelete(): Promise<void> {
               :class="diffGroupLabelClasses[group.label]">
               {{ group.label }} ({{ group.keys.length }})
             </p>
-            <p class="break-words font-mono text-xs text-ink">
+            <p class="font-mono text-xs text-ink">
               {{ group.keys.join(", ") || "—" }}
             </p>
           </div>
-          <div class="flex flex-wrap items-center justify-end gap-2">
+          <div class="flex items-center justify-end gap-2">
             <DbButton
               variant="ghost"
               :disabled="editorSaving"
@@ -630,8 +604,8 @@ async function confirmDelete(): Promise<void> {
             </DbButton>
           </div>
         </div>
-      </template>
-    </template>
+      </div>
+    </div>
 
     <!-- Create / edit secret -->
     <DbModal
@@ -652,33 +626,12 @@ async function confirmDelete(): Promise<void> {
           mono
           hint="Use letters, numbers, '_', and '-'. The first character cannot be a number." />
         <div v-else class="flex flex-col gap-1.5">
-          <div class="rounded-control bg-raised" data-testid="secret-key-field">
-            <p class="px-3.5 pb-0.5 pt-2 text-xs font-semibold text-ink-muted">
-              Key
-            </p>
-            <div class="flex h-9 items-center gap-2 px-3.5">
-              <LockIcon
-                class="h-3.5 w-3.5 shrink-0 text-ink-faint"
-                aria-hidden="true" />
-              <span
-                class="min-w-0 flex-1 truncate font-mono text-xs text-ink-strong"
-                :title="form.secret.key">
-                {{ form.secret.key }}
-              </span>
-              <DbBadge>v{{ form.secret.version }}</DbBadge>
-            </div>
-          </div>
-          <p class="text-xs text-ink-muted">
-            Keys can't be renamed. Saving stores the new value as v{{
-              form.secret.version + 1
-            }}.
-            <button
-              type="button"
-              class="cursor-pointer text-accent-strong underline-offset-2 hover:underline"
-              @click="openHistory(form.secret.key)">
-              See history
-            </button>
-          </p>
+          <span class="text-xs font-medium text-ink-muted">Key</span>
+          <DbCode>{{ form.secret.key }}</DbCode>
+          <span class="text-xs text-ink-muted">
+            Current version: v{{ form.secret.version }}. Saving creates a new
+            version.
+          </span>
         </div>
         <DbTextarea
           v-model="form.value"
@@ -718,7 +671,7 @@ async function confirmDelete(): Promise<void> {
     <DbConfirmDialog
       :open="deleteTarget !== null"
       title="Delete secret"
-      :description="`Deleting '${deleteTarget?.key}' permanently removes its value and its version history. This is recorded in the audit log.`"
+      :description="`Deleting '${deleteTarget?.key}' permanently removes the current value. This is recorded in the audit log.`"
       :confirm-word="deleteTarget?.key"
       confirm-label="Delete secret"
       :loading="deleteLoading"
@@ -736,17 +689,11 @@ async function confirmDelete(): Promise<void> {
       @confirm="confirmDiscardSwitch"
       @close="discardTarget = null" />
 
-    <!-- Version history and rollback -->
-    <SecretHistoryDialog
-      :environment-id="environmentId"
-      :secret-key="historyKey"
-      @close="historyKey = null"
-      @rolled-back="onRolledBack" />
-
     <!-- Import / export -->
     <ImportSecretsDialog
       :open="showImport"
       :environment-id="environmentId"
+      :environment-name="environmentName"
       @close="showImport = false" />
     <ExportSecretsDialog
       :open="showExport"

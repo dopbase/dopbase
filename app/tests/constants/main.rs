@@ -28,6 +28,7 @@ fn route_templates_match_the_public_contract() {
     api::secrets::EXPORT,
     api::secrets::RUNTIME,
     api::tokens::COLLECTION,
+    api::tokens::WORKSPACE_COLLECTION,
     api::tokens::REVOKE,
     api::audit::COLLECTION,
     api::audit::VERIFY,
@@ -71,6 +72,7 @@ fn route_templates_match_the_public_contract() {
     "/api/v1/environments/{environment_id}/secrets/export",
     "/api/v1/environments/{environment_id}/secrets/runtime",
     "/api/v1/environments/{environment_id}/tokens",
+    "/api/v1/workspaces/{workspace_id}/tokens",
     "/api/v1/tokens/{token_id}/revoke",
     "/api/v1/audit-events",
     "/api/v1/audit-events/verify",
@@ -112,8 +114,11 @@ fn path_builders_match_the_previous_format_output() {
     "/api/v1/backups/snapshot.dop/restore"
   );
 
-  // Path parameters remain unencoded to preserve the existing format! behavior.
-  assert_eq!(api::projects::item("a/b"), "/api/v1/projects/a/b");
+  assert_eq!(api::projects::item("a/b"), "/api/v1/projects/a%2Fb");
+  assert_eq!(
+    api::projects::environments("workspace1/api"),
+    "/api/v1/projects/workspace1%2Fapi/environments"
+  );
 }
 
 #[test]

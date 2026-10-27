@@ -93,6 +93,18 @@ See [server setup](./setup).
 | Run with injected secrets | `dopbase run [ENVIRONMENT_REF] -- <COMMAND>`                | `DOPBASE_TOKEN` takes priority over the saved credential. Everything after `--` is the child command                                        | `dopbase run payment-service/development -- npm start`                                    |
 | Run selected secrets      | `dopbase run [ENVIRONMENT_REF] --only <KEY> -- <COMMAND>`   | `--only` and `--preserve-env` repeat and take comma lists. `--allow-missing` warns instead of stopping on a missing key                     | `dopbase run payment-service/production --only API_KEY,DATABASE_URL -- npm start`         |
 
+## Docker
+
+See [Docker integration](./docker) for full examples.
+
+| Task | Command | Example |
+| ---- | ------- | ------- |
+| Write a Docker env file | `dopbase docker env-file <ENVIRONMENT_REF> [-o FILE]` | `dopbase docker env-file workspace1/api/staging -o .env` |
+| `docker run` with secrets | `dopbase docker run <ENVIRONMENT_REF> -- docker run …` | `dopbase docker run payment-service/production -- docker run --rm my-image` |
+| `docker compose` with secrets | `dopbase docker compose <ENVIRONMENT_REF> -- docker compose …` | `dopbase docker compose workspace1/api/staging -- docker compose up` |
+| `docker exec` in Dopbase container with secrets | `dopbase docker exec <ENVIRONMENT_REF> -- <CMD>` | `dopbase docker exec workspace1/api/staging -- admin reset-password admin@example.com` |
+| Administer containerized server | `dopbase --container server …` or `dopbase --container admin …` | `dopbase --container server status` |
+
 ## Tokens, backups, and maintenance
 
 | Task                             | Command                                                | Command options                                                                                                                                                                         | Example                                                                            |

@@ -1,6 +1,6 @@
 use std::{
   fs::{self, File, OpenOptions},
-  io::{BufRead, BufReader, BufWriter, Write},
+  io::Write,
   path::{Path, PathBuf},
   sync::{
     Mutex,
@@ -9,19 +9,25 @@ use std::{
   time::Duration,
 };
 
-use crate::server::provision::{GeneratedSetup, SetupCommittedError, StartupMode};
+#[cfg(unix)]
+use std::io::{BufRead, BufReader, BufWriter};
+
+use crate::server::provision::{GeneratedSetup, SetupCommittedError};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use crate::{
-  config::{
-    EnvironmentOverrides, ServerConfig, ServerOverrides, ensure_data_dir, resolve_data_dir,
-  },
-  constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME},
-};
+#[cfg(unix)]
+use crate::server::provision::StartupMode;
+
+#[cfg(unix)]
+use crate::config::ensure_data_dir;
+use crate::config::{EnvironmentOverrides, ServerConfig, ServerOverrides, resolve_data_dir};
+
+use crate::constants::config::{DAEMON_LOG_FILENAME, DAEMON_PID_FILENAME};
 
 /// File descriptor the supervised server reports readiness on.
+#[cfg(unix)]
 const READY_FD: i32 = 3;
 pub(crate) const ENV_DAEMON_LAUNCH: &str = "DOPBASE_INTERNAL_DAEMON_LAUNCH";
 
@@ -58,7 +64,9 @@ impl LaunchDescriptor {
     Ok(config)
   }
 }
+#[cfg(unix)]
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(unix)]
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// One-shot readiness reporter used by the supervised server process.

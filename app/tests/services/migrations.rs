@@ -248,3 +248,62 @@ async fn assert_table(
   .unwrap();
   assert_eq!(exists, expected, "unexpected state for table {name}");
 }
+
+/// Highest four-digit version a fork database recorded before 0.1.10.
+const FORK_LEGACY_HEAD: i64 = 17;
+
+#[tokio::test]
+async fn rewrites_fork_workspace_legacy_versions() {
+  let database_dir = tempfile::TempDir::new().unwrap();
+  let database = database_dir.path().join("fork-legacy.db");
+  let db = DbClient::connect(&sqlite_url(&database)).await.unwrap();
+
+  let directory = tempfile::TempDir::new().unwrap();
+  let legacy = directory.path().join("legacy");
+  fs::create_dir(&legacy).unwrap();
+  let ups = timestamped_ups();
+  for version in 1..=13 {
+    fs::copy(
+      migrations_dir().join(&ups[version - 1]),
+      legacy.join(format!("{version:04}_legacy.up.sql")),
+    )
+    .unwrap();
+    fs::write(legacy.join(format!("{version:04}_legacy.down.sql")), "").unwrap();
+  }
+  let fork_only = [
+    "20261024132209_workspaces.up.sql",
+    "20261024132210_default_workspace.up.sql",
+    "20261024132211_project_names_per_workspace.up.sql",
+    "20261024132212_workspace_tokens.up.sql",
+  ];
+  for (index, name) in fork_only.iter().enumerate() {
+    let version = 14 + index;
+    fs::copy(
+      migrations_dir().join(name),
+      legacy.join(format!("{version:04}_legacy.up.sql")),
+    )
+    .unwrap();
+    fs::write(legacy.join(format!("{version:04}_legacy.down.sql")), "").unwrap();
+  }
+
+  let migrator = sqlx::migrate::Migrator::new(legacy.as_path())
+    .await
+    .unwrap();
+  migrator.run(db.pool()).await.unwrap();
+
+  db.migrate().await.unwrap();
+  db.migrate().await.unwrap();
+
+  assert_table(&db, "workspaces", true).await;
+  assert_table(&db, "workspace_tokens", true).await;
+  assert_table(&db, "sso_providers", true).await;
+
+  let versions: Vec<i64> =
+    sqlx::query_scalar("SELECT version FROM _sqlx_migrations ORDER BY version")
+      .fetch_all(db.pool())
+      .await
+      .unwrap();
+  assert!(versions.contains(&20261024132212));
+  assert!(versions.iter().all(|version| *version > FORK_LEGACY_HEAD));
+  db.close().await;
+}

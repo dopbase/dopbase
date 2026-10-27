@@ -155,6 +155,11 @@ jobs:
             target: aarch64-apple-darwin
             asset_os: darwin
             asset_arch: arm64
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            asset_os: windows
+            asset_arch: amd64
+            binary_name: dopbase.exe
     runs-on: ${{ matrix.runner }}
     env:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
@@ -193,23 +198,112 @@ jobs:
           name: release-ui
           path: dist/
 
+      - name: Test Windows installer
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: ./scripts/install.test.ps1
+
       - name: Build release binary
         shell: bash
         run: bash scripts/release/build-binary.sh "$RELEASE_TARGET"
 
       - name: Smoke-test release binary
+        if: matrix.asset_os != 'windows'
         shell: bash
         run: bash scripts/release/smoke-test.sh "app/target/$RELEASE_TARGET/release/dopbase" "$RELEASE_VERSION"
 
+      - name: Smoke-test Windows release binary
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $binary = "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
+          $version = "${{ github.ref_name }}"
+          $actualVersion = (& $binary --version).Trim()
+          if ($actualVersion -ne "v$version") {
+            throw "unexpected Dopbase version: $actualVersion"
+          }
+
+          $runtimeRoot = Join-Path $env:RUNNER_TEMP ("dopbase-smoke-" + [guid]::NewGuid())
+          $dataDir = Join-Path $runtimeRoot "data"
+          $serverLog = Join-Path $runtimeRoot "server.log"
+          $serverError = Join-Path $runtimeRoot "server-error.log"
+          New-Item -ItemType Directory -Path $runtimeRoot | Out-Null
+          $bindAddress = "127.0.0.1:${{ env.SMOKE_PORT }}"
+          $publicUrl = "http://${bindAddress}"
+          $process = $null
+          try {
+            $process = Start-Process -FilePath $binary -ArgumentList @(
+              "--data-dir", $dataDir,
+              "server", "start",
+              "--docs",
+              "--host", "127.0.0.1",
+              "--port", "${{ env.SMOKE_PORT }}",
+              "--public-url", $publicUrl
+            ) -RedirectStandardOutput $serverLog -RedirectStandardError $serverError -PassThru
+
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              try {
+                Invoke-RestMethod -Uri "$publicUrl/api/v1/health" | Out-Null
+                $ready = $true
+                break
+              } catch {
+                if ($process.HasExited) {
+                  Get-Content $serverLog, $serverError -ErrorAction SilentlyContinue
+                  throw "Dopbase exited before becoming ready"
+                }
+                Start-Sleep -Milliseconds 250
+              }
+            }
+            if (-not $ready) {
+              Get-Content $serverLog, $serverError -ErrorAction SilentlyContinue
+              throw "Dopbase did not become ready"
+            }
+
+            $health = Invoke-RestMethod -Uri "$publicUrl/api/v1/health"
+            if ($health.success -ne $true -or $health.data.version -ne $version) {
+              throw "unexpected health response"
+            }
+            $root = Invoke-WebRequest -UseBasicParsing -Uri "$publicUrl/"
+            if ($root.Content -notmatch '<div id="app"></div>') {
+              throw "embedded Admin UI is unavailable"
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $dataDir "dopbase.db"))) {
+              throw "database file was not created"
+            }
+          } finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id
+              $process.WaitForExit()
+            }
+            Remove-Item -Recurse -Force -LiteralPath $runtimeRoot -ErrorAction SilentlyContinue
+          }
+
       - name: Package release archive
+        if: matrix.asset_os != 'windows'
         shell: bash
         run: bash scripts/release/package-archive.sh "app/target/$RELEASE_TARGET/release/dopbase" "$RELEASE_VERSION" "$ASSET_OS" "$ASSET_ARCH" "$GITHUB_WORKSPACE"
+
+      - name: Package Windows release archive
+        if: matrix.asset_os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:RELEASE_VERSION
+          $archive = "dopbase_${version}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}.zip"
+          $packageDir = Join-Path $env:RUNNER_TEMP ("dopbase-package-" + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $packageDir | Out-Null
+          Copy-Item "app/target/${{ matrix.target }}/release/${{ matrix.binary_name }}" (Join-Path $packageDir "dopbase.exe")
+          Copy-Item CHANGELOG.md, LICENSE, NOTICE -Destination $packageDir
+          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $archive
+          (Get-ChildItem -LiteralPath $packageDir).Name | Sort-Object
 
       - name: Upload release archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.asset_os }}-${{ matrix.asset_arch }}
-          path: dopbase_*.tar.gz
+          path: dopbase_*.*
           compression-level: 0
           if-no-files-found: error
           retention-days: 1

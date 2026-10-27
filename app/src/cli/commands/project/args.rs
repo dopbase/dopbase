@@ -3,18 +3,27 @@ use clap::Subcommand;
 pub(crate) const HELP: &str = "\
 Examples:
   dopbase project create payment-service
+  dopbase project create blipsu/api
+  dopbase project create /api
   dopbase project list
-  dopbase project show payment-service
+  dopbase project show blipsu/api
+  dopbase project show /api
   dopbase project rename payment-service payments
   dopbase project delete payment-service
 ";
 const CREATE_HELP: &str = "\
 Examples:
   dopbase project create payment-service
+  dopbase project create blipsu/api
+  dopbase project create /api
 ";
 const LIST_HELP: &str = "\
 Examples:
   dopbase project list
+";
+const CURRENT_HELP: &str = "\
+Examples:
+  dopbase project current
 ";
 const SHOW_HELP: &str = "\
 Examples:
@@ -35,17 +44,20 @@ pub enum ProjectCommand {
   /// Create an empty project.
   #[command(after_help = CREATE_HELP)]
   Create {
-    /// Project name, unique on the server.
+    /// Project name, or WORKSPACE/PROJECT (or /PROJECT for the default workspace).
     #[arg(value_name = "PROJECT_NAME")]
     name: String,
   },
   /// List accessible projects.
   #[command(after_help = LIST_HELP)]
   List,
+  /// Show the project mapped to the current working directory.
+  #[command(after_help = CURRENT_HELP)]
+  Current,
   /// Show project metadata.
   #[command(after_help = SHOW_HELP)]
   Show {
-    /// Project ID or name.
+    /// Project ID, name, WORKSPACE/PROJECT, or /PROJECT for the default workspace.
     #[arg(value_name = "PROJECT_REF")]
     project: String,
   },

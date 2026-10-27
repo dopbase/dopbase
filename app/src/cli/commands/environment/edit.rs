@@ -70,7 +70,9 @@ pub(super) async fn execute(
   }
   let authentication = client::acquire_human_client(server).await?;
   let api = authentication.client();
-  let env = environment::resolve_environment(api, reference).await?;
+  let reference =
+    crate::cli::project_resolve::complete_environment_reference(api, reference).await?;
+  let env = environment::resolve_environment(api, &reference).await?;
   let id = environment::env_id(&env)?;
   let metadata = api
     .request(Method::GET, &api::secrets::collection(id), None)
@@ -96,7 +98,7 @@ pub(super) async fn execute(
   let api = authentication.confirm_plaintext_access().await?;
   output::print_fields(&[
     ("Server:", server.url.clone()),
-    ("Environment:", reference.into()),
+    ("Environment:", reference.clone()),
     ("Environment ID:", id.into()),
   ]);
   output::print_warning(
@@ -134,7 +136,7 @@ pub(super) async fn execute(
   let preparation = prepare(
     &api,
     id,
-    reference,
+    &reference,
     &snapshot,
     &editor,
     &mut session,

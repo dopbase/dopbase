@@ -3,6 +3,7 @@ export * from "./api-errors";
 export * from "./auth.api";
 export * from "./bootstrap.api";
 export * from "./projects.api";
+export * from "./workspaces.api";
 export * from "./environments.api";
 export * from "./secrets.api";
 export * from "./tokens.api";

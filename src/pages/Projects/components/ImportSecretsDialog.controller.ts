@@ -6,6 +6,7 @@ import { useImportStore } from "~/stores/import.store";
 /** Owns local .env parsing and navigation to the import review screen. */
 export function useImportSecretsDialogController(
   environmentId: Ref<string>,
+  environmentName: Ref<string>,
   open: Ref<boolean>,
 ) {
   const route = useRoute();
@@ -41,8 +42,9 @@ export function useImportSecretsDialogController(
       await router.push({
         name: "environment-import",
         params: {
+          workspaceSlug: route.params.workspaceSlug,
           projectRef: route.params.projectRef,
-          environmentId: environmentId.value,
+          environmentName: environmentName.value,
         },
       });
       return true;

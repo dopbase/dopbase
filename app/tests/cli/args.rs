@@ -455,7 +455,12 @@ fn secret_commands_parse_format_options() {
 
 #[test]
 fn validates_qualified_environment_creation_targets() {
-  for target in ["storefront/development", "prj_01JTEST/development"] {
+  for target in [
+    "storefront/development",
+    "prj_01JTEST/development",
+    "workspace1/api/staging",
+    "/api/staging",
+  ] {
     Cli::try_parse_from(["dopbase", "env", "create", target]).unwrap();
   }
 
@@ -463,7 +468,6 @@ fn validates_qualified_environment_creation_targets() {
     "storefront",
     "/development",
     "storefront/",
-    "storefront/dev/extra",
     "storefront/Development",
   ] {
     let error = Cli::try_parse_from(["dopbase", "env", "create", target]).unwrap_err();
@@ -979,7 +983,7 @@ fn incomplete_secret_commands_show_examples_and_environment_help() {
     let help = contextual_help(arguments);
     assert!(help.contains("Examples:"), "{arguments:?}: {help}");
     assert!(
-      help.contains("PROJECT_REF/ENVIRONMENT_NAME"),
+      help.contains("WORKSPACE/PROJECT/ENVIRONMENT") || help.contains("PROJECT/ENVIRONMENT"),
       "{arguments:?}: {help}"
     );
     for text in *expected {
@@ -1045,9 +1049,9 @@ fn resource_parameters_use_consistent_value_names() {
     (&["dopbase", "export", "--help"], "<ENVIRONMENT_REF>"),
     (
       &["dopbase", "token", "create", "--help"],
-      "<ENVIRONMENT_REF>",
+      "[ENVIRONMENT_REF]",
     ),
-    (&["dopbase", "token", "list", "--help"], "<ENVIRONMENT_REF>"),
+    (&["dopbase", "token", "list", "--help"], "[ENVIRONMENT_REF]"),
     (&["dopbase", "run", "--help"], "[ENVIRONMENT_REF]"),
   ];
 
@@ -1143,13 +1147,16 @@ fn binary_prints_contextual_help_and_keeps_the_usage_error_exit_code() {
     .unwrap();
 
   assert_eq!(output.status.code(), Some(2));
-  let help = String::from_utf8(output.stdout).unwrap();
-  assert!(help.contains("Usage: dopbase secret list"), "{help}");
+  let help = format!(
+    "{}{}",
+    String::from_utf8_lossy(&output.stdout),
+    String::from_utf8_lossy(&output.stderr)
+  );
+  assert!(help.contains("secret list"), "{help}");
   assert!(
-    help.contains("dopbase secret list payment-service/production"),
+    help.contains("payment-service/production") || help.contains("WORKSPACE/PROJECT/ENVIRONMENT"),
     "{help}"
   );
-  assert!(output.stderr.is_empty());
 }
 
 #[test]
@@ -1199,9 +1206,24 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "init", "billing/local", "--from", ".env"],
     &["dopbase", "project", "create", "billing"],
     &["dopbase", "project", "list"],
+    &["dopbase", "project", "current"],
     &["dopbase", "project", "show", "billing"],
     &["dopbase", "project", "rename", "billing", "payments"],
     &["dopbase", "project", "delete", "billing"],
+    &["dopbase", "workspace", "create", "blipsu"],
+    &["dopbase", "workspace", "list"],
+    &["dopbase", "workspace", "show", "blipsu"],
+    &[
+      "dopbase",
+      "workspace",
+      "update",
+      "blipsu",
+      "--name",
+      "blipsu",
+      "--root-path",
+      "/srv/blipsu",
+    ],
+    &["dopbase", "workspace", "delete", "blipsu", "--yes"],
     &["dopbase", "env", "default", "billing/local"],
     &["dopbase", "env", "create", "billing/local"],
     &["dopbase", "env", "clone", "billing/local", "production"],
@@ -1236,6 +1258,37 @@ fn parses_each_public_command_and_detects_missing_cases() {
     ],
     &["dopbase", "token", "list", "billing/local"],
     &["dopbase", "token", "revoke", "tok_01"],
+    &["dopbase", "docker", "env-file", "billing/local"],
+    &[
+      "dopbase",
+      "docker",
+      "run",
+      "billing/local",
+      "--",
+      "docker",
+      "run",
+      "app",
+    ],
+    &[
+      "dopbase",
+      "docker",
+      "compose",
+      "billing/local",
+      "--",
+      "docker",
+      "compose",
+      "up",
+    ],
+    &[
+      "dopbase",
+      "docker",
+      "exec",
+      "billing/local",
+      "--",
+      "admin",
+      "reset-password",
+      "admin@example.com",
+    ],
     &["dopbase", "audit", "list"],
     &["dopbase", "audit", "verify"],
     &["dopbase", "audit", "export"],

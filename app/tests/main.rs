@@ -217,7 +217,7 @@ async fn project_and_environment_conflicts_leave_existing_data_unchanged() {
   assert_eq!(status, 201);
   let project_id = initialized["data"]["project"]["id"].as_str().unwrap();
 
-  let (status, conflict, _) = call(
+  let (status, second_init, _) = call(
     &router,
     "POST",
     "/api/v1/projects/init",
@@ -225,14 +225,14 @@ async fn project_and_environment_conflicts_leave_existing_data_unchanged() {
     Some(json!({
       "projectName":"conflict-test",
       "environmentName":"staging",
-      "entries":[{"key":"SHOULD_NOT_EXIST","value":"private"}]
+      "entries":[{"key":"SECOND_APP","value":"allowed"}]
     })),
   )
   .await;
-  assert_eq!(status, 409);
-  assert_eq!(
-    conflict["error"]["PROJECT_ALREADY_EXISTS"],
-    "A project with this name already exists."
+  assert_eq!(status, 201);
+  assert_ne!(
+    second_init["data"]["project"]["id"].as_str().unwrap(),
+    project_id
   );
 
   let (status, conflict, _) = call(
@@ -723,6 +723,7 @@ async fn health_and_openapi_are_available() {
     "/api/v1/environments/{environment_id}/secrets/export",
     "/api/v1/environments/{environment_id}/secrets/runtime",
     "/api/v1/environments/{environment_id}/tokens",
+    "/api/v1/workspaces/{workspace_id}/tokens",
     "/api/v1/tokens/{token_id}/revoke",
     "/api/v1/audit-events",
     "/api/v1/backups",
@@ -1314,6 +1315,131 @@ async fn runner_expiry_is_enforced_and_existing_default_stays_unlimited() {
   )
   .await;
   assert_eq!(status, 400);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn workspace_runner_token_accesses_linked_environments_only() {
+  let (_directory, state, router) = test_app().await;
+  let admin = bootstrap_admin(&state, &router).await;
+  let (_, workspaces, _) = call(&router, "GET", "/api/v1/workspaces", Some(&admin), None).await;
+  let workspace_id = workspaces["data"][0]["id"].as_str().unwrap();
+
+  let mut linked_env_ids = Vec::new();
+  for name in ["linked-a", "linked-b"] {
+    let (status, _, _) = call(
+      &router,
+      "POST",
+      "/api/v1/projects",
+      Some(&admin),
+      Some(json!({"name":name})),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let (status, _, _) = call(
+      &router,
+      "PATCH",
+      &format!("/api/v1/projects/{name}/location"),
+      Some(&admin),
+      Some(json!({"workspaceId":workspace_id,"relativePath":name})),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (status, environment, _) = call(
+      &router,
+      "POST",
+      &format!("/api/v1/projects/{name}/environments"),
+      Some(&admin),
+      Some(json!({"name":"production"})),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let environment_id = environment["data"]["id"].as_str().unwrap();
+    linked_env_ids.push(environment_id.to_owned());
+    let secret_path = format!("/api/v1/environments/{environment_id}/secrets/KEY");
+    let (status, _, _) = call(
+      &router,
+      "PUT",
+      &secret_path,
+      Some(&admin),
+      Some(json!({"value":"linked-secret"})),
+    )
+    .await;
+    assert_eq!(status, 200);
+  }
+
+  let (status, _, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects",
+    Some(&admin),
+    Some(json!({"name":"orphan"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let (status, orphan_env, _) = call(
+    &router,
+    "POST",
+    "/api/v1/projects/orphan/environments",
+    Some(&admin),
+    Some(json!({"name":"production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let orphan_env_id = orphan_env["data"]["id"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "PUT",
+    &format!("/api/v1/environments/{orphan_env_id}/secrets/KEY"),
+    Some(&admin),
+    Some(json!({"value":"orphan-secret"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+
+  let token_path = format!("/api/v1/workspaces/{workspace_id}/tokens");
+  let (status, created, _) = call(
+    &router,
+    "POST",
+    &token_path,
+    Some(&admin),
+    Some(json!({"name":"ci","role":"workspace"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let workspace_token = created["data"]["plaintextToken"].as_str().unwrap();
+
+  for environment_id in &linked_env_ids {
+    let runtime = format!("/api/v1/environments/{environment_id}/secrets/runtime");
+    let (status, body, _) = call(&router, "GET", &runtime, Some(workspace_token), None).await;
+    assert_eq!(status, 200);
+    assert_eq!(body["data"]["entries"][0]["value"], "linked-secret");
+  }
+
+  let orphan_runtime = format!("/api/v1/environments/{orphan_env_id}/secrets/runtime");
+  let (status, _, _) = call(&router, "GET", &orphan_runtime, Some(workspace_token), None).await;
+  assert_eq!(status, 403);
+
+  let (status, created_runner, _) = call(
+    &router,
+    "POST",
+    &format!("/api/v1/environments/{}/tokens", linked_env_ids[0]),
+    Some(&admin),
+    Some(json!({"name":"env-only","role":"runner"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let env_runner = created_runner["data"]["plaintextToken"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router,
+    "GET",
+    &format!("/api/v1/environments/{}/secrets/runtime", linked_env_ids[1]),
+    Some(env_runner),
+    None,
+  )
+  .await;
+  assert_eq!(status, 403);
+
   state.db.close().await;
 }
 

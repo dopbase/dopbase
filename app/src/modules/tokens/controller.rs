@@ -38,6 +38,31 @@ pub async fn list(
   ))
 }
 
+/// List workspace runner tokens
+#[utoipa::path(
+  get,
+  path = crate::constants::api::tokens::WORKSPACE_COLLECTION,
+  tag = "tokens",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("workspace_id" = String, Path, description = "Workspace id")),
+  responses(
+    (status = 200, description = "Tokens fetched", body = inline(HttpResponseFormat<Vec<WorkspaceTokenMetadata>>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Only administrators may list tokens", body = crate::http::ErrorBody),
+    (status = 404, description = "The workspace was not found", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn list_workspace(
+  State(state): State<AppState>,
+  identity: AuthIdentity,
+  Path(workspace_id): Path<String>,
+) -> Result<HttpResponse<Vec<WorkspaceTokenMetadata>>, TokenError> {
+  Ok(HttpResponse::ok(
+    service::list_workspace(&state, &identity, &workspace_id).await?,
+    "TOKENS_FETCHED",
+  ))
+}
+
 /// Create a runner token
 ///
 /// Mint a new runner token for the environment. The plaintext token is
@@ -74,18 +99,50 @@ pub async fn create(
   ))
 }
 
-/// Revoke a runner token
+/// Create a workspace runner token
+#[utoipa::path(
+  post,
+  path = crate::constants::api::tokens::WORKSPACE_COLLECTION,
+  tag = "tokens",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("workspace_id" = String, Path, description = "Workspace id")),
+  request_body = CreateTokenRequest,
+  responses(
+    (status = 201, description = "Token created. The plaintext token is returned once", body = inline(HttpResponseFormat<CreatedWorkspaceTokenResponse>)),
+    (status = 400, description = "Invalid expiry. Use hours or days up to 3 years", body = crate::http::ErrorBody),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
+    (status = 404, description = "The workspace was not found", body = crate::http::ErrorBody),
+    (status = 409, description = "A token with this name already exists in the workspace", body = crate::http::ErrorBody),
+    (status = 422, description = "Token role or name is invalid", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn create_workspace(
+  State(state): State<AppState>,
+  headers: HeaderMap,
+  identity: AuthIdentity,
+  Path(workspace_id): Path<String>,
+  axum::Json(request): axum::Json<CreateTokenRequest>,
+) -> Result<HttpResponse<CreatedWorkspaceTokenResponse>, TokenError> {
+  require_mutation(&identity, &headers)?;
+  Ok(HttpResponse::created(
+    service::create_workspace(&state, &identity, &workspace_id, request).await?,
+    "TOKEN_CREATED",
+  ))
+}
+
+/// Revoke a runner or workspace token
 ///
-/// Permanently revoke a runner token. The change cannot be undone.
+/// Permanently revoke a token. The change cannot be undone.
 /// Requires the CSRF header for browser sessions.
 #[utoipa::path(
   post,
   path = crate::constants::api::tokens::REVOKE,
   tag = "tokens",
   security(("bearerAuth" = []), ("cookieAuth" = [])),
-  params(("token_id" = String, Path, description = "Runner token id")),
+  params(("token_id" = String, Path, description = "Runner or workspace token id")),
   responses(
-    (status = 200, description = "Token revoked", body = inline(HttpResponseFormat<TokenMetadata>)),
+    (status = 200, description = "Token revoked", body = inline(HttpResponseFormat<RevokedTokenMetadata>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The token was not found", body = crate::http::ErrorBody),
@@ -97,7 +154,7 @@ pub async fn revoke(
   headers: HeaderMap,
   identity: AuthIdentity,
   Path(id): Path<String>,
-) -> Result<HttpResponse<TokenMetadata>, TokenError> {
+) -> Result<HttpResponse<RevokedTokenMetadata>, TokenError> {
   require_mutation(&identity, &headers)?;
   Ok(HttpResponse::ok(
     service::revoke(&state, &identity, &id).await?,

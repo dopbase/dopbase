@@ -15,8 +15,9 @@ A project represents one application or service, such as `payment-service`,
 
 Projects provide the scope for environments, membership, service tokens, and
 audit history. A project name should identify the application rather than the
-team that happens to own it today. Names are unique within one Dopbase server,
-and every project also receives an immutable ID.
+team that happens to own it today. Names are unique within a **workspace**
+(see [Workspace paths (design)](./workspace-paths)), and every project also
+receives an immutable ID.
 
 Manage projects explicitly:
 

@@ -45,6 +45,8 @@ pub struct StatusResponse {
   pub ai_agents: i64,
   /// Count of active unrevoked runner tokens.
   pub active_runner_tokens: i64,
+  /// Count of active unrevoked workspace runner tokens.
+  pub active_workspace_tokens: i64,
   /// Count of active unexpired and unrevoked agent tokens.
   pub active_agent_tokens: i64,
   /// Count of backup archives on disk.

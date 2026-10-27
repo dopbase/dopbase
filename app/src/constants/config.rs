@@ -43,6 +43,7 @@ pub const ENV_RUN_ENVIRONMENT: &str = "DOPBASE_ENV";
 pub const ENV_SERVER_URL: &str = "DOPBASE_URL";
 pub const ENV_SHUTDOWN_GRACE_SECONDS: &str = "DOPBASE_SHUTDOWN_GRACE_SECONDS";
 pub const ENV_TOKEN: &str = "DOPBASE_TOKEN";
+pub const ENV_CONTAINER: &str = "DOPBASE_CONTAINER";
 /// Not read yet; reserved so a future file-mount mode cannot be spoofed by a
 /// stored secret.
 pub const ENV_SECRETS_PATH: &str = "DOPBASE_SECRETS_PATH";
@@ -85,9 +86,10 @@ pub const RUN_SENSITIVE_NAMES: [&str; 5] = [
 ];
 
 /// Every environment variable read by the Dopbase executable.
-pub const fn executable_environment_names() -> [&'static str; 15] {
+pub const fn executable_environment_names() -> [&'static str; 16] {
   [
     ENV_TOKEN,
+    ENV_CONTAINER,
     ENV_SERVER_URL,
     ENV_RUN_ENVIRONMENT,
     ENV_ROOT_EMAIL,

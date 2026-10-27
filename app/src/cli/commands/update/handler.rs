@@ -48,9 +48,23 @@ pub fn update_message(status: &UpdateStatus) -> String {
      Latest version   {VERSION}{}{VERSION:#}\n\
      Release notes    {}\n\n\
      {HEADING}Stop every running Dopbase server before updating.{HEADING:#}\n\
-     Then run:\n\n  {COMMAND}curl -fsSL https://dopbase.com/install.sh | sh{COMMAND:#}",
-    status.current_version, status.latest_version, status.release_url
+     Then run:\n\n  {COMMAND}{}{COMMAND:#}",
+    status.current_version,
+    status.latest_version,
+    status.release_url,
+    install_command_hint()
   )
+}
+
+fn install_command_hint() -> &'static str {
+  #[cfg(windows)]
+  {
+    "irm https://dopbase.com/install.ps1 | iex"
+  }
+  #[cfg(not(windows))]
+  {
+    "curl -fsSL https://dopbase.com/install.sh | sh"
+  }
 }
 
 #[doc(hidden)]

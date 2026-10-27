@@ -48,9 +48,28 @@ function pack(root, os = "darwin", arch = "arm64") {
   assert.equal(result.status, 0, result.stderr);
   return join(root, "assets", `dopbase_1.2.3_${os}_${arch}.tar.gz`);
 }
+function windowsZip(root) {
+  writeFileSync(join(root, "dopbase.exe"), "dopbase");
+  const script = [
+    "import sys, zipfile",
+    "root, archive = sys.argv[1], sys.argv[2]",
+    "with zipfile.ZipFile(archive, 'w') as bundle:",
+    "    for name in ['dopbase.exe', 'CHANGELOG.md', 'LICENSE', 'NOTICE']:",
+    "        bundle.write(root + '/' + name, name)",
+  ].join("\n");
+  const archive = join(root, "assets/dopbase_1.2.3_windows_amd64.zip");
+  for (const command of ["python3", "python"]) {
+    const result = spawnSync(command, ["-c", script, root.replaceAll("\\", "/"), archive], {
+      encoding: "utf8",
+    });
+    if (result.status === 0) return archive;
+  }
+  throw new Error("python is required to build the Windows release fixture");
+}
 function bundle(root) {
   for (const os of ["darwin", "linux"])
     for (const arch of ["amd64", "arm64"]) pack(root, os, arch);
+  windowsZip(root);
   const result = run(root, "verify-assets.sh", ["1.2.3", join(root, "assets")]);
   assert.equal(result.status, 0, result.stderr);
   writeFileSync(join(root, "assets/release-notes.md"), "Release notes\n");
@@ -185,7 +204,7 @@ for (const status of ["404", "200"])
     assert.equal(result.status, 0, result.stderr);
     const commands = readFileSync(join(root, "commands"), "utf8");
     assert.equal(commands.includes("release create"), status === "404");
-    assert.equal((commands.match(/release upload/g) ?? []).length, 5);
+    assert.equal((commands.match(/release upload/g) ?? []).length, 6);
     assert.ok(
       commands.lastIndexOf("release download") <
         commands.indexOf("--draft=false"),

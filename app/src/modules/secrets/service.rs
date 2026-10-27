@@ -4,7 +4,7 @@ use crate::{
   constants::{
     errors::{
       IMPORT_DUPLICATE_KEY, SECRET_COUNT_LIMIT_MESSAGE, SECRET_LIMIT_EXCEEDED,
-      SECRET_TOTAL_SIZE_LIMIT_MESSAGE, TOKEN_SCOPE_INVALID,
+      SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
     },
     limits::{MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
   },
@@ -712,15 +712,10 @@ pub async fn export(
       let (admin_id, email) = require_project_manager(identity)?;
       (identity.audit_actor_type(), admin_id, Some(email))
     }
-    AuthIdentity::Runner {
-      token_id,
-      environment_id,
-    } if environment_id == id => ("runner", token_id.as_str(), None),
-    AuthIdentity::Runner { .. } => {
-      return Err(HttpError::forbidden(
-        TOKEN_SCOPE_INVALID,
-        "The runner token cannot access this environment.",
-      ));
+    AuthIdentity::Runner { token_id, .. } => {
+      crate::modules::tokens::access::runner_may_access_environment(state.db.pool(), identity, id)
+        .await?;
+      ("runner", token_id.as_str(), None)
     }
     AuthIdentity::ServiceAccount { .. } => {
       return Err(HttpError::forbidden(
@@ -782,15 +777,10 @@ pub async fn runtime(
       admin_id.as_str(),
       Some(email.as_str()),
     ),
-    AuthIdentity::Runner {
-      token_id,
-      environment_id,
-    } if environment_id == id => ("runner", token_id.as_str(), None),
-    AuthIdentity::Runner { .. } => {
-      return Err(HttpError::forbidden(
-        TOKEN_SCOPE_INVALID,
-        "The runner token cannot access this environment.",
-      ));
+    AuthIdentity::Runner { token_id, .. } => {
+      crate::modules::tokens::access::runner_may_access_environment(state.db.pool(), identity, id)
+        .await?;
+      ("runner", token_id.as_str(), None)
     }
     AuthIdentity::ServiceAccount { .. } => {
       return Err(HttpError::forbidden(

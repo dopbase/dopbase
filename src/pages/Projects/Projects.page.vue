@@ -4,6 +4,7 @@ import { useProjectsController } from "./Projects.controller";
 import ProjectRail from "./components/ProjectRail.vue";
 import SecretsPanel from "./components/SecretsPanel.vue";
 import TokensPanel from "./components/TokensPanel.vue";
+import EnvironmentsOverviewPanel from "./components/EnvironmentsOverviewPanel.vue";
 import NameDialog from "./components/NameDialog.vue";
 import { DashboardLayout } from "~/layouts";
 import {
@@ -11,15 +12,9 @@ import {
   DbButton,
   DbCopyButton,
   DbEmptyState,
-  DbSheet,
   DbSkeleton,
 } from "~/components/ui";
-import {
-  BoxIcon,
-  ChevronDownIcon,
-  FolderIcon,
-  LayersIcon,
-} from "~/assets/icons";
+import { BoxIcon, FolderIcon, LayersIcon, SlidersHorizontalIcon } from "~/assets/icons";
 
 /**
  * Projects is the authenticated project and environment screen.
@@ -27,61 +22,58 @@ import {
  * Left: project/environment keyline rail. Right: the selected
  * environment's secrets or runner tokens. Empty states explain the
  * project/environment model and offer the primary actions.
- *
- * Below `lg` the rail folds away: a switcher row names the current
- * project and environment and opens the same rail in a sheet, which
- * closes once an environment is chosen.
  */
 const controller = useProjectsController();
 const showCreateProject = ref(false);
-const railOpen = ref(false);
+const projectRailOpen = ref(false);
 // Destructure so refs auto-unwrap in the template.
-const { projects, project, selectedEnvironment, activeTab, selectProject } =
-  controller;
+const {
+  projects,
+  project,
+  selectedEnvironment,
+  activeTab,
+  selectProject,
+  isProjectOverview,
+  projectRef,
+} = controller;
 
-watch(
-  () => selectedEnvironment.value?.id,
-  () => {
-    railOpen.value = false;
-  },
-);
+watch(projectRef, () => {
+  projectRailOpen.value = false;
+});
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="flex min-h-[calc(100svh-3rem)] lg:min-h-svh">
-      <ProjectRail
-        class="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r border-line bg-panel/60 lg:flex"
-        :controller="controller" />
+    <div class="relative flex min-h-svh flex-col md:flex-row">
+      <button
+        v-if="projectRailOpen"
+        type="button"
+        class="fixed inset-0 z-50 bg-ink/40 md:hidden"
+        aria-label="Close projects menu"
+        @click="projectRailOpen = false" />
 
-      <section class="min-w-0 flex-1">
-        <!-- Narrow screens: the rail lives behind this switcher -->
-        <div
-          v-if="projects && projects.length > 0"
-          class="border-b border-line px-2 py-1 lg:hidden">
+      <ProjectRail
+        :controller="controller"
+        :mobile-open="projectRailOpen"
+        @close="projectRailOpen = false" />
+
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header
+          class="flex shrink-0 items-center gap-2 border-b border-line-soft px-4 py-3 md:hidden">
           <button
             type="button"
-            class="flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-control px-2 font-mono text-sm text-ink-strong transition-colors hover:bg-raised"
-            :aria-expanded="railOpen"
-            data-testid="project-switcher"
-            @click="railOpen = true">
-            <FolderIcon class="h-4 w-4 shrink-0 text-ink-faint" />
-            <span class="truncate">
-              <template v-if="project">
-                {{ project.name
-                }}<template v-if="selectedEnvironment">
-                  <span class="text-ink-faint"> / </span
-                  >{{ selectedEnvironment.name }}</template
-                >
-              </template>
-              <template v-else>Choose project</template>
-            </span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-ink-faint" />
+            class="cursor-pointer rounded-control bg-raised p-1.5 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong"
+            aria-label="Open projects"
+            data-testid="open-project-rail"
+            @click="projectRailOpen = true">
+            <SlidersHorizontalIcon class="h-4 w-4" />
           </button>
-        </div>
-
+          <span class="min-w-0 truncate font-mono text-sm text-ink-strong">
+            {{ project?.name ?? "Projects" }}
+          </span>
+        </header>
         <!-- No projects yet: explain the model -->
-        <div v-if="projects && projects.length === 0" class="p-4 sm:p-10">
+        <div v-if="projects && projects.length === 0" class="p-10">
           <DbEmptyState
             title="No projects yet"
             description="A project is one application or service. Each project holds environments like development, staging, and production, and every environment stores its own encrypted secret values.">
@@ -103,12 +95,12 @@ watch(
           data-testid="projects-page-skeleton">
           <!-- Header skeleton -->
           <div
-            class="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
+            class="flex items-center justify-between border-b border-line px-6 py-4">
             <DbSkeleton class="h-4 w-40" />
             <DbSkeleton class="h-7 w-36 rounded-control" />
           </div>
           <!-- Body skeleton -->
-          <div class="p-4 sm:p-6">
+          <div class="p-6">
             <div class="mb-4 flex items-center justify-between gap-4">
               <DbSkeleton class="h-8 w-64 rounded-control" />
               <div class="flex gap-2">
@@ -153,21 +145,31 @@ watch(
           </div>
         </div>
 
+        <!-- All environments overview -->
+        <template v-else-if="isProjectOverview && project">
+          <header
+            class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-6 py-4">
+            <nav
+              class="flex items-center gap-1.5 font-mono text-sm text-ink-muted">
+              <span class="text-ink-strong">{{ project.name }}</span>
+              <span class="text-ink-faint">/</span>
+              <span class="text-accent-strong">all environments</span>
+            </nav>
+          </header>
+          <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
+            <EnvironmentsOverviewPanel
+              :controller="controller"
+              :project-name="project.name" />
+          </div>
+        </template>
+
         <!-- Project selected but has no environments -->
-        <div v-else-if="project && !selectedEnvironment" class="p-4 sm:p-10">
+        <div v-else-if="project && !selectedEnvironment" class="p-10">
           <DbEmptyState
             title="No environments"
             description="Environments hold the values a project needs in one context development, staging, production. Create the first one to start storing secrets.">
             <template #icon>
               <LayersIcon class="h-5 w-5" />
-            </template>
-            <template #actions>
-              <DbButton
-                class="lg:hidden"
-                variant="secondary"
-                @click="railOpen = true">
-                Open project list
-              </DbButton>
             </template>
           </DbEmptyState>
         </div>
@@ -175,36 +177,29 @@ watch(
         <!-- Selected environment -->
         <template v-else-if="selectedEnvironment">
           <header
-            class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:px-6 sm:py-4">
-            <nav
-              class="hidden items-center gap-1.5 font-mono text-sm text-ink-muted lg:flex">
-              <button
-                type="button"
-                class="cursor-pointer transition-colors hover:text-ink-strong"
-                @click="selectProject(project!.name)">
-                {{ project!.name }}
-              </button>
-              <span class="text-ink-faint">/</span>
-              <span class="text-ink-strong">
-                {{ selectedEnvironment.name }}
-              </span>
-            </nav>
-
-            <div class="flex min-w-0 items-center gap-2">
-              <DbBadge
-                class="min-w-0 max-w-[16ch] truncate sm:max-w-none"
-                :title="selectedEnvironment.id"
-                data-testid="environment-id">
-                {{ selectedEnvironment.id }}
-              </DbBadge>
-              <DbCopyButton :value="selectedEnvironment.id" label="Copy ID" />
-            </div>
-
+            class="flex flex-col gap-3 border-b border-line px-4 py-4 sm:px-6"
+            data-testid="environment-header">
             <div
-              class="flex w-full items-center gap-1 rounded-control border border-line bg-panel p-1 sm:ml-auto sm:w-auto">
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <nav
+                class="flex min-w-0 items-center gap-1.5 font-mono text-sm text-ink-muted">
+                <button
+                  type="button"
+                  class="min-w-0 shrink cursor-pointer truncate transition-colors hover:text-ink-strong"
+                  @click="selectProject(project!.name)">
+                  {{ project!.name }}
+                </button>
+                <span class="shrink-0 text-ink-faint">/</span>
+                <span class="min-w-0 truncate text-ink-strong">
+                  {{ selectedEnvironment.name }}
+                </span>
+              </nav>
+
+              <div
+                class="flex w-fit shrink-0 items-center gap-1 self-start rounded-control border border-line bg-panel p-1 sm:self-auto">
               <button
                 type="button"
-                class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
+                class="cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors"
                 :class="
                   activeTab === 'secrets'
                     ? 'bg-accent-soft text-ink-strong'
@@ -215,7 +210,7 @@ watch(
               </button>
               <button
                 type="button"
-                class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
+                class="cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors"
                 :class="
                   activeTab === 'tokens'
                     ? 'bg-accent-soft text-ink-strong'
@@ -224,10 +219,18 @@ watch(
                 @click="controller.switchTab('tokens')">
                 tokens
               </button>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <DbBadge data-testid="environment-id" class="max-w-full truncate">
+                {{ selectedEnvironment.id }}
+              </DbBadge>
+              <DbCopyButton :value="selectedEnvironment.id" label="Copy ID" />
             </div>
           </header>
 
-          <div class="p-4 sm:p-6">
+          <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
             <SecretsPanel
               v-if="activeTab === 'secrets'"
               :environment-id="selectedEnvironment.id"
@@ -238,35 +241,17 @@ watch(
         </template>
 
         <!-- Projects page without a selected project -->
-        <div v-else class="p-4 sm:p-10">
+        <div v-else class="p-10">
           <DbEmptyState
             title="Select a project"
-            description="Pick a project from the list, or create one to get started.">
+            description="Pick a project from the rail, or create one to get started.">
             <template #icon>
               <FolderIcon class="h-5 w-5" />
-            </template>
-            <template #actions>
-              <DbButton
-                class="lg:hidden"
-                variant="primary"
-                @click="railOpen = true">
-                Choose project
-              </DbButton>
             </template>
           </DbEmptyState>
         </div>
       </section>
     </div>
-
-    <!-- Narrow screens: the rail in a sheet -->
-    <DbSheet
-      :open="railOpen"
-      title="Projects and environments"
-      @close="railOpen = false">
-      <ProjectRail
-        class="flex min-h-0 flex-1 flex-col"
-        :controller="controller" />
-    </DbSheet>
 
     <!-- Create project from the zero state -->
     <NameDialog

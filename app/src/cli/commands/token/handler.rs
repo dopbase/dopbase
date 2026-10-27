@@ -1,5 +1,5 @@
 use super::TokenCommand;
-use crate::cli::{commands::environment, output};
+use crate::cli::{commands::environment, commands::workspace, output};
 use crate::{
   cli::{client, local_config},
   constants::api as api_paths,
@@ -17,46 +17,108 @@ pub(crate) async fn execute(
   match command {
     TokenCommand::Create {
       environment,
+      workspace,
       name,
       role,
       expires_in,
     } => {
-      let env = environment::resolve_environment(&api, &environment).await?;
-      let data = api
-        .request(
-          Method::POST,
-          &api_paths::tokens::collection(environment::env_id(&env)?),
-          Some(json!({"name":name,"role":role,"expiresIn":expires_in})),
-        )
-        .await?;
-      if json_output {
-        output::print_json(&data)?;
+      if let Some(workspace_ref) = workspace {
+        let workspace_id = workspace::resolve_workspace_id(&api, &workspace_ref).await?;
+        let role = if role == "runner" {
+          "workspace".to_string()
+        } else {
+          role
+        };
+        let data = api
+          .request(
+            Method::POST,
+            &api_paths::tokens::workspace_collection(&workspace_id),
+            Some(json!({"name":name,"role":role,"expiresIn":expires_in})),
+          )
+          .await?;
+        if json_output {
+          output::print_json(&data)?;
+        } else {
+          let token = data.get("token").unwrap_or(&serde_json::Value::Null);
+          output::print_success(&format!(
+            "Created token {name} for workspace {workspace_ref}."
+          ));
+          output::print_fields(&[
+            ("ID:", output::string(token, "id")),
+            (
+              "Expires:",
+              token
+                .get("expiresAt")
+                .and_then(|value| value.as_str())
+                .map_or_else(|| "never".into(), str::to_owned),
+            ),
+            ("Token:", output::string(&data, "plaintextToken")),
+          ]);
+          output::print_warning("Store this token now. Dopbase will not show it again.");
+        }
       } else {
-        let token = data.get("token").unwrap_or(&serde_json::Value::Null);
-        output::print_success(&format!("Created token {name} for {environment}."));
-        output::print_fields(&[
-          ("ID:", output::string(token, "id")),
-          (
-            "Expires:",
-            token
-              .get("expiresAt")
-              .and_then(|value| value.as_str())
-              .map_or_else(|| "never".into(), str::to_owned),
-          ),
-          ("Token:", output::string(&data, "plaintextToken")),
-        ]);
-        output::print_warning("Store this token now. Dopbase will not show it again.");
+        let environment = environment
+          .as_deref()
+          .ok_or_else(|| anyhow::anyhow!("environment reference or --workspace is required"))?;
+        let env = environment::resolve_environment(&api, environment).await?;
+        let data = api
+          .request(
+            Method::POST,
+            &api_paths::tokens::collection(environment::env_id(&env)?),
+            Some(json!({"name":name,"role":role,"expiresIn":expires_in})),
+          )
+          .await?;
+        if json_output {
+          output::print_json(&data)?;
+        } else {
+          let token = data.get("token").unwrap_or(&serde_json::Value::Null);
+          output::print_success(&format!("Created token {name} for {environment}."));
+          output::print_fields(&[
+            ("ID:", output::string(token, "id")),
+            (
+              "Expires:",
+              token
+                .get("expiresAt")
+                .and_then(|value| value.as_str())
+                .map_or_else(|| "never".into(), str::to_owned),
+            ),
+            ("Token:", output::string(&data, "plaintextToken")),
+          ]);
+          output::print_warning("Store this token now. Dopbase will not show it again.");
+        }
       }
     }
-    TokenCommand::List { environment } => {
-      let env = environment::resolve_environment(&api, &environment).await?;
-      let data = api
-        .request(
-          Method::GET,
-          &api_paths::tokens::collection(environment::env_id(&env)?),
-          None,
+    TokenCommand::List {
+      environment,
+      workspace,
+    } => {
+      let (data, empty_label) = if let Some(workspace_ref) = workspace {
+        let workspace_id = workspace::resolve_workspace_id(&api, &workspace_ref).await?;
+        let data = api
+          .request(
+            Method::GET,
+            &api_paths::tokens::workspace_collection(&workspace_id),
+            None,
+          )
+          .await?;
+        (
+          data,
+          format!("No tokens found for workspace {workspace_ref}."),
         )
-        .await?;
+      } else {
+        let environment = environment
+          .as_deref()
+          .ok_or_else(|| anyhow::anyhow!("environment reference or --workspace is required"))?;
+        let env = environment::resolve_environment(&api, environment).await?;
+        let data = api
+          .request(
+            Method::GET,
+            &api_paths::tokens::collection(environment::env_id(&env)?),
+            None,
+          )
+          .await?;
+        (data, format!("No tokens found for {environment}."))
+      };
       if json_output {
         output::print_json(&data)?;
       } else {
@@ -92,7 +154,7 @@ pub(crate) async fn execute(
         output::print_table(
           &["NAME", "ID", "STATUS", "EXPIRES", "LAST USED", "CREATED"],
           &rows,
-          &format!("No tokens found for {environment}."),
+          &empty_label,
           &format!("{} token(s)", rows.len()),
         );
       }

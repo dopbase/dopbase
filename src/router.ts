@@ -4,10 +4,9 @@ import { installRouterGuards } from "./router.guards";
 /**
  * Route table for the Admin UI.
  *
- * Selection state lives in the URL: a project is addressed by its unique
- * name (`/projects/p/:projectRef`) and an environment by its immutable id
- * (`/projects/p/:projectRef/e/:environmentId`). No global "active
- * environment" is stored anywhere else.
+ * Project selection lives in the URL as
+ * `/projects/:workspaceSlug/:projectRef/:environmentName`, with `all` as the
+ * environment segment for the multi-environment overview.
  */
 export const router = createRouter({
   history: createWebHistory(),
@@ -41,21 +40,46 @@ export const router = createRouter({
     },
     {
       path: "/projects/p/:projectRef",
+      redirect: { name: "projects" },
+    },
+    {
+      path: "/projects/p/:projectRef/all",
+      redirect: { name: "projects" },
+    },
+    {
+      path: "/projects/p/:projectRef/e/:environmentId",
+      redirect: { name: "projects" },
+    },
+    {
+      path: "/projects/p/:projectRef/e/:environmentId/tokens",
+      redirect: { name: "projects" },
+    },
+    {
+      path: "/projects/p/:projectRef/e/:environmentId/import",
+      redirect: { name: "projects" },
+    },
+    {
+      path: "/projects/:workspaceSlug/:projectRef",
       name: "project",
       component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/projects/p/:projectRef/e/:environmentId",
+      path: "/projects/:workspaceSlug/:projectRef/all",
+      name: "project-overview",
+      component: () => import("~/pages/Projects/Projects.page.vue"),
+    },
+    {
+      path: "/projects/:workspaceSlug/:projectRef/:environmentName",
       name: "environment",
       component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/projects/p/:projectRef/e/:environmentId/tokens",
+      path: "/projects/:workspaceSlug/:projectRef/:environmentName/tokens",
       name: "environment-tokens",
       component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
-      path: "/projects/p/:projectRef/e/:environmentId/import",
+      path: "/projects/:workspaceSlug/:projectRef/:environmentName/import",
       name: "environment-import",
       component: () => import("~/pages/Projects/ImportSecrets.page.vue"),
     },

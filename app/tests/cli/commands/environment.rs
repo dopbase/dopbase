@@ -79,6 +79,34 @@ fn save_session(
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn env_create_expands_default_workspace_shorthand_for_the_request() {
+  let (request, url, server) = start_server().await;
+  let directory = TempDir::new().unwrap();
+  save_session(&directory, &url);
+
+  let output = Command::new(env!("CARGO_BIN_EXE_dopbase"))
+    .args([
+      "--server",
+      &url,
+      "--data-dir",
+      directory.path().to_str().unwrap(),
+      "--json",
+      "env",
+      "create",
+      "/storefront/staging",
+    ])
+    .output()
+    .unwrap();
+  server.abort();
+
+  assert!(output.status.success(), "{output:?}");
+  assert_eq!(
+    request.project.lock().unwrap().as_deref(),
+    Some("default/storefront")
+  );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn env_create_splits_a_qualified_target_for_the_request() {
   let (request, url, server) = start_server().await;
   let directory = TempDir::new().unwrap();

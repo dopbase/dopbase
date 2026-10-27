@@ -16,7 +16,8 @@ pub enum AuthIdentity {
   },
   Runner {
     token_id: String,
-    environment_id: String,
+    environment_id: Option<String>,
+    workspace_id: Option<String>,
   },
   ServiceAccount {
     service_account_id: String,

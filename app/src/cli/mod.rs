@@ -3,12 +3,14 @@ pub mod args;
 pub mod client;
 #[doc(hidden)]
 pub mod commands;
+pub mod container;
 mod docker_env;
 pub mod dotenv;
 #[doc(hidden)]
 pub mod environment_target;
 #[doc(hidden)]
 pub mod local_config;
+mod project_resolve;
 #[doc(hidden)]
 pub use commands::run::cache as runtime_cache;
 #[doc(hidden)]

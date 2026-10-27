@@ -56,7 +56,7 @@ fn interactive_init_validates_targets_and_rejects_existing_projects() {
   );
   assert_eq!(
     validate_interactive_target("payment", &existing).unwrap_err(),
-    "Environment target must use PROJECT/ENVIRONMENT, for example payment-service/local."
+    "Environment target must use PROJECT/ENVIRONMENT, WORKSPACE/PROJECT/ENVIRONMENT, or /PROJECT/ENVIRONMENT for the default workspace, for example payment-service/local, workspace1/api/staging, or /storefront/staging."
   );
   assert_eq!(
     validate_interactive_target("payment-service/local", &existing).unwrap_err(),

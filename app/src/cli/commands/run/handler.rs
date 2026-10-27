@@ -23,6 +23,12 @@ pub(crate) async fn execute(
     preserve_env,
   };
   let api = client::any_authenticated_client(server).await?;
+  let environment = match environment {
+    Some(reference) => {
+      Some(crate::cli::project_resolve::complete_environment_reference(&api, &reference).await?)
+    }
+    None => None,
+  };
   let selection = run_environment(
     environment,
     env::var(ENV_RUN_ENVIRONMENT),

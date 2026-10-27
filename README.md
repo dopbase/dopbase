@@ -17,7 +17,7 @@
   <a href="https://github.com/dopbase/dopbase/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/dopbase/dopbase/release.yml?style=flat-square&label=release" alt="Release workflow status" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/dopbase/dopbase?style=flat-square&color=863BFF" alt="Apache 2.0 license" /></a>
   <a href="https://dopbase.com"><img src="https://img.shields.io/badge/website-dopbase.com-863BFF?style=flat-square" alt="Dopbase website" /></a>
-  <a href="./docs/guide/quick-start.md"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-863BFF?style=flat-square" alt="Supported platforms: macOS and Linux" /></a>
+  <a href="./docs/guide/quick-start.md"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-863BFF?style=flat-square" alt="Supported platforms: macOS, Linux, and Windows" /></a>
   <a href="./docs/guide/quick-start.md"><img src="https://img.shields.io/badge/arch-AMD64%20%7C%20ARM64-863BFF?style=flat-square" alt="Supported architectures: AMD64 and ARM64" /></a>
 </p>
 
@@ -48,12 +48,21 @@
 
 Dopbase keeps application secrets organized by project and environment on infrastructure you control. Runtime data stays separate from the executable: its SQLite database, configuration, and master key live under `~/.dopbase` by default.
 
+Every push to `main` builds and publishes a `linux/amd64` container image to GitHub Container Registry at `ghcr.io/<repository>` with tags `main`, `latest`, the `package.json` version, and the short commit SHA (workflow: `.github/workflows/container.yml`). Optional native `linux/arm64` images use `.github/workflows/container-arm.yml` (manual dispatch).
+
 ## Quick start
 
 Install the latest release on macOS or Linux and start it:
 
 ```bash
 curl -fsSL https://dopbase.com/install.sh | sh
+dopbase server start
+```
+
+On Windows, use PowerShell or [Git Bash](https://gitforwindows.org/) (MinGW):
+
+```powershell
+irm https://dopbase.com/install.ps1 | iex
 dopbase server start
 ```
 
@@ -76,7 +85,62 @@ resets still require explicit setup.
 The [quick-start guide](./docs/guide/quick-start.md)
 covers sign-in, importing a `.env` file, and running an application with its secrets.
 
-Native release archives are available for macOS and Linux on AMD64 and ARM64.
+Native release archives are available for macOS and Linux on AMD64 and ARM64, and for Windows on AMD64.
+
+### Install from this repository
+
+The installers in `scripts/` download a release archive from GitHub, verify its
+SHA-256 checksum, and place the `dopbase` binary on your `PATH`. They accept the
+same environment variables as the hosted installers (`DOPBASE_VERSION`,
+`DOPBASE_INSTALL_DIR`, `DOPBASE_REPOSITORY_URL`, and `DOPBASE_DOWNLOAD_BASE_URL`).
+
+From a clone of this repository, the script installs a published release when the
+archive exists. If a Windows archive is not published yet (for example before the
+first Windows release), the installer builds from the checkout instead:
+
+```bash
+./scripts/install.sh
+```
+
+```powershell
+.\scripts\install.ps1
+```
+
+Force a local build at any time:
+
+```bash
+./scripts/install.sh --from-source
+```
+
+```powershell
+.\scripts\install.ps1 -FromSource
+```
+
+Without cloning, point the script at this repository (replace `main` with a
+release tag or branch if needed):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dopbase/dopbase/main/scripts/install.sh | sh
+```
+
+```powershell
+irm https://raw.githubusercontent.com/dopbase/dopbase/main/scripts/install.ps1 | iex
+```
+
+Default install locations:
+
+| Shell | Default directory |
+| ----- | ----------------- |
+| macOS / Linux (`install.sh`) | `~/.local/bin/dopbase` |
+| Windows PowerShell (`install.ps1`) | `%LOCALAPPDATA%\Dopbase\bin\dopbase.exe` |
+| Git Bash / MinGW (`install.sh`) | `%LOCALAPPDATA%\Dopbase\bin\dopbase.exe` |
+
+On Windows, run `dopbase server start` in the foreground. Background
+`server start --background`, `server stop`, and `server restart` are available
+on macOS and Linux only. A Docker container is started and stopped by Docker,
+not by those commands.
+State still lives under `%USERPROFILE%\.dopbase` unless you set `--data-dir` or
+`DOPBASE_DATA_DIR`.
 
 ## CLI reference
 

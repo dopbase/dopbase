@@ -20,10 +20,39 @@ fn map_unique(error: sqlx::Error) -> HttpError {
   if error.to_string().contains("UNIQUE") {
     HttpError::conflict(
       "PROJECT_ALREADY_EXISTS",
-      "A project with this name already exists.",
+      "A project with this name already exists in the workspace.",
     )
   } else {
     HttpError::from(error)
+  }
+}
+
+async fn ensure_name_available_in_workspace(
+  pool: &sqlx::SqlitePool,
+  workspace_id: &str,
+  name: &str,
+  exclude_project_id: Option<&str>,
+) -> Result<(), HttpError> {
+  if repository::name_taken_in_workspace(pool, workspace_id, name, exclude_project_id).await? {
+    return Err(HttpError::conflict(
+      "PROJECT_ALREADY_EXISTS",
+      "A project with this name already exists in the workspace.",
+    ));
+  }
+  Ok(())
+}
+
+fn map_show(matches: Vec<ProjectResponse>) -> Result<ProjectResponse, HttpError> {
+  match matches.len() {
+    0 => Err(HttpError::not_found(
+      "PROJECT_NOT_FOUND",
+      "The requested project was not found.",
+    )),
+    1 => Ok(matches[0].clone()),
+    _ => Err(HttpError::conflict(
+      "PROJECT_REFERENCE_AMBIGUOUS",
+      "Multiple projects match this reference. Use WORKSPACE/PROJECT or the project ID.",
+    )),
   }
 }
 pub async fn list(state: &AppState) -> Result<Vec<ProjectResponse>, HttpError> {
@@ -33,11 +62,7 @@ pub async fn show(
   state: &AppState,
   reference: &str,
 ) -> Result<ProjectResponse, HttpError> {
-  repository::find(state.db.pool(), reference)
-    .await?
-    .ok_or_else(|| {
-      HttpError::not_found("PROJECT_NOT_FOUND", "The requested project was not found.")
-    })
+  map_show(repository::find_all(state.db.pool(), reference).await?)
 }
 pub async fn create(
   state: &AppState,
@@ -49,9 +74,7 @@ pub async fn create(
   let id = token::public_id(PROJECT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  let project = repository::insert(&mut tx, &id, &request.name, &now)
-    .await
-    .map_err(map_unique)?;
+  let project = repository::insert(&mut tx, &id, &request.name, &now).await?;
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
@@ -77,6 +100,15 @@ pub async fn rename(
   common::validate_slug(&request.name, "PROJECT_NAME_INVALID", "Project name")?;
   let (admin_id, email) = crate::extractors::require_project_manager(identity)?;
   let project = show(state, reference).await?;
+  if let Some(workspace_id) = &project.workspace_id {
+    ensure_name_available_in_workspace(
+      state.db.pool(),
+      workspace_id,
+      &request.name,
+      Some(&project.id),
+    )
+    .await?;
+  }
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
   let updated = sqlx::query("UPDATE projects SET name=?,updated_at=? WHERE id=?")
@@ -189,9 +221,7 @@ pub async fn init(
   let project_id = token::public_id(PROJECT_ID_PREFIX);
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
-  let project = repository::insert(&mut tx, &project_id, &request.project_name, &now)
-    .await
-    .map_err(map_unique)?;
+  let project = repository::insert(&mut tx, &project_id, &request.project_name, &now).await?;
   let environment_id = crate::modules::environments::service::insert_generated(
     &mut tx,
     &project_id,

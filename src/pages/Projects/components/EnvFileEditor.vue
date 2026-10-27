@@ -25,6 +25,10 @@ const props = withDefaults(
     subtitle?: string;
     /** Marks the buffer as modified — drives the tab's dirty dot. */
     dirty?: boolean;
+    /** When set, highlights this line in every synced editor column. */
+    peerActiveLine?: number;
+    /** Grow to fill a flex parent instead of using a fixed max height. */
+    fillHeight?: boolean;
   }>(),
   {
     issues: () => [],
@@ -34,6 +38,7 @@ const props = withDefaults(
     filename: ".env",
     subtitle: "",
     dirty: false,
+    fillHeight: false,
   },
 );
 
@@ -41,6 +46,8 @@ const emit = defineEmits<{
   "update:modelValue": [value: string];
   /** Cmd/Ctrl+S pressed — the parent owns the save flow. */
   save: [];
+  /** 1-based line index of the caret — used to sync multi-env editors. */
+  "caret-line": [line: number];
 }>();
 
 /** Gutter width in `ch` units. The textarea's left padding must match. */
@@ -78,10 +85,16 @@ const tokenClass: Record<EnvTokenType, string> = {
 const caretLine = ref(1);
 const caretCol = ref(1);
 
+function activeHighlightLine(line: number): boolean {
+  const peer = props.peerActiveLine;
+  return line + 1 === (peer && peer > 0 ? peer : caretLine.value);
+}
+
 function syncCaret(el: HTMLTextAreaElement): void {
   const lines = el.value.slice(0, el.selectionStart).split("\n");
   caretLine.value = lines.length;
   caretCol.value = (lines[lines.length - 1]?.length ?? 0) + 1;
+  emit("caret-line", caretLine.value);
 }
 
 function onCaretMove(event: Event): void {
@@ -128,7 +141,10 @@ defineExpose({ focus });
   <div
     data-testid="env-editor"
     class="flex flex-col overflow-hidden rounded-card border bg-panel transition-colors focus-within:border-accent"
-    :class="issues.length > 0 ? 'border-crit/60' : 'border-line'">
+    :class="[
+      issues.length > 0 ? 'border-crit/60' : 'border-line',
+      fillHeight ? 'min-h-0 flex-1' : '',
+    ]">
     <!-- Editor tab bar: filename + dirty dot + context, editor chrome. -->
     <div
       class="flex items-center gap-2 border-b border-line-soft bg-panel px-3 py-2">
@@ -147,7 +163,11 @@ defineExpose({ focus });
 
     <!-- Code area: gutter column + tokenized highlight overlay, on the
          darker canvas so the editor reads as a distinct surface. -->
-    <div class="max-h-[26rem] min-h-[12rem] overflow-y-auto bg-canvas">
+    <div
+      class="overflow-y-auto bg-canvas"
+      :class="
+        fillHeight ? 'min-h-0 flex-1' : 'max-h-[26rem] min-h-[12rem]'
+      ">
       <div class="relative">
         <!-- Highlight overlay: gutter number + tokens per logical line. -->
         <div
@@ -160,14 +180,14 @@ defineExpose({ focus });
               :class="
                 errorLines.has(line + 1)
                   ? 'font-semibold text-crit'
-                  : line + 1 === caretLine
+                  : activeHighlightLine(line)
                     ? 'text-ink-strong'
                     : 'text-ink-faint'
               "
               >{{ line + 1 }}</span
             ><span
               class="min-w-0 flex-1 whitespace-pre-wrap break-words pr-[1ch]"
-              :class="line + 1 === caretLine ? 'bg-raised' : ''"
+              :class="activeHighlightLine(line) ? 'bg-raised' : ''"
               ><template v-if="tokens.length === 0">&#8203;</template
               ><span
                 v-for="(token, tokenIndex) in tokens"

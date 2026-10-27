@@ -32,7 +32,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 tower-http = { version = "0.7", features = ["request-id", "timeout", "trace"] }
 # API Documentation
 utoipa = { version = "5", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "9", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 # SQLite driver, connection pool, and runtime migrations
 sqlx = { version = "0.8", default-features = false, features = [
   "sqlite",
@@ -102,3 +102,11 @@ opt-level = "z"
 strip = "symbols"
 lto = "thin"
 codegen-units = 1
+
+# Container images: faster CI builds; release binaries for distribution stay on [profile.release].
+[profile.docker]
+inherits = "release"
+opt-level = 3
+strip = "symbols"
+lto = false
+codegen-units = 16

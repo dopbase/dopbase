@@ -15,6 +15,25 @@ fn rejects_duplicates() {
 }
 
 #[test]
+fn parses_triple_quoted_multiline() {
+  let pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nline2\n-----END OPENSSH PRIVATE KEY-----";
+  let text = format!("DEPLOY_SSH_KEY=\"\"\"\n{pem}\n\"\"\"\nPLAIN=ok\n");
+  let values = parse(&text).unwrap();
+  assert_eq!(values.len(), 2);
+  assert_eq!(values[0].key, "DEPLOY_SSH_KEY");
+  assert_eq!(values[0].value, pem);
+  assert_eq!(values[1].value, "ok");
+  let roundtrip = app::cli::dotenv::render(&values);
+  let again = parse(&roundtrip).unwrap();
+  assert_eq!(again[0].value, pem);
+}
+
+#[test]
+fn rejects_unterminated_triple_quote() {
+  assert!(parse("A=\"\"\"\nstill open\n").is_err());
+}
+
+#[test]
 fn editor_round_trips_values_and_preserves_value_free_layout() {
   use app::{
     cli::dotenv::{parse_document, render, render_layout, validate_layout},

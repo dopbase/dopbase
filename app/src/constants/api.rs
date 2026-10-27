@@ -28,6 +28,14 @@ fn with_query(
   format!("{path}?{name}={value}")
 }
 
+fn encode_project_ref(project_ref: &str) -> String {
+  project_ref
+    .split('/')
+    .map(|segment| url::form_urlencoded::byte_serialize(segment.as_bytes()).collect::<String>())
+    .collect::<Vec<_>>()
+    .join("%2F")
+}
+
 /// Append URL-encoded query parameters. Empty values are skipped, so callers
 /// can pass their options directly.
 fn with_params(
@@ -88,18 +96,41 @@ pub mod auth {
   pub const CLI_APPROVE_PAGE: &str = "/cli/approve";
 }
 
+pub mod workspaces {
+  pub const COLLECTION: &str = api_path!("/workspaces");
+  pub const ITEM: &str = api_path!("/workspaces/{id}");
+
+  pub fn item(id: &str) -> String {
+    super::render(ITEM, &[("id", id)])
+  }
+}
+
 pub mod projects {
   pub const COLLECTION: &str = api_path!("/projects");
   pub const INIT: &str = api_path!("/projects/init");
   pub const ITEM: &str = api_path!("/projects/{project_ref}");
   pub const ENVIRONMENTS: &str = api_path!("/projects/{project_ref}/environments");
+  pub const LOCATION: &str = api_path!("/projects/{project_ref}/location");
 
   pub fn item(project_ref: &str) -> String {
-    super::render(ITEM, &[("project_ref", project_ref)])
+    super::render(
+      ITEM,
+      &[("project_ref", &super::encode_project_ref(project_ref))],
+    )
   }
 
   pub fn environments(project_ref: &str) -> String {
-    super::render(ENVIRONMENTS, &[("project_ref", project_ref)])
+    super::render(
+      ENVIRONMENTS,
+      &[("project_ref", &super::encode_project_ref(project_ref))],
+    )
+  }
+
+  pub fn location(project_ref: &str) -> String {
+    super::render(
+      LOCATION,
+      &[("project_ref", &super::encode_project_ref(project_ref))],
+    )
   }
 }
 
@@ -213,10 +244,15 @@ pub mod secrets {
 
 pub mod tokens {
   pub const COLLECTION: &str = api_path!("/environments/{environment_id}/tokens");
+  pub const WORKSPACE_COLLECTION: &str = api_path!("/workspaces/{workspace_id}/tokens");
   pub const REVOKE: &str = api_path!("/tokens/{token_id}/revoke");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
+  }
+
+  pub fn workspace_collection(workspace_id: &str) -> String {
+    super::render(WORKSPACE_COLLECTION, &[("workspace_id", workspace_id)])
   }
 
   pub fn revoke(token_id: &str) -> String {

@@ -25,6 +25,7 @@ const sectionNames: Record<string, string> = {
   cloud: "Cloud",
   reference: "Reference",
   about: "About",
+  adr: "Architecture decisions",
   security: "Security",
 };
 
@@ -301,6 +302,10 @@ const config = defineConfig({
               text: "Server and client",
               link: "/guide/server-client",
             },
+            {
+              text: "Workspace paths (design)",
+              link: "/guide/workspace-paths",
+            },
           ],
         },
         {
@@ -343,6 +348,7 @@ const config = defineConfig({
             { text: "Server setup", link: "/cli/setup" },
             { text: "Server lifecycle", link: "/cli/serve" },
             { text: "Client connect", link: "/cli/client-connect" },
+            { text: "Docker integration", link: "/cli/docker" },
           ],
         },
       ],
@@ -380,6 +386,7 @@ const config = defineConfig({
           text: "Deployment & Storage",
           items: [
             { text: "Overview", link: "/self-hosting/" },
+            { text: "Docker", link: "/self-hosting/docker" },
             {
               text: "Storage and backups",
               link: "/self-hosting/storage-backups",
@@ -466,6 +473,19 @@ const config = defineConfig({
             { text: "Open source", link: "/about/open-source" },
             { text: "Roadmap", link: "/about/roadmap" },
             { text: "Product boundaries", link: "/about/product-boundaries" },
+            { text: "Architecture decisions (fork)", link: "/adr/" },
+          ],
+        },
+      ],
+      "/adr/": [
+        {
+          text: "Architecture decisions",
+          items: [
+            { text: "Overview", link: "/adr/" },
+            {
+              text: "ADR 0001 — an1by fork",
+              link: "/adr/0001-an1by-fork",
+            },
           ],
         },
       ],

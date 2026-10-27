@@ -56,4 +56,5 @@ A project represents an application or service. Environments hold the values tha
 - Learn how the [server and client](./server-client) divide responsibilities.
 - Manage secrets in the browser with the [Admin UI](/ui/).
 - Read the [self-hosting guide](/self-hosting/) before operating a server.
+- Run the server in [Docker](/self-hosting/docker) on Windows or in a container stack.
 - Review the [security model](/reference/security) before storing real credentials.

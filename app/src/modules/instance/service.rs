@@ -52,6 +52,12 @@ pub async fn public_status(
       .bind(chrono::Utc::now().to_rfc3339())
       .fetch_one(state.db.pool())
       .await?;
+  let active_workspace_tokens = sqlx::query_scalar::<_, i64>(
+    "SELECT COUNT(*) FROM workspace_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+  )
+  .bind(chrono::Utc::now().to_rfc3339())
+  .fetch_one(state.db.pool())
+  .await?;
   let active_agent_tokens = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)").bind(chrono::Utc::now().to_rfc3339()).fetch_one(state.db.pool()).await?;
   let backups = std::fs::read_dir(state.config.data_dir.join("backups"))
     .map(|entries| {
@@ -77,6 +83,7 @@ pub async fn public_status(
     human_users,
     ai_agents,
     active_runner_tokens,
+    active_workspace_tokens,
     active_agent_tokens,
     backups,
     observed_at: chrono::Utc::now().to_rfc3339(),
@@ -171,6 +178,7 @@ pub async fn factory_reset(
       "audit_chain_anchor",
       "audit_chain_genesis",
       "runner_tokens",
+      "workspace_tokens",
       "agent_tokens",
       "service_accounts",
       "secrets",

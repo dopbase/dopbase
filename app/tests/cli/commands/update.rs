@@ -70,7 +70,10 @@ fn update_message_explains_how_to_install_safely() {
   assert!(message.contains("Current version  \u{1b}[36m0.0.12"));
   assert!(message.contains("Latest version   \u{1b}[36m0.1.0"));
   assert!(message.contains("Stop every running Dopbase server before updating."));
+  #[cfg(not(windows))]
   assert!(message.contains("curl -fsSL https://dopbase.com/install.sh | sh"));
+  #[cfg(windows)]
+  assert!(message.contains("irm https://dopbase.com/install.ps1 | iex"));
   assert!(message.contains("https://github.com/dopbase/dopbase/releases/tag/0.1.0"));
 }
 

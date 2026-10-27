@@ -64,6 +64,11 @@ The current pre-release schema is assembled in this order:
 20261024132206_sso_require.up.sql
 20261024132207_sso_flows_reauth.up.sql
 20261024132208_cli_device_reauth.up.sql
+
+20261024132209_workspaces.up.sql
+20261024132210_default_workspace.up.sql
+20261024132211_project_names_per_workspace.up.sql
+20261024132212_workspace_tokens.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -98,6 +103,16 @@ sqlx migrate add -r <name>
 
 That writes the pair shown above with the current UTC time as its version.
 
+
+
+## Fork-only workspace migrations
+
+This fork adds four timestamped pairs after the upstream 0.1.10 schema. Their
+SQL matches the former `0014`–`0017` sequential files, so `adopt_legacy_versions`
+rewrites existing fork databases by checksum before applying audit, SSO, and
+other upstream migrations that were not present on the fork.
+
+Fresh installs apply upstream 0.1.10 migrations first, then workspaces.
 ## Upgrading from 0.1.9
 
 Migrations used four-digit versions through 0.1.9 and were renamed to the

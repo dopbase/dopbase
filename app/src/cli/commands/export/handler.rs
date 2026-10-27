@@ -1,7 +1,7 @@
-use crate::cli::{commands::environment, output};
+use crate::cli::{commands::environment, commands::run::cache as runtime_cache, output};
 use crate::{
   cli::{client, local_config, secret_format},
-  constants::api,
+  constants::{api, tokens::WORKSPACE_TOKEN_PREFIX},
   models::SecretInput,
 };
 use anyhow::{Context, Result, bail};
@@ -28,16 +28,28 @@ pub(crate) async fn execute(
     bail!("--stdout and --json cannot be combined");
   }
   let format = ExportFormat::for_output(output.as_deref(), format);
-  let api = client::export_client(server).await?;
-  let env = environment::resolve_environment(&api, &environment).await?;
-  let data = api
-    .request(
-      Method::POST,
-      &api::secrets::export(environment::env_id(&env)?),
-      None,
-    )
-    .await?;
-  let entries = parse_entries(&data)?;
+  let credential = client::credential(server)?;
+  let workspace_token = credential
+    .token
+    .as_deref()
+    .is_some_and(|token| token.starts_with(WORKSPACE_TOKEN_PREFIX));
+  let entries = if workspace_token {
+    let api = client::any_authenticated_client(server).await?;
+    runtime_cache::load(server, &api, &environment)
+      .await?
+      .entries
+  } else {
+    let api = client::export_client(server).await?;
+    let env = environment::resolve_environment(&api, &environment).await?;
+    let data = api
+      .request(
+        Method::POST,
+        &api::secrets::export(environment::env_id(&env)?),
+        None,
+      )
+      .await?;
+    parse_entries(&data)?
+  };
   let rendered = secret_format::render(&entries, format)?;
   if stdout {
     print!("{rendered}");

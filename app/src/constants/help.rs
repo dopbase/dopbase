@@ -12,6 +12,7 @@ Environment variables:
   DOPBASE_WEB_UI                  Enable or disable the web UI (default: true)
   DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
+  DOPBASE_CONTAINER               Docker container name for --container and dopbase docker exec (default: dopbase)
   DOPBASE_AUDIT_RETENTION_DAYS    Days to keep audit records (unset keeps the whole log)
   DOPBASE_SECRET_HISTORY_VERSIONS Versions per secret that can be rolled back to (default: 20)
   DOPBASE_TRUSTED_PROXIES         Proxies allowed to report the client IP, comma-separated
@@ -36,5 +37,7 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
-PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production.";
+pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID, \
+PROJECT/ENVIRONMENT, WORKSPACE/PROJECT/ENVIRONMENT, or /PROJECT/ENVIRONMENT for the default workspace. \
+PROJECT matches the project name or workspace directory. \
+For example: payment-service/production, workspace1/api/staging, or /api/production.";

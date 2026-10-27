@@ -52,14 +52,16 @@ const consoleLabel = computed(() =>
 
     <!-- Wide screens: fixed sidebar -->
     <aside
-      class="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-line bg-panel lg:flex">
+      class="sticky top-0 hidden h-svh w-16 shrink-0 flex-col border-r border-line bg-panel md:flex min-[1120px]:w-60"
+      aria-label="Main navigation">
       <div
-        class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4">
+        class="flex h-[4.75rem] min-h-[4.75rem] shrink-0 items-center justify-center gap-2.5 border-b border-line-soft px-2 py-4 min-[1120px]:justify-start min-[1120px]:px-5">
         <div
-          class="flex h-8 w-8 items-center justify-center rounded-control border border-accent/40 bg-accent-soft text-accent-strong">
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-accent/40 bg-accent-soft text-accent-strong"
+          :title="`Dopbase ${consoleLabel}`">
           <DopbaseIcon class="h-5 w-5" />
         </div>
-        <div class="leading-tight">
+        <div class="hidden min-w-0 leading-tight min-[1120px]:block">
           <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
           <p class="text-xs text-ink-muted">{{ consoleLabel }}</p>
         </div>
@@ -67,7 +69,26 @@ const consoleLabel = computed(() =>
       <DashboardNav :email="email" :logging-out="loggingOut" @logout="logout" />
     </aside>
 
-    <main class="min-w-0 flex-1">
+    <nav
+      class="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-line-soft bg-panel px-2 py-2 md:hidden"
+      aria-label="Primary">
+      <RouterLink
+        v-for="item in visibleNavItems"
+        :key="item.name"
+        :to="{ name: item.name }"
+        class="flex flex-col items-center gap-0.5 rounded-control px-3 py-1.5 text-[10px] uppercase tracking-wide transition-colors"
+        :class="
+          isActive(item)
+            ? 'text-accent-strong'
+            : 'text-ink-muted hover:text-ink-strong'
+        "
+        :aria-current="isActive(item) ? 'page' : undefined">
+        <component :is="item.icon" class="h-5 w-5" />
+        <span>{{ item.label }}</span>
+      </RouterLink>
+    </nav>
+
+    <main class="min-w-0 flex-1 pb-[4.5rem] md:pb-0">
       <slot />
     </main>
 
@@ -98,3 +119,6 @@ const consoleLabel = computed(() =>
     </DbModal>
   </div>
 </template>
+
+
+

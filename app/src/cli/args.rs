@@ -7,8 +7,8 @@ use std::{
 
 use crate::{
   cli::commands::{
-    admin, audit, auth, backup, cache, client, environment, export, import, init, project, restore,
-    run, secret, server, token, update,
+    admin, audit, auth, backup, cache, client, docker, environment, export, import, init, project,
+    restore, run, secret, server, token, update, workspace,
   },
   constants::help::*,
 };
@@ -19,6 +19,7 @@ pub use auth::LoginArgs;
 pub use backup::BackupArgs;
 pub use cache::CacheCommand;
 pub use client::ClientCommand;
+pub use docker::DockerCommand;
 pub use environment::EnvCommand;
 pub use export::ExportArgs;
 pub use import::ImportArgs;
@@ -29,6 +30,7 @@ pub use run::RunArgs;
 pub use secret::SecretCommand;
 pub use server::{ServerCommand, ServerLaunchArgs, ServerSetupArgs, ServerStartArgs};
 pub use token::TokenCommand;
+pub use workspace::WorkspaceCommand;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -59,6 +61,14 @@ pub struct Cli {
   /// Print machine-readable JSON instead of human-readable output, where supported.
   #[arg(long, global = true)]
   pub json: bool,
+  /// Run a local `admin` or `server` command inside the Dopbase Docker container.
+  #[arg(
+    long,
+    global = true,
+    action = ArgAction::SetTrue,
+    help = "Forward the command to `docker exec` in the Dopbase container (name from DOPBASE_CONTAINER, default `dopbase`)"
+  )]
+  pub container: bool,
   #[command(subcommand)]
   pub command: Command,
 }
@@ -156,6 +166,12 @@ pub enum Command {
     #[command(subcommand)]
     command: ProjectCommand,
   },
+  /// Manage workspaces (create, list, show, update, delete).
+  #[command(name = "workspace", after_help = workspace::HELP)]
+  Workspace {
+    #[command(subcommand)]
+    command: WorkspaceCommand,
+  },
   /// Manage environments inside a project (create, clone, edit, list, rename, delete).
   #[command(after_help = environment::HELP)]
   Env {
@@ -177,7 +193,8 @@ pub enum Command {
   /// Export secrets as dotenv, JSON, YAML, TOML, or a Docker env file.
   ///
   /// Requires --output <FILE> or --stdout. --force overwrites an existing
-  /// file. Every export requires interactive password confirmation.
+  /// file. Human export requires interactive password confirmation; runner tokens
+  /// (`dbs_…`) export via the runtime API for non-interactive CI.
   #[command(after_help = export::HELP)]
   Export(ExportArgs),
   /// Manage CI/runner access tokens for an environment.
@@ -229,6 +246,12 @@ pub enum Command {
   /// default. Specify -o/--output to also download and save locally.
   #[command(after_help = backup::HELP)]
   Backup(BackupArgs),
+  /// Inject secrets into Docker workflows (`run`, `compose`, `exec`, `env-file`).
+  #[command(after_help = docker::HELP)]
+  Docker {
+    #[command(subcommand)]
+    command: DockerCommand,
+  },
   /// Restore the instance from an encrypted .dop backup file.
   ///
   /// Restores all projects, environments, secrets, runner tokens, and admin

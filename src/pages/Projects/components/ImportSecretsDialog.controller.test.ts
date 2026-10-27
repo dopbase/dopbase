@@ -6,7 +6,13 @@ import { useImportSecretsDialogController } from "./ImportSecretsDialog.controll
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { projectRef: "project" } }),
+  useRoute: () => ({
+    params: {
+      workspaceSlug: "default",
+      projectRef: "project",
+      environmentName: "staging",
+    },
+  }),
   useRouter: () => ({ push }),
 }));
 
@@ -19,6 +25,7 @@ describe("useImportSecretsDialogController", () => {
   it("stores a parsed file and navigates to its review route", async () => {
     const controller = useImportSecretsDialogController(
       ref("env_1"),
+      ref("staging"),
       ref(true),
     );
     const file = new File(["DATABASE_URL=postgres://db"], "production.env");
@@ -31,13 +38,18 @@ describe("useImportSecretsDialogController", () => {
     });
     expect(push).toHaveBeenCalledWith({
       name: "environment-import",
-      params: { projectRef: "project", environmentId: "env_1" },
+      params: {
+        workspaceSlug: "default",
+        projectRef: "project",
+        environmentName: "staging",
+      },
     });
   });
 
   it("keeps the dialog open when the file contains no valid entries", async () => {
     const controller = useImportSecretsDialogController(
       ref("env_1"),
+      ref("staging"),
       ref(true),
     );
     const file = new File(["not an assignment"], "broken.env");

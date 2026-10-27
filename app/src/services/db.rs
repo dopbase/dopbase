@@ -31,6 +31,7 @@ impl DbClient {
     let database = (!url.contains(":memory:"))
       .then(|| database_path(url))
       .transpose()?;
+    #[cfg(unix)]
     let database_existed = database.as_ref().is_some_and(|path| path.exists());
     if let Some(parent) = database.as_ref().and_then(|path| path.parent()) {
       fs::create_dir_all(parent)

@@ -740,6 +740,7 @@ pub async fn restore_database_from_archive(
     sqlx::query("DELETE FROM audit_chain_anchor").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM audit_chain_genesis").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM runner_tokens").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM workspace_tokens").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM agent_tokens").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM service_accounts").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM secret_versions").execute(&mut *tx).await?;
@@ -751,6 +752,8 @@ pub async fn restore_database_from_archive(
     sqlx::query("DELETE FROM sso_flows").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM admin_identities").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM sso_providers").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM project_locations").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM workspaces").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM sessions").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM admins").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM instance_metadata").execute(&mut *tx).await?;
@@ -764,12 +767,17 @@ pub async fn restore_database_from_archive(
     }
     sqlx::query("INSERT INTO service_accounts SELECT * FROM backup_db.service_accounts").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO agent_tokens SELECT * FROM backup_db.agent_tokens").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO workspaces SELECT * FROM backup_db.workspaces").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO projects SELECT * FROM backup_db.projects").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO project_locations SELECT * FROM backup_db.project_locations").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO environments SELECT * FROM backup_db.environments").execute(&mut *tx).await?;
     sqlx::query("INSERT OR REPLACE INTO environment_env_layout SELECT * FROM backup_db.environment_env_layout").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO secrets SELECT * FROM backup_db.secrets").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO secret_versions SELECT * FROM backup_db.secret_versions").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO runner_tokens SELECT * FROM backup_db.runner_tokens").execute(&mut *tx).await?;
+    let _ = sqlx::query("INSERT INTO workspace_tokens SELECT * FROM backup_db.workspace_tokens")
+      .execute(&mut *tx)
+      .await;
     sqlx::query("INSERT INTO audit_events SELECT * FROM backup_db.audit_events").execute(&mut *tx).await?;
     // The chain's genesis and pruning anchor belong to the restored records.
     sqlx::query("INSERT INTO audit_chain_anchor SELECT * FROM backup_db.audit_chain_anchor").execute(&mut *tx).await?;
