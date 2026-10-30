@@ -797,6 +797,15 @@ pub fn normalize_login_email(value: &str) -> Result<String> {
 pub(crate) enum HumanClient {
   Existing(ApiClient),
   NewlyAuthenticated(ApiClient),
+  /// A personal token. It has no session to check or confirm; the server
+  /// decides what it reaches.
+  PersonalToken(ApiClient),
+}
+
+/// Personal tokens, and the agent tokens that became personal tokens.
+pub(crate) fn is_personal_token(token: &str) -> bool {
+  use crate::constants::tokens::{AGENT_TOKEN_PREFIX, PERSONAL_TOKEN_PREFIX};
+  token.starts_with(PERSONAL_TOKEN_PREFIX) || token.starts_with(AGENT_TOKEN_PREFIX)
 }
 
 pub(crate) async fn acquire_human_client(server: &ResolvedServer) -> Result<HumanClient> {
@@ -808,6 +817,12 @@ async fn acquire_human_client_with_credential(
   credential: Credential,
 ) -> Result<HumanClient> {
   if let Some(token) = credential.token {
+    if is_personal_token(&token) {
+      return Ok(HumanClient::PersonalToken(ApiClient::new(
+        server,
+        Some(token),
+      )?));
+    }
     let client = ApiClient::new(server, Some(token))?;
     if client
       .request(Method::GET, api::auth::SESSION, None)
@@ -827,36 +842,28 @@ async fn acquire_human_client_with_credential(
 
 pub async fn human_client(server: &ResolvedServer) -> Result<ApiClient> {
   Ok(match acquire_human_client(server).await? {
-    HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
+    HumanClient::Existing(client)
+    | HumanClient::NewlyAuthenticated(client)
+    | HumanClient::PersonalToken(client) => client,
   })
 }
 
 pub(crate) async fn metadata_client(server: &ResolvedServer) -> Result<ApiClient> {
-  let credential = credential(server)?;
-  if credential
-    .token
-    .as_deref()
-    .is_some_and(|token| token.starts_with(crate::constants::tokens::AGENT_TOKEN_PREFIX))
-  {
-    return authenticated_client(server, credential);
-  }
-  Ok(
-    match acquire_human_client_with_credential(server, credential).await? {
-      HumanClient::Existing(client) | HumanClient::NewlyAuthenticated(client) => client,
-    },
-  )
+  human_client(server).await
 }
 
 impl HumanClient {
   pub(crate) fn client(&self) -> &ApiClient {
     match self {
-      Self::Existing(client) | Self::NewlyAuthenticated(client) => client,
+      Self::Existing(client) | Self::NewlyAuthenticated(client) | Self::PersonalToken(client) => {
+        client
+      }
     }
   }
 
   pub(crate) async fn confirm_plaintext_access(self) -> Result<ApiClient> {
     match self {
-      HumanClient::NewlyAuthenticated(client) => Ok(client),
+      HumanClient::NewlyAuthenticated(client) | HumanClient::PersonalToken(client) => Ok(client),
       HumanClient::Existing(client) => {
         // Older servers omit the field; they only know passwords.
         let session = client
@@ -905,6 +912,10 @@ impl HumanClient {
 }
 
 pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<ApiClient> {
+  let credential = credential(server)?;
+  if credential.token.as_deref().is_some_and(is_personal_token) {
+    return authenticated_client(server, credential);
+  }
   if !io::stdin().is_terminal() {
     bail!("interactive password confirmation is required for plaintext secret access");
   }
@@ -915,7 +926,7 @@ pub async fn recently_authenticated_client(server: &ResolvedServer) -> Result<Ap
 }
 
 pub(crate) async fn export_client(server: &ResolvedServer) -> Result<ApiClient> {
-  use crate::constants::tokens::{AGENT_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX};
+  use crate::constants::tokens::RUNNER_TOKEN_PREFIX;
 
   let credential = credential(server)?;
   match credential.token.as_deref() {
@@ -923,8 +934,9 @@ pub(crate) async fn export_client(server: &ResolvedServer) -> Result<ApiClient> 
       validate_runner_token(token)?;
       return authenticated_client(server, credential);
     }
-    Some(token) if token.starts_with(AGENT_TOKEN_PREFIX) => {
-      bail!("AI agents may access secret metadata but never secret values");
+    // The server checks the token reaches values.
+    Some(token) if is_personal_token(token) => {
+      return authenticated_client(server, credential);
     }
     _ => {}
   }

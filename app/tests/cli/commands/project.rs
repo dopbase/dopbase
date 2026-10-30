@@ -102,7 +102,7 @@ async fn agent_metadata_rejects_invalid_expired_and_revoked_tokens_without_fallb
       "revoked_at"
     };
     if scenario != "invalid" {
-      sqlx::query(&format!("UPDATE agent_tokens SET {column}=? WHERE id=?"))
+      sqlx::query(&format!("UPDATE personal_tokens SET {column}=? WHERE id=?"))
         .bind((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339())
         .bind(token_id)
         .execute(fixture.state.db.pool())
@@ -125,11 +125,13 @@ async fn agent_metadata_rejects_invalid_expired_and_revoked_tokens_without_fallb
       assert!(!String::from_utf8_lossy(&result.stderr).contains(credential));
     }
     if scenario != "invalid" {
-      sqlx::query(&format!("UPDATE agent_tokens SET {column}=NULL WHERE id=?"))
-        .bind(token_id)
-        .execute(fixture.state.db.pool())
-        .await
-        .unwrap();
+      sqlx::query(&format!(
+        "UPDATE personal_tokens SET {column}=NULL WHERE id=?"
+      ))
+      .bind(token_id)
+      .execute(fixture.state.db.pool())
+      .await
+      .unwrap();
     }
   }
 }

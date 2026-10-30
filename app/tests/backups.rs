@@ -1016,22 +1016,22 @@ async fn test_dashboard_upload_cross_key_rekeys_cleanly() {
 async fn restore_recovers_agent_and_expiring_runner_tokens() {
   let (_dir, state, router, token) = admin_setup().await;
   let now = Utc::now().to_rfc3339();
-  sqlx::query("INSERT INTO service_accounts(id,name,role,created_at,updated_at) VALUES(?,?,?,?,?)")
-    .bind("aia_backup_test")
+  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,owner_id,created_at,updated_at) VALUES(?,?,'','ai_agent','rol_ai_agent',(SELECT id FROM admins WHERE is_root=1),?,?)")
+    .bind("usr_backup_agent")
     .bind("backup-agent")
-    .bind("ai_agent")
     .bind(&now)
     .bind(&now)
     .execute(state.db.pool())
     .await
     .unwrap();
   sqlx::query(
-    "INSERT INTO agent_tokens(id,service_account_id,name,token_hash,created_at) VALUES(?,?,?,?,?)",
+    "INSERT INTO personal_tokens(id,user_id,name,token_hash,level,created_at,expires_at) VALUES(?,?,?,?,'metadata',?,?)",
   )
-  .bind("ait_backup_test")
-  .bind("aia_backup_test")
+  .bind("ptk_backup_test")
+  .bind("usr_backup_agent")
   .bind("restore-token")
-  .bind(app::services::token::hash("dpa_restore_test"))
+  .bind(app::services::token::hash("dpp_restore_test"))
+  .bind(&now)
   .bind(&now)
   .execute(state.db.pool())
   .await
@@ -1057,7 +1057,7 @@ async fn restore_recovers_agent_and_expiring_runner_tokens() {
   assert_eq!(status, 201);
   let key = backup["data"]["key"].as_str().unwrap();
 
-  sqlx::query("DELETE FROM agent_tokens")
+  sqlx::query("DELETE FROM personal_tokens")
     .execute(state.db.pool())
     .await
     .unwrap();
@@ -1065,7 +1065,7 @@ async fn restore_recovers_agent_and_expiring_runner_tokens() {
     .execute(state.db.pool())
     .await
     .unwrap();
-  sqlx::query("DELETE FROM service_accounts")
+  sqlx::query("DELETE FROM admins WHERE id='usr_backup_agent'")
     .execute(state.db.pool())
     .await
     .unwrap();
@@ -1080,15 +1080,21 @@ async fn restore_recovers_agent_and_expiring_runner_tokens() {
   .await;
   assert_eq!(status, 200);
 
-  let account_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM service_accounts")
+  // The agent comes back with its owner, who is still this root.
+  let owner: Option<String> =
+    sqlx::query_scalar("SELECT owner_id FROM admins WHERE id='usr_backup_agent'")
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  let root: String = sqlx::query_scalar("SELECT id FROM admins WHERE is_root=1")
     .fetch_one(state.db.pool())
     .await
     .unwrap();
-  let token_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_tokens")
+  let token_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM personal_tokens")
     .fetch_one(state.db.pool())
     .await
     .unwrap();
-  assert_eq!(account_count, 1);
+  assert_eq!(owner, Some(root));
   assert_eq!(token_count, 1);
   let restored_expiry: String =
     sqlx::query_scalar("SELECT expires_at FROM runner_tokens WHERE id='tok_backup_test'")

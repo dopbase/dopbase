@@ -444,7 +444,7 @@ async fn runner_export_rejects_other_environments_and_invalid_credentials_withou
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_export_is_denied_by_the_cli_and_server() {
+async fn metadata_token_export_is_denied_by_the_server() {
   use super::support::{failure, output};
   let (fixture, id, _) = runner_fixture().await;
   let created = fixture.agent_token().await;
@@ -460,7 +460,7 @@ async fn agent_export_is_denied_by_the_cli_and_server() {
     let result = output(command, None).await;
     failure(
       &result,
-      "AI agents may access secret metadata but never secret values",
+      "Your access to this environment does not allow this.",
     );
     assert!(result.stdout.is_empty());
   }

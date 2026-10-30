@@ -735,10 +735,11 @@ async fn health_and_openapi_are_available() {
     "/api/v1/instance/factory-reset",
     "/api/v1/users",
     "/api/v1/users/{id}",
-    "/api/v1/service-accounts",
-    "/api/v1/service-accounts/{id}",
-    "/api/v1/service-accounts/{id}/tokens",
-    "/api/v1/service-accounts/{id}/tokens/{token_id}/revoke",
+    "/api/v1/users/{id}/tokens",
+    "/api/v1/users/{id}/tokens/{token_id}/revoke",
+    "/api/v1/users/{id}/access",
+    "/api/v1/grants",
+    "/api/v1/groups",
   ] {
     assert!(
       spec["paths"][path].is_object(),
@@ -755,11 +756,9 @@ async fn health_and_openapi_are_available() {
     "StatusResponse",
     "FactoryResetPreview",
     "FactoryResetRequest",
-    "ServiceAccountResponse",
-    "CreateServiceAccountRequest",
-    "AgentTokenResponse",
-    "CreateAgentTokenRequest",
-    "CreatedAgentTokenResponse",
+    "PersonalTokenResponse",
+    "CreatePersonalTokenRequest",
+    "CreatedPersonalTokenResponse",
   ] {
     assert!(
       spec["components"]["schemas"][schema].is_object(),
@@ -800,32 +799,16 @@ async fn health_and_openapi_are_available() {
     "Perform a factory reset"
   );
   assert_eq!(
-    spec["paths"]["/api/v1/service-accounts"]["get"]["summary"],
-    "List service accounts"
+    spec["paths"]["/api/v1/users/{id}/tokens"]["get"]["summary"],
+    "List personal tokens"
   );
   assert_eq!(
-    spec["paths"]["/api/v1/service-accounts"]["post"]["summary"],
-    "Create a service account"
+    spec["paths"]["/api/v1/users/{id}/tokens"]["post"]["summary"],
+    "Create a personal token"
   );
   assert_eq!(
-    spec["paths"]["/api/v1/service-accounts/{id}"]["get"]["summary"],
-    "Show a service account"
-  );
-  assert_eq!(
-    spec["paths"]["/api/v1/service-accounts/{id}"]["delete"]["summary"],
-    "Delete a service account"
-  );
-  assert_eq!(
-    spec["paths"]["/api/v1/service-accounts/{id}/tokens"]["get"]["summary"],
-    "List service account tokens"
-  );
-  assert_eq!(
-    spec["paths"]["/api/v1/service-accounts/{id}/tokens"]["post"]["summary"],
-    "Create a service account token"
-  );
-  assert_eq!(
-    spec["paths"]["/api/v1/service-accounts/{id}/tokens/{token_id}/revoke"]["post"]["summary"],
-    "Revoke a service account token"
+    spec["paths"]["/api/v1/users/{id}/tokens/{token_id}/revoke"]["post"]["summary"],
+    "Revoke a personal token"
   );
   state.db.close().await;
 }
@@ -1393,6 +1376,8 @@ mod auth_cli_device;
 mod grants_access;
 #[path = "modules/groups/members.rs"]
 mod groups_members;
+#[path = "modules/personal_tokens/tokens.rs"]
+mod personal_tokens_tokens;
 #[path = "modules/secrets/import.rs"]
 mod secrets_import;
 #[path = "modules/secrets/versions.rs"]

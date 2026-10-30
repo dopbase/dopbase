@@ -41,6 +41,55 @@ pub enum TokenCommand {
     /// ID of the token to revoke.
     token_id: String,
   },
+  /// Manage your personal tokens, for scripts and AI agents that act as you.
+  #[command(after_help = PERSONAL_HELP)]
+  Personal {
+    #[command(subcommand)]
+    command: PersonalTokenCommand,
+  },
+}
+
+fn parse_level(value: &str) -> Result<String, String> {
+  match value {
+    "metadata" | "read" | "write" => Ok(value.to_owned()),
+    _ => Err("Use metadata, read, or write.".into()),
+  }
+}
+
+#[derive(Subcommand, Debug)]
+pub enum PersonalTokenCommand {
+  /// Create a personal token. It reaches at most what you reach, within its
+  /// own scope and level, and always expires.
+  ///
+  /// The value is shown once. Pass it to client commands through
+  /// DOPBASE_TOKEN.
+  #[command(after_help = PERSONAL_CREATE_HELP)]
+  Create {
+    /// Display name for the token, unique among yours.
+    #[arg(long)]
+    name: String,
+    /// metadata (names only), read (values), or write (changes).
+    #[arg(long, default_value = "read", value_parser = parse_level)]
+    level: String,
+    /// Limit the token to one project.
+    #[arg(long, value_name = "PROJECT_REF", conflicts_with = "env")]
+    project: Option<String>,
+    /// Limit the token to one environment.
+    #[arg(long, value_name = "ENVIRONMENT_REF")]
+    env: Option<String>,
+    /// Lifetime as a whole number followed by h or d. Defaults to your role's default.
+    #[arg(long, value_name = "DURATION", value_parser = parse_expiry)]
+    expires_in: Option<String>,
+  },
+  /// List your personal tokens.
+  #[command(after_help = PERSONAL_LIST_HELP)]
+  List,
+  /// Revoke one of your personal tokens by ID.
+  #[command(after_help = PERSONAL_REVOKE_HELP)]
+  Revoke {
+    /// ID of the token to revoke.
+    token_id: String,
+  },
 }
 
 pub(crate) const HELP: &str = "\
@@ -49,6 +98,28 @@ Examples:
   dopbase token create payment-service/production --name deploy --expires-in 12h
   dopbase token list payment-service/production
   dopbase token revoke tok_01ABCDEF
+  dopbase token personal create --name laptop-agent --env payment-service/development
+";
+const PERSONAL_HELP: &str = "\
+Examples:
+  dopbase token personal create --name laptop-agent --level metadata
+  dopbase token personal list
+  dopbase token personal revoke ptk_01ABCDEF
+";
+const PERSONAL_LIST_HELP: &str = "\
+Examples:
+  dopbase token personal list
+  dopbase token personal list --json
+";
+const PERSONAL_REVOKE_HELP: &str = "\
+Examples:
+  dopbase token personal revoke ptk_01ABCDEF
+";
+const PERSONAL_CREATE_HELP: &str = "\
+Examples:
+  dopbase token personal create --name laptop-agent --level metadata
+  dopbase token personal create --name ci --level write --project payment-service --expires-in 30d
+  dopbase token personal create --name reader --env payment-service/production --expires-in 12h
 ";
 const CREATE_HELP: &str = "\
 Examples:

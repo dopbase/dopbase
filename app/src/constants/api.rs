@@ -102,6 +102,10 @@ pub mod projects {
   pub fn environments(project_ref: &str) -> String {
     super::render(ENVIRONMENTS, &[("project_ref", project_ref)])
   }
+
+  pub fn access(project_ref: &str) -> String {
+    super::render(ACCESS, &[("project_ref", project_ref)])
+  }
 }
 
 pub mod environments {
@@ -274,9 +278,26 @@ pub mod users {
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
   pub const ACCESS: &str = api_path!("/users/{id}/access");
+  pub const TOKENS: &str = api_path!("/users/{id}/tokens");
+  pub const TOKEN_REVOKE: &str = api_path!("/users/{id}/tokens/{token_id}/revoke");
 
   pub fn item(id: &str) -> String {
     super::render(ITEM, &[("id", id)])
+  }
+
+  pub fn access(id: &str) -> String {
+    super::render(ACCESS, &[("id", id)])
+  }
+
+  pub fn tokens(id: &str) -> String {
+    super::render(TOKENS, &[("id", id)])
+  }
+
+  pub fn token_revoke(
+    id: &str,
+    token_id: &str,
+  ) -> String {
+    super::render(TOKEN_REVOKE, &[("id", id), ("token_id", token_id)])
   }
 }
 
@@ -289,28 +310,6 @@ pub mod groups {
   pub const COLLECTION: &str = api_path!("/groups");
   pub const ITEM: &str = api_path!("/groups/{id}");
   pub const MEMBER: &str = api_path!("/groups/{id}/members/{user_id}");
-}
-
-pub mod service_accounts {
-  pub const COLLECTION: &str = api_path!("/service-accounts");
-  pub const ITEM: &str = api_path!("/service-accounts/{id}");
-  pub const TOKENS: &str = api_path!("/service-accounts/{id}/tokens");
-  pub const REVOKE_TOKEN: &str = api_path!("/service-accounts/{id}/tokens/{token_id}/revoke");
-
-  pub fn item(id: &str) -> String {
-    super::render(ITEM, &[("id", id)])
-  }
-
-  pub fn tokens(id: &str) -> String {
-    super::render(TOKENS, &[("id", id)])
-  }
-
-  pub fn revoke_token(
-    id: &str,
-    token_id: &str,
-  ) -> String {
-    super::render(REVOKE_TOKEN, &[("id", id), ("token_id", token_id)])
-  }
 }
 
 pub mod backups {

@@ -4,6 +4,7 @@
 //! support code together. This file only routes parsed commands and re-exports
 //! the small set of helpers used outside their owning module.
 
+pub mod access;
 pub mod admin;
 pub mod audit;
 pub mod auth;
@@ -101,6 +102,7 @@ async fn execute_client(
     Command::Import(args) => import::execute(server, args, json_output).await,
     Command::Export(args) => export::execute(server, args, json_output).await,
     Command::Token { command } => token::execute(command, server, json_output).await,
+    Command::Access(args) => access::execute(server, args, json_output).await,
     Command::Run(args) => run::execute(server, args).await,
     Command::Cache { command } => cache::execute(command, server, json_output),
     Command::Backup(args) => backup::execute(server, args, json_output).await,

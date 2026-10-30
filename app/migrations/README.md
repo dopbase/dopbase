@@ -69,6 +69,7 @@ The current pre-release schema is assembled in this order:
 20261026065130_grants.up.sql
 20261026065131_groups.up.sql
 20261026065132_environment_protection.up.sql
+20261026085441_personal_tokens.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -95,6 +96,11 @@ environment. Its triggers delete a grant together with the account, project,
 or environment it names, and it gives existing admins and members the
 all-projects access they already had. `groups` adds groups and their
 members. `environment_protection` adds the `protected` flag to environments.
+`personal_tokens` adds personal tokens, turns each service account into an
+account with the AI agent role owned by root, keeps its tokens working as
+personal tokens with their hashes unchanged, and drops `service_accounts`
+and `agent_tokens`. Rolling it back moves AI agent accounts and their
+all-projects tokens back and drops people's personal tokens.
 
 The database test suite applies all migrations, rolls back to version zero,
 and reapplies them.

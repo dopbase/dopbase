@@ -313,27 +313,67 @@ pub async fn user_access(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<UserAccessResponse, HttpError> {
-  let (actor_id, _) = require_person(identity)?;
+  // A personal token can ask about its own account only.
+  let (actor_id, token) = match identity {
+    AuthIdentity::Token {
+      admin_id,
+      token_name,
+      scope,
+      level,
+      ..
+    } => (
+      admin_id.as_str(),
+      Some(TokenLimit {
+        name: token_name.clone(),
+        scope_type: match scope {
+          authx::Scope::All => ScopeType::All,
+          authx::Scope::Project(_) => ScopeType::Project,
+          authx::Scope::Environment(_) => ScopeType::Environment,
+        },
+        scope_id: match scope {
+          authx::Scope::All => String::new(),
+          authx::Scope::Project(id) | authx::Scope::Environment(id) => id.clone(),
+        },
+        scope_label: String::new(),
+        level: *level,
+      }),
+    ),
+    _ => (require_person(identity)?.0, None),
+  };
+  let id = if id == "me" { actor_id } else { id };
   if id != actor_id {
     require_capability(identity, Capability::UsersView)?;
   }
   let mut conn = state.db.pool().acquire().await?;
-  let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM admins WHERE id = ?")
+  let email: Option<String> = sqlx::query_scalar("SELECT email FROM admins WHERE id = ?")
     .bind(id)
     .fetch_optional(&mut *conn)
     .await?;
-  if exists.is_none() {
+  let Some(email) = email else {
     return Err(HttpError::not_found(
       "USER_NOT_FOUND",
       "The user was not found.",
     ));
+  };
+  let access = authx::load_access(&mut conn, id).await?;
+  let mut token = token;
+  if let Some(token) = token.as_mut() {
+    token.scope_label = sqlx::query_scalar(
+      "SELECT COALESCE((SELECT name FROM projects WHERE id = ?1), (SELECT p.name || '/' || e.name FROM environments e JOIN projects p ON p.id = e.project_id WHERE e.id = ?1), '')",
+    )
+    .bind(&token.scope_id)
+    .fetch_one(&mut *conn)
+    .await?;
   }
-  let max_level = authx::load_access(&mut conn, id)
-    .await?
-    .map_or(Level::None, |access| access.max_level);
   drop(conn);
   Ok(UserAccessResponse {
-    max_level,
+    user_id: id.to_owned(),
+    email,
+    role_name: access
+      .as_ref()
+      .map_or_else(String::new, |access| access.role_name.clone()),
+    max_level: access.map_or(Level::None, |access| access.max_level),
+    token,
     groups: repository::groups_of(state.db.pool(), id).await?,
     grants: repository::for_user(state.db.pool(), id).await?,
   })

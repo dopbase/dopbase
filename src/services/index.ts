@@ -8,6 +8,6 @@ export * from "./secrets.api";
 export * from "./tokens.api";
 export * from "./audit.api";
 export * from "./instance.api";
-export * from "./service-accounts.api";
+export * from "./personal-tokens.api";
 export * from "./access.api";
 export * from "./health.api";

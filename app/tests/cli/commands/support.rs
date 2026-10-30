@@ -210,40 +210,103 @@ impl Fixture {
       .into()
   }
 
+  /// An AI agent account that reads names on the fixture project, and one
+  /// of its personal tokens.
   pub async fn agent_token(&self) -> Value {
     let (cookie, csrf) = browser_credentials(self).await;
     let api = reqwest::Client::new();
-    let account: Value = api
-      .post(format!("{}/api/v1/service-accounts", self.url))
-      .header("cookie", &cookie)
-      .header("x-dopbase-csrf", &csrf)
-      .json(&json!({"name":"metadata-agent"}))
-      .send()
-      .await
-      .unwrap()
-      .error_for_status()
-      .unwrap()
-      .json()
-      .await
-      .unwrap();
-    let response: Value = api
-      .post(format!(
-        "{}/api/v1/service-accounts/{}/tokens",
-        self.url,
-        account["data"]["id"].as_str().unwrap()
-      ))
-      .header("cookie", &cookie)
-      .header("x-dopbase-csrf", &csrf)
-      .json(&json!({"name":"agent"}))
-      .send()
-      .await
-      .unwrap()
-      .error_for_status()
-      .unwrap()
-      .json()
-      .await
-      .unwrap();
+    let send = |method: reqwest::Method, path: String, body: Value| {
+      api
+        .request(method, format!("{}{path}", self.url))
+        .header("cookie", &cookie)
+        .header("x-dopbase-csrf", &csrf)
+        .json(&body)
+        .send()
+    };
+    let account: Value = send(
+      reqwest::Method::POST,
+      "/api/v1/users".into(),
+      json!({"email":"metadata-agent","role":"ai_agent"}),
+    )
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+    let id = account["data"]["id"].as_str().unwrap();
+    send(
+      reqwest::Method::PUT,
+      "/api/v1/grants".into(),
+      json!({"principalType":"user","principalId":id,"scopeType":"project","scope":"fixture","level":"metadata"}),
+    )
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap();
+    let response: Value = send(
+      reqwest::Method::POST,
+      format!("/api/v1/users/{id}/tokens"),
+      json!({"name":"agent","level":"metadata"}),
+    )
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
     response["data"].clone()
+  }
+
+  /// Signs a member with read on the fixture project in to the CLI, in
+  /// place of root. Returns the member's id.
+  pub async fn sign_in_member(&self) -> String {
+    let (cookie, csrf) = browser_credentials(self).await;
+    let api = reqwest::Client::new();
+    let member: Value = api
+      .post(format!("{}/api/v1/users", self.url))
+      .header("cookie", &cookie)
+      .header("x-dopbase-csrf", &csrf)
+      .json(&json!({"email":"member@example.com","password":PASSWORD,"role":"member"}))
+      .send()
+      .await
+      .unwrap()
+      .error_for_status()
+      .unwrap()
+      .json()
+      .await
+      .unwrap();
+    let id = member["data"]["id"].as_str().unwrap().to_owned();
+    api
+      .put(format!("{}/api/v1/grants", self.url))
+      .header("cookie", &cookie)
+      .header("x-dopbase-csrf", &csrf)
+      .json(&json!({"principalType":"user","principalId":id,"scopeType":"project","scope":"fixture","level":"read"}))
+      .send()
+      .await
+      .unwrap()
+      .error_for_status()
+      .unwrap();
+    let login: Value = api
+      .post(format!("{}/api/v1/auth/login", self.url))
+      .json(&json!({"email":"member@example.com","password":PASSWORD,"sessionKind":"cli"}))
+      .send()
+      .await
+      .unwrap()
+      .error_for_status()
+      .unwrap()
+      .json()
+      .await
+      .unwrap();
+    session::save(
+      &self.resolved(),
+      login["data"]["token"].as_str().unwrap(),
+      Some("member@example.com"),
+    )
+    .unwrap();
+    id
   }
 
   pub async fn stop(&self) {

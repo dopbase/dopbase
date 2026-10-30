@@ -51,6 +51,55 @@ pub(super) async fn browser_login(router: &Router) -> (String, String) {
   )
 }
 
+/// The plaintext of a personal token for a new AI agent account that reads
+/// secret names on `project` and nothing more.
+pub(super) async fn metadata_agent_token(
+  router: &Router,
+  cookie: &str,
+  csrf: &str,
+  name: &str,
+  project: &str,
+) -> String {
+  let send = |method: &str, path: String, body: Value| {
+    let request = Request::builder()
+      .method(method)
+      .uri(path)
+      .header(header::COOKIE, cookie)
+      .header("x-dopbase-csrf", csrf)
+      .header(header::CONTENT_TYPE, "application/json")
+      .body(Body::from(body.to_string()))
+      .unwrap();
+    async move {
+      let response = router.clone().oneshot(request).await.unwrap();
+      let status = response.status().as_u16();
+      let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+      let body: Value = serde_json::from_slice(&bytes).unwrap();
+      assert!(status < 300, "{body}");
+      body
+    }
+  };
+  let agent = send(
+    "POST",
+    "/api/v1/users".into(),
+    json!({"email":name,"role":"ai_agent"}),
+  )
+  .await;
+  let id = agent["data"]["id"].as_str().unwrap();
+  send(
+    "PUT",
+    "/api/v1/grants".into(),
+    json!({"principalType":"user","principalId":id,"scopeType":"project","scope":project,"level":"metadata"}),
+  )
+  .await;
+  let token = send(
+    "POST",
+    format!("/api/v1/users/{id}/tokens"),
+    json!({"name":"default","level":"metadata"}),
+  )
+  .await;
+  token["data"]["plaintextToken"].as_str().unwrap().to_owned()
+}
+
 pub(super) async fn expire_confirmation(state: &app::state::AppState) {
   sqlx::query("UPDATE sessions SET recent_auth_at=? WHERE kind='browser'")
     .bind((chrono::Utc::now() - chrono::Duration::minutes(11)).to_rfc3339())
@@ -246,25 +295,8 @@ async fn import_rejects_nonhuman_credentials_and_invalid_sessions() {
   .await;
   assert_eq!(status, 201);
   let (cookie, csrf) = browser_login(&router).await;
-  let (status, agent) = browser_call(
-    &router,
-    "/api/v1/service-accounts",
-    &cookie,
-    Some(&csrf),
-    json!({"name":"test-agent"}),
-  )
-  .await;
-  assert_eq!(status, 201);
-  let agent_id = agent["data"]["id"].as_str().unwrap();
-  let (status, agent_token) = browser_call(
-    &router,
-    &format!("/api/v1/service-accounts/{agent_id}/tokens"),
-    &cookie,
-    Some(&csrf),
-    json!({"name":"test-token"}),
-  )
-  .await;
-  assert_eq!(status, 201);
+  let agent_token =
+    metadata_agent_token(&router, &cookie, &csrf, "test-agent", "concurrency-test").await;
   for dry_run in [true, false] {
     let request =
       json!({"mode":"merge","dryRun":dry_run,"entries":[{"key":"APP_SECRETS","value":"fixture"}]});
@@ -278,7 +310,7 @@ async fn import_rejects_nonhuman_credentials_and_invalid_sessions() {
     }
     for credential in [
       runner["data"]["plaintextToken"].as_str().unwrap(),
-      agent_token["data"]["plaintextToken"].as_str().unwrap(),
+      agent_token.as_str(),
     ] {
       let (status, body, _) = call(
         &router,

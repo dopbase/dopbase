@@ -3,8 +3,11 @@ import type { AccountRole } from "./auth.api";
 
 export interface User {
   id: string;
+  /** An AI agent's name. */
   email: string;
-  role: "root" | "admin" | "member";
+  role: "root" | "admin" | "member" | "ai_agent";
+  /** The person who answers for an AI agent. */
+  ownerId?: string | null;
   createdAt: string;
   updatedAt: string;
   hasPassword: boolean;
@@ -16,11 +19,14 @@ export async function fetchUsers(): Promise<User[]> {
   return data;
 }
 
-/** Leave `password` empty for an account that uses single sign-on only. */
+/**
+ * Leave `password` empty for an account that uses single sign-on only, and
+ * for an AI agent, whose `email` is its name.
+ */
 export async function createUser(
   email: string,
   password: string,
-  role: Exclude<AccountRole, "root" | "ai_agent"> = "member",
+  role: Exclude<AccountRole, "root"> = "member",
 ): Promise<User> {
   const { data } = await apiRequest<User>(BASE, {
     method: "POST",

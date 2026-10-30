@@ -10,7 +10,7 @@ pub struct UserResponse {
   pub id: String,
   /// User email address.
   pub email: String,
-  /// Account role: `root`, `admin`, or `member`.
+  /// Account role: `root`, `admin`, `member`, or `ai_agent`.
   pub role: AdminRole,
   /// ISO 8601 creation timestamp.
   pub created_at: String,
@@ -20,19 +20,24 @@ pub struct UserResponse {
   pub has_password: bool,
   /// The account has a single sign-on identity linked.
   pub sso_linked: bool,
+  /// The accountable person behind an AI agent account.
+  pub owner_id: Option<String>,
 }
 
 /// Request to create a new user account.
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateUserRequest {
-  /// User email address.
+  /// User email address. For an AI agent, its name: letters, digits, dots,
+  /// dashes, and underscores.
   pub email: String,
   /// Account password (minimum 12 characters). Leave it out to create an
   /// account that signs in only through single sign-on, which must be on.
   #[serde(default)]
   pub password: Option<String>,
-  /// Account role (`admin` or `member`). Defaults to `admin`.
+  /// Account role (`admin`, `member`, or `ai_agent`). Defaults to `admin`.
+  /// An AI agent has no password, signs in with personal tokens only, and
+  /// the person who creates it becomes its owner.
   #[serde(default)]
   pub role: Option<AdminRole>,
 }
@@ -47,4 +52,7 @@ pub struct UpdateUserRequest {
   pub password: Option<String>,
   /// Updated account role (`admin` or `member`).
   pub role: Option<AdminRole>,
+  /// A new owner for an AI agent account: a person who signs in.
+  #[serde(default)]
+  pub owner_id: Option<String>,
 }
