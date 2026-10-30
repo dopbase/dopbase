@@ -170,9 +170,9 @@ Config file:     /home/alex/.dopbase/config.toml
 Server:          https://dopbase.example.com
 Server status:   connected (live)
 Server source:   config
-Authentication:  encrypted_session
-Identity:        admin
-Email:           admin@example.com
+Authentication:  dopbase login (saved session)
+Role:            Member
+Email:           alex@example.com
 Environment:     env_482731 (default)
 ```
 
@@ -188,6 +188,7 @@ same safe fields for diagnostics and automation:
   "server_source": "default",
   "authentication": "none",
   "identity": "none",
+  "role": null,
   "email": null,
   "environment": null
 }
@@ -199,11 +200,23 @@ the remaining fields still come from safe local configuration and session
 metadata. The health probe times out after three seconds.
 
 The stable server-source values are `argument`, `environment`, `config`, and
-`default`. Authentication is `environment`, `encrypted_session`, or `none`.
-Identity is `admin`, `human`, `runner`, `ai_agent`, `unknown`, or `none`. Dopbase
-identifies environment credentials from their token prefix, so this field does
-not confirm that the token is valid. Environment credentials have no email in
-status output.
+`default`.
+
+Authentication says how the CLI signed in: `dopbase login` (a saved session), a
+runner, personal, or AI agent token saved with `dopbase login --token`, or a
+token in `DOPBASE_TOKEN`. In JSON, `authentication` is `environment`,
+`encrypted_session`, or `none`, and `identity` is the kind of credential:
+`admin` (a saved login session), `human`, `runner`, `personal_token`,
+`ai_agent` (an agent token from before personal tokens), `unknown`, or `none`.
+Dopbase reads the kind from the token prefix, so it does not confirm that the
+token is valid. Environment credentials have no email in status output.
+
+Role is the account's role as the server names it, such as `Root`, `Admin`,
+`Member`, `Auditor`, `AI agent`, or a custom role. Dopbase asks the server, so
+the role is only shown while it is connected; offline, it reads
+`unknown (server offline)` and the JSON `role` is `null`. Runner tokens act for
+one environment and have no role. A personal token reaches at most what its
+role allows and often less, so run `dopbase access` to see what it reaches.
 
 ## Resolution order
 

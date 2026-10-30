@@ -106,8 +106,8 @@ dopbase client status
 Server:          http://localhost:8840
 Server status:   connected (live)
 Server source:   default
-Authentication:  none
-Identity:        none
+Authentication:  none (run dopbase login)
+Role:            none
 Email:           none
 Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```

@@ -369,7 +369,10 @@ const config = defineConfig({
         {
           text: "Administration",
           items: [
+            { text: "Project access", link: "/ui/project-access" },
             { text: "Users and AI agents", link: "/ui/users" },
+            { text: "Groups", link: "/ui/groups" },
+            { text: "Roles", link: "/ui/roles" },
             { text: "Backups and restoration", link: "/ui/backups" },
             { text: "Audit and instance status", link: "/ui/audit-instance" },
           ],
@@ -418,7 +421,7 @@ const config = defineConfig({
           items: [
             { text: "Security model", link: "/reference/security" },
             { text: "Public security updates", link: "/security/" },
-            { text: "Identity and tokens", link: "/reference/identity" },
+            { text: "Identity and access", link: "/reference/identity" },
             { text: "Audit events", link: "/reference/audit-events" },
           ],
         },

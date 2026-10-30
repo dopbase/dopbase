@@ -51,6 +51,14 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- `dopbase client status` shows the account's role, such as Member, Auditor,
+  or Root, on a new **Role** line in place of **Identity**. It used to say
+  `admin` for every saved login, whatever the role. The role comes from the
+  server, so it reads `unknown (server offline)` when the server can't be
+  reached. **Authentication** now says how the CLI signed in, for example
+  `dopbase login (saved session)` or `personal token (DOPBASE_TOKEN)`. The
+  JSON output adds `role` and keeps `authentication` and `identity` as they
+  were.
 - Service accounts are now accounts with the AI agent role. The upgrade turns
   each one into an AI agent owned by root that still reads secret names on
   every project, and its `dpa_` tokens keep working as personal tokens. New
@@ -87,12 +95,28 @@ All notable changes to Dopbase are documented in this file.
   the Audit page is open to all people and members no longer get a 403.
 - The built-in Auditor role gains `audit.read_all` and `tokens.personal`.
 - Factory reset deletes custom roles.
+- Signing in with a password refuses disabled accounts and accounts that use
+  tokens only, instead of issuing a session the server then rejects. Keeping
+  password sign-in while single sign-on is required now follows the
+  `password.breakglass` capability, and verifying a provider follows
+  `sso.manage`; both are root's alone.
+- `dopbase client status` reports a `dpp_` token as `personal_token`.
+- The documentation covers roles, grants, groups, protected environments,
+  personal tokens, AI agent accounts, and audit visibility, with new Project
+  access, Groups, and Roles pages. "Identity and tokens" is now "Identity and
+  access".
 - User management, the audit log, instance status, backups, single sign-on
   settings, and factory reset now check a capability instead of a role. A
   refused request says `Your role does not allow this operation.` where it
   said `This operation requires an administrator.`
 - `PATCH /api/v1/environments/{id}` answers `ENVIRONMENT_UPDATED` instead of
   `ENVIRONMENT_RENAMED`, and its `name` is optional.
+
+### Fixed
+
+- Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
+  pool` while loading `sqlx-macros`. The release profile now strips only the
+  final binary and leaves proc-macro libraries unstripped.
 
 ## 0.1.10 - 2026-10-26
 

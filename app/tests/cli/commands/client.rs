@@ -48,9 +48,10 @@ fn status_includes_cached_admin_email_and_default_environment() {
     email: Some("admin@example.com".into()),
   };
 
-  let value = status_document(&server, &credential, true);
+  let value = status_document(&server, &credential, true, Some("Member"));
   assert_eq!(value["authentication"], "encrypted_session");
   assert_eq!(value["identity"], "admin");
+  assert_eq!(value["role"], "Member");
   assert_eq!(value["email"], "admin@example.com");
   assert_eq!(value["environment"], "env_default");
   assert_eq!(value["server_status"], "connected");
@@ -69,9 +70,10 @@ fn status_identifies_an_encrypted_runner_token() {
     email: None,
   };
 
-  let value = status_document(&server, &credential, true);
+  let value = status_document(&server, &credential, true, None);
   assert_eq!(value["authentication"], "encrypted_session");
   assert_eq!(value["identity"], "runner");
+  assert!(value["role"].is_null());
   assert!(value["email"].is_null());
   assert!(!value.to_string().contains(token));
 }
@@ -84,6 +86,7 @@ fn status_identifies_environment_token_types_without_exposing_tokens() {
     ("dbc_admin-secret", "human"),
     ("dbs_runner-secret", "runner"),
     ("dpa_agent-secret", "ai_agent"),
+    ("dpp_personal-secret", "personal_token"),
     ("other-secret", "unknown"),
   ] {
     let credential = Credential {
@@ -92,7 +95,7 @@ fn status_identifies_environment_token_types_without_exposing_tokens() {
       email: None,
     };
 
-    let value = status_document(&server, &credential, true);
+    let value = status_document(&server, &credential, true, None);
     assert_eq!(value["identity"], identity);
     assert!(value["email"].is_null());
     assert!(!value.to_string().contains(token));
@@ -110,12 +113,46 @@ fn status_reports_no_identity_without_credentials() {
     email: None,
   };
 
-  let value = status_document(&server, &credential, false);
+  let value = status_document(&server, &credential, false, None);
   assert_eq!(value["identity"], "none");
+  assert!(value["role"].is_null());
   assert!(value["email"].is_null());
   assert!(value["environment"].is_null());
   assert_eq!(value["server_status"], "offline");
   assert_eq!(value["status_source"], "cache");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn status_reports_the_role_and_how_the_cli_signed_in() {
+  use super::support::Fixture;
+  let fixture = Fixture::new().await;
+  fixture.environment().await;
+  assert_eq!(fixture.json(&["client", "status"]).await["role"], "Root");
+
+  fixture.sign_in_member().await;
+  let member = fixture.json(&["client", "status"]).await;
+  assert_eq!(member["identity"], "admin");
+  assert_eq!(member["role"], "Member");
+  let human = fixture.run(&["client", "status"]).await;
+  assert!(human.status.success());
+  let text = String::from_utf8_lossy(&human.stdout);
+  assert!(text.contains("dopbase login (saved session)"), "{text}");
+  assert!(text.contains("Role:") && text.contains("Member"), "{text}");
+  assert!(!text.contains("Identity:"), "{text}");
+
+  let token = fixture.agent_token().await;
+  let mut agent = fixture.command();
+  agent
+    .env("DOPBASE_TOKEN", token["plaintextToken"].as_str().unwrap())
+    .args(["client", "status"]);
+  let agent = super::support::output(agent, None).await;
+  let text = String::from_utf8_lossy(&agent.stdout);
+  assert!(text.contains("personal token (DOPBASE_TOKEN)"), "{text}");
+  assert!(
+    text.contains("AI agent (the token may reach less"),
+    "{text}"
+  );
+  fixture.stop().await;
 }
 
 #[cfg(unix)]

@@ -85,15 +85,15 @@ impl AdminRole {
     }
   }
 
-  /// The role of a person who signs in, read from `admins.role`. AI agents
-  /// never sign in, so they and unknown values give `None`.
-  // TODO(rbac): maps the fixed role names. Load the account's roles from
-  // the role tables instead once roles are configurable.
-  pub fn parse_human(value: &str) -> Option<Self> {
+  /// The legacy label stored in `admins.role`. Authorization never reads
+  /// it: an account's role and capabilities come from the role tables, and
+  /// this label only keeps older API clients working.
+  pub fn parse(value: &str) -> Option<Self> {
     match value {
       "root" => Some(Self::Root),
       "admin" => Some(Self::Admin),
       "member" => Some(Self::Member),
+      "ai_agent" => Some(Self::AiAgent),
       _ => None,
     }
   }

@@ -15,7 +15,10 @@ use crate::{
   extractors::{require_person, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
-  services::token,
+  services::{
+    authx::{self, Capability, SignIn},
+    token,
+  },
   state::AppState,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -65,18 +68,30 @@ pub async fn login(
   }
   state.rate_limiter.clear(&limit_key).await;
   let (admin_id, email, _, role_value) = admin.expect("validated");
-  let role = AdminRole::parse_human(&role_value).ok_or_else(HttpError::internal)?;
+  let role = AdminRole::parse(&role_value).ok_or_else(HttpError::internal)?;
   // The password was right, so saying why it is refused leaks nothing.
-  // TODO(rbac): root is the fixed break-glass role that keeps password
-  // sign-in. Check a permission instead once roles are configurable.
-  if role != AdminRole::Root
+  let mut conn = state.db.pool().acquire().await?;
+  let access = authx::load_access(&mut conn, &admin_id)
+    .await?
+    .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled."))?;
+  drop(conn);
+  if access.sign_in == SignIn::TokenOnly {
+    return Err(HttpError::unauthorized(
+      AUTHENTICATION_INVALID,
+      "This account signs in with tokens only.",
+    ));
+  }
+  let actor_type = if access.is_root { "root" } else { "admin" };
+  // Only a break-glass account, root, keeps password sign-in while single
+  // sign-on is required, so there is always a way back in.
+  if !access.has(Capability::PasswordBreakglass)
     && crate::modules::sso::service::policy(state)
       .await?
       .require_sso
   {
     let _ = common::audit_standalone(
       state.db.pool(),
-      role.audit_actor_type(),
+      actor_type,
       Some(&admin_id),
       Some(&email),
       "login.failed",
@@ -96,7 +111,7 @@ pub async fn login(
   let session = issue_session(&mut tx, &admin_id, request.session_kind).await?;
   common::audit(
     &mut tx,
-    role.audit_actor_type(),
+    actor_type,
     Some(&admin_id),
     Some(&email),
     "login.succeeded",
@@ -182,20 +197,19 @@ pub(crate) async fn issue_session(
   })
 }
 /// Whether this account may confirm itself with its password: it has one,
-/// and single sign-on does not require otherwise.
+/// and single sign-on does not require otherwise. Break-glass accounts keep
+/// their password either way.
 async fn password_confirmation(
   state: &AppState,
   admin_id: &str,
-  role: AdminRole,
+  breakglass: bool,
 ) -> Result<bool, HttpError> {
   let hash = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .unwrap_or_default();
-  // TODO(rbac): root keeps its password when single sign-on is required.
-  // Check a permission instead once roles are configurable.
   Ok(
     common::has_password(&hash)
-      && (role == AdminRole::Root
+      && (breakglass
         || !crate::modules::sso::service::policy(state)
           .await?
           .require_sso),
@@ -206,14 +220,18 @@ pub async fn session(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<SessionResponse, HttpError> {
-  if let AuthIdentity::Admin { admin_id, role, .. } = identity {
+  if let AuthIdentity::Admin {
+    admin_id, access, ..
+  } = identity
+  {
     let mut response = session_summary(identity)?;
     response.has_password = common::has_password(
       &repository::password_hash(state.db.pool(), admin_id)
         .await?
         .unwrap_or_default(),
     );
-    response.password_confirmation = password_confirmation(state, admin_id, *role).await?;
+    response.password_confirmation =
+      password_confirmation(state, admin_id, access.has(Capability::PasswordBreakglass)).await?;
     response.sso_confirmation =
       crate::modules::sso::service::confirmation_name(state, admin_id).await?;
     if let AuthIdentity::Admin { access, .. } = identity
@@ -316,8 +334,8 @@ pub async fn reauthenticate(
   let hash = repository::password_hash(state.db.pool(), admin_id)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The session is invalid."))?;
-  let role = match identity {
-    AuthIdentity::Admin { role, .. } => *role,
+  let breakglass = match identity {
+    AuthIdentity::Admin { access, .. } => access.has(Capability::PasswordBreakglass),
     _ => unreachable!(),
   };
   if !common::has_password(&hash) {
@@ -326,7 +344,7 @@ pub async fn reauthenticate(
       "This account has no password. Confirm with single sign-on instead.",
     ));
   }
-  if !password_confirmation(state, admin_id, role).await? {
+  if !password_confirmation(state, admin_id, breakglass).await? {
     return Err(HttpError::forbidden(
       PASSWORD_LOGIN_DISABLED,
       "Passwords are turned off for this account. Confirm with single sign-on instead.",

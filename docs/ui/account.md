@@ -1,6 +1,6 @@
 ---
 title: "Admin UI: account settings"
-description: "Manage your profile, update passwords, view session status, and understand offline password recovery in the Dopbase Admin UI."
+description: "Manage your profile, password, and personal tokens, view session status, and understand offline password recovery in the Dopbase Admin UI."
 ---
 
 # Account settings
@@ -15,7 +15,7 @@ Open **Account** from the user menu in the sidebar or navigation bar.
 The profile card displays your identity details:
 
 - **Email**: Your account email address.
-- **Role**: Your assigned permission level (`root`, `admin`, or `member`).
+- **Role**: The name of your role, such as Admin, Member, or a custom role.
 - **Last login**: The timestamp and relative time of your last successful sign-in.
 
 ## Session security
@@ -27,6 +27,30 @@ Dopbase tracks your authentication freshness to protect sensitive operations:
   re-authentication window. This badge indicates that you can perform sensitive
   actions like revealing secret values or exporting environments without an
   immediate password challenge.
+
+## Personal tokens
+
+A personal token lets a script or an AI agent on your machine act as you,
+through `DOPBASE_TOKEN`. It never reaches more than you do: if you lose access
+to a project, your tokens lose it too.
+
+Choose **New token** and pick:
+
+- a **name**, such as the machine or agent that will use it;
+- what it **can** do: read names only, read values, or also change secrets,
+  up to what your role allows;
+- **where**: every project you reach, or one project;
+- when it **expires**. Personal tokens always expire.
+
+Dopbase shows the token once, so copy it straight into a secret store. The card
+lists your active tokens; choose **Revoke** to stop one immediately. If your
+role's tokens read the audit log, as an auditor's do, the card creates audit
+tokens instead, for a SIEM or another log collector.
+
+The card isn't shown for root, which has no personal tokens, or for roles
+without `tokens.personal`. You can also use `dopbase token personal` in the
+CLI. See [AI agent access](/guide/ai-agent-access) for handing a token to an
+agent.
 
 ## Changing your password
 

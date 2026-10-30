@@ -13,12 +13,14 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Secrets               | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.version_revealed`, `secret.rolled_back`, `secret.imported`, `secret.import_previewed`, `secret.exported`, `secret.runtime_accessed`                                |
 | Projects              | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                                                                                                                      |
-| Environments          | `environment.created`, `environment.renamed`, `environment.deleted`                                                                                                                                                                                 |
+| Environments          | `environment.created`, `environment.renamed`, `environment.deleted`, `environment.protected`, `environment.unprotected`                                                                                                                             |
 | Runner tokens         | `token.created`, `token.revoked`                                                                                                                                                                                                                    |
 | Authentication        | `login.succeeded`, `login.failed`, `logout.succeeded`, `cli_login.approved`, `cli_login.denied`                                                                                                                                                     |
 | Single sign-on        | `sso_provider.created`, `sso_provider.updated`, `sso_provider.verified`, `sso_provider.enabled`, `sso_provider.disabled`, `sso_provider.deleted`, `sso_provider.policy_changed`, `sso_identity.linked`, `sso_identity.unlinked`, `sso_login.failed` |
 | Administrator & users | `admin.bootstrapped`, `admin.created`, `admin.updated`, `admin.deleted`, `admin.reauthenticated`, `admin.password_changed`                                                                                                                          |
-| AI service accounts   | `service_account.created`, `service_account.deleted`, `service_account.token_created`, `service_account.token_revoked`                                                                                                                              |
+| Access                | `grant.set`, `grant.removed`, `group.created`, `group.updated`, `group.deleted`, `group_member.added`, `group_member.removed`                                                                                                                       |
+| Roles                 | `role.created`, `role.updated`, `role.deleted`                                                                                                                                                                                                      |
+| Personal tokens       | `personal_token.created`, `personal_token.revoked`                                                                                                                                                                                                  |
 | Backups               | `backup.created`, `backup.downloaded`, `backup.uploaded`, `backup.restored`, `backup.deleted`, `master_key.downloaded`, `backup.restored_bootstrap`                                                                                                 |
 | Audit log             | `audit.pruned`                                                                                                                                                                                                                                      |
 
@@ -116,7 +118,7 @@ fields included, for write-once storage.
    edit, or deliberate. Review who could reach the data directory: host logins,
    container exec sessions, and volume access.
 5. If it was deliberate, treat it as a breach of the host. Rotate the secrets
-   Dopbase holds, administrator passwords, runner and service account tokens,
+   Dopbase holds, passwords, runner and personal tokens,
    and consider the master key exposed.
 6. Records before the break can still be trusted; records from the break on
    cannot.
@@ -173,7 +175,13 @@ elsewhere with `dopbase audit export`.
 
 ## Record contents
 
-Root and admin can review user, AI account, and backup history in the Audit page.
+What the Audit page and `dopbase audit` list depends on the reader's role:
+every event with `audit.read_all` (Auditor and root), settings events and
+events on the projects they reach with `audit.read` (Admin), and otherwise
+only the reader's own actions. Accounts and AI agents appear as `admin.*`
+events. Requests made with a personal token are recorded with the actor type
+`personal_token` and the account as the actor. Service account events from
+earlier versions keep their `service_account.*` names.
 
 An audit record may contain:
 

@@ -129,9 +129,9 @@ Managing secrets across a team requires distinguishing who is asking for data:
 - **Machine runners** use scoped runner tokens tied strictly to a single
   environment (e.g. `payment-service/staging`). A compromised runner on a
   staging server cannot read production values or list other projects.
-- **AI service accounts** receive restricted access that permits reading
-  project structure and metadata while preventing access to runtime secret
-  values.
+- **AI agents** use personal tokens that reach only the projects and level
+  they are given, and never more than the person who owns them. Names only is
+  enough to compare configuration without seeing a value.
 
 ### 4. Continuous audit trails without secret leakage
 

@@ -33,8 +33,12 @@ in your installed version.
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
-| Human users                                        | `/api/v1/users`                                      |
-| AI service accounts                                | `/api/v1/service-accounts`                           |
+| People and AI agents                               | `/api/v1/users`                                      |
+| Personal tokens                                    | `/api/v1/users/{id}/tokens`                          |
+| Where someone's access comes from                  | `/api/v1/users/{id}/access`                          |
+| Roles                                              | `/api/v1/roles`                                      |
+| Grants                                             | `/api/v1/grants`, `/api/v1/projects/{ref}/access`    |
+| Groups                                             | `/api/v1/groups`                                     |
 | Instance summary                                   | `/api/v1/status`                                     |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
@@ -137,8 +141,9 @@ server that supplies the snapshot revision and fails safely when it is missing.
 
 `GET /api/v1/audit-events/verify` walks the audit log in sequence order,
 recomputes every record's hash from its stored contents, and reports the first
-inconsistency. Administrators only, like reading the audit log; runner tokens
-and AI service accounts are refused with `403`.
+inconsistency. It needs `audit.verify`, which Admin and Auditor hold, from a
+session or an audit token; runner tokens and other personal tokens are refused
+with `403`.
 
 The response carries `ok`, the number of `records` checked before the first
 break, `headSeq` and `headHash` for external anchoring, `legacy` for records
@@ -169,7 +174,13 @@ streams the filtered list as JSON lines.
   token, and `GET /api/v1/auth/session` returns `csrfToken` too, so a tab
   opened later can get one. That token is derived from the session's own, and
   both stay valid.
-- CLI sessions, runner identities, and AI service accounts use `Authorization: Bearer <token>`.
+- CLI sessions, runner tokens, and personal tokens use `Authorization: Bearer <token>`.
+- A personal token acts for its account within its own scope and level. It
+  never holds the account's capabilities, so it can't manage people, grants,
+  projects, or tokens.
+- Projects, environments, and secrets the caller can't reach answer `404`;
+  those it can see but not change answer `403`. Project and environment
+  responses include the caller's `level`.
 - A runner token can retrieve runtime secrets and export the snapshot of its
   assigned environment. It cannot list secret metadata, mutate secrets, reveal
   individual values, or access another environment. Export retains the existing

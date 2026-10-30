@@ -31,6 +31,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase logout`                       | Remove the active saved credential  |
 | `dopbase client status`                | Show safe effective client settings |
 | `dopbase status`                       | Alias for `dopbase client status`   |
+| `dopbase access`                       | Show what you or a token can reach  |
 | `dopbase update`                       | Check GitHub for a newer release    |
 | `dopbase admin reset-password <email>` | Reset a user password offline       |
 | `dopbase admin factory-reset`          | Reset the local instance offline    |
@@ -258,7 +259,8 @@ created in that project, so cloning across projects or servers is not
 supported. Dopbase resolves the source, checks that the new name is available,
 shows the source, destination, and secret count, then asks for confirmation.
 `--yes` skips this confirmation but still requires a recently authenticated
-human account. Runner tokens and service accounts cannot clone environments.
+human account with project manager on the project. Runner tokens and personal
+tokens cannot clone environments.
 
 Dopbase creates the destination before reading plaintext secrets. This closes
 a name-conflict race without exposing source values. If export or import
@@ -390,8 +392,9 @@ v1        created               ana@example.com   2026-09-01 08:00 UTC   availab
 Dopbase still shows who changed them and when, but no longer stores the value.
 `--limit` sets the page size (1 to 200, default 50). When more versions exist,
 the command for the next page, with `--before`, is printed to standard error.
-`--json` prints the API page unchanged. History never contains values, and AI
-agent tokens can read it the same way they read `secret list`.
+`--json` prints the API page unchanged. History never contains values, and a
+personal token that reads names only can read it the same way it reads
+`secret list`.
 
 `secret rollback` saves the value of an earlier version as a new version. It
 never edits history, so a rollback can be rolled back too. Leave out VERSION
@@ -492,7 +495,8 @@ and creates the file with restrictive permissions where the platform supports
 them. Export reveals plaintext values and records access in the audit log.
 Human CLI exports require interactive password confirmation. Runner tokens can
 export only their assigned environment without a prompt, using `DOPBASE_TOKEN`
-or an encrypted saved runner credential. AI agent tokens cannot export values.
+or an encrypted saved runner credential. A personal token exports without a
+prompt when it reaches read on the environment; a names-only token is refused.
 
 Exports require a live server response. They never fall back to the encrypted
 run cache. Authentication, network, or rendering failures leave an existing
@@ -571,6 +575,46 @@ assigned environment. It cannot modify secrets or access another environment.
 Export audit entries identify the runner token and secret count without storing
 values.
 
+## Personal tokens
+
+A personal token lets a script or an AI agent act as you through
+`DOPBASE_TOKEN`. It reaches at most what you reach at that moment, within its
+own project or environment and level, and always expires.
+
+```bash
+dopbase token personal create --name laptop-agent --level metadata \
+  --project payment-service --expires-in 7d
+dopbase token personal create --name siem --audit --expires-in 90d
+```
+
+| Command                                                                                                                                              | Purpose                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `dopbase token personal create --name <NAME> [--level metadata\|read\|write] [--project <REF> \| --env <ENVIRONMENT_REF>] [--expires-in <DURATION>]` | Create one of your tokens |
+| `dopbase token personal create --name <NAME> --audit [--expires-in <DURATION>]`                                                                      | Create an audit token     |
+| `dopbase token personal list`                                                                                                                        | List your tokens          |
+| `dopbase token personal revoke <token-id>`                                                                                                           | Revoke one of your tokens |
+
+`--level` defaults to `read` and stops at your role's token limit. Leave out
+`--project` and `--env` for every project you reach. `--expires-in` defaults to
+your role's default and can't be `never`. `--audit` is for roles whose tokens
+read the audit log, such as Auditor. The value is shown once. Tokens for AI
+agent accounts are created on the [Users](/ui/users) page.
+
+## Access
+
+`dopbase access` shows your role, groups, and every grant that reaches you.
+With a personal token in `DOPBASE_TOKEN`, it also shows the token's own limit,
+so you can check what an agent will reach before handing it over.
+
+| Command                                  | Purpose                                         |
+| ---------------------------------------- | ----------------------------------------------- |
+| `dopbase access`                         | Show your access, or the token's                |
+| `dopbase access --project <PROJECT_REF>` | Show who reaches a project and its environments |
+| `dopbase access --user <USER_ID>`        | Show another account's access (`users.view`)    |
+
+`--project` needs project manager on the project, or `access.report`. Access
+is changed in the Admin UI, on a project's [Access](/ui/project-access) page.
+
 ## Audit commands
 
 The audit log answers who performed a sensitive action, where it happened, and
@@ -616,9 +660,11 @@ with nothing on standard error. `nextCursor` is `null` on the last page. To
 read every matching record in a script, use `dopbase audit export` instead of
 paging by hand.
 
-The table leaves out each event's metadata; `--json` includes it. The command
-requires an administrator sign-in. A member gets the server's authorization
-error, and runner or agent tokens are refused before any audit request. Audit
+The table leaves out each event's metadata; `--json` includes it. You see the
+events your role allows: everything with `audit.read_all`, your projects with
+`audit.read`, and otherwise your own actions. Audit tokens read the log as
+their account would; runner tokens and personal tokens that read project data
+are refused. Audit
 events never contain secret values, and the CLI does not fetch any. Control
 characters and bidirectional text markers stored in an event are shown as `?`,
 so a planted record cannot rewrite the lines around it in your terminal.

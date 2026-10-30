@@ -10,7 +10,7 @@ Technical reference documentation for Dopbase operators, developers, and adminis
 ## Architecture and security
 
 - **[Security model](./security)**: Encryption standards, key hierarchy, data at rest, and transport security.
-- **[Identity and tokens](./identity)**: Human roles (root, admin, member), machine runner tokens, and AI service accounts.
+- **[Identity and access](./identity)**: Root, roles and capabilities, grants and groups, personal tokens, AI agents, and runner tokens.
 - **[Audit events](./audit-events)**: Audited operations, event format, and security guarantees.
 
 ## API and internals
