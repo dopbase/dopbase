@@ -113,6 +113,84 @@ folder, even if it looks reusable. Move it once a second page needs it: to
 after its domain knowledge moves out into props. A page never imports another
 page's components.
 
+## Design source
+
+The console is designed in the Figma file
+[Dopbase admin console](https://www.figma.com/design/JkWa51Xg9VDnFvvdvFojmw/-POC--ADMIN-CONSOLE).
+Its Foundations page uses the same tokens as `src/style.css`, and its
+Components page holds the shared set every screen is built from. Each Figma
+component maps to one component in code:
+
+| Figma component                                | Code                                                 | Status                    |
+| ---------------------------------------------- | ---------------------------------------------------- | ------------------------- |
+| Button                                         | `DbButton`                                           | Exists; restyle to Figma  |
+| IconButton                                     | `DbButton` with an icon slot                         | To build                  |
+| Badge                                          | `DbBadge`                                            | Exists                    |
+| LevelBadge, RoleChip                           | `DbLevelBadge`, `DbRoleChip`                         | To build                  |
+| EnvPill, EnvSwitcher, EnvMenu                  | `DbEnvPill`, `DbEnvSwitcher`, `DbEnvMenu`            | To build                  |
+| Kbd, Avatar                                    | `DbKbd`, `DbAvatar`                                  | To build                  |
+| Input, Select, Checkbox, Switch                | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`      | Exist; restyle to Figma   |
+| SearchField                                    | `DbInput` with a search icon                         | To build                  |
+| RadioCard, Segment, Tab, FilterChip            | `DbRadioCard`, `DbSegment`, `DbTabs`, `DbFilterChip` | To build                  |
+| SelectMenu, SelectOption, Combobox             | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`       | To build                  |
+| Menu, MenuItem, row ⋯ menu                     | `DbMenu`, `DbMenuItem`, `DbRowMenu`                  | To build                  |
+| Toast                                          | `DbToast` and a `useToast` store                     | To build                  |
+| Alert                                          | `DbAlert`                                            | Exists; add the warn tone |
+| EmptyState                                     | `DbEmptyState`                                       | Exists                    |
+| CopyField, CodeSnippet                         | `DbCopyButton`, `DbCode`                             | Exist; restyle to Figma   |
+| Table rows on every screen                     | `DbTable`                                            | To build                  |
+| Modal, Drawer, mobile Sheet                    | `DbModal`, `DbSheet`                                 | Exist                     |
+| PageHeader, Card, Stat                         | `DbPageHeader`, `DbCard`, `DbStat`                   | To build                  |
+| Sidebar, SidebarItem, AccountMenu, ProjectTabs | `src/layouts`                                        | Rebuild with the shell    |
+| ProjectTreeRow, EnvTreeRow, ProjectAccordion   | `src/pages/Projects/components`                      | Rebuild with Projects     |
+
+Sidebar and project pieces know about Dopbase, so they live with their layout or
+page rather than in `src/components/ui`.
+
+## Brand and icons
+
+The logo comes from the Figma brand page. It is two stacked Ds in Lavender
+(`--color-brand-mark`, `#c4a3fc`). Where they overlap, the colour is a deeper
+tint (`--color-brand-mark-overlap`, `#af8ef0`), never a different hue. In the
+console, `DopbaseIcon` draws the mark on its own, without a tile, gradient or
+outline.
+
+| File                     | Use                                                                |
+| ------------------------ | ------------------------------------------------------------------ |
+| `public/logo.svg`        | Lavender mark, for dark backgrounds and the docs site in dark mode |
+| `public/logo-violet.svg` | Violet mark, for light backgrounds and the docs site in light mode |
+| `public/logo-github.svg` | Mark and wordmark in a violet that reads on both GitHub themes     |
+| `public/favicon.svg`     | Violet app icon, also rendered to `favicon.ico`                    |
+| `public/og-image.jpg`    | Social preview, from the GitHub social preview banner in Figma     |
+
+Icons live in `src/assets/icons` as one `*.icon.vue` file each, exported from
+`index.ts`. They follow the Figma icon set: Lucide shapes on a 24px grid with a
+2px stroke in `currentColor`. Add an icon to Figma first, then add the matching
+file here. Delete an icon file once nothing imports it.
+
+## Routes
+
+The route table moves to the shape the design uses. Project pages are addressed
+by project name and environment name, and each project tab gets its own path:
+
+```text
+/projects
+/projects/:project
+/projects/:project/:env/secrets
+/projects/:project/:env/tokens
+/projects/:project/:env/activity
+/projects/:project/access
+/projects/:project/settings
+/status
+```
+
+Every old path keeps working through a redirect: `/projects/p/:projectRef`,
+`/projects/p/:projectRef/e/:environmentId` and its `tokens` and `import`
+children, `/projects/p/:projectRef/access`, and `/instance`. The selection
+still lives only in the URL. The sidebar and the router guards read the same
+capability map, so a link to a page the viewer can't open shows the No access
+screen instead of a silent redirect.
+
 ## Verification
 
 Run these checks before submitting frontend changes:
