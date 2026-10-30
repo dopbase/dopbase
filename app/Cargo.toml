@@ -83,7 +83,9 @@ shlex = "2"
 webbrowser = "1.2"
 # OpenID Connect relying party for single sign-on. Uses the reqwest client
 # above; discovery, PKCE, nonce, and ID token checks come from the crate.
-openidconnect = { version = "4", default-features = false, features = ["reqwest"] }
+openidconnect = { version = "4", default-features = false, features = [
+  "reqwest",
+] }
 tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
@@ -96,6 +98,9 @@ nix = { version = "0.30", features = ["term"] }
 tower = { version = "0.5", features = ["util"] }
 # Signs ID tokens for the mock identity provider in the SSO tests.
 p256 = { version = "0.13", features = ["ecdsa"] }
+
+[profile.dev]
+debug = "line-tables-only"
 
 [profile.release]
 opt-level = "z"
