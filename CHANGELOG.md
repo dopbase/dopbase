@@ -126,6 +126,16 @@ All notable changes to Dopbase are documented in this file.
   new banner. The icon set now matches the Figma file: it adds icons for
   agents, filters, activity, menus, external links and the command key, and
   drops 33 icons nothing used.
+- The console sidebar now groups its pages into **Workspace** (Projects, Audit
+  log), **People & access** (Users, Groups, Roles) and **Instance** (Status,
+  Backups, Single sign-on), and hides a group when your role can open none of
+  its pages. Your email and real role name sit at the bottom, replacing the
+  "admin console" and "member console" label, and open a menu with Account,
+  Personal tokens, Docs and Sign out. Instance is now **Status** at `/status`;
+  `/instance` redirects there. A link to a page your role can't open now
+  shows a **No access** screen that names the missing capability, instead of
+  sending you to Projects. The sidebar and the router read the same
+  capability map, so the nav never offers a page the router would refuse.
 
 ### Fixed
 
