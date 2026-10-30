@@ -2,6 +2,30 @@
 
 All notable changes to Dopbase are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Accounts now point to a row in the new `roles` table instead of a fixed
+  role name. A role holds capabilities, such as `users.manage` or
+  `audit.read`, and a ceiling on the access its grants can give. Admin,
+  Member, Auditor, and AI agent are built in. Root is a flag on the account
+  and holds every capability. Grants give a user or a group one level
+  (`metadata`, `read`, `write`, `manage`, or `project_manager`) on all
+  projects, one project, or one environment, and an environment can be marked
+  protected. The Admin UI and the CLI do not use grants or groups yet, so
+  access is unchanged: the upgrade gives every admin `project_manager` and
+  every member `write` on all projects, and new accounts get the same.
+  `GET /api/v1/auth/session` now reports `roleName`, `capabilities`, and
+  `maxLevel`. Backups include the new tables.
+
+### Changed
+
+- User management, the audit log, instance status, backups, single sign-on
+  settings, and factory reset now check a capability instead of a role. A
+  refused request says `Your role does not allow this operation.` where it
+  said `This operation requires an administrator.`
+
 ## 0.1.10 - 2026-10-26
 
 [Dopbase](https://dopbase.com) 0.1.10 adds single sign-on for the Admin UI

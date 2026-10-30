@@ -10,6 +10,8 @@ use regex::Regex;
 /// A timestamped migration a later branch would add after the current set.
 const PROBE_MIGRATION: &str = "20261024091600_upgrade_probe";
 const PROBE_VERSION: i64 = 20_261_024_091_600;
+/// The last version before roles and grants replaced the fixed roles.
+const BEFORE_ROLES: i64 = 20_261_024_132_208;
 /// Highest version recorded before migrations were renamed.
 const LEGACY_HEAD: i64 = 18;
 
@@ -159,6 +161,89 @@ async fn applies_a_new_migration_to_an_existing_database() {
   // The embedded migrator still accepts the current checksums and finds
   // nothing left to apply.
   MIGRATOR.run(db.pool()).await.unwrap();
+  db.close().await;
+}
+
+#[tokio::test]
+async fn upgrading_to_roles_keeps_every_account_s_access() {
+  let database_dir = tempfile::TempDir::new().unwrap();
+  let db = DbClient::connect(&sqlite_url(&database_dir.path().join("roles.db")))
+    .await
+    .unwrap();
+  MIGRATOR.run(db.pool()).await.unwrap();
+  MIGRATOR.undo(db.pool(), BEFORE_ROLES).await.unwrap();
+  assert_table(&db, "roles", false).await;
+  for (id, role) in [
+    ("usr_root", "root"),
+    ("usr_admin", "admin"),
+    ("usr_member", "member"),
+  ] {
+    sqlx::query("INSERT INTO admins(id,email,password_hash,role,created_at,updated_at) VALUES(?,?,'',?,'t','t')")
+      .bind(id)
+      .bind(format!("{id}@example.com"))
+      .bind(role)
+      .execute(db.pool())
+      .await
+      .unwrap();
+  }
+
+  MIGRATOR.run(db.pool()).await.unwrap();
+
+  let accounts: Vec<(String, i64, Option<String>, String)> =
+    sqlx::query_as("SELECT id, is_root, role_id, status FROM admins ORDER BY id")
+      .fetch_all(db.pool())
+      .await
+      .unwrap();
+  assert_eq!(
+    accounts,
+    [
+      (
+        "usr_admin".into(),
+        0,
+        Some("rol_admin".into()),
+        "active".into()
+      ),
+      (
+        "usr_member".into(),
+        0,
+        Some("rol_member".into()),
+        "active".into()
+      ),
+      ("usr_root".into(), 1, None, "active".into()),
+    ]
+  );
+  let grants: Vec<(String, String, String, String)> = sqlx::query_as(
+    "SELECT principal_id, scope_type, scope_id, level FROM grants ORDER BY principal_id",
+  )
+  .fetch_all(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(
+    grants,
+    [
+      (
+        "usr_admin".into(),
+        "all".into(),
+        String::new(),
+        "project_manager".into()
+      ),
+      (
+        "usr_member".into(),
+        "all".into(),
+        String::new(),
+        "write".into()
+      ),
+    ]
+  );
+  let built_in: Vec<String> =
+    sqlx::query_scalar("SELECT id FROM roles WHERE builtin = 1 ORDER BY rank")
+      .fetch_all(db.pool())
+      .await
+      .unwrap();
+  assert_eq!(
+    built_in,
+    ["rol_admin", "rol_member", "rol_auditor", "rol_ai_agent"]
+  );
   db.close().await;
 }
 

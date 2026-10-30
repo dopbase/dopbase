@@ -1,4 +1,7 @@
-use crate::models::{AdminRole, SessionKind};
+use crate::{
+  models::{AdminRole, SessionKind},
+  services::authx::{Capability, Level},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 #[derive(Deserialize, ToSchema)]
@@ -25,6 +28,13 @@ pub struct SessionResponse {
   pub admin_id: String,
   pub email: String,
   pub role: AdminRole,
+  /// The display name of the account's role, from the role tables.
+  pub role_name: String,
+  /// What the account may do to the instance. Gate UI on these, not on
+  /// `role`.
+  pub capabilities: Vec<Capability>,
+  /// The deepest project and environment access any grant can give.
+  pub max_level: Level,
   pub session_kind: SessionKind,
   pub recent_authentication: bool,
   pub last_login_at: Option<String>,

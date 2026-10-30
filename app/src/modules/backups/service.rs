@@ -14,10 +14,11 @@ use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 use super::model::*;
 use crate::{
   constants::config::AUDIT_ARCHIVE_DIRECTORY_NAME,
-  extractors::{require_recent_browser_auth, require_root},
+  extractors::{require_capability, require_recent_browser_auth},
   http::HttpError,
   models::AuthIdentity,
   modules::common,
+  services::authx::Capability,
   state::AppState,
   utils::private_file,
 };
@@ -73,7 +74,7 @@ pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<Vec<BackupItem>, HttpError> {
-  require_root(identity)?;
+  require_capability(identity, Capability::InstanceBackup)?;
   let dir = backup_dir(state);
   let mut items = Vec::new();
 
@@ -117,7 +118,7 @@ pub async fn create(
   identity: &AuthIdentity,
   request: CreateBackupRequest,
 ) -> Result<BackupItem, HttpError> {
-  let (admin_id, email) = require_root(identity)?;
+  let (admin_id, email) = require_capability(identity, Capability::InstanceBackup)?;
   let dir = backup_dir(state);
 
   let key = if let Some(raw_name) = request.name.filter(|n| !n.trim().is_empty()) {
@@ -225,7 +226,7 @@ pub async fn read_for_download(
   identity: &AuthIdentity,
   key: &str,
 ) -> Result<(PathBuf, u64), HttpError> {
-  let (admin_id, email) = require_root(identity)?;
+  let (admin_id, email) = require_capability(identity, Capability::InstanceBackup)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 
@@ -264,7 +265,7 @@ pub async fn upload(
   bytes: Vec<u8>,
   provided_master_key: Option<&[u8]>,
 ) -> Result<BackupItem, HttpError> {
-  let (admin_id, email) = require_root(identity)?;
+  let (admin_id, email) = require_capability(identity, Capability::InstanceBackup)?;
 
   if bytes.len() > MAX_BACKUP_FILE_BYTES {
     return Err(HttpError::bad_request(
@@ -504,7 +505,7 @@ pub async fn restore(
   provided_master_key: Option<&[u8]>,
 ) -> Result<(), HttpError> {
   require_recent_browser_auth(identity)?;
-  let (admin_id, email) = require_root(identity)?;
+  let (admin_id, email) = require_capability(identity, Capability::InstanceBackup)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 
@@ -686,7 +687,19 @@ pub async fn restore_database_from_archive(
     let mut tx = conn.begin().await?;
 
     // Capture current active admin and session to preserve login if requested
-    type AdminRowTuple = (String, String, String, String, String, String);
+    type AdminRowTuple = (
+      String,
+      String,
+      String,
+      String,
+      String,
+      String,
+      i64,
+      Option<String>,
+      String,
+      Option<String>,
+      Option<String>,
+    );
     type SessionRowTuple = (
       String,
       String,
@@ -710,7 +723,7 @@ pub async fn restore_database_from_archive(
     }) = preserve_admin
     {
       current_admin = sqlx::query_as(
-        "SELECT id, email, password_hash, role, created_at, updated_at FROM admins WHERE id = ?",
+        "SELECT id, email, password_hash, role, created_at, updated_at, is_root, role_id, status, owner_id, created_by FROM admins WHERE id = ?",
       )
       .bind(admin_id)
       .fetch_optional(&mut *tx)
@@ -752,16 +765,25 @@ pub async fn restore_database_from_archive(
     sqlx::query("DELETE FROM admin_identities").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM sso_providers").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM sessions").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM grants").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM group_members").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM groups").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM admins").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM role_capabilities").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM roles").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM instance_metadata").execute(&mut *tx).await?;
 
     // Copy snapshot data from backup_db
     sqlx::query("INSERT INTO instance_metadata SELECT * FROM backup_db.instance_metadata").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO roles SELECT * FROM backup_db.roles").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO role_capabilities SELECT * FROM backup_db.role_capabilities").execute(&mut *tx).await?;
     if preserve_admin.is_some() {
-      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins WHERE role <> 'root'").execute(&mut *tx).await?;
+      sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins WHERE is_root = 0").execute(&mut *tx).await?;
     } else {
       sqlx::query("INSERT INTO admins SELECT * FROM backup_db.admins").execute(&mut *tx).await?;
     }
+    sqlx::query("INSERT INTO groups SELECT * FROM backup_db.groups").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO group_members SELECT * FROM backup_db.group_members WHERE user_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO service_accounts SELECT * FROM backup_db.service_accounts").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO agent_tokens SELECT * FROM backup_db.agent_tokens").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO projects SELECT * FROM backup_db.projects").execute(&mut *tx).await?;
@@ -770,6 +792,7 @@ pub async fn restore_database_from_archive(
     sqlx::query("INSERT INTO secrets SELECT * FROM backup_db.secrets").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO secret_versions SELECT * FROM backup_db.secret_versions").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO runner_tokens SELECT * FROM backup_db.runner_tokens").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO grants SELECT * FROM backup_db.grants WHERE principal_type <> 'user' OR principal_id IN (SELECT id FROM admins)").execute(&mut *tx).await?;
     sqlx::query("INSERT INTO audit_events SELECT * FROM backup_db.audit_events").execute(&mut *tx).await?;
     // The chain's genesis and pruning anchor belong to the restored records.
     sqlx::query("INSERT INTO audit_chain_anchor SELECT * FROM backup_db.audit_chain_anchor").execute(&mut *tx).await?;
@@ -799,8 +822,9 @@ pub async fn restore_database_from_archive(
           .await?;
       }
 
-      sqlx::query("INSERT OR REPLACE INTO admins(id, email, password_hash, role, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?)")
+      sqlx::query("INSERT OR REPLACE INTO admins(id, email, password_hash, role, created_at, updated_at, is_root, role_id, status, owner_id, created_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&admin.0).bind(&admin.1).bind(&admin.2).bind(&admin.3).bind(&admin.4).bind(&admin.5)
+        .bind(admin.6).bind(&admin.7).bind(&admin.8).bind(&admin.9).bind(&admin.10)
         .execute(&mut *tx).await?;
       sess.1 = admin.0.clone();
       effective_admin_id = Some(admin.0.clone());
@@ -883,7 +907,7 @@ pub async fn delete(
   identity: &AuthIdentity,
   key: &str,
 ) -> Result<(), HttpError> {
-  let (admin_id, email) = require_root(identity)?;
+  let (admin_id, email) = require_capability(identity, Capability::InstanceBackup)?;
   let safe_key = sanitize_key(key)?;
   let file_path = backup_dir(state).join(&safe_key);
 

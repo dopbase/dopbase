@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::services::authx::Access;
+
 #[derive(Clone, Debug)]
 pub enum AuthIdentity {
   Admin {
@@ -13,6 +15,8 @@ pub enum AuthIdentity {
     recent_auth_at: DateTime<Utc>,
     created_at: DateTime<Utc>,
     csrf_hash: Option<Vec<u8>>,
+    /// The account's capabilities and level ceiling, from its role.
+    access: Access,
   },
   Runner {
     token_id: String,

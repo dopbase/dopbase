@@ -22,7 +22,7 @@ use crate::{
     },
     tokens::{DEVICE_CODE_PREFIX, DEVICE_REQUEST_ID_PREFIX},
   },
-  extractors::{require_project_manager, require_recent_browser_auth},
+  extractors::{require_person, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
   modules::common,
@@ -112,7 +112,7 @@ fn rate_limited() -> HttpError {
 /// Approving hands out a long-lived CLI session, so only a human signed in
 /// to the Admin UI may do it, never another CLI session or a token.
 fn require_browser_human(identity: &AuthIdentity) -> Result<(&str, &str, &str), HttpError> {
-  let (admin_id, email) = require_project_manager(identity)?;
+  let (admin_id, email) = require_person(identity)?;
   match identity {
     AuthIdentity::Admin {
       kind: SessionKind::Browser,

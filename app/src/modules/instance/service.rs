@@ -2,11 +2,12 @@ use super::{model::InstanceStatus, repository};
 use crate::{
   constants::errors::RATE_LIMITED,
   extractors::{
-    require_admin, require_metadata_access, require_mutation, require_recent_browser_auth,
-    require_root_browser,
+    require_capability, require_capability_browser, require_metadata_access, require_mutation,
+    require_recent_browser_auth,
   },
   http::HttpError,
   models::AuthIdentity,
+  services::authx::Capability,
   state::AppState,
 };
 use axum::http::HeaderMap;
@@ -14,7 +15,7 @@ pub async fn status(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<InstanceStatus, HttpError> {
-  require_admin(identity)?;
+  require_capability(identity, Capability::InstanceView)?;
   state.db.ping().await?;
   Ok(InstanceStatus {
     version: env!("CARGO_PKG_VERSION"),
@@ -87,7 +88,7 @@ pub async fn preview(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<super::model::FactoryResetPreview, HttpError> {
-  require_root_browser(identity)?;
+  require_capability_browser(identity, Capability::InstanceReset)?;
   async fn count(
     pool: &sqlx::SqlitePool,
     table: &str,
@@ -124,7 +125,7 @@ pub async fn factory_reset(
 ) -> Result<(), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  let (root_id, _) = require_root_browser(identity)?;
+  let (root_id, _) = require_capability_browser(identity, Capability::InstanceReset)?;
   // The root password verification here shares the reauthentication
   // limiter budget for this account.
   let limit_key = format!("password_verify:{root_id}");

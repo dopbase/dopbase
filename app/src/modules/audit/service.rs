@@ -1,7 +1,11 @@
 use super::{model::*, repository};
 use crate::{
-  constants::errors::REQUEST_INVALID, extractors::require_admin, http::HttpError,
-  models::AuthIdentity, services::audit_chain, state::AppState,
+  constants::errors::REQUEST_INVALID,
+  extractors::require_capability,
+  http::HttpError,
+  models::AuthIdentity,
+  services::{audit_chain, authx::Capability},
+  state::AppState,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 fn decode(value: &str) -> Result<(String, String), HttpError> {
@@ -20,7 +24,7 @@ pub async fn list(
   identity: &AuthIdentity,
   query: AuditQuery,
 ) -> Result<AuditPage, HttpError> {
-  require_admin(identity)?;
+  require_capability(identity, Capability::AuditRead)?;
   let limit = query.limit.unwrap_or(50).clamp(1, 200);
   let cursor = query.cursor.as_deref().map(decode).transpose()?;
   let mut items = repository::list(
@@ -51,7 +55,7 @@ pub async fn verify(
   identity: &AuthIdentity,
   query: ChainVerifyQuery,
 ) -> Result<ChainVerifyReport, HttpError> {
-  require_admin(identity)?;
+  require_capability(identity, Capability::AuditVerify)?;
   let anchor = match (query.anchor_seq, query.anchor_hash) {
     (None, None) => None,
     (Some(seq), Some(hash)) if seq > 0 && !hash.is_empty() => {

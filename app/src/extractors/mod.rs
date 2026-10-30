@@ -14,7 +14,10 @@ use crate::{
   },
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
-  services::token,
+  services::{
+    authx::{self, Capability, Level},
+    token,
+  },
   state::AppState,
 };
 
@@ -104,7 +107,15 @@ impl FromRequestParts<AppState> for AuthIdentity {
       sqlx::query("UPDATE sessions SET last_used_at = ?, idle_expires_at = MIN(?, absolute_expires_at) WHERE id = ?")
                 .bind(now.to_rfc3339()).bind(next_idle.to_rfc3339()).bind(&session.session_id)
                 .execute(state.db.pool()).await.map_err(HttpError::from)?;
+      let mut conn = state.db.pool().acquire().await.map_err(HttpError::from)?;
+      let access = authx::load_access(&mut conn, &session.admin_id)
+        .await
+        .map_err(HttpError::from)?
+        .ok_or_else(|| {
+          HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.")
+        })?;
       return Ok(AuthIdentity::Admin {
+        access,
         admin_id: session.admin_id,
         email: session.email,
         role: parse_role(&session.role)?,
@@ -181,29 +192,76 @@ fn credential(headers: &HeaderMap) -> Option<(String, bool)> {
   })
 }
 
-pub fn require_admin(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+/// Any person signed in with a session, whatever their role. Tokens are
+/// not people.
+pub fn require_person(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
   match identity {
     AuthIdentity::Admin {
-      admin_id,
-      email,
-      role: AdminRole::Root | AdminRole::Admin,
-      ..
+      admin_id, email, ..
     } => Ok((admin_id, email)),
     _ => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
-      "This operation requires an administrator.",
+      "This operation requires a signed-in account.",
     )),
   }
 }
 
+/// A signed-in person whose role holds `capability`. Root holds them all.
+pub fn require_capability(
+  identity: &AuthIdentity,
+  capability: Capability,
+) -> Result<(&str, &str), HttpError> {
+  match identity {
+    AuthIdentity::Admin {
+      admin_id,
+      email,
+      access,
+      ..
+    } if access.has(capability) => Ok((admin_id, email)),
+    _ if Capability::ROOT_ONLY.contains(&capability) => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation requires the root administrator.",
+    )),
+    _ => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "Your role does not allow this operation.",
+    )),
+  }
+}
+
+/// [`require_capability`] from an Admin UI session only.
+pub fn require_capability_browser(
+  identity: &AuthIdentity,
+  capability: Capability,
+) -> Result<(&str, &str), HttpError> {
+  let result = require_capability(identity, capability)?;
+  if !matches!(
+    identity,
+    AuthIdentity::Admin {
+      kind: SessionKind::Browser,
+      ..
+    }
+  ) {
+    return Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "This operation is available from the Admin UI only.",
+    ));
+  }
+  Ok(result)
+}
+
+/// A signed-in person whose role may change project data.
+// TODO(rbac): checks the role's level ceiling only. Check the level the
+// account's grants give on the project or environment once data access is
+// granted per resource.
 pub fn require_project_manager(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
   match identity {
     AuthIdentity::Admin {
       admin_id,
       email,
-      role: AdminRole::Root | AdminRole::Admin | AdminRole::Member,
+      access,
       ..
-    } => Ok((admin_id, email)),
+    } if access.max_level >= Level::Write => Ok((admin_id, email)),
     _ => Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "This operation requires a human project account.",
@@ -231,60 +289,11 @@ pub fn require_metadata_access(identity: &AuthIdentity) -> Result<(), HttpError>
   }
 }
 
-pub fn require_root(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
-  match identity {
-    AuthIdentity::Admin {
-      admin_id,
-      email,
-      role: AdminRole::Root,
-      ..
-    } => Ok((admin_id, email)),
-    _ => Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "This operation requires the root administrator.",
-    )),
-  }
-}
-
-pub fn require_root_browser(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
-  let result = require_root(identity)?;
-  if !matches!(
-    identity,
-    AuthIdentity::Admin {
-      kind: SessionKind::Browser,
-      ..
-    }
-  ) {
-    return Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "This operation is available from the Admin UI only.",
-    ));
-  }
-  Ok(result)
-}
-
-pub fn require_admin_browser(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
-  let result = require_admin(identity)?;
-  if !matches!(
-    identity,
-    AuthIdentity::Admin {
-      kind: SessionKind::Browser,
-      ..
-    }
-  ) {
-    return Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "This operation is available from the Admin UI only.",
-    ));
-  }
-  Ok(result)
-}
-
 pub fn require_mutation(
   identity: &AuthIdentity,
   headers: &HeaderMap,
 ) -> Result<(), HttpError> {
-  require_project_manager(identity)?;
+  require_person(identity)?;
   if let AuthIdentity::Admin {
     kind: SessionKind::Browser,
     csrf_hash,
@@ -322,7 +331,7 @@ pub fn require_recent_browser_auth(identity: &AuthIdentity) -> Result<(), HttpEr
       "Please confirm your password before continuing.",
     ));
   }
-  require_project_manager(identity).map(|_| ())
+  require_person(identity).map(|_| ())
 }
 
 pub struct OptionalIdentity(pub Option<AuthIdentity>);

@@ -126,7 +126,10 @@ pub async fn download_master_key(
   State(state): State<AppState>,
   identity: AuthIdentity,
 ) -> Result<Response, HttpError> {
-  let (admin_id, email) = extractors::require_root(&identity)?;
+  let (admin_id, email) = extractors::require_capability(
+    &identity,
+    crate::services::authx::Capability::InstanceBackup,
+  )?;
   require_recent_browser_auth(&identity)?;
   let key_bytes = state.crypto.master_key_bytes();
   let _ = common::audit_standalone(

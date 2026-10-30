@@ -64,7 +64,7 @@ async fn factory_reset_offline(
   let db = crate::services::db::DbClient::connect(&config.database_url).await?;
 
   let root: Option<(String, String)> =
-    sqlx::query_as("SELECT email,password_hash FROM admins WHERE role='root'")
+    sqlx::query_as("SELECT email,password_hash FROM admins WHERE is_root=1")
       .fetch_optional(db.pool())
       .await?;
   let (root_email, root_password_hash) =
