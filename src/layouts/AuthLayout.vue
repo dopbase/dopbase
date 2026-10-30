@@ -18,10 +18,7 @@ const { health, reachable, endpoint } = useServerStatus();
     <aside
       class="flex flex-col justify-between border-b border-line bg-panel px-8 py-8 md:w-[380px] md:border-b-0 md:border-r lg:w-[440px] lg:px-12 lg:py-12">
       <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-lg border border-accent/40 bg-accent-soft text-accent-strong">
-          <DopbaseIcon class="h-6 w-6" />
-        </div>
+        <DopbaseIcon class="h-9 w-9 shrink-0" />
         <div>
           <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
           <p class="text-xs text-ink-muted">Secret manager in a single file</p>

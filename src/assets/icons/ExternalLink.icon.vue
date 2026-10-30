@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * BikeIcon — a motorbike used as a motorcycle parking facility indicator.
+ * ExternalLinkIcon — an arrow leaving a box for links that open elsewhere.
  * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });
@@ -18,9 +18,8 @@ defineOptions({ inheritAttrs: true });
     stroke-linecap="round"
     stroke-linejoin="round"
     v-bind="$attrs">
-    <circle cx="18.5" cy="17.5" r="3.5" />
-    <circle cx="5.5" cy="17.5" r="3.5" />
-    <circle cx="15" cy="5" r="1" />
-    <path d="M12 17.5V14l-3-3 4-3 2 3h2" />
+    <path d="M15 3h6v6" />
+    <path d="M10 14 21 3" />
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
   </svg>
 </template>

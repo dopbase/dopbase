@@ -8,3 +8,5 @@ docs/.vitepress/dist/
 *.codegraph
 package.dev.json
 target/
+.claude/
+.vscode/

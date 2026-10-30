@@ -118,6 +118,14 @@ All notable changes to Dopbase are documented in this file.
   business logic, every screen splits into a page and a controller, and a
   component one page uses lives in that page's folder. Nothing changes for
   people using the console.
+- New Dopbase logo: two stacked Ds in lavender, replacing the D in a ring. The
+  console shows it on its own in the sidebar, the sign-in and setup pages, and
+  the not-found page. The favicon is now the violet app icon, the docs site
+  switches between the lavender and violet mark with its theme, the README
+  shows the full logo with the wordmark, and the social preview image uses the
+  new banner. The icon set now matches the Figma file: it adds icons for
+  agents, filters, activity, menus, external links and the command key, and
+  drops 33 icons nothing used.
 
 ### Fixed
 

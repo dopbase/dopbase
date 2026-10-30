@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * DopbaseIcon — the Dopbase brand mark.
- * Uses currentColor so each surface can control its color via classes.
+ * DopbaseIcon — the Dopbase double-D mark in its primary Lavender colours.
+ * Place it freestanding on dark surfaces, never inside a tile. Inherit
+ * attrs so callers can set the size through class.
  */
 defineOptions({ inheritAttrs: true });
 </script>
@@ -9,20 +10,17 @@ defineOptions({ inheritAttrs: true });
 <template>
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 1024 1024"
-    fill="currentColor"
+    viewBox="0 0 54 64"
     aria-hidden="true"
     v-bind="$attrs">
-    <circle
-      cx="512"
-      cy="512"
-      r="397"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="96" />
     <path
-      fill-rule="evenodd"
-      d="M334 298h198c146 0 226 81 226 214s-80 214-226 214H334V298Zm122 102v224h70c72 0 110-39 110-112s-38-112-110-112h-70Z"
-      clip-rule="evenodd" />
+      class="fill-brand-mark"
+      d="M6 0h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z" />
+    <path
+      class="fill-brand-mark"
+      d="M20 20h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H20a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6Z" />
+    <path
+      class="fill-brand-mark-overlap"
+      d="M34 20a20 20 0 0 1 6 .92V24a20 20 0 0 1-20 20h-6V26a6 6 0 0 1 6-6Z" />
   </svg>
 </template>

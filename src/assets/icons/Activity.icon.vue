@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * SunIcon — the sun used as a drying area facility indicator.
+ * ActivityIcon — a pulse line for activity and event history.
  * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });
@@ -18,14 +18,6 @@ defineOptions({ inheritAttrs: true });
     stroke-linecap="round"
     stroke-linejoin="round"
     v-bind="$attrs">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2" />
-    <path d="M12 20v2" />
-    <path d="m4.93 4.93 1.41 1.41" />
-    <path d="m17.66 17.66 1.41 1.41" />
-    <path d="M2 12h2" />
-    <path d="M20 12h2" />
-    <path d="m6.34 17.66-1.41 1.41" />
-    <path d="m19.07 4.93-1.41 1.41" />
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
   </svg>
 </template>

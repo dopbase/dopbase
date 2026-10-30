@@ -46,6 +46,12 @@
   --color-crit-alt1: color-mix(in srgb, #f26d6d, white 10%);
   --color-crit-alt2: color-mix(in srgb, #f26d6d, white 15%);
 
+  /* Logo colours from the Figma brand page (color/brand-mark and
+     color/brand-mark-overlap). The overlap is always a deeper tint of the
+     mark, never a different hue. */
+  --color-brand-mark: #c4a3fc;
+  --color-brand-mark-overlap: #af8ef0;
+
   --color-ok: #3fd68f;
   --color-warn: #f5b74e;
   --color-crit: #f26d6d;

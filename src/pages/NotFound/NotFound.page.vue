@@ -6,10 +6,7 @@ import { DbButton } from "~/components/ui";
 <template>
   <div
     class="flex min-h-svh flex-col items-center justify-center gap-4 px-6 text-center">
-    <div
-      class="flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-panel text-ink-muted">
-      <DopbaseIcon class="h-7 w-7" />
-    </div>
+    <DopbaseIcon class="h-12 w-12" />
     <p class="font-mono text-sm text-ink-faint">404 · not found</p>
     <h1 class="text-lg font-semibold">This route does not exist</h1>
     <p class="max-w-md text-sm text-ink-muted">

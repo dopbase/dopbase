@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * WardrobeIcon — a wardrobe cabinet facility indicator.
+ * BotIcon — a robot head for AI agents.
  * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });
@@ -18,9 +18,11 @@ defineOptions({ inheritAttrs: true });
     stroke-linecap="round"
     stroke-linejoin="round"
     v-bind="$attrs">
-    <rect x="5" y="2" width="14" height="20" rx="2" />
-    <path d="M12 2v20" />
-    <path d="M9.5 11v2" />
-    <path d="M14.5 11v2" />
+    <path d="M12 8V4H8" />
+    <rect width="16" height="12" x="4" y="8" rx="2" />
+    <path d="M2 14h2" />
+    <path d="M20 14h2" />
+    <path d="M15 13v2" />
+    <path d="M9 13v2" />
   </svg>
 </template>

@@ -251,7 +251,7 @@ const config = defineConfig({
     },
   },
   themeConfig: {
-    logo: "/logo.svg",
+    logo: { light: "/logo-violet.svg", dark: "/logo.svg" },
     siteTitle: "Dopbase",
     search: { provider: "local" },
     socialLinks: [{ icon: "github", link: projectUrl }],
