@@ -14,6 +14,9 @@ import { installRouterGuards } from "./router.guards";
  */
 export const router = createRouter({
   history: createWebHistory(),
+  // The account menu links to sections of the Account page by hash. Other
+  // navigations keep the scroll position, as before.
+  scrollBehavior: (to) => (to.hash ? { el: to.hash } : undefined),
   routes: [
     {
       path: "/",
@@ -89,9 +92,13 @@ export const router = createRouter({
       component: () => import("~/pages/Audit/Audit.page.vue"),
     },
     {
-      path: "/instance",
-      name: "instance",
+      path: "/status",
+      name: "status",
       component: () => import("~/pages/Instance/Instance.page.vue"),
+    },
+    {
+      path: "/instance",
+      redirect: { name: "status" },
     },
     {
       path: "/account",

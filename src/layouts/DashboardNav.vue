@@ -1,150 +1,89 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
-import { useAuthStore } from "~/stores/auth.store";
+import type { Component } from "vue";
 import {
   ArchiveIcon,
   FolderIcon,
   HistoryIcon,
   KeyIcon,
   ServerIcon,
+  SlidersHorizontalIcon,
   UserIcon,
   UsersIcon,
-  ShieldIcon,
-  SlidersHorizontalIcon,
-  LogOutIcon,
 } from "~/assets/icons";
-import type { Capability } from "~/services/access.api";
-import { DbSpinner } from "~/components/ui";
+import type { PageName, SidebarSection } from "~/navigation/access-map";
+import AccountMenu from "./AccountMenu.vue";
 
 /**
- * DashboardNav — primary navigation plus the account footer (email and
- * logout). Rendered by DashboardLayout in the desktop sidebar and in the
- * navigation sheet on narrow screens, so both stay in sync.
+ * DashboardNav — the grouped sidebar navigation plus the account menu.
+ * DashboardLayout renders it in the desktop sidebar and in the navigation
+ * sheet on narrow screens, so both stay in sync. The sections arrive
+ * already filtered by the capability map.
  */
 defineProps<{
+  sections: SidebarSection[];
+  activePage: PageName | null;
   email: string;
+  roleName: string;
+  showPersonalTokens: boolean;
   loggingOut: boolean;
 }>();
 
 const emit = defineEmits<{ logout: [] }>();
 
-const route = useRoute();
-const auth = useAuthStore();
-
-const navItems = [
-  {
-    name: "users",
-    label: "Users",
-    icon: UsersIcon,
-    match: (r: string) => r.startsWith("/users"),
-  },
-  {
-    name: "groups",
-    label: "Groups",
-    icon: ShieldIcon,
-    match: (r: string) => r.startsWith("/groups"),
-  },
-  {
-    name: "roles",
-    label: "Roles",
-    icon: SlidersHorizontalIcon,
-    match: (r: string) => r.startsWith("/roles"),
-  },
-  {
-    name: "projects",
-    label: "Projects",
-    icon: FolderIcon,
-    match: (r: string) => r.startsWith("/projects"),
-  },
-  {
-    name: "backups",
-    label: "Backups",
-    icon: ArchiveIcon,
-    match: (r: string) => r.startsWith("/backups"),
-  },
-  {
-    name: "sso",
-    label: "Single sign-on",
-    icon: KeyIcon,
-    match: (r: string) => r.startsWith("/sso"),
-  },
-  {
-    name: "audit",
-    label: "Audit",
-    icon: HistoryIcon,
-    match: (r: string) => r.startsWith("/audit"),
-  },
-  {
-    name: "instance",
-    label: "Instance",
-    icon: ServerIcon,
-    match: (r: string) => r.startsWith("/instance"),
-  },
-  {
-    name: "account",
-    label: "Account",
-    icon: UserIcon,
-    match: (r: string) => r.startsWith("/account"),
-  },
-] as const;
-
-const isActive = (item: (typeof navItems)[number]): boolean =>
-  item.match(route.path);
-/** The capabilities that show each item. Items without an entry always show. */
-const needs: Partial<Record<(typeof navItems)[number]["name"], Capability[]>> =
-  {
-    users: ["users.view"],
-    groups: ["users.view", "groups.manage"],
-    backups: ["instance.backup"],
-    sso: ["sso.manage"],
-    roles: ["roles.manage"],
-  };
-const visibleNavItems = computed(() =>
-  navItems.filter((item) => {
-    const capabilities = needs[item.name];
-    return !capabilities || auth.can(...capabilities);
-  }),
-);
+const icons: Record<PageName, Component> = {
+  projects: FolderIcon,
+  audit: HistoryIcon,
+  users: UserIcon,
+  groups: UsersIcon,
+  roles: SlidersHorizontalIcon,
+  status: ServerIcon,
+  backups: ArchiveIcon,
+  sso: KeyIcon,
+};
 </script>
 
 <template>
-  <nav class="flex flex-col gap-1 px-3 py-4" aria-label="Primary">
-    <RouterLink
-      v-for="item in visibleNavItems"
-      :key="item.name"
-      :to="{ name: item.name }"
-      class="flex items-center gap-2.5 rounded-control px-3 py-2 text-sm transition-colors pointer-coarse:min-h-11"
-      :class="
-        isActive(item)
-          ? 'bg-accent-soft text-ink-strong'
-          : 'text-ink-muted hover:bg-raised hover:text-ink-strong'
-      "
-      :aria-current="isActive(item) ? 'page' : undefined">
-      <component :is="item.icon" class="h-4 w-4" />
-      <span>{{ item.label }}</span>
-    </RouterLink>
+  <nav
+    class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1"
+    aria-label="Primary">
+    <section
+      v-for="section in sections"
+      :key="section.label"
+      class="flex flex-col gap-0.5 py-2"
+      :aria-label="section.label">
+      <p class="px-2.5 py-1 text-sm font-medium leading-5 text-ink-faint">
+        {{ section.label }}
+      </p>
+      <RouterLink
+        v-for="item in section.items"
+        :key="item.name"
+        :to="{ name: item.name }"
+        class="group flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-sm font-medium leading-5 transition-colors pointer-coarse:min-h-11"
+        :class="
+          item.name === activePage
+            ? 'bg-accent-soft text-ink-strong'
+            : 'text-ink hover:bg-raised hover:text-ink-strong'
+        "
+        :aria-current="item.name === activePage ? 'page' : undefined">
+        <component
+          :is="icons[item.name]"
+          class="h-4 w-4 shrink-0"
+          :class="
+            item.name === activePage
+              ? 'text-accent-strong'
+              : 'text-ink-muted group-hover:text-ink-strong'
+          " />
+        <span class="truncate">{{ item.label }}</span>
+      </RouterLink>
+    </section>
   </nav>
 
-  <div class="mt-auto border-t border-line-soft px-4 py-3.5">
-    <div class="flex items-center justify-between gap-2">
-      <div class="min-w-0">
-        <p class="text-xs text-ink-faint">Signed in as</p>
-        <p class="truncate font-mono text-xs text-ink-strong">
-          {{ email }}
-        </p>
-      </div>
-      <button
-        type="button"
-        class="cursor-pointer rounded-control bg-raised p-1.5 text-ink-muted transition-colors hover:bg-crit/15 hover:text-crit disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:p-3"
-        :disabled="loggingOut"
-        :aria-label="loggingOut ? 'Logging out...' : 'Log out'"
-        :title="loggingOut ? 'Logging out...' : 'Log out'"
-        data-testid="logout-button"
-        @click="emit('logout')">
-        <DbSpinner v-if="loggingOut" class="h-4 w-4 text-ink-muted" />
-        <LogOutIcon v-else class="h-4 w-4" />
-      </button>
-    </div>
+  <div class="border-t border-line-soft px-3 pb-3 pt-2">
+    <AccountMenu
+      :email="email"
+      :role-name="roleName"
+      :show-personal-tokens="showPersonalTokens"
+      :logging-out="loggingOut"
+      @logout="emit('logout')" />
   </div>
 </template>

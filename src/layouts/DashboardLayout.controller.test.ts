@@ -12,7 +12,10 @@ const { routerPush, routerReplace, route } = await vi.hoisted(async () => {
   return {
     routerPush: vi.fn(),
     routerReplace: vi.fn(),
-    route: reactive({ fullPath: "/projects/p/billing/e/env_1" }),
+    route: reactive({
+      path: "/projects/p/billing/e/env_1",
+      fullPath: "/projects/p/billing/e/env_1",
+    }),
   };
 });
 
@@ -27,6 +30,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   routerPush.mockReset();
   routerReplace.mockReset();
+  route.path = "/projects/p/billing/e/env_1";
   route.fullPath = "/projects/p/billing/e/env_1";
   sessionStorage.clear();
 });
@@ -41,6 +45,55 @@ describe("useDashboardLayoutController", () => {
     await loginAdmin();
     const c = useDashboardLayoutController();
     expect(c.email.value).toBe("a@b.c");
+  });
+
+  it("shows a member only the sections their capabilities open", () => {
+    useAuthStore().session = {
+      adminId: "usr_2",
+      email: "maya@example.com",
+      sessionKind: "browser",
+      recentAuthentication: false,
+      role: "member",
+      roleName: "Member",
+      capabilities: ["tokens.personal"],
+    };
+    const c = useDashboardLayoutController();
+
+    expect(c.sections.value.map((section) => section.label)).toEqual([
+      "Workspace",
+      "Instance",
+    ]);
+    expect(c.roleName.value).toBe("Member");
+    expect(c.showPersonalTokens.value).toBe(true);
+  });
+
+  it("names the built-in role when the session has no role name", () => {
+    useAuthStore().session = {
+      adminId: "usr_1",
+      email: "root@example.com",
+      sessionKind: "browser",
+      recentAuthentication: false,
+      role: "root",
+    };
+    const c = useDashboardLayoutController();
+
+    expect(c.roleName.value).toBe("Root Administrator");
+    // Root has every capability but no personal tokens.
+    expect(c.showPersonalTokens.value).toBe(false);
+    expect(c.sections.value).toHaveLength(3);
+  });
+
+  it("highlights the sidebar item for the current path", async () => {
+    const c = useDashboardLayoutController();
+    expect(c.activePage.value).toBe("projects");
+
+    route.path = "/status";
+    await nextTick();
+    expect(c.activePage.value).toBe("status");
+
+    route.path = "/account";
+    await nextTick();
+    expect(c.activePage.value).toBeNull();
   });
 
   it("logs out and routes to the login screen with loggingOut state", async () => {

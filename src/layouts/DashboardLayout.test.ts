@@ -8,6 +8,20 @@ const { controller } = await vi.hoisted(async () => {
   return {
     controller: {
       email: ref("admin@example.com"),
+      roleName: ref("Admin"),
+      sections: ref([
+        {
+          label: "Workspace",
+          items: [
+            { name: "projects", label: "Projects" },
+            { name: "audit", label: "Audit log" },
+          ],
+        },
+        { label: "Instance", items: [{ name: "status", label: "Status" }] },
+      ]),
+      activePage: ref("projects"),
+      showPersonalTokens: ref(true),
+      instanceHost: "secrets.acme.dev",
       loggingOut: ref(false),
       sessionExpired: ref(false),
       navOpen: ref(false),
@@ -21,18 +35,6 @@ vi.mock("./DashboardLayout.controller", () => ({
   useDashboardLayoutController: () => controller,
 }));
 
-vi.mock("~/stores/auth.store", () => ({
-  useAuthStore: () => ({
-    isAdmin: true,
-    can: () => true,
-    session: { role: "root" },
-  }),
-}));
-
-vi.mock("vue-router", () => ({
-  useRoute: () => ({ path: "/projects" }),
-}));
-
 vi.mock("~/components/app/ReauthModal.vue", () => ({
   default: defineComponent({ render: () => null }),
 }));
@@ -44,6 +46,8 @@ afterEach(() => {
   app = null;
   controller.sessionExpired.value = false;
   controller.navOpen.value = false;
+  controller.showPersonalTokens.value = true;
+  controller.logout.mockClear();
   controller.signInAgain.mockReset();
   document.body.innerHTML = "";
 });
@@ -55,8 +59,10 @@ function mountLayout(): void {
   app.component(
     "RouterLink",
     defineComponent({
-      setup(_, { slots }) {
-        return () => h("a", slots.default?.());
+      props: { to: { type: [String, Object], required: true } },
+      setup(props, { slots }) {
+        return () =>
+          h("a", { "data-to": JSON.stringify(props.to) }, slots.default?.());
       },
     }),
   );
@@ -102,6 +108,7 @@ describe("DashboardLayout", () => {
 
     const sheet = document.body.querySelector<HTMLElement>(sheetSelector);
     expect(sheet?.textContent).toContain("Projects");
+    expect(sheet?.textContent).toContain("Admin");
     expect(sheet?.textContent).toContain("admin@example.com");
 
     sheet
@@ -109,5 +116,80 @@ describe("DashboardLayout", () => {
       ?.click();
     await nextTick();
     expect(controller.navOpen.value).toBe(false);
+  });
+
+  it("groups the sidebar into the sections it is given", () => {
+    mountLayout();
+    const aside = document.body.querySelector<HTMLElement>("aside");
+    const sections = Array.from(
+      aside?.querySelectorAll<HTMLElement>("nav section") ?? [],
+    );
+
+    expect(
+      sections.map((section) => section.getAttribute("aria-label")),
+    ).toEqual(["Workspace", "Instance"]);
+    expect(sections[0]?.textContent).toContain("Audit log");
+    expect(
+      aside?.querySelector('[aria-current="page"]')?.textContent,
+    ).toContain("Projects");
+    expect(aside?.textContent).toContain("secrets.acme.dev");
+    expect(aside?.textContent).not.toContain("admin console");
+  });
+
+  it("opens the account menu with its links and signs out from it", async () => {
+    mountLayout();
+    const aside = document.body.querySelector<HTMLElement>("aside");
+    const button = aside?.querySelector<HTMLButtonElement>(
+      '[data-testid="account-menu-button"]',
+    );
+    expect(button?.textContent).toContain("admin@example.com");
+    expect(aside?.querySelector('[data-testid="account-menu"]')).toBeNull();
+
+    button?.click();
+    await nextTick();
+
+    const menu = aside?.querySelector<HTMLElement>(
+      '[data-testid="account-menu"]',
+    );
+    expect(button?.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      Array.from(menu?.querySelectorAll("a, button") ?? []).map((item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(["Account", "Personal tokens", "Docs", "Sign out"]);
+
+    menu
+      ?.querySelector<HTMLButtonElement>('[data-testid="logout-button"]')
+      ?.click();
+    expect(controller.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves Personal tokens out when the controller hides it", async () => {
+    controller.showPersonalTokens.value = false;
+    mountLayout();
+    const aside = document.body.querySelector<HTMLElement>("aside");
+
+    aside
+      ?.querySelector<HTMLButtonElement>('[data-testid="account-menu-button"]')
+      ?.click();
+    await nextTick();
+
+    expect(
+      aside?.querySelector('[data-testid="account-menu"]')?.textContent,
+    ).not.toContain("Personal tokens");
+  });
+
+  it("closes the account menu on Escape", async () => {
+    mountLayout();
+    const aside = document.body.querySelector<HTMLElement>("aside");
+    aside
+      ?.querySelector<HTMLButtonElement>('[data-testid="account-menu-button"]')
+      ?.click();
+    await nextTick();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await nextTick();
+
+    expect(aside?.querySelector('[data-testid="account-menu"]')).toBeNull();
   });
 });

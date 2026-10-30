@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useAuthStore } from "~/stores/auth.store";
 import { AlertTriangleIcon, DopbaseIcon, MenuIcon } from "~/assets/icons";
 import { DbButton, DbModal, DbSheet } from "~/components/ui";
 import ReauthModal from "~/components/app/ReauthModal.vue";
@@ -10,18 +8,24 @@ import { useDashboardLayoutController } from "./DashboardLayout.controller";
 /**
  * DashboardLayout — the authenticated app shell.
  *
- * From `lg` up: a fixed sidebar with primary navigation and the account
- * footer beside the content. Below `lg` the sidebar folds into a 48px top
+ * From `lg` up: a fixed sidebar with the brand, the grouped navigation and
+ * the account menu beside the content. Below `lg` the sidebar folds into a 48px top
  * bar whose menu button opens the same navigation in a sheet. The global
  * reauthentication dialog lives here so every screen inherits it.
  */
-const auth = useAuthStore();
-const { email, sessionExpired, loggingOut, navOpen, logout, signInAgain } =
-  useDashboardLayoutController();
-
-const consoleLabel = computed(() =>
-  auth.session?.role === "member" ? "member console" : "admin console",
-);
+const {
+  email,
+  roleName,
+  sections,
+  activePage,
+  showPersonalTokens,
+  instanceHost,
+  sessionExpired,
+  loggingOut,
+  navOpen,
+  logout,
+  signInAgain,
+} = useDashboardLayoutController();
 </script>
 
 <template>
@@ -43,22 +47,43 @@ const consoleLabel = computed(() =>
     </header>
 
     <DbSheet :open="navOpen" title="Dopbase" @close="navOpen = false">
-      <p class="px-6 pt-3 text-xs text-ink-muted">{{ consoleLabel }}</p>
-      <DashboardNav :email="email" :logging-out="loggingOut" @logout="logout" />
+      <DashboardNav
+        :sections="sections"
+        :active-page="activePage"
+        :email="email"
+        :role-name="roleName"
+        :show-personal-tokens="showPersonalTokens"
+        :logging-out="loggingOut"
+        @logout="logout" />
     </DbSheet>
 
     <!-- Wide screens: fixed sidebar -->
     <aside
-      class="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-line bg-panel lg:flex">
-      <div
-        class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4">
-        <DopbaseIcon class="h-7 w-7 shrink-0" />
-        <div class="leading-tight">
-          <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
-          <p class="text-xs text-ink-muted">{{ consoleLabel }}</p>
+      class="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-line-soft bg-panel lg:flex">
+      <div class="flex items-center gap-2.5 px-4 pb-3 pt-4">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center">
+          <DopbaseIcon class="h-7.5 w-7.5" />
+        </span>
+        <div class="min-w-0">
+          <p
+            class="text-[15px] font-semibold leading-5 tracking-[-0.3px] text-ink-strong">
+            Dopbase
+          </p>
+          <p
+            class="truncate font-mono text-sm leading-[22px] text-ink-faint"
+            :title="instanceHost">
+            {{ instanceHost }}
+          </p>
         </div>
       </div>
-      <DashboardNav :email="email" :logging-out="loggingOut" @logout="logout" />
+      <DashboardNav
+        :sections="sections"
+        :active-page="activePage"
+        :email="email"
+        :role-name="roleName"
+        :show-personal-tokens="showPersonalTokens"
+        :logging-out="loggingOut"
+        @logout="logout" />
     </aside>
 
     <main class="min-w-0 flex-1">

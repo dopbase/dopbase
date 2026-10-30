@@ -71,7 +71,8 @@ async function submit(): Promise<void> {
 <template>
   <section
     v-if="visible"
-    class="rounded-card border border-line bg-panel p-5 shadow-xs"
+    id="personal-tokens"
+    class="scroll-mt-16 rounded-card border border-line bg-panel p-5 shadow-xs lg:scroll-mt-8"
     aria-labelledby="personal-tokens-heading"
     data-testid="personal-tokens-card">
     <div class="flex items-center gap-2">
