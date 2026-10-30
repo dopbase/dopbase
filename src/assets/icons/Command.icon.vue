@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * SendIcon — a paper plane used for chat composer submit affordances.
+ * CommandIcon — the command key for keyboard shortcuts.
  * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });
@@ -18,7 +18,7 @@ defineOptions({ inheritAttrs: true });
     stroke-linecap="round"
     stroke-linejoin="round"
     v-bind="$attrs">
-    <path d="m22 2-7 20-4-9-9-4Z" />
-    <path d="M22 2 11 13" />
+    <path
+      d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
   </svg>
 </template>

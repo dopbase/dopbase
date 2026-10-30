@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * ReceiptIcon — a receipt slip with a zig-zag tear edge, used for the
- * bills tab. Inherit attrs so callers can override size/color via class
- * or style.
+ * MoreHorizontalIcon — three dots for row and overflow menus.
+ * Inherit attrs so callers can override size/color via class or style.
  */
 defineOptions({ inheritAttrs: true });
 </script>
@@ -19,10 +18,8 @@ defineOptions({ inheritAttrs: true });
     stroke-linecap="round"
     stroke-linejoin="round"
     v-bind="$attrs">
-    <path
-      d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
-    <path d="M8 7h8" />
-    <path d="M8 11h8" />
-    <path d="M8 15h5" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+    <circle cx="5" cy="12" r="1" />
   </svg>
 </template>
