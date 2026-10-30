@@ -2,10 +2,6 @@
 import { createApp, h, nextTick } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/stores/auth.store", () => ({
-  useAuthStore: () => ({ can: () => true }),
-}));
-
 const { controller } = await vi.hoisted(async () => {
   const { reactive, ref } = await import("vue");
   return {
@@ -31,6 +27,7 @@ const { controller } = await vi.hoisted(async () => {
       loadingMore: ref(false),
       loadError: ref(null),
       hasLoaded: ref(true),
+      scopeDescription: ref("Your own actions on this server."),
       filters: reactive({
         action: "",
         projectId: "",

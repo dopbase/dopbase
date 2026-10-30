@@ -27,16 +27,14 @@ const { controller } = await vi.hoisted(async () => {
       selectProject: vi.fn(),
       switchTab: vi.fn(),
       createProject: vi.fn(async () => undefined),
+      canCreateProjects: ref(true),
+      managesEnvironment: () => true,
     },
   };
 });
 
 vi.mock("./Projects.controller", () => ({
   useProjectsController: () => controller,
-}));
-
-vi.mock("~/stores/auth.store", () => ({
-  useAuthStore: () => ({ can: () => true }),
 }));
 
 vi.mock("~/layouts", async () => {

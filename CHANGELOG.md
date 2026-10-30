@@ -111,6 +111,13 @@ All notable changes to Dopbase are documented in this file.
   said `This operation requires an administrator.`
 - `PATCH /api/v1/environments/{id}` answers `ENVIRONMENT_UPDATED` instead of
   `ENVIRONMENT_RENAMED`, and its `name` is optional.
+- The **Projects** and **Audit** pages no longer read the session store
+  themselves. Their controllers now decide who can create projects, manage a
+  project or environment, and how much of the audit log the viewer sees. The
+  frontend architecture guide spells out the rule: `ui` components hold no
+  business logic, every screen splits into a page and a controller, and a
+  component one page uses lives in that page's folder. Nothing changes for
+  people using the console.
 
 ### Fixed
 

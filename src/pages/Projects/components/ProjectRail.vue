@@ -13,8 +13,6 @@ import {
   TrashIcon,
 } from "~/assets/icons";
 import type { Environment, Project } from "~/services";
-import { reaches } from "~/services/access.api";
-import { useAuthStore } from "~/stores/auth.store";
 
 /**
  * ProjectRail — the project/environment keyline rail.
@@ -33,6 +31,9 @@ const {
   environments,
   environmentsLoading,
   environmentsError,
+  canCreateProjects,
+  managesProject,
+  managesEnvironment,
 } = props.controller;
 
 type ProjectDialogState =
@@ -53,14 +54,6 @@ const isProjectActive = (project: Project): boolean =>
   props.controller.projectRef.value === project.id;
 const isEnvActive = (environment: Environment): boolean =>
   props.controller.environmentId.value === environment.id;
-
-// The server checks every action; these only hide what it would refuse.
-// Responses without a level come from servers that predate grants.
-const auth = useAuthStore();
-const managesProject = (project: Project): boolean =>
-  reaches(project.level ?? "project_manager", "project_manager");
-const managesEnvironment = (environment: Environment): boolean =>
-  reaches(environment.level ?? "manage", "manage");
 
 async function openEnvDelete(environment: Environment): Promise<void> {
   envDelete.value = environment;
@@ -109,7 +102,7 @@ async function confirmEnvDelete(): Promise<void> {
     <header class="flex items-center justify-between px-4 py-3.5">
       <h2 class="text-xs text-ink-muted">Projects</h2>
       <button
-        v-if="auth.can('projects.create')"
+        v-if="canCreateProjects"
         type="button"
         class="cursor-pointer rounded-control bg-raised p-1 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong pointer-coarse:p-2.5"
         aria-label="New project"
@@ -278,7 +271,7 @@ async function confirmEnvDelete(): Promise<void> {
       </ul>
 
       <p
-        v-else-if="auth.can('projects.create')"
+        v-else-if="canCreateProjects"
         class="px-2 py-4 text-xs leading-relaxed text-ink-muted">
         No projects yet. Create one with the + button above.
       </p>

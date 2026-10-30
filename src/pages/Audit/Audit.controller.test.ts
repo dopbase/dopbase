@@ -9,6 +9,16 @@ vi.mock("vue", async (importOriginal) => ({
   onMounted: vi.fn(),
 }));
 
+const { capabilities } = vi.hoisted(() => ({
+  capabilities: new Set<string>(),
+}));
+
+vi.mock("~/stores/auth.store", () => ({
+  useAuthStore: () => ({
+    can: (...needed: string[]) => needed.some((cap) => capabilities.has(cap)),
+  }),
+}));
+
 vi.mock("~/services/audit.api");
 vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
@@ -34,6 +44,23 @@ beforeEach(() => {
 });
 
 describe("useAuditController", () => {
+  it("describes the audit scope the viewer's capabilities allow", () => {
+    capabilities.clear();
+    expect(useAuditController().scopeDescription.value).toBe(
+      "Your own actions on this server.",
+    );
+
+    capabilities.add("audit.read");
+    expect(useAuditController().scopeDescription.value).toBe(
+      "Actions on this server's settings and on the projects you reach.",
+    );
+
+    capabilities.add("audit.read_all");
+    expect(useAuditController().scopeDescription.value).toBe(
+      "Immutable record of every action on this server.",
+    );
+  });
+
   it("loads the first page with a page-size limit", async () => {
     vi.mocked(auditApi.listAuditEvents).mockResolvedValueOnce({
       items: [event],

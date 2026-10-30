@@ -4,6 +4,7 @@ import type { AuditEvent } from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import type { Environment, Project } from "~/services";
+import { useAuthStore } from "~/stores/auth.store";
 import { formatDateTime, formatRelativeTime } from "~/utils/format";
 
 export const AUDIT_PAGE_SIZE = 25;
@@ -14,6 +15,7 @@ export const AUDIT_PAGE_SIZE = 25;
  * from the first page. "Load more" appends the next cursor page.
  */
 export function useAuditController() {
+  const auth = useAuthStore();
   const items = ref<AuditEvent[]>([]);
   const nextCursor = ref<string | null>(null);
   const loading = ref(false);
@@ -118,6 +120,17 @@ export function useAuditController() {
     }
   }
 
+  /** What the viewer's audit capabilities let this screen show. */
+  const scopeDescription = computed(() => {
+    if (auth.can("audit.read_all")) {
+      return "Immutable record of every action on this server.";
+    }
+    if (auth.can("audit.read")) {
+      return "Actions on this server's settings and on the projects you reach.";
+    }
+    return "Your own actions on this server.";
+  });
+
   onMounted(() => {
     load();
     loadFilterOptions();
@@ -130,6 +143,7 @@ export function useAuditController() {
     loadingMore,
     loadError,
     hasLoaded,
+    scopeDescription,
     filters,
     projects,
     environments,

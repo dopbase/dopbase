@@ -5,6 +5,8 @@ import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
 import type { AffectedCounts, Environment, Project } from "~/services";
+import { reaches } from "~/services/access.api";
+import { useAuthStore } from "~/stores/auth.store";
 
 /**
  * Projects controller: project and environment rail data, URL-derived
@@ -18,6 +20,7 @@ import type { AffectedCounts, Environment, Project } from "~/services";
 export function useProjectsController() {
   const route = useRoute();
   const router = useRouter();
+  const auth = useAuthStore();
 
   const projects = ref<Project[] | null>(null);
   const projectsError = ref<string | null>(null);
@@ -237,6 +240,14 @@ export function useProjectsController() {
     ];
   }
 
+  // The server checks every action; these only hide what it would refuse.
+  // Responses without a level come from servers that predate grants.
+  const canCreateProjects = computed(() => auth.can("projects.create"));
+  const managesProject = (project: Project): boolean =>
+    reaches(project.level ?? "project_manager", "project_manager");
+  const managesEnvironment = (environment: Environment): boolean =>
+    reaches(environment.level ?? "manage", "manage");
+
   return {
     projects,
     projectsError,
@@ -259,6 +270,9 @@ export function useProjectsController() {
     renameEnvironment,
     deleteEnvironment,
     describeEnvironmentDeletion,
+    canCreateProjects,
+    managesProject,
+    managesEnvironment,
   };
 }
 

@@ -32,6 +32,16 @@ vi.mock("vue-router", () => ({
   useRoute: () => route,
 }));
 
+const { capabilities } = vi.hoisted(() => ({
+  capabilities: new Set<string>(),
+}));
+
+vi.mock("~/stores/auth.store", () => ({
+  useAuthStore: () => ({
+    can: (...needed: string[]) => needed.some((cap) => capabilities.has(cap)),
+  }),
+}));
+
 vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
 vi.mock("~/services/secrets.api");
@@ -84,6 +94,7 @@ beforeEach(() => {
   route.name = "environment";
   routerPush.mockReset();
   routerReplace.mockReset();
+  capabilities.clear();
 });
 
 afterEach(() => {
@@ -91,6 +102,54 @@ afterEach(() => {
 });
 
 describe("useProjectsController", () => {
+  it("offers project creation only with projects.create", () => {
+    const controller = createController();
+    expect(controller.canCreateProjects.value).toBe(false);
+
+    capabilities.add("projects.create");
+    expect(createController().canCreateProjects.value).toBe(true);
+  });
+
+  it("treats project_manager as the project bar and manage as the environment bar", () => {
+    const controller = createController();
+    const environment = {
+      id: "env_1",
+      projectId: "prj_1",
+      projectName: "payments",
+      name: "dev",
+      createdAt: "",
+      updatedAt: "",
+    };
+
+    expect(controller.managesProject({ ...project, level: "manage" })).toBe(
+      false,
+    );
+    expect(
+      controller.managesProject({ ...project, level: "project_manager" }),
+    ).toBe(true);
+    expect(
+      controller.managesEnvironment({ ...environment, level: "write" }),
+    ).toBe(false);
+    expect(
+      controller.managesEnvironment({ ...environment, level: "manage" }),
+    ).toBe(true);
+  });
+
+  it("assumes full access when an older server sends no level", () => {
+    const controller = createController();
+    expect(controller.managesProject(project)).toBe(true);
+    expect(
+      controller.managesEnvironment({
+        id: "env_1",
+        projectId: "prj_1",
+        projectName: "payments",
+        name: "dev",
+        createdAt: "",
+        updatedAt: "",
+      }),
+    ).toBe(true);
+  });
+
   it("surfaces project loading failures", async () => {
     vi.mocked(projectsApi.listProjects).mockRejectedValueOnce(
       new Error("down"),

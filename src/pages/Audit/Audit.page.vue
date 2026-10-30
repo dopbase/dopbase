@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useAuditController } from "./Audit.controller";
-import { useAuthStore } from "~/stores/auth.store";
 import { DashboardLayout } from "~/layouts";
 import {
   DbAlert,
@@ -34,6 +33,7 @@ const {
   loadingMore,
   loadError,
   hasLoaded,
+  scopeDescription,
   filters,
   projectOptions,
   environmentOptions,
@@ -56,7 +56,6 @@ const activeFilterCount = computed(
 function toggle(event: AuditEvent): void {
   expandedId.value = expandedId.value === event.id ? null : event.id;
 }
-const auth = useAuthStore();
 </script>
 
 <template>
@@ -65,13 +64,7 @@ const auth = useAuthStore();
       <header class="mb-6">
         <h1 class="text-lg font-semibold">Audit</h1>
         <p class="mt-0.5 text-sm text-ink-muted">
-          {{
-            auth.can("audit.read_all")
-              ? "Immutable record of every action on this server."
-              : auth.can("audit.read")
-                ? "Actions on this server's settings and on the projects you reach."
-                : "Your own actions on this server."
-          }}
+          {{ scopeDescription }}
         </p>
       </header>
 

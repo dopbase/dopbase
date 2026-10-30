@@ -21,8 +21,6 @@ import {
   LayersIcon,
   LockIcon,
 } from "~/assets/icons";
-import { reaches } from "~/services/access.api";
-import { useAuthStore } from "~/stores/auth.store";
 
 /**
  * Projects is the authenticated project and environment screen.
@@ -39,9 +37,14 @@ const controller = useProjectsController();
 const showCreateProject = ref(false);
 const railOpen = ref(false);
 // Destructure so refs auto-unwrap in the template.
-const { projects, project, selectedEnvironment, activeTab, selectProject } =
-  controller;
-const auth = useAuthStore();
+const {
+  projects,
+  project,
+  selectedEnvironment,
+  activeTab,
+  selectProject,
+  canCreateProjects,
+} = controller;
 
 watch(
   () => selectedEnvironment.value?.id,
@@ -88,7 +91,7 @@ watch(
         <div v-if="projects && projects.length === 0" class="p-4 sm:p-10">
           <DbEmptyState
             :title="
-              auth.can('projects.create')
+              canCreateProjects
                 ? 'No projects yet'
                 : 'No projects shared with you'
             "
@@ -96,7 +99,7 @@ watch(
             <template #icon>
               <BoxIcon class="h-5 w-5" />
             </template>
-            <template v-if="auth.can('projects.create')" #actions>
+            <template v-if="canCreateProjects" #actions>
               <DbButton variant="primary" @click="showCreateProject = true">
                 Create project
               </DbButton>
@@ -231,7 +234,7 @@ watch(
                 secrets
               </button>
               <button
-                v-if="reaches(selectedEnvironment.level ?? 'manage', 'manage')"
+                v-if="controller.managesEnvironment(selectedEnvironment)"
                 type="button"
                 class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
                 :class="
