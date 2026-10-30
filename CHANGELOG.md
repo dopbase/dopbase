@@ -6,25 +6,54 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
-- Accounts now point to a row in the new `roles` table instead of a fixed
-  role name. A role holds capabilities, such as `users.manage` or
-  `audit.read`, and a ceiling on the access its grants can give. Admin,
-  Member, Auditor, and AI agent are built in. Root is a flag on the account
-  and holds every capability. Grants give a user or a group one level
-  (`metadata`, `read`, `write`, `manage`, or `project_manager`) on all
-  projects, one project, or one environment, and an environment can be marked
-  protected. The Admin UI and the CLI do not use grants or groups yet, so
-  access is unchanged: the upgrade gives every admin `project_manager` and
-  every member `write` on all projects, and new accounts get the same.
-  `GET /api/v1/auth/session` now reports `roleName`, `capabilities`, and
-  `maxLevel`. Backups include the new tables.
+- Access per project and environment. Accounts now point to a row in the new
+  `roles` table instead of a fixed role name. A role holds capabilities, such
+  as `users.manage` or `audit.read`, and a ceiling on the access its grants
+  can give. Admin, Member, Auditor, and AI agent are built in. Root is a flag
+  on the account and holds every capability. Grants give a user or a group one
+  level (`metadata`, `read`, `write`, `manage`, or `project_manager`) on all
+  projects, one project, or one environment. A grant on an environment
+  overrides one on its project, and `none` on an environment cuts it out of a
+  project grant. `GET /api/v1/auth/session` reports `roleName`,
+  `capabilities`, and `maxLevel`, and backups include the new tables.
+- A project's **Access** page, opened from the shield next to it, lists who
+  reaches the project and lets its project managers give or remove access
+  for users and groups. The `PUT /api/v1/grants`,
+  `DELETE /api/v1/grants/{id}`, `GET /api/v1/projects/{ref}/access`, and
+  `GET /api/v1/users/{id}/access` endpoints back it, and the Users page shows
+  where each person's access comes from.
+- Groups. The new **Groups** page creates groups and adds or removes members,
+  and a grant to a group reaches everyone in it. Leaving a group takes its
+  access away on the next request.
+- Protected environments. Turn protection on from the Access page or with
+  `PATCH /api/v1/environments/{id}` and `{"protected": true}`, and a project
+  grant below project manager stops reaching the environment. Only a grant
+  on the environment itself or a project manager gets in.
 
 ### Changed
 
+- Lists of projects and environments show only what your grants reach, and
+  anything else answers 404. Reading secret names needs `metadata`, values
+  need `read`, changes need `write`, and runner tokens, renaming, or deleting
+  an environment need `manage`. Renaming or deleting a project and adding
+  environments need `project_manager`. The Admin UI hides what your level
+  does not allow.
+- Creating a project needs the `projects.create` capability, which admins
+  have and members do not. The creator becomes the project's project manager.
+- New members start with no access until someone shares a project with them.
+  Admins that root creates start as project managers of every project, and
+  admins that other admins create start with none. Existing accounts keep
+  what they had: the upgrade gives every admin `project_manager` and every
+  member `write` on all projects.
+- Nobody can change, delete, or unlink an account whose role or access goes
+  beyond their own, give a role they do not hold, or change their own
+  grants.
 - User management, the audit log, instance status, backups, single sign-on
   settings, and factory reset now check a capability instead of a role. A
   refused request says `Your role does not allow this operation.` where it
   said `This operation requires an administrator.`
+- `PATCH /api/v1/environments/{id}` answers `ENVIRONMENT_UPDATED` instead of
+  `ENVIRONMENT_RENAMED`, and its `name` is optional.
 
 ## 0.1.10 - 2026-10-26
 

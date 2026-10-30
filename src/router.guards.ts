@@ -1,6 +1,7 @@
 import type { Router } from "vue-router";
 import type { NavigationGuardWithThis } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
+import type { Capability } from "~/services/access.api";
 
 /**
  * Installs the global navigation guards on the router.
@@ -39,7 +40,8 @@ export function installRouterGuards(router: Router): void {
         }
       }
       if (to.meta.rootOnly && !auth.isRoot) return { name: "projects" };
-      if (to.meta.adminOnly && !auth.isAdmin) return { name: "projects" };
+      const needed = to.meta.capabilities as Capability[] | undefined;
+      if (needed && !auth.can(...needed)) return { name: "projects" };
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {

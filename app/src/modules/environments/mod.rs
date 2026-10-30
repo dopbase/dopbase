@@ -26,7 +26,7 @@ pub fn routes() -> Router<AppState> {
     .route(
       crate::constants::api::environments::ITEM,
       get(controller::show)
-        .patch(controller::rename)
+        .patch(controller::update)
         .delete(controller::delete),
     )
 }

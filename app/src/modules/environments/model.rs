@@ -1,4 +1,4 @@
-use crate::models::AffectedCounts;
+use crate::{models::AffectedCounts, services::authx::Level};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 #[derive(Clone, Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -8,6 +8,12 @@ pub struct EnvironmentResponse {
   pub project_id: String,
   pub project_name: String,
   pub name: String,
+  /// Reached only through a grant on the environment itself or a project
+  /// manager grant.
+  pub protected: bool,
+  /// What the caller can do here.
+  #[sqlx(skip)]
+  pub level: Level,
   pub created_at: String,
   pub updated_at: String,
 }
@@ -16,8 +22,13 @@ pub struct CreateEnvironmentRequest {
   pub name: String,
 }
 #[derive(Deserialize, ToSchema)]
-pub struct RenameEnvironmentRequest {
-  pub name: String,
+pub struct UpdateEnvironmentRequest {
+  /// New name.
+  #[serde(default)]
+  pub name: Option<String>,
+  /// Turn protection on or off.
+  #[serde(default)]
+  pub protected: Option<bool>,
 }
 #[derive(Deserialize)]
 pub struct EnvironmentListQuery {

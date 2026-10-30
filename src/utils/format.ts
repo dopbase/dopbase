@@ -1,4 +1,5 @@
 import type { AccountRole } from "~/services/auth.api";
+import type { Level } from "~/services/access.api";
 
 /** Formats an RFC 3339 timestamp as a compact relative age, e.g. `2h ago`. */
 export function formatRelativeTime(
@@ -77,4 +78,18 @@ const ROLE_LABELS: Record<AccountRole, string> = {
 /** The name of an account role as people see it, e.g. `Root Administrator`. */
 export function formatRole(role: string): string {
   return ROLE_LABELS[role as AccountRole] ?? role;
+}
+
+const LEVEL_LABELS: Record<Level, string> = {
+  none: "No access",
+  metadata: "Names only",
+  read: "Read",
+  write: "Write",
+  manage: "Manage",
+  project_manager: "Project manager",
+};
+
+/** An access level as people see it, e.g. `Names only`. */
+export function formatLevel(level: Level): string {
+  return LEVEL_LABELS[level];
 }

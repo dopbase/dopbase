@@ -8,7 +8,10 @@ use crate::{
   http::HttpError,
   models::{AdminRole, AuthIdentity},
   modules::common,
-  services::{authx::Capability, token},
+  services::{
+    authx::{self, Access, Capability, Catalog},
+    token,
+  },
   state::AppState,
 };
 use axum::http::HeaderMap;
@@ -40,16 +43,91 @@ fn human_role(role: Option<AdminRole>) -> Result<AdminRole, HttpError> {
   }
 }
 
-/// The role row and the all-projects grant that keep a fixed role's access
-/// as it was: admins manage every project and members change them all.
+/// The built-in role row behind a fixed role.
 // TODO(rbac): maps the fixed admin and member roles to their built-in role
-// rows and shared grants. Take the role id from the request and grant
-// access per project once grants can be managed.
-fn role_access(role: AdminRole) -> (&'static str, &'static str) {
+// rows. Take the role id from the request once roles can be picked.
+fn role_id(role: AdminRole) -> &'static str {
   match role {
-    AdminRole::Admin => ("rol_admin", "project_manager"),
-    _ => ("rol_member", "write"),
+    AdminRole::Admin => "rol_admin",
+    _ => "rol_member",
   }
+}
+
+fn exceeds_access() -> HttpError {
+  HttpError::forbidden(
+    "ACCESS_EXCEEDS_YOURS",
+    "This account has access you don't have, so you can't manage it.",
+  )
+}
+
+/// The caller's own access and id.
+fn caller(identity: &AuthIdentity) -> Result<(&str, &Access), HttpError> {
+  match identity {
+    AuthIdentity::Admin {
+      admin_id, access, ..
+    } => Ok((admin_id, access)),
+    _ => Err(HttpError::internal()),
+  }
+}
+
+/// Only roles within the caller's own capabilities and ceiling can be
+/// handed out.
+async fn require_assignable(
+  state: &AppState,
+  identity: &AuthIdentity,
+  role_id: &str,
+) -> Result<(), HttpError> {
+  let (_, access) = caller(identity)?;
+  let mut conn = state.db.pool().acquire().await?;
+  let role = authx::role_access(&mut conn, role_id)
+    .await?
+    .ok_or_else(|| HttpError::bad_request("ROLE_INVALID", "The role was not found."))?;
+  if !access.includes(&role) {
+    return Err(HttpError::forbidden(
+      "ROLE_EXCEEDS_YOURS",
+      "You can only give roles that are within your own.",
+    ));
+  }
+  Ok(())
+}
+
+/// A person can manage another account only when that account's role and
+/// data access are within their own. Root manages everyone.
+async fn require_within(
+  state: &AppState,
+  identity: &AuthIdentity,
+  target_id: &str,
+) -> Result<(), HttpError> {
+  let (actor_id, access) = caller(identity)?;
+  if access.is_root {
+    return Ok(());
+  }
+  let mut conn = state.db.pool().acquire().await?;
+  let target = authx::load_access(&mut conn, target_id)
+    .await?
+    .unwrap_or_else(Access::none);
+  if !access.includes(&target) {
+    return Err(exceeds_access());
+  }
+  let mine = authx::account_data_access(&mut conn, actor_id, access).await?;
+  let theirs = authx::account_data_access(&mut conn, target_id, &target).await?;
+  let catalog = Catalog::load(&mut conn).await?;
+  if !mine.covers(&theirs, &catalog.projects, &catalog.environments()) {
+    return Err(exceeds_access());
+  }
+  Ok(())
+}
+
+/// The all-projects grant a new or changed account starts with. Only root
+/// gives it, and only to admins; everyone else starts with no data access
+/// and gets grants per project.
+fn starting_grant(
+  identity: &AuthIdentity,
+  role: AdminRole,
+) -> Option<&'static str> {
+  let (_, access) = caller(identity).ok()?;
+  (role == AdminRole::Admin && access.has(Capability::GrantsAllProjects))
+    .then_some("project_manager")
 }
 
 fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
@@ -138,7 +216,8 @@ pub async fn create(
   let id = token::public_id("usr_");
   let now = Utc::now().to_rfc3339();
   let (actor_id, actor_email) = actor(identity);
-  let (role_id, level) = role_access(requested_role);
+  let role_id = role_id(requested_role);
+  require_assignable(state, identity, role_id).await?;
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,
@@ -162,7 +241,9 @@ pub async fn create(
     }
     return Err(error.into());
   }
-  repository::set_all_projects_grant(&mut tx, &id, level, actor_id, &now).await?;
+  if let Some(level) = starting_grant(identity, requested_role) {
+    repository::set_all_projects_grant(&mut tx, &id, Some(level), actor_id, &now).await?;
+  }
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
@@ -224,6 +305,12 @@ pub async fn update(
       "Use the root password change flow to change the root password.",
     ));
   }
+  if old_role != "root" {
+    require_within(state, identity, id).await?;
+  }
+  if new_role != AdminRole::Root && old_role != new_role.as_str() {
+    require_assignable(state, identity, role_id(new_role)).await?;
+  }
   let email = match request.email {
     Some(value) => common::validate_email(&value)?,
     None => old_email,
@@ -248,20 +335,28 @@ pub async fn update(
     )
     .await
   } else {
-    let (role_id, level) = role_access(new_role);
     let updated = repository::update(
       &mut tx,
       id,
       &email,
       password_hash.as_deref(),
       new_role.as_str(),
-      Some(role_id),
+      Some(role_id(new_role)),
       &now,
     )
     .await;
+    // A new role starts over on all projects; project grants stay and are
+    // capped by the new role's ceiling.
     match updated {
       Ok(()) if old_role != new_role.as_str() => {
-        repository::set_all_projects_grant(&mut tx, id, level, actor_id, &now).await
+        repository::set_all_projects_grant(
+          &mut tx,
+          id,
+          starting_grant(identity, new_role),
+          actor_id,
+          &now,
+        )
+        .await
       }
       other => other,
     }
@@ -327,6 +422,7 @@ pub async fn delete(
     Some("admin") | Some("member") => {}
     _ => return Err(HttpError::internal()),
   }
+  require_within(state, identity, id).await?;
   let mut tx = state.db.pool().begin().await?;
   repository::delete(&mut tx, id).await?;
   common::audit(
@@ -367,6 +463,9 @@ pub async fn unlink_sso(
       "ROOT_PROTECTED",
       "The root administrator cannot be modified.",
     ));
+  }
+  if target.role != AdminRole::Root {
+    require_within(state, identity, id).await?;
   }
   crate::modules::sso::service::unlink(state, identity, id, &target.email).await?;
   fetch_user(state, id).await

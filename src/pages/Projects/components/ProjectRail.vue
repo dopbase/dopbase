@@ -6,11 +6,15 @@ import { DbConfirmDialog, DbSkeleton } from "~/components/ui";
 import {
   BoxIcon,
   LayersIcon,
+  LockIcon,
   PencilIcon,
   PlusIcon,
+  ShieldIcon,
   TrashIcon,
 } from "~/assets/icons";
 import type { Environment, Project } from "~/services";
+import { reaches } from "~/services/access.api";
+import { useAuthStore } from "~/stores/auth.store";
 
 /**
  * ProjectRail — the project/environment keyline rail.
@@ -49,6 +53,14 @@ const isProjectActive = (project: Project): boolean =>
   props.controller.projectRef.value === project.id;
 const isEnvActive = (environment: Environment): boolean =>
   props.controller.environmentId.value === environment.id;
+
+// The server checks every action; these only hide what it would refuse.
+// Responses without a level come from servers that predate grants.
+const auth = useAuthStore();
+const managesProject = (project: Project): boolean =>
+  reaches(project.level ?? "project_manager", "project_manager");
+const managesEnvironment = (environment: Environment): boolean =>
+  reaches(environment.level ?? "manage", "manage");
 
 async function openEnvDelete(environment: Environment): Promise<void> {
   envDelete.value = environment;
@@ -97,6 +109,7 @@ async function confirmEnvDelete(): Promise<void> {
     <header class="flex items-center justify-between px-4 py-3.5">
       <h2 class="text-xs text-ink-muted">Projects</h2>
       <button
+        v-if="auth.can('projects.create')"
         type="button"
         class="cursor-pointer rounded-control bg-raised p-1 text-ink-muted transition-colors hover:bg-line hover:text-ink-strong pointer-coarse:p-2.5"
         aria-label="New project"
@@ -151,7 +164,18 @@ async function confirmEnvDelete(): Promise<void> {
               </span>
             </button>
             <span
+              v-if="managesProject(project)"
               class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+              <RouterLink
+                :to="{
+                  name: 'project-access',
+                  params: { projectRef: project.name },
+                }"
+                class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong pointer-coarse:p-2.5"
+                :aria-label="`Access to ${project.name}`"
+                :title="`Who can reach ${project.name}`">
+                <ShieldIcon class="h-3 w-3" />
+              </RouterLink>
               <button
                 type="button"
                 class="cursor-pointer rounded p-1 text-ink-faint hover:text-ink-strong pointer-coarse:p-2.5"
@@ -201,8 +225,13 @@ async function confirmEnvDelete(): Promise<void> {
                     ">
                     {{ environment.name }}
                   </span>
+                  <LockIcon
+                    v-if="environment.protected"
+                    class="h-3 w-3 shrink-0 text-ink-faint"
+                    aria-label="Protected" />
                 </button>
                 <span
+                  v-if="managesEnvironment(environment)"
                   class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
                   <button
                     type="button"
@@ -235,7 +264,7 @@ async function confirmEnvDelete(): Promise<void> {
               {{ environmentsError }}
             </li>
 
-            <li>
+            <li v-if="managesProject(project)">
               <button
                 type="button"
                 class="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 font-mono text-xs pointer-coarse:min-h-11 text-ink-faint transition-colors hover:bg-raised/60 hover:text-ink"
@@ -248,8 +277,13 @@ async function confirmEnvDelete(): Promise<void> {
         </li>
       </ul>
 
-      <p v-else class="px-2 py-4 text-xs leading-relaxed text-ink-muted">
+      <p
+        v-else-if="auth.can('projects.create')"
+        class="px-2 py-4 text-xs leading-relaxed text-ink-muted">
         No projects yet. Create one with the + button above.
+      </p>
+      <p v-else class="px-2 py-4 text-xs leading-relaxed text-ink-muted">
+        Nobody has shared a project with you yet.
       </p>
     </div>
 

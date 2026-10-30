@@ -119,11 +119,11 @@ pub async fn update(
   Ok(())
 }
 
-/// Replaces the account's all-projects grant with `level`.
+/// Replaces the account's all-projects grant with `level`, or removes it.
 pub async fn set_all_projects_grant(
   conn: &mut SqliteConnection,
   id: &str,
-  level: &str,
+  level: Option<&str>,
   granted_by: &str,
   now: &str,
 ) -> Result<(), sqlx::Error> {
@@ -133,6 +133,9 @@ pub async fn set_all_projects_grant(
   .bind(id)
   .execute(&mut *conn)
   .await?;
+  let Some(level) = level else {
+    return Ok(());
+  };
   sqlx::query("INSERT INTO grants(id,principal_type,principal_id,scope_type,scope_id,level,granted_by,created_at) VALUES(?,'user',?,'all','',?,?,?)")
     .bind(token::public_id(GRANT_ID_PREFIX))
     .bind(id)

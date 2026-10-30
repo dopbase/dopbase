@@ -1,4 +1,7 @@
-use crate::models::{AffectedCounts, SecretInput};
+use crate::{
+  models::{AffectedCounts, SecretInput},
+  services::authx::Level,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 #[derive(Clone, Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -6,6 +9,10 @@ use utoipa::ToSchema;
 pub struct ProjectResponse {
   pub id: String,
   pub name: String,
+  /// What the caller can do to the project itself. `metadata` when only
+  /// some of its environments are granted.
+  #[sqlx(skip)]
+  pub level: Level,
   pub created_at: String,
   pub updated_at: String,
 }

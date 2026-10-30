@@ -19,7 +19,10 @@ import {
   ChevronDownIcon,
   FolderIcon,
   LayersIcon,
+  LockIcon,
 } from "~/assets/icons";
+import { reaches } from "~/services/access.api";
+import { useAuthStore } from "~/stores/auth.store";
 
 /**
  * Projects is the authenticated project and environment screen.
@@ -38,6 +41,7 @@ const railOpen = ref(false);
 // Destructure so refs auto-unwrap in the template.
 const { projects, project, selectedEnvironment, activeTab, selectProject } =
   controller;
+const auth = useAuthStore();
 
 watch(
   () => selectedEnvironment.value?.id,
@@ -83,12 +87,16 @@ watch(
         <!-- No projects yet: explain the model -->
         <div v-if="projects && projects.length === 0" class="p-4 sm:p-10">
           <DbEmptyState
-            title="No projects yet"
+            :title="
+              auth.can('projects.create')
+                ? 'No projects yet'
+                : 'No projects shared with you'
+            "
             description="A project is one application or service. Each project holds environments like development, staging, and production, and every environment stores its own encrypted secret values.">
             <template #icon>
               <BoxIcon class="h-5 w-5" />
             </template>
-            <template #actions>
+            <template v-if="auth.can('projects.create')" #actions>
               <DbButton variant="primary" @click="showCreateProject = true">
                 Create project
               </DbButton>
@@ -198,6 +206,15 @@ watch(
                 {{ selectedEnvironment.id }}
               </DbBadge>
               <DbCopyButton :value="selectedEnvironment.id" label="Copy ID" />
+              <DbBadge
+                v-if="selectedEnvironment.protected"
+                class="inline-flex items-center gap-1"
+                tone="warn"
+                title="Only people granted this environment, or project managers, can reach it."
+                data-testid="environment-protected">
+                <LockIcon class="h-3 w-3" />
+                protected
+              </DbBadge>
             </div>
 
             <div
@@ -214,6 +231,7 @@ watch(
                 secrets
               </button>
               <button
+                v-if="reaches(selectedEnvironment.level ?? 'manage', 'manage')"
                 type="button"
                 class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
                 :class="
@@ -232,7 +250,8 @@ watch(
               v-if="activeTab === 'secrets'"
               :environment-id="selectedEnvironment.id"
               :environment-name="selectedEnvironment.name"
-              :project-name="project!.name" />
+              :project-name="project!.name"
+              :level="selectedEnvironment.level" />
             <TokensPanel v-else :environment-id="selectedEnvironment.id" />
           </div>
         </template>

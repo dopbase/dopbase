@@ -1,6 +1,6 @@
 use super::model::EnvironmentResponse;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
+const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.protected,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
 
 pub async fn insert(
   tx: &mut Transaction<'_, Sqlite>,

@@ -15,7 +15,7 @@ use crate::{
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
   services::{
-    authx::{self, Capability, Level},
+    authx::{self, Capability},
     token,
   },
   state::AppState,
@@ -229,12 +229,10 @@ pub fn require_capability(
   }
 }
 
-/// [`require_capability`] from an Admin UI session only.
-pub fn require_capability_browser(
-  identity: &AuthIdentity,
-  capability: Capability,
-) -> Result<(&str, &str), HttpError> {
-  let result = require_capability(identity, capability)?;
+/// A person signed in to the Admin UI. Changes to who can reach what are
+/// made there only, behind CSRF and recent sign-in checks.
+pub fn require_browser(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
+  let result = require_person(identity)?;
   if !matches!(
     identity,
     AuthIdentity::Admin {
@@ -250,23 +248,14 @@ pub fn require_capability_browser(
   Ok(result)
 }
 
-/// A signed-in person whose role may change project data.
-// TODO(rbac): checks the role's level ceiling only. Check the level the
-// account's grants give on the project or environment once data access is
-// granted per resource.
-pub fn require_project_manager(identity: &AuthIdentity) -> Result<(&str, &str), HttpError> {
-  match identity {
-    AuthIdentity::Admin {
-      admin_id,
-      email,
-      access,
-      ..
-    } if access.max_level >= Level::Write => Ok((admin_id, email)),
-    _ => Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "This operation requires a human project account.",
-    )),
-  }
+/// [`require_capability`] from an Admin UI session only.
+pub fn require_capability_browser(
+  identity: &AuthIdentity,
+  capability: Capability,
+) -> Result<(&str, &str), HttpError> {
+  let result = require_capability(identity, capability)?;
+  require_browser(identity)?;
+  Ok(result)
 }
 
 pub fn require_read_access(identity: &AuthIdentity) -> Result<(), HttpError> {

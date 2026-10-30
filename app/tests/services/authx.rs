@@ -1,5 +1,5 @@
 use app::services::authx::{
-  self, Access, Capability, EnvironmentTarget, Grant, Level, Scope, SignIn,
+  self, Access, Capability, DataAccess, EnvironmentTarget, Grant, Level, Scope, SignIn,
 };
 use app::services::db::{DbClient, MIGRATOR};
 
@@ -156,6 +156,98 @@ fn project_level_ignores_environment_grants() {
     authx::project_level(&grants, "prj_other", Level::ProjectManager),
     Level::Read
   );
+}
+
+#[test]
+fn each_kind_of_principal_reaches_its_own_data() {
+  let other = EnvironmentTarget {
+    environment_id: "env_dev",
+    ..PROD
+  };
+  assert_eq!(
+    DataAccess::Everything.environment(protected()),
+    Level::Manage
+  );
+  assert_eq!(
+    DataAccess::Everything.project("prj_any"),
+    Level::ProjectManager
+  );
+  let agent = DataAccess::Uniform(Level::Metadata);
+  assert_eq!(agent.environment(protected()), Level::Metadata);
+  let runner = DataAccess::Runner("env_prod".into());
+  assert_eq!(runner.environment(PROD), Level::Read);
+  assert_eq!(runner.environment(other), Level::None);
+  assert_eq!(runner.project("prj_pay"), Level::None);
+}
+
+#[test]
+fn an_environment_grant_shows_its_project_without_rights_over_it() {
+  let access = DataAccess::Grants {
+    grants: vec![environment("env_prod", Level::Read)],
+    ceiling: Level::Manage,
+  };
+  assert_eq!(access.project("prj_pay"), Level::None);
+  assert!(access.sees_project("prj_pay", [PROD].into_iter()));
+  assert!(!access.sees_project("prj_other", std::iter::empty()));
+}
+
+#[test]
+fn covering_another_access_needs_at_least_its_level_everywhere() {
+  let manager = DataAccess::Grants {
+    grants: vec![project("prj_pay", Level::ProjectManager)],
+    ceiling: Level::ProjectManager,
+  };
+  let writer = DataAccess::Grants {
+    grants: vec![project("prj_pay", Level::Write)],
+    ceiling: Level::Manage,
+  };
+  let everywhere = DataAccess::Grants {
+    grants: vec![all(Level::Read)],
+    ceiling: Level::Manage,
+  };
+  let projects = ["prj_pay".to_owned(), "prj_other".to_owned()];
+  let environments = [
+    PROD,
+    EnvironmentTarget {
+      project_id: "prj_other",
+      environment_id: "env_other",
+      protected: false,
+    },
+  ];
+  assert!(manager.covers(&writer, &projects, &environments));
+  assert!(!writer.covers(&manager, &projects, &environments));
+  assert!(!manager.covers(&everywhere, &projects, &environments));
+  assert!(DataAccess::Everything.covers(&everywhere, &projects, &environments));
+}
+
+#[test]
+fn a_role_includes_only_what_it_holds_itself() {
+  let admin = Access::role(
+    "rol_admin",
+    "Admin",
+    [Capability::UsersManage, Capability::UsersView],
+    Level::ProjectManager,
+    SignIn::Interactive,
+  );
+  let member = Access::role(
+    "rol_member",
+    "Member",
+    [Capability::TokensPersonal],
+    Level::Manage,
+    SignIn::Interactive,
+  );
+  let viewer = Access::role(
+    "rol_viewer",
+    "Viewer",
+    [Capability::UsersView],
+    Level::Read,
+    SignIn::Interactive,
+  );
+  assert!(admin.includes(&viewer));
+  assert!(!admin.includes(&member));
+  assert!(!viewer.includes(&admin));
+  assert!(!admin.includes(&Access::root()));
+  assert!(Access::root().includes(&admin));
 }
 
 #[test]

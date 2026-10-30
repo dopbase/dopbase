@@ -45,6 +45,11 @@ export const router = createRouter({
       component: () => import("~/pages/Projects/Projects.page.vue"),
     },
     {
+      path: "/projects/p/:projectRef/access",
+      name: "project-access",
+      component: () => import("~/pages/ProjectAccess/ProjectAccess.page.vue"),
+    },
+    {
       path: "/projects/p/:projectRef/e/:environmentId",
       name: "environment",
       component: () => import("~/pages/Projects/Projects.page.vue"),
@@ -81,7 +86,7 @@ export const router = createRouter({
       path: "/audit",
       name: "audit",
       component: () => import("~/pages/Audit/Audit.page.vue"),
-      meta: { adminOnly: true },
+      meta: { capabilities: ["audit.read"] },
     },
     {
       path: "/instance",
@@ -97,7 +102,13 @@ export const router = createRouter({
       path: "/users",
       name: "users",
       component: () => import("~/pages/Users/Users.page.vue"),
-      meta: { adminOnly: true },
+      meta: { capabilities: ["users.view"] },
+    },
+    {
+      path: "/groups",
+      name: "groups",
+      component: () => import("~/pages/Groups/Groups.page.vue"),
+      meta: { capabilities: ["users.view", "groups.manage"] },
     },
     {
       path: "/cli/approve",

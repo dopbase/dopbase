@@ -1,11 +1,16 @@
 import { apiRequest } from "./http.client";
 import type { AffectedCounts } from "./projects.api";
+import type { Level } from "./access.api";
 
 export interface Environment {
   id: string;
   projectId: string;
   projectName: string;
   name: string;
+  /** Reached only by a grant on the environment itself or a project manager. */
+  protected?: boolean;
+  /** What you can do here. */
+  level?: Level;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +58,17 @@ export async function renameEnvironment(
   const { data } = await apiRequest<Environment>(
     `${BASE}/${encodeURIComponent(id)}`,
     { method: "PATCH", body: { name } },
+  );
+  return data;
+}
+
+export async function setEnvironmentProtected(
+  id: string,
+  isProtected: boolean,
+): Promise<Environment> {
+  const { data } = await apiRequest<Environment>(
+    `${BASE}/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: { protected: isProtected } },
   );
   return data;
 }

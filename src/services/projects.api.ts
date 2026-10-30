@@ -1,8 +1,11 @@
 import { apiRequest } from "./http.client";
+import type { Level } from "./access.api";
 
 export interface Project {
   id: string;
   name: string;
+  /** What you can do to the project itself. */
+  level?: Level;
   createdAt: string;
   updatedAt: string;
 }

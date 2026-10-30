@@ -8,6 +8,9 @@ import {
   updateUser,
 } from "~/services/users.api";
 import { fetchAuthMethods } from "~/services/auth.api";
+import { fetchUserAccess } from "~/services/access.api";
+import type { UserAccess } from "~/services/access.api";
+import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import type { User } from "~/services/users.api";
 import { useAuthStore } from "~/stores/auth.store";
@@ -483,6 +486,26 @@ export function useUsersController() {
     }
   }
 
+  // Access view state
+  const accessUser = ref<User | null>(null);
+  const userAccess = ref<UserAccess | null>(null);
+  const accessError = ref<string | null>(null);
+
+  async function openAccess(user: User): Promise<void> {
+    accessUser.value = user;
+    userAccess.value = null;
+    accessError.value = null;
+    try {
+      userAccess.value = await fetchUserAccess(user.id);
+    } catch (cause) {
+      accessError.value = errorMessage(cause, "Could not load this access.");
+    }
+  }
+
+  function closeAccess(): void {
+    accessUser.value = null;
+  }
+
   function acknowledgeCreatedToken(): void {
     createdAgentToken.value = null;
     agentForToken.value = null;
@@ -534,6 +557,9 @@ export function useUsersController() {
     tokenExpiryUnits,
     generatingToken,
     createdAgentToken,
+    accessUser,
+    userAccess,
+    accessError,
   });
 
   const actions = {
@@ -556,6 +582,8 @@ export function useUsersController() {
     closeTokenReauth,
     confirmTokenReauthAndGenerate,
     acknowledgeCreatedToken,
+    openAccess,
+    closeAccess,
   };
 
   return { state, actions };

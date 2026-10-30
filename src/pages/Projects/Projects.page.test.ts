@@ -35,6 +35,10 @@ vi.mock("./Projects.controller", () => ({
   useProjectsController: () => controller,
 }));
 
+vi.mock("~/stores/auth.store", () => ({
+  useAuthStore: () => ({ can: () => true }),
+}));
+
 vi.mock("~/layouts", async () => {
   const { defineComponent, h } = await import("vue");
   return {

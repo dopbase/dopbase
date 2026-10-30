@@ -13,7 +13,7 @@ import {
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import { KeyIcon, LockIcon, PlusIcon } from "~/assets/icons";
-import { formatDateTime } from "~/utils/format";
+import { formatDateTime, formatLevel } from "~/utils/format";
 import {
   MAX_TOKEN_EXPIRY_DAYS,
   MAX_TOKEN_EXPIRY_HOURS,
@@ -103,6 +103,14 @@ const { state, actions } = useUsersController();
           <DbButton
             v-if="user.role !== 'root'"
             :class="user.ssoLinked ? '' : 'ml-auto sm:ml-0'"
+            size="sm"
+            variant="ghost"
+            data-testid="user-access"
+            @click="actions.openAccess(user)">
+            Access
+          </DbButton>
+          <DbButton
+            v-if="user.role !== 'root'"
             size="sm"
             variant="secondary"
             @click="actions.openEdit(user)">
@@ -426,5 +434,50 @@ const { state, actions } = useUsersController();
         "
         @acknowledge="actions.acknowledgeCreatedToken" />
     </div>
+    <!-- Where a user's access comes from -->
+    <DbModal
+      :open="state.accessUser !== null"
+      :title="`Access for ${state.accessUser?.email ?? ''}`"
+      size="lg"
+      @close="actions.closeAccess">
+      <DbAlert v-if="state.accessError">{{ state.accessError }}</DbAlert>
+      <DbSkeleton
+        v-else-if="!state.userAccess"
+        class="h-24 w-full rounded-card" />
+      <div v-else class="flex flex-col gap-4">
+        <p class="text-sm text-ink-muted">
+          Their role allows up to
+          <strong class="text-ink-strong">
+            {{ formatLevel(state.userAccess.maxLevel) }}</strong
+          >. Groups:
+          {{
+            state.userAccess.groups.map((group) => group.name).join(", ") ||
+            "none"
+          }}.
+        </p>
+        <ul
+          v-if="state.userAccess.grants.length > 0"
+          class="overflow-hidden rounded-card border border-line"
+          data-testid="user-access-grants">
+          <li
+            v-for="grant in state.userAccess.grants"
+            :key="grant.id"
+            class="flex flex-wrap items-center gap-3 border-b border-line-soft px-3 py-2 last:border-0">
+            <span class="min-w-0 flex-1 truncate font-mono text-sm">
+              {{ grant.scopeLabel || "All projects" }}
+            </span>
+            <span
+              v-if="grant.principalType === 'group'"
+              class="text-xs text-ink-muted">
+              through {{ grant.principalLabel }}
+            </span>
+            <DbBadge>{{ formatLevel(grant.level) }}</DbBadge>
+          </li>
+        </ul>
+        <p v-else class="text-sm text-ink-muted">
+          No grants. They reach no project until someone shares one.
+        </p>
+      </div>
+    </DbModal>
   </DashboardLayout>
 </template>
