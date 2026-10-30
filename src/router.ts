@@ -8,6 +8,9 @@ import { installRouterGuards } from "./router.guards";
  * name (`/projects/p/:projectRef`) and an environment by its immutable id
  * (`/projects/p/:projectRef/e/:environmentId`). No global "active
  * environment" is stored anywhere else.
+ *
+ * Which signed-in pages an account may open comes from
+ * `~/navigation/access-map`, not from route meta.
  */
 export const router = createRouter({
   history: createWebHistory(),
@@ -68,7 +71,6 @@ export const router = createRouter({
       path: "/backups",
       name: "backups",
       component: () => import("~/pages/Backups/Backups.page.vue"),
-      meta: { rootOnly: true },
     },
     {
       path: "/sso/confirmed",
@@ -80,7 +82,6 @@ export const router = createRouter({
       path: "/sso",
       name: "sso",
       component: () => import("~/pages/Sso/Sso.page.vue"),
-      meta: { rootOnly: true },
     },
     {
       path: "/audit",
@@ -101,19 +102,16 @@ export const router = createRouter({
       path: "/users",
       name: "users",
       component: () => import("~/pages/Users/Users.page.vue"),
-      meta: { capabilities: ["users.view"] },
     },
     {
       path: "/roles",
       name: "roles",
       component: () => import("~/pages/Roles/Roles.page.vue"),
-      meta: { capabilities: ["roles.manage"] },
     },
     {
       path: "/groups",
       name: "groups",
       component: () => import("~/pages/Groups/Groups.page.vue"),
-      meta: { capabilities: ["users.view", "groups.manage"] },
     },
     {
       path: "/cli/approve",
@@ -128,6 +126,13 @@ export const router = createRouter({
       name: "not-found",
       component: () => import("~/pages/NotFound/NotFound.page.vue"),
       meta: { public: true },
+    },
+    {
+      // Only reached by name from the guard, which keeps the address the
+      // viewer asked for. By path, every unknown URL matches not-found.
+      path: "/:pathMatch(.*)*",
+      name: "no-access",
+      component: () => import("~/pages/NoAccess/NoAccess.page.vue"),
     },
   ],
 });

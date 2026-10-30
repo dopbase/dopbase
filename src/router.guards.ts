@@ -1,7 +1,7 @@
 import type { Router } from "vue-router";
 import type { NavigationGuardWithThis } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
-import type { Capability } from "~/services/access.api";
+import { canOpen } from "~/navigation/access-map";
 
 /**
  * Installs the global navigation guards on the router.
@@ -12,7 +12,9 @@ import type { Capability } from "~/services/access.api";
  *    including stale tabs after bootstrap closes.
  * 3. Protected routes require a session. An absent or expired cookie
  *    redirects to `/login` with the intended destination preserved.
- * 4. Signed-in admins never see `/login` again.
+ * 4. A page the account can't open, per the capability map, renders the
+ *    No access screen at the same address instead of redirecting.
+ * 5. Signed-in admins never see `/login` again.
  */
 export function installRouterGuards(router: Router): void {
   const guard: NavigationGuardWithThis<undefined> = async (to) => {
@@ -39,9 +41,14 @@ export function installRouterGuards(router: Router): void {
           };
         }
       }
-      if (to.meta.rootOnly && !auth.isRoot) return { name: "projects" };
-      const needed = to.meta.capabilities as Capability[] | undefined;
-      if (needed && !auth.can(...needed)) return { name: "projects" };
+      if (!canOpen(to.name, auth.can)) {
+        return {
+          name: "no-access",
+          params: { pathMatch: to.path.slice(1).split("/") },
+          query: to.query,
+          hash: to.hash,
+        };
+      }
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {
