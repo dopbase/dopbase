@@ -1,47 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  viewBox="0 0 1024 1024"
-  role="img"
-  aria-labelledby="dopbase-logo-title dopbase-logo-desc"
->
+<svg xmlns="http://www.w3.org/2000/svg" width="54" height="64" viewBox="0 0 54 64" fill="none" role="img" aria-labelledby="dopbase-logo-title">
   <title id="dopbase-logo-title">Dopbase</title>
-  <desc id="dopbase-logo-desc">A bold purple letter D inside a circular ring.</desc>
-
-  <defs>
-    <linearGradient id="dopbase-violet" x1="170" y1="170" x2="854" y2="854" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#914BFF" />
-      <stop offset="0.52" stop-color="#7D35FF" />
-      <stop offset="1" stop-color="#7128F4" />
-    </linearGradient>
-  </defs>
-
-  <circle
-    cx="512"
-    cy="512"
-    r="397"
-    fill="none"
-    stroke="url(#dopbase-violet)"
-    stroke-width="96"
-  />
-
-  <path
-    fill="url(#dopbase-violet)"
-    fill-rule="evenodd"
-    d="
-      M 334 298
-      H 532
-      C 678 298 758 379 758 512
-      C 758 645 678 726 532 726
-      H 334
-      Z
-
-      M 456 400
-      V 624
-      H 526
-      C 598 624 636 585 636 512
-      C 636 439 598 400 526 400
-      Z
-    "
-  />
+  <path d="M6 0H20C25.3043 0 30.3914 2.10714 34.1421 5.85786C37.8929 9.60859 40 14.6957 40 20V24C40 29.3043 37.8929 34.3914 34.1421 38.1421C30.3914 41.8929 25.3043 44 20 44H6C4.4087 44 2.88258 43.3679 1.75736 42.2426C0.632141 41.1174 0 39.5913 0 38L0 6C0 4.4087 0.632141 2.88258 1.75736 1.75736C2.88258 0.632141 4.4087 0 6 0Z" fill="#C4A3FC"/>
+  <path d="M20 20H34C39.3043 20 44.3914 22.1071 48.1421 25.8579C51.8929 29.6086 54 34.6957 54 40V44C54 49.3043 51.8929 54.3914 48.1421 58.1421C44.3914 61.8929 39.3043 64 34 64H20C18.4087 64 16.8826 63.3679 15.7574 62.2426C14.6321 61.1174 14 59.5913 14 58V26C14 24.4087 14.6321 22.8826 15.7574 21.7574C16.8826 20.6321 18.4087 20 20 20Z" fill="#C4A3FC"/>
+  <path d="M34 20C36.0543 20 38.0759 20.3167 40 20.9219V24C40 29.3043 37.8933 34.3918 34.1426 38.1426C30.3918 41.8933 25.3043 44 20 44H14V26C14 24.4087 14.6326 22.883 15.7578 21.7578C16.883 20.6326 18.4087 20 20 20H34Z" fill="#AF8EF0"/>
 </svg>

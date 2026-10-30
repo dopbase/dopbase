@@ -1,10 +1,8 @@
 <p align="center">
   <a href="https://dopbase.com">
-    <img src="./public/logo.svg" alt="Dopbase logo" width="180" />
+    <img src="./public/logo-github.svg" alt="Dopbase" width="300" />
   </a>
 </p>
-
-<h1 align="center">Dopbase</h1>
 
 <p align="center">
   Open-source, self-hosted secrets management in a single file.<br />
