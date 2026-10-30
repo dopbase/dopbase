@@ -29,10 +29,7 @@ const consoleLabel = computed(() =>
     <!-- Narrow screens: top bar with the navigation behind a menu button -->
     <header
       class="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-panel pl-4 pr-1 lg:hidden">
-      <div
-        class="flex h-7 w-7 items-center justify-center rounded-control border border-accent/40 bg-accent-soft text-accent-strong">
-        <DopbaseIcon class="h-4 w-4" />
-      </div>
+      <DopbaseIcon class="h-6 w-6 shrink-0" />
       <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
       <button
         type="button"
@@ -55,10 +52,7 @@ const consoleLabel = computed(() =>
       class="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-line bg-panel lg:flex">
       <div
         class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-control border border-accent/40 bg-accent-soft text-accent-strong">
-          <DopbaseIcon class="h-5 w-5" />
-        </div>
+        <DopbaseIcon class="h-7 w-7 shrink-0" />
         <div class="leading-tight">
           <p class="font-mono text-sm font-semibold text-ink-strong">Dopbase</p>
           <p class="text-xs text-ink-muted">{{ consoleLabel }}</p>

@@ -16,10 +16,7 @@ const { endpoint } = useServerStatus();
     <header
       class="flex items-center justify-between gap-4 border-b border-line-soft px-5 py-4 sm:px-8">
       <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg border border-accent/40 bg-accent-soft text-accent-strong">
-          <DopbaseIcon class="h-5 w-5" />
-        </div>
+        <DopbaseIcon class="h-7 w-7 shrink-0" />
         <span class="font-mono text-sm font-semibold text-ink-strong">
           Dopbase
         </span>
