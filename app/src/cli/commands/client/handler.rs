@@ -6,6 +6,7 @@ use crate::{
   },
   config::{ServerConfig, ServerOverrides},
   constants::{
+    api as api_paths,
     config::{DEFAULT_PUBLIC_URL, ENV_SERVER_URL},
     tokens::{
       ADMIN_SESSION_PREFIX, AGENT_TOKEN_PREFIX, PERSONAL_TOKEN_PREFIX, RUNNER_TOKEN_PREFIX,
@@ -14,6 +15,7 @@ use crate::{
   daemon::ManagedDaemonState,
 };
 use anyhow::{Result, bail};
+use reqwest::Method;
 use serde_json::{Value, json};
 use std::{env, path::Path, time::Duration};
 
@@ -201,11 +203,20 @@ pub(crate) async fn show_status(
   let server = local_config::resolve(argument, data_dir)?;
   let credential = client::credential(&server)?;
   let connected = server_is_connected(&server).await;
-  let value = status_document(&server, &credential, connected);
+  let identity = credential_identity(&credential);
+  let role = if connected && has_account(identity) {
+    Some(fetch_role(&server, &credential).await)
+  } else {
+    None
+  };
+  let role_name = match &role {
+    Some(RoleLookup::Found(name)) => Some(name.as_str()),
+    _ => None,
+  };
+  let value = status_document(&server, &credential, connected, role_name);
   if json_output {
     output::print_json(&value)?;
   } else {
-    let identity = credential_identity(&credential);
     let email = match (&credential.email, credential.source, identity) {
       (Some(email), _, _) => email.as_str(),
       (None, CredentialSource::EncryptedSession, "admin") => {
@@ -227,13 +238,49 @@ pub(crate) async fn show_status(
       ("Server:", server.url.clone()),
       ("Server status:", server_status.into()),
       ("Server source:", server.source.as_str().into()),
-      ("Authentication:", credential.source.as_str().into()),
-      ("Identity:", human_identity(identity).into()),
+      (
+        "Authentication:",
+        human_authentication(credential.source, identity).into(),
+      ),
+      ("Role:", human_role(identity, connected, role.as_ref())),
       ("Email:", email.into()),
       ("Environment:", environment),
     ]);
   }
   Ok(())
+}
+
+enum RoleLookup {
+  Found(String),
+  SessionExpired,
+  Unavailable,
+}
+
+/// Runner tokens and missing or unrecognized credentials have no account
+/// behind them to ask about.
+fn has_account(identity: &str) -> bool {
+  matches!(identity, "admin" | "human" | "personal_token" | "ai_agent")
+}
+
+/// Asks the server for the role of the account behind the credential, such
+/// as `Member` or `Root`. The token prefix alone can't tell.
+async fn fetch_role(
+  server: &local_config::ResolvedServer,
+  credential: &Credential,
+) -> RoleLookup {
+  let Ok(api) = client::ApiClient::new(server, credential.token.clone()) else {
+    return RoleLookup::Unavailable;
+  };
+  let path = api_paths::users::access("me");
+  let request = api.request(Method::GET, &path, None);
+  match tokio::time::timeout(Duration::from_secs(3), request).await {
+    Ok(Ok(data)) => match data.get("roleName").and_then(Value::as_str) {
+      Some(name) if !name.is_empty() => RoleLookup::Found(name.to_owned()),
+      _ => RoleLookup::Unavailable,
+    },
+    Ok(Err(error)) if client::is_authentication_error(&error) => RoleLookup::SessionExpired,
+    _ => RoleLookup::Unavailable,
+  }
 }
 
 async fn server_is_connected(server: &local_config::ResolvedServer) -> bool {
@@ -264,6 +311,7 @@ pub fn status_document(
   server: &local_config::ResolvedServer,
   credential: &Credential,
   connected: bool,
+  role: Option<&str>,
 ) -> Value {
   json!({
     "config_file": server.config_path,
@@ -271,6 +319,7 @@ pub fn status_document(
     "server_source": server.source.as_str(),
     "authentication": credential.source.as_str(),
     "identity": credential_identity(credential),
+    "role": role,
     "email": credential.email,
     "environment": server.default_environment(),
     "server_status": if connected { "connected" } else { "offline" },
@@ -297,10 +346,39 @@ fn credential_identity(credential: &Credential) -> &'static str {
   }
 }
 
-fn human_identity(identity: &str) -> &str {
-  match identity {
-    "ai_agent" => "AI agent",
-    "personal_token" => "personal token (run dopbase access to see what it reaches)",
-    other => other,
+/// How the CLI signed in, and where the credential came from.
+fn human_authentication(
+  source: CredentialSource,
+  identity: &str,
+) -> &'static str {
+  match (source, identity) {
+    (CredentialSource::EncryptedSession, "admin") => "dopbase login (saved session)",
+    (CredentialSource::EncryptedSession, "runner") => "runner token (saved)",
+    (CredentialSource::EncryptedSession, "personal_token") => "personal token (saved)",
+    (CredentialSource::EncryptedSession, "ai_agent") => "AI agent token (saved)",
+    (CredentialSource::Environment, "human") => "session token (DOPBASE_TOKEN)",
+    (CredentialSource::Environment, "runner") => "runner token (DOPBASE_TOKEN)",
+    (CredentialSource::Environment, "personal_token") => "personal token (DOPBASE_TOKEN)",
+    (CredentialSource::Environment, "ai_agent") => "AI agent token (DOPBASE_TOKEN)",
+    (CredentialSource::Environment, _) => "unrecognized token (DOPBASE_TOKEN)",
+    _ => "none (run dopbase login)",
+  }
+}
+
+fn human_role(
+  identity: &str,
+  connected: bool,
+  role: Option<&RoleLookup>,
+) -> String {
+  match (identity, role) {
+    ("none", _) => "none".into(),
+    ("runner", _) => "none (runner tokens act for one environment, not a person)".into(),
+    ("personal_token" | "ai_agent", Some(RoleLookup::Found(name))) => {
+      format!("{name} (the token may reach less; run dopbase access)")
+    }
+    (_, Some(RoleLookup::Found(name))) => name.clone(),
+    (_, Some(RoleLookup::SessionExpired)) => "unknown (run dopbase login again)".into(),
+    _ if !connected => "unknown (server offline)".into(),
+    _ => "unknown".into(),
   }
 }
