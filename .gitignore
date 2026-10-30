@@ -10,4 +10,3 @@ package.dev.json
 target/
 .claude/
 .vscode/
-app/docs
