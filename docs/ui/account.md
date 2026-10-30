@@ -8,7 +8,9 @@ description: "Manage your profile, password, and personal tokens, view session s
 The Account page lets you manage your personal profile, update your password,
 and view your active session details.
 
-Open **Account** from the user menu in the sidebar or navigation bar.
+Click your email at the bottom of the sidebar to open the account menu, then
+choose **Account**. **Personal tokens** in the same menu jumps to that section
+of the page.
 
 ## Profile overview
 

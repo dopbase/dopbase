@@ -5,12 +5,12 @@ description: "Review what happened on your Dopbase server with the audit log and
 
 # Audit and instance status
 
-Audit shows recorded activity. Instance shows server health and an overview
-of what is stored on your instance.
+Audit log shows recorded activity. Status shows server health and an overview
+of what is stored on your instance. Both sit in the sidebar.
 
 ## The audit log
 
-Everyone can open the Audit page. What it lists depends on your role:
+Everyone can open the Audit log page. What it lists depends on your role:
 
 | Role             | Sees                                                            |
 | ---------------- | --------------------------------------------------------------- |
@@ -42,7 +42,8 @@ one specific value, filter by environment and action rather than scrolling.
 
 ## Instance status
 
-The Instance page reports:
+The Status page lives at `/status`, and old `/instance` links still open it.
+It reports:
 
 - The running Dopbase version
 - How long the server has been running and when the summary was updated
@@ -59,7 +60,7 @@ Configuration still loads at startup and requires a restart to change. See
 
 ## Danger Zone
 
-Root also sees **Danger Zone** on the Instance page. Its factory-reset action
+Root also sees **Danger Zone** on the Status page. Its factory-reset action
 permanently removes accounts, project data, audit history, and server backups.
 Reading the status summary does not reset anything.
 

@@ -17,7 +17,8 @@ accounts.
 
 ## Navigating to Backups
 
-From anywhere in the Admin UI, click **Backups** in the top navigation bar.
+From anywhere in the Admin UI, click **Backups** under **Instance** in the
+sidebar. Only root sees it.
 
 The Backups dashboard displays:
 

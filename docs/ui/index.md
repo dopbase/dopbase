@@ -33,6 +33,17 @@ commands. CLI changes appear in the UI.
 | [Roles](./roles)                                     | Create custom roles, as root                                                     |
 | [Account settings](./account)                        | Manage profile details, update passwords, and view session status                |
 
+## Finding your way around
+
+The sidebar groups pages into **Workspace** (Projects, Audit log), **People &
+access** (Users, Groups, Roles) and **Instance** (Status, Backups, Single
+sign-on). It only lists pages your role can open, and a group with none of
+them doesn't show. If you follow a link to a page your role can't open, the
+console says which capability it needs instead of sending you somewhere else.
+
+Your email and role name sit at the bottom of the sidebar. Click them for
+Account, Personal tokens, the docs and Sign out.
+
 ## On phones and tablets
 
 The UI works on screens down to phone width. Below 1024 pixels the sidebar

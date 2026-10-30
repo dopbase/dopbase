@@ -121,28 +121,29 @@ Its Foundations page uses the same tokens as `src/style.css`, and its
 Components page holds the shared set every screen is built from. Each Figma
 component maps to one component in code:
 
-| Figma component                                | Code                                                 | Status                    |
-| ---------------------------------------------- | ---------------------------------------------------- | ------------------------- |
-| Button                                         | `DbButton`                                           | Exists; restyle to Figma  |
-| IconButton                                     | `DbButton` with an icon slot                         | To build                  |
-| Badge                                          | `DbBadge`                                            | Exists                    |
-| LevelBadge, RoleChip                           | `DbLevelBadge`, `DbRoleChip`                         | To build                  |
-| EnvPill, EnvSwitcher, EnvMenu                  | `DbEnvPill`, `DbEnvSwitcher`, `DbEnvMenu`            | To build                  |
-| Kbd, Avatar                                    | `DbKbd`, `DbAvatar`                                  | To build                  |
-| Input, Select, Checkbox, Switch                | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`      | Exist; restyle to Figma   |
-| SearchField                                    | `DbInput` with a search icon                         | To build                  |
-| RadioCard, Segment, Tab, FilterChip            | `DbRadioCard`, `DbSegment`, `DbTabs`, `DbFilterChip` | To build                  |
-| SelectMenu, SelectOption, Combobox             | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`       | To build                  |
-| Menu, MenuItem, row ⋯ menu                     | `DbMenu`, `DbMenuItem`, `DbRowMenu`                  | To build                  |
-| Toast                                          | `DbToast` and a `useToast` store                     | To build                  |
-| Alert                                          | `DbAlert`                                            | Exists; add the warn tone |
-| EmptyState                                     | `DbEmptyState`                                       | Exists                    |
-| CopyField, CodeSnippet                         | `DbCopyButton`, `DbCode`                             | Exist; restyle to Figma   |
-| Table rows on every screen                     | `DbTable`                                            | To build                  |
-| Modal, Drawer, mobile Sheet                    | `DbModal`, `DbSheet`                                 | Exist                     |
-| PageHeader, Card, Stat                         | `DbPageHeader`, `DbCard`, `DbStat`                   | To build                  |
-| Sidebar, SidebarItem, AccountMenu, ProjectTabs | `src/layouts`                                        | Rebuild with the shell    |
-| ProjectTreeRow, EnvTreeRow, ProjectAccordion   | `src/pages/Projects/components`                      | Rebuild with Projects     |
+| Figma component                              | Code                                                 | Status                    |
+| -------------------------------------------- | ---------------------------------------------------- | ------------------------- |
+| Button                                       | `DbButton`                                           | Exists; restyle to Figma  |
+| IconButton                                   | `DbButton` with an icon slot                         | To build                  |
+| Badge                                        | `DbBadge`                                            | Exists                    |
+| LevelBadge, RoleChip                         | `DbLevelBadge`, `DbRoleChip`                         | To build                  |
+| EnvPill, EnvSwitcher, EnvMenu                | `DbEnvPill`, `DbEnvSwitcher`, `DbEnvMenu`            | To build                  |
+| Kbd, Avatar                                  | `DbKbd`, `DbAvatar`                                  | To build                  |
+| Input, Select, Checkbox, Switch              | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`      | Exist; restyle to Figma   |
+| SearchField                                  | `DbInput` with a search icon                         | To build                  |
+| RadioCard, Segment, Tab, FilterChip          | `DbRadioCard`, `DbSegment`, `DbTabs`, `DbFilterChip` | To build                  |
+| SelectMenu, SelectOption, Combobox           | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`       | To build                  |
+| Menu, MenuItem, row ⋯ menu                   | `DbMenu`, `DbMenuItem`, `DbRowMenu`                  | To build                  |
+| Toast                                        | `DbToast` and a `useToast` store                     | To build                  |
+| Alert                                        | `DbAlert`                                            | Exists; add the warn tone |
+| EmptyState                                   | `DbEmptyState`                                       | Exists                    |
+| CopyField, CodeSnippet                       | `DbCopyButton`, `DbCode`                             | Exist; restyle to Figma   |
+| Table rows on every screen                   | `DbTable`                                            | To build                  |
+| Modal, Drawer, mobile Sheet                  | `DbModal`, `DbSheet`                                 | Exist                     |
+| PageHeader, Card, Stat                       | `DbPageHeader`, `DbCard`, `DbStat`                   | To build                  |
+| Sidebar, SidebarItem, AccountMenu            | `DashboardNav`, `AccountMenu` in `src/layouts`       | Exist                     |
+| ProjectTabs                                  | `src/pages/Projects/components`                      | Rebuild with Projects     |
+| ProjectTreeRow, EnvTreeRow, ProjectAccordion | `src/pages/Projects/components`                      | Rebuild with Projects     |
 
 Sidebar and project pieces know about Dopbase, so they live with their layout or
 page rather than in `src/components/ui`.
@@ -170,7 +171,8 @@ file here. Delete an icon file once nothing imports it.
 
 ## Routes
 
-The route table moves to the shape the design uses. Project pages are addressed
+`/status` (the Status page) replaced `/instance`, which now redirects to it.
+Project pages move next, with the project page rebuild. They will be addressed
 by project name and environment name, and each project tab gets its own path:
 
 ```text
@@ -181,15 +183,30 @@ by project name and environment name, and each project tab gets its own path:
 /projects/:project/:env/activity
 /projects/:project/access
 /projects/:project/settings
-/status
 ```
 
-Every old path keeps working through a redirect: `/projects/p/:projectRef`,
-`/projects/p/:projectRef/e/:environmentId` and its `tokens` and `import`
-children, `/projects/p/:projectRef/access`, and `/instance`. The selection
-still lives only in the URL. The sidebar and the router guards read the same
-capability map, so a link to a page the viewer can't open shows the No access
-screen instead of a silent redirect.
+The old project paths will keep working through redirects:
+`/projects/p/:projectRef`, `/projects/p/:projectRef/e/:environmentId` and its
+`tokens` and `import` children, and `/projects/p/:projectRef/access`. The
+selection still lives only in the URL.
+
+## Capability map
+
+`src/navigation/access-map.ts` says which capabilities open each signed-in
+page. A page opens for anyone holding one of them; a page with none listed, or
+a route that isn't in the map, opens for every signed-in account. Two things
+read it:
+
+- The sidebar. `visibleSections()` keeps the pages the viewer can open and
+  drops a section with nothing left in it.
+- The router guard. A page the viewer can't open renders the No access screen
+  at the address they asked for, so a shared link explains what's missing
+  instead of landing on Projects.
+
+To gate a new page, add it to `pages` with its capabilities, and to
+`sidebarSections` if it belongs in the nav. Don't add `meta` to the route for
+access: the guard ignores it. The server still refuses anything the map lets
+through, so the map only decides what the console offers.
 
 ## Verification
 
