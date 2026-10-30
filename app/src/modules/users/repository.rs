@@ -2,20 +2,21 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::{constants::tokens::GRANT_ID_PREFIX, services::token};
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id";
 
-/// id, email, role, created_at, updated_at, has_password, sso_linked,
-/// owner_id.
-pub type UserRow = (
-  String,
-  String,
-  String,
-  String,
-  String,
-  bool,
-  bool,
-  Option<String>,
-);
+#[derive(sqlx::FromRow)]
+pub struct UserRow {
+  pub id: String,
+  pub email: String,
+  pub role: String,
+  pub role_id: Option<String>,
+  pub role_name: String,
+  pub created_at: String,
+  pub updated_at: String,
+  pub has_password: bool,
+  pub sso_linked: bool,
+  pub owner_id: Option<String>,
+}
 
 /// Root first, then by role rank, each by email.
 pub async fn list(pool: &SqlitePool) -> Result<Vec<UserRow>, sqlx::Error> {
@@ -30,28 +31,21 @@ pub async fn find(
   pool: &SqlitePool,
   id: &str,
 ) -> Result<Option<UserRow>, sqlx::Error> {
-  sqlx::query_as(&format!("SELECT {USER_COLUMNS} FROM admins a WHERE a.id=?"))
-    .bind(id)
-    .fetch_optional(pool)
-    .await
+  sqlx::query_as(&format!(
+    "SELECT {USER_COLUMNS} FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id=?"
+  ))
+  .bind(id)
+  .fetch_optional(pool)
+  .await
 }
 
-/// The email and role of an account.
+/// The email, root flag, role id, and whether the role signs in with tokens
+/// only, of an account.
 pub async fn account(
   pool: &SqlitePool,
   id: &str,
-) -> Result<Option<(String, String)>, sqlx::Error> {
-  sqlx::query_as("SELECT email,role FROM admins WHERE id=?")
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-}
-
-pub async fn role(
-  pool: &SqlitePool,
-  id: &str,
-) -> Result<Option<String>, sqlx::Error> {
-  sqlx::query_scalar("SELECT role FROM admins WHERE id=?")
+) -> Result<Option<(String, bool, Option<String>, bool)>, sqlx::Error> {
+  sqlx::query_as("SELECT a.email, a.is_root = 1, a.role_id, COALESCE(r.sign_in = 'token_only', 0) FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id=?")
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -91,42 +85,26 @@ pub async fn insert(
   Ok(())
 }
 
-/// Leaves the password unchanged when `password_hash` is `None`. Fails with
-/// a unique violation when the email is taken.
+/// Leaves the password unchanged when `password_hash` is `None`, and the
+/// role when `role` is `None`; `role` is the legacy role name and the role
+/// id. Fails with a unique violation when the email is taken.
 pub async fn update(
   conn: &mut SqliteConnection,
   id: &str,
   email: &str,
   password_hash: Option<&str>,
-  role: &str,
-  role_id: Option<&str>,
+  role: Option<(&str, &str)>,
   now: &str,
 ) -> Result<(), sqlx::Error> {
-  match password_hash {
-    Some(hash) => {
-      sqlx::query(
-        "UPDATE admins SET email=?,password_hash=?,role=?,role_id=?,updated_at=? WHERE id=?",
-      )
-      .bind(email)
-      .bind(hash)
-      .bind(role)
-      .bind(role_id)
-      .bind(now)
-      .bind(id)
-      .execute(conn)
-      .await?
-    }
-    None => {
-      sqlx::query("UPDATE admins SET email=?,role=?,role_id=?,updated_at=? WHERE id=?")
-        .bind(email)
-        .bind(role)
-        .bind(role_id)
-        .bind(now)
-        .bind(id)
-        .execute(conn)
-        .await?
-    }
-  };
+  sqlx::query("UPDATE admins SET email=?,password_hash=COALESCE(?,password_hash),role=COALESCE(?,role),role_id=COALESCE(?,role_id),updated_at=? WHERE id=?")
+    .bind(email)
+    .bind(password_hash)
+    .bind(role.map(|(name, _)| name))
+    .bind(role.map(|(_, id)| id))
+    .bind(now)
+    .bind(id)
+    .execute(conn)
+    .await?;
   Ok(())
 }
 
@@ -219,4 +197,15 @@ pub async fn set_owner(
     .execute(conn)
     .await?;
   Ok(())
+}
+
+/// A role's id and whether its holders sign in with tokens only.
+pub async fn role_sign_in(
+  pool: &SqlitePool,
+  role_id: &str,
+) -> Result<Option<bool>, sqlx::Error> {
+  sqlx::query_scalar("SELECT sign_in = 'token_only' FROM roles WHERE id=?")
+    .bind(role_id)
+    .fetch_optional(pool)
+    .await
 }

@@ -86,7 +86,6 @@ export const router = createRouter({
       path: "/audit",
       name: "audit",
       component: () => import("~/pages/Audit/Audit.page.vue"),
-      meta: { capabilities: ["audit.read"] },
     },
     {
       path: "/instance",
@@ -103,6 +102,12 @@ export const router = createRouter({
       name: "users",
       component: () => import("~/pages/Users/Users.page.vue"),
       meta: { capabilities: ["users.view"] },
+    },
+    {
+      path: "/roles",
+      name: "roles",
+      component: () => import("~/pages/Roles/Roles.page.vue"),
+      meta: { capabilities: ["roles.manage"] },
     },
     {
       path: "/groups",

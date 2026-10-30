@@ -37,6 +37,9 @@ pub enum AuthIdentity {
     /// The accountable owner of an AI agent account. The agent never
     /// reaches more than its owner does.
     owner_id: Option<String>,
+    /// An audit token reads the audit log as its account would, and no
+    /// project data.
+    audit: bool,
   },
 }
 

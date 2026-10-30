@@ -324,3 +324,14 @@ pub async fn decide_device_request(
   .fetch_optional(conn)
   .await
 }
+
+/// What a role's personal tokens are for.
+pub async fn token_scope(
+  pool: &sqlx::SqlitePool,
+  role_id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+  sqlx::query_scalar("SELECT token_scope FROM roles WHERE id = ?")
+    .bind(role_id)
+    .fetch_optional(pool)
+    .await
+}

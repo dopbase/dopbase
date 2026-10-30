@@ -13,6 +13,7 @@ pub const PERSONAL_TOKEN_ID_PREFIX: &str = "ptk_";
 /// Personal tokens of people and AI agent accounts.
 pub const PERSONAL_TOKEN_PREFIX: &str = "dpp_";
 pub const PROJECT_ID_PREFIX: &str = "prj_";
+pub const ROLE_ID_PREFIX: &str = "rol_";
 pub const RUNNER_TOKEN_ID_PREFIX: &str = "tok_";
 pub const RUNNER_TOKEN_PREFIX: &str = "dbs_";
 pub const SESSION_ID_PREFIX: &str = "ses_";

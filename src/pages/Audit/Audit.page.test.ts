@@ -2,6 +2,10 @@
 import { createApp, h, nextTick } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("~/stores/auth.store", () => ({
+  useAuthStore: () => ({ can: () => true }),
+}));
+
 const { controller } = await vi.hoisted(async () => {
   const { reactive, ref } = await import("vue");
   return {

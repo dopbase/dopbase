@@ -37,6 +37,8 @@ pub enum ScopeType {
   All,
   Project,
   Environment,
+  /// The audit log, for audit tokens. Never a grant's scope.
+  Audit,
 }
 
 impl ScopeType {
@@ -45,6 +47,7 @@ impl ScopeType {
       Self::All => "all",
       Self::Project => "project",
       Self::Environment => "environment",
+      Self::Audit => "audit",
     }
   }
 
@@ -53,6 +56,7 @@ impl ScopeType {
       "all" => Some(Self::All),
       "project" => Some(Self::Project),
       "environment" => Some(Self::Environment),
+      "audit" => Some(Self::Audit),
       _ => None,
     }
   }

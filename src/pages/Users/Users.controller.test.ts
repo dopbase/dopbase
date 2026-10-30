@@ -4,6 +4,7 @@ import { useUsersController } from "./Users.controller";
 import * as usersApi from "~/services/users.api";
 import * as tokensApi from "~/services/personal-tokens.api";
 import * as authApi from "~/services/auth.api";
+import * as rolesApi from "~/services/roles.api";
 import { ApiError } from "~/services/http.client";
 
 vi.mock("vue", async (importOriginal) => ({
@@ -19,6 +20,7 @@ vi.mock("vue-router", () => ({
 vi.mock("~/services/users.api");
 vi.mock("~/services/personal-tokens.api");
 vi.mock("~/services/auth.api");
+vi.mock("~/services/roles.api");
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -34,6 +36,7 @@ beforeEach(() => {
       ssoLinked: false,
     },
   ]);
+  vi.mocked(rolesApi.fetchRoles).mockResolvedValue([]);
   vi.mocked(authApi.reauthenticate).mockReset();
 });
 
@@ -57,6 +60,64 @@ function agentFixture({
 }
 
 describe("useUsersController", () => {
+  it("offers the roles you may give people and creates users with one", async () => {
+    const base = {
+      description: "",
+      builtin: true,
+      capabilities: [],
+      maxLevel: "read" as const,
+      requiresOwner: false,
+      tokenScope: "data" as const,
+      tokenMaxLevel: "read" as const,
+      tokenDefaultTtlDays: 30,
+      tokenMaxTtlDays: 365,
+      rank: 10,
+      members: 0,
+      createdAt: "",
+      updatedAt: "",
+    };
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValueOnce([
+      {
+        ...base,
+        id: "rol_member",
+        name: "Member",
+        signIn: "interactive",
+        assignable: true,
+      },
+      {
+        ...base,
+        id: "rol_auditor",
+        name: "Auditor",
+        signIn: "interactive",
+        assignable: false,
+      },
+      {
+        ...base,
+        id: "rol_ai_agent",
+        name: "AI agent",
+        signIn: "token_only",
+        assignable: true,
+      },
+    ]);
+    vi.mocked(usersApi.createUser).mockResolvedValueOnce(
+      (await usersApi.fetchUsers())[0],
+    );
+    const c = useUsersController();
+    await c.actions.load();
+    expect(c.state.roleOptions.map((option) => option.value)).toEqual([
+      "rol_member",
+    ]);
+    c.actions.openCreate();
+    c.state.email = "new@example.com";
+    c.state.password = "correct-horse-123";
+    await c.actions.save();
+    expect(usersApi.createUser).toHaveBeenCalledWith(
+      "new@example.com",
+      "correct-horse-123",
+      { roleId: "rol_member" },
+    );
+  });
+
   it("loads non-revoked agent tokens for the agents list", async () => {
     const agent = agentFixture({ id: "sa_agent_1", name: "indexer-agent" });
     const unavailableAgent = agentFixture({

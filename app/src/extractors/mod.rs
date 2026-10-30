@@ -175,9 +175,10 @@ impl FromRequestParts<AppState> for AuthIdentity {
         .await
         .map_err(HttpError::from)?;
       // Audit tokens reach no project data.
+      let audit = token.scope_type == "audit";
       let (scope, level) = match authx::Scope::from_row(&token.scope_type, token.scope_id) {
-        Some(scope) => (scope, authx::Level::parse(&token.level).unwrap_or_default()),
-        None => (authx::Scope::All, authx::Level::None),
+        Some(scope) if !audit => (scope, authx::Level::parse(&token.level).unwrap_or_default()),
+        _ => (authx::Scope::All, authx::Level::None),
       };
       return Ok(AuthIdentity::Token {
         admin_id: token.admin_id,
@@ -188,6 +189,7 @@ impl FromRequestParts<AppState> for AuthIdentity {
         scope,
         level,
         owner_id: token.owner_id,
+        audit,
       });
     }
 

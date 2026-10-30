@@ -9,5 +9,6 @@ export * from "./tokens.api";
 export * from "./audit.api";
 export * from "./instance.api";
 export * from "./personal-tokens.api";
+export * from "./roles.api";
 export * from "./access.api";
 export * from "./health.api";

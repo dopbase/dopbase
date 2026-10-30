@@ -33,6 +33,7 @@ export type Capability =
   | "grants.all_projects"
   | "projects.create"
   | "audit.read"
+  | "audit.read_all"
   | "audit.verify"
   | "access.report"
   | "tokens.personal"
@@ -44,7 +45,8 @@ export type Capability =
   | "password.breakglass";
 
 export type PrincipalType = "user" | "group";
-export type ScopeType = "all" | "project" | "environment";
+/** `audit` is for audit tokens only, never a grant. */
+export type ScopeType = "all" | "project" | "environment" | "audit";
 
 export interface Grant {
   id: string;

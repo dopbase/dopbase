@@ -25,7 +25,8 @@ export interface CreatedPersonalToken {
 
 export interface CreatePersonalTokenRequest {
   name: string;
-  level: Level;
+  /** Audit tokens take none. */
+  level?: Level;
   scopeType?: ScopeType;
   /** Project id or name, or environment id. */
   scope?: string;

@@ -41,7 +41,9 @@ export function useAccountController() {
   const role = computed(() => auth.session?.role ?? "admin");
   const lastLoginAt = computed(() => auth.session?.lastLoginAt ?? null);
 
-  const formattedRole = computed(() => formatRole(role.value));
+  const formattedRole = computed(
+    () => auth.session?.roleName || formatRole(role.value),
+  );
 
   const formattedLastLogin = computed(() => {
     if (!lastLoginAt.value) return null;

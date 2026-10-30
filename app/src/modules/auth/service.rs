@@ -216,6 +216,13 @@ pub async fn session(
     response.password_confirmation = password_confirmation(state, admin_id, *role).await?;
     response.sso_confirmation =
       crate::modules::sso::service::confirmation_name(state, admin_id).await?;
+    if let AuthIdentity::Admin { access, .. } = identity
+      && let Some(role_id) = &access.role_id
+    {
+      response.token_scope = repository::token_scope(state.db.pool(), role_id)
+        .await?
+        .unwrap_or_else(|| "none".into());
+    }
     return Ok(response);
   }
   session_summary(identity)
@@ -240,6 +247,7 @@ fn session_summary(identity: &AuthIdentity) -> Result<SessionResponse, HttpError
       role_name: access.role_name.clone(),
       capabilities: access.capabilities().collect(),
       max_level: access.max_level,
+      token_scope: "none".into(),
       session_kind: *kind,
       recent_authentication: Utc::now() - *recent_auth_at
         <= Duration::minutes(RECENT_AUTHENTICATION_MINUTES),
