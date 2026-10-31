@@ -12,7 +12,7 @@ import { mountController } from "~/tests/mount-controller";
 vi.mock("~/services/secrets.api");
 vi.mock("~/services/auth.api");
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-let route: { params: { projectRef: string; environmentId: string } };
+let route: { params: { projectRef: string; environmentName: string } };
 vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => navigation,
@@ -37,10 +37,11 @@ beforeEach(() => {
   useReauthentication().dismiss();
   vi.resetAllMocks();
   route = reactive({
-    params: { projectRef: "project", environmentId: "env_1" },
+    params: { projectRef: "project", environmentName: "dev" },
   });
   useImportStore().begin({
     environmentId: "env_1",
+    environmentName: "dev",
     fileName: "test.env",
     entries: [{ key: "APP_SECRETS", value: "fixture-value" }],
     errors: [],
@@ -104,10 +105,11 @@ describe("import password confirmation", () => {
     await nextTick();
     if (action === "cancel") c.cancel();
     if (action === "unmount") unmount();
-    if (action === "environment") route.params.environmentId = "env_2";
+    if (action === "environment") route.params.environmentName = "staging";
     if (action === "draft")
       useImportStore().begin({
         environmentId: "env_1",
+        environmentName: "dev",
         fileName: "new.env",
         entries: [{ key: "OTHER", value: "new" }],
         errors: [],
@@ -147,7 +149,7 @@ describe("import password confirmation", () => {
       }),
     );
     const validating = c.validate();
-    route.params.environmentId = "env_2";
+    route.params.environmentName = "staging";
     finish(preview);
     await validating;
     expect(c.stage.value).toBe("review");

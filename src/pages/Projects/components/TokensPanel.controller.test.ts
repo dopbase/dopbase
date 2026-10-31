@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
-import { useTokensPanelController } from "./TokensPanel.controller";
+import {
+  describeExpiry,
+  useTokensPanelController,
+} from "./TokensPanel.controller";
 import * as tokensApi from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
@@ -62,6 +65,31 @@ describe("useTokensPanelController", () => {
     expect(c.created.value).toBeNull();
   });
 
+  it("still shows the plaintext when the environment changes mid-create", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+    let finish!: (value: {
+      token: typeof token;
+      plaintextToken: string;
+    }) => void;
+    vi.mocked(tokensApi.createToken).mockReturnValueOnce(
+      new Promise((resolve) => (finish = resolve)),
+    );
+    const environmentId = ref("env_1");
+    const c = mountController(() =>
+      useTokensPanelController(environmentId),
+    ).controller;
+    const pending = c.create("deploy");
+    environmentId.value = "env_2";
+    await nextTick();
+
+    finish({ token, plaintextToken: "dbs_secret" });
+    await pending;
+
+    // The token exists either way; this is the only chance to copy it.
+    expect(c.created.value?.plaintextToken).toBe("dbs_secret");
+    expect(c.creating.value).toBe(false);
+  });
+
   it("discards the plaintext when the panel unmounts", async () => {
     vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
     vi.mocked(tokensApi.createToken).mockResolvedValueOnce({
@@ -114,5 +142,70 @@ describe("useTokensPanelController", () => {
     await c.revoke(token);
     expect(tokensApi.revokeToken).toHaveBeenCalledWith("tok_1");
     await vi.waitFor(() => expect(c.tokens.value).toEqual([]));
+  });
+});
+
+describe("describeExpiry", () => {
+  const now = new Date("2026-10-01T00:00:00Z").getTime();
+
+  it.each([
+    [{ revokedAt: "2026-09-30T00:00:00Z" }, "Revoked", "crit", false],
+    [{ expiresAt: null }, "Never", "default", true],
+    [{ expiresAt: "2026-09-30T00:00:00Z" }, "Expired", "crit", false],
+    [{ expiresAt: "2026-10-01T12:00:00Z" }, "Expires in 1 day", "warn", true],
+    [{ expiresAt: "2026-10-04T00:00:00Z" }, "Expires in 3 days", "warn", true],
+  ] as const)("%j reads %s", (overrides, expires, tone, active) => {
+    expect(describeExpiry({ ...token, ...overrides }, now)).toEqual({
+      expires,
+      expiresTone: tone,
+      active,
+    });
+  });
+
+  it("shows the date when expiry is more than a week away", () => {
+    const result = describeExpiry(
+      { ...token, expiresAt: "2027-01-25T00:00:00Z" },
+      now,
+    );
+    expect(result.expiresTone).toBe("default");
+    expect(result.expires).toMatch(/2027/);
+  });
+});
+
+describe("useTokensPanelController rows", () => {
+  it("filters by name and says when a token was last used", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([
+      { ...token, id: "tok_1", name: "deploy-prod" },
+      {
+        ...token,
+        id: "tok_2",
+        name: "ci-staging",
+        lastUsedAt: new Date().toISOString(),
+      },
+    ]);
+    const c = makeController();
+    await vi.waitFor(() => expect(c.rows.value).toHaveLength(2));
+
+    expect(c.rows.value?.map((row) => row.lastUsed)).toEqual([
+      "Never",
+      "just now",
+    ]);
+    c.filter.value = "CI";
+    expect(c.rows.value?.map((row) => row.token.name)).toEqual(["ci-staging"]);
+  });
+
+  it("copies a token's name", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([token]);
+    const c = makeController();
+
+    await c.copyName(token);
+
+    expect(writeText).toHaveBeenCalledWith("deploy");
+    expect(c.copiedId.value).toBe("tok_1");
   });
 });

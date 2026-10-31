@@ -17,6 +17,7 @@ import {
   type EnvFileIssue,
 } from "~/utils/env-file";
 import { formatCountdown } from "~/utils/format";
+import { copyText } from "~/utils/clipboard";
 
 /** How long a revealed plaintext stays visible in component memory. */
 export const REVEAL_SECONDS = 30;
@@ -46,6 +47,20 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   let operationScope = new AbortController();
   let editorScope = new AbortController();
   let editorImportScope = new AbortController();
+
+  /** Narrows the table by key. Kept while switching environments. */
+  const filter = ref("");
+  const visibleSecrets = computed(() => {
+    const query = filter.value.trim().toLowerCase();
+    if (!secrets.value || !query) return secrets.value;
+    return secrets.value.filter((secret) =>
+      secret.key.toLowerCase().includes(query),
+    );
+  });
+
+  /** The key whose value was just copied, for a short confirmation. */
+  const copiedKey = ref<string | null>(null);
+  let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   const revealedKey = ref<string | null>(null);
   const revealedValue = ref<string | null>(null);
@@ -108,11 +123,15 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
       editorScope = new AbortController();
       hideRevealed();
       wipeEditor();
+      // Drop the old environment's rows so nothing acts on their keys here.
+      secrets.value = null;
+      actionError.value = null;
       void load(target);
     },
     { immediate: true },
   );
   onUnmounted(() => {
+    if (copiedTimer) clearTimeout(copiedTimer);
     loadRequest?.abort();
     operationScope.abort();
     editorScope.abort();
@@ -165,6 +184,34 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     } catch (cause) {
       if (signal.aborted) return;
       reportActionError(cause, "Could not reveal the secret.");
+    }
+  }
+
+  /**
+   * Copies a value without showing it. It reads the value the same way
+   * Reveal does, so it asks for the password when needed and is recorded
+   * in the audit log.
+   */
+  async function copyValue(key: string): Promise<void> {
+    const target = environmentId.value;
+    const signal = operationScope.signal;
+    actionError.value = null;
+    try {
+      await runWithReauth(async () => {
+        const revealed = await secretsApi.revealSecret(target, key);
+        if (signal.aborted || environmentId.value !== target) return;
+        if (!(await copyText(revealed.value))) {
+          actionError.value =
+            "The browser blocked the copy. Reveal the value and copy it from there.";
+          return;
+        }
+        copiedKey.value = key;
+        if (copiedTimer) clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => (copiedKey.value = null), 2000);
+      }, signal);
+    } catch (cause) {
+      if (signal.aborted) return;
+      reportActionError(cause, "Could not copy the secret.");
     }
   }
 
@@ -412,6 +459,10 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     actionError,
     /** Refetches the metadata listing (e.g. after a full-page import). */
     reload: load,
+    filter,
+    visibleSecrets,
+    copiedKey,
+    copyValue,
     revealedKey,
     revealedValue,
     revealCountdown,

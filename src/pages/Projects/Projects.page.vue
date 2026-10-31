@@ -1,303 +1,215 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import { useProjectsController } from "./Projects.controller";
-import ProjectRail from "./components/ProjectRail.vue";
-import SecretsPanel from "./components/SecretsPanel.vue";
-import TokensPanel from "./components/TokensPanel.vue";
+import ProjectTree from "./components/ProjectTree.vue";
 import NameDialog from "./components/NameDialog.vue";
 import { DashboardLayout } from "~/layouts";
 import {
-  DbBadge,
+  DbAlert,
   DbButton,
+  DbConfirmDialog,
   DbCopyButton,
   DbEmptyState,
-  DbSheet,
+  DbSearchField,
   DbSkeleton,
 } from "~/components/ui";
-import {
-  BoxIcon,
-  ChevronDownIcon,
-  FolderIcon,
-  LayersIcon,
-  LockIcon,
-} from "~/assets/icons";
+import { FolderIcon, PlusIcon, TerminalIcon } from "~/assets/icons";
 
 /**
- * Projects is the authenticated project and environment screen.
- *
- * Left: project/environment keyline rail. Right: the selected
- * environment's secrets or runner tokens. Empty states explain the
- * project/environment model and offer the primary actions.
- *
- * Below `lg` the rail folds away: a switcher row names the current
- * project and environment and opens the same rail in a sheet, which
- * closes once an environment is chosen.
+ * Projects — every project the viewer reaches, as a tree. Opening a
+ * project lists its environments with protection, the viewer's level and
+ * the last change; clicking an environment opens its secrets.
  */
 const controller = useProjectsController();
-const showCreateProject = ref(false);
-const railOpen = ref(false);
-// Destructure so refs auto-unwrap in the template.
 const {
   projects,
-  project,
-  selectedEnvironment,
-  activeTab,
-  selectProject,
+  loadError,
+  filter,
+  rows,
   canCreateProjects,
+  nameDialog,
+  nameDialogCopy,
+  deleting,
+  deleteCounts,
+  deleteLoading,
+  deleteError,
 } = controller;
 
-watch(
-  () => selectedEnvironment.value?.id,
-  () => {
-    railOpen.value = false;
-  },
-);
+const CREATE_COMMAND = "dopbase project create payments";
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="flex min-h-[calc(100svh-3rem)] lg:min-h-svh">
-      <ProjectRail
-        class="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r border-line bg-panel/60 lg:flex"
-        :controller="controller" />
-
-      <section class="min-w-0 flex-1">
-        <!-- Narrow screens: the rail lives behind this switcher -->
-        <div
-          v-if="projects && projects.length > 0"
-          class="border-b border-line px-2 py-1 lg:hidden">
-          <button
-            type="button"
-            class="flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-control px-2 font-mono text-sm text-ink-strong transition-colors hover:bg-raised"
-            :aria-expanded="railOpen"
-            data-testid="project-switcher"
-            @click="railOpen = true">
-            <FolderIcon class="h-4 w-4 shrink-0 text-ink-faint" />
-            <span class="truncate">
-              <template v-if="project">
-                {{ project.name
-                }}<template v-if="selectedEnvironment">
-                  <span class="text-ink-faint"> / </span
-                  >{{ selectedEnvironment.name }}</template
-                >
-              </template>
-              <template v-else>Choose project</template>
-            </span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-ink-faint" />
-          </button>
-        </div>
-
-        <!-- No projects yet: explain the model -->
-        <div v-if="projects && projects.length === 0" class="p-4 sm:p-10">
-          <DbEmptyState
-            :title="
-              canCreateProjects
-                ? 'No projects yet'
-                : 'No projects shared with you'
-            "
-            description="A project is one application or service. Each project holds environments like development, staging, and production, and every environment stores its own encrypted secret values.">
-            <template #icon>
-              <BoxIcon class="h-5 w-5" />
+    <div class="page-width py-6 lg:py-7">
+      <header class="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 class="text-lg font-semibold text-ink-strong">Projects</h1>
+          <p class="mt-1 text-sm text-ink-muted">
+            <template v-if="projects && projects.length === 0">
+              A project holds the environments and secrets for one app or
+              service.
             </template>
-            <template v-if="canCreateProjects" #actions>
-              <DbButton variant="primary" @click="showCreateProject = true">
-                Create project
-              </DbButton>
+            <template v-else>
+              Every project you can reach. Open one to see its environments and
+              your access in each.
             </template>
-          </DbEmptyState>
+          </p>
         </div>
+        <DbButton
+          v-if="canCreateProjects && projects && projects.length > 0"
+          variant="primary"
+          data-testid="new-project"
+          @click="nameDialog = { kind: 'new-project' }">
+          <PlusIcon class="h-4 w-4" />
+          New project
+        </DbButton>
+      </header>
 
-        <!-- Loading projects skeleton -->
-        <div
-          v-else-if="!projects"
-          class="flex flex-col"
-          data-testid="projects-page-skeleton">
-          <!-- Header skeleton -->
+      <div v-if="loadError" class="mb-4 flex flex-col items-start gap-3">
+        <DbAlert>{{ loadError }}</DbAlert>
+        <DbButton size="sm" variant="secondary" @click="controller.load">
+          Try again
+        </DbButton>
+      </div>
+
+      <!-- Loading -->
+      <div
+        v-if="!projects && !loadError"
+        class="flex flex-col gap-4"
+        data-testid="projects-skeleton">
+        <DbSkeleton class="h-9 w-[280px] rounded-control" />
+        <div class="overflow-hidden rounded-card border border-line">
           <div
-            class="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
+            v-for="i in 5"
+            :key="i"
+            class="flex h-10 items-center gap-2 border-t border-line bg-raised px-3 first:border-t-0">
+            <DbSkeleton class="h-4 w-4 rounded" />
             <DbSkeleton class="h-4 w-40" />
-            <DbSkeleton class="h-7 w-36 rounded-control" />
-          </div>
-          <!-- Body skeleton -->
-          <div class="p-4 sm:p-6">
-            <div class="mb-4 flex items-center justify-between gap-4">
-              <DbSkeleton class="h-8 w-64 rounded-control" />
-              <div class="flex gap-2">
-                <DbSkeleton class="h-8 w-24 rounded-control" />
-                <DbSkeleton class="h-8 w-24 rounded-control" />
-              </div>
-            </div>
-            <div
-              class="overflow-x-auto rounded-card border border-line bg-panel">
-              <table class="min-w-full text-left text-sm">
-                <thead>
-                  <tr class="border-b border-line">
-                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-16" /></th>
-                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-16" /></th>
-                    <th class="px-4 py-2.5"><DbSkeleton class="h-3 w-20" /></th>
-                    <th class="px-4 py-2.5 text-right">
-                      <DbSkeleton class="ml-auto h-3 w-16" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="i in 5"
-                    :key="i"
-                    class="border-b border-line-soft last:border-b-0">
-                    <td class="px-4 py-3"><DbSkeleton class="h-4 w-36" /></td>
-                    <td class="px-4 py-3">
-                      <DbSkeleton class="h-4 w-10 rounded-control" />
-                    </td>
-                    <td class="px-4 py-3"><DbSkeleton class="h-4 w-20" /></td>
-                    <td class="px-4 py-3 text-right">
-                      <div class="flex items-center justify-end gap-1">
-                        <DbSkeleton class="h-6 w-16 rounded-control" />
-                        <DbSkeleton class="h-6 w-6 rounded-control" />
-                        <DbSkeleton class="h-6 w-6 rounded-control" />
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
+      </div>
 
-        <!-- Project selected but has no environments -->
-        <div v-else-if="project && !selectedEnvironment" class="p-4 sm:p-10">
-          <DbEmptyState
-            title="No environments"
-            description="Environments hold the values a project needs in one context development, staging, production. Create the first one to start storing secrets.">
-            <template #icon>
-              <LayersIcon class="h-5 w-5" />
-            </template>
-            <template #actions>
-              <DbButton
-                class="lg:hidden"
-                variant="secondary"
-                @click="railOpen = true">
-                Open project list
-              </DbButton>
-            </template>
-          </DbEmptyState>
-        </div>
-
-        <!-- Selected environment -->
-        <template v-else-if="selectedEnvironment">
-          <header
-            class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:px-6 sm:py-4">
-            <nav
-              class="hidden items-center gap-1.5 font-mono text-sm text-ink-muted lg:flex">
-              <button
-                type="button"
-                class="cursor-pointer transition-colors hover:text-ink-strong"
-                @click="selectProject(project!.name)">
-                {{ project!.name }}
-              </button>
-              <span class="text-ink-faint">/</span>
-              <span class="text-ink-strong">
-                {{ selectedEnvironment.name }}
-              </span>
-            </nav>
-
-            <div class="flex min-w-0 items-center gap-2">
-              <DbBadge
-                class="min-w-0 max-w-[16ch] truncate sm:max-w-none"
-                :title="selectedEnvironment.id"
-                data-testid="environment-id">
-                {{ selectedEnvironment.id }}
-              </DbBadge>
-              <DbCopyButton :value="selectedEnvironment.id" label="Copy ID" />
-              <DbBadge
-                v-if="selectedEnvironment.protected"
-                class="inline-flex items-center gap-1"
-                tone="warn"
-                title="Only people granted this environment, or project managers, can reach it."
-                data-testid="environment-protected">
-                <LockIcon class="h-3 w-3" />
-                protected
-              </DbBadge>
-            </div>
-
-            <div
-              class="flex w-full items-center gap-1 rounded-control border border-line bg-panel p-1 sm:ml-auto sm:w-auto">
-              <button
-                type="button"
-                class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
-                :class="
-                  activeTab === 'secrets'
-                    ? 'bg-accent-soft text-ink-strong'
-                    : 'text-ink-muted hover:text-ink-strong'
-                "
-                @click="controller.switchTab('secrets')">
-                secrets
-              </button>
-              <button
-                v-if="controller.managesEnvironment(selectedEnvironment)"
-                type="button"
-                class="flex-1 cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors pointer-coarse:py-2 sm:flex-none"
-                :class="
-                  activeTab === 'tokens'
-                    ? 'bg-accent-soft text-ink-strong'
-                    : 'text-ink-muted hover:text-ink-strong'
-                "
-                @click="controller.switchTab('tokens')">
-                tokens
-              </button>
-            </div>
-          </header>
-
-          <div class="p-4 sm:p-6">
-            <SecretsPanel
-              v-if="activeTab === 'secrets'"
-              :environment-id="selectedEnvironment.id"
-              :environment-name="selectedEnvironment.name"
-              :project-name="project!.name"
-              :level="selectedEnvironment.level" />
-            <TokensPanel v-else :environment-id="selectedEnvironment.id" />
+      <!-- No projects yet -->
+      <div
+        v-else-if="projects && projects.length === 0"
+        class="mx-auto mt-10 flex max-w-[520px] flex-col gap-3">
+        <DbEmptyState
+          :title="
+            canCreateProjects
+              ? 'Create your first project'
+              : 'No projects shared with you'
+          "
+          :description="
+            canCreateProjects
+              ? 'Add a project, then its environments (dev, staging, prod) and secrets. You can import an existing .env file.'
+              : 'Ask a project manager to give you access to a project.'
+          ">
+          <template #icon>
+            <FolderIcon class="h-5 w-5" />
+          </template>
+          <template v-if="canCreateProjects" #actions>
+            <DbButton
+              variant="primary"
+              data-testid="new-project"
+              @click="nameDialog = { kind: 'new-project' }">
+              <PlusIcon class="h-4 w-4" />
+              New project
+            </DbButton>
+          </template>
+        </DbEmptyState>
+        <div
+          v-if="canCreateProjects"
+          class="rounded-card border border-line bg-panel">
+          <div
+            class="flex items-center gap-2 border-b border-line-soft px-3 py-2 text-sm text-ink-muted">
+            <TerminalIcon class="h-4 w-4" />
+            Or from your terminal
+            <DbCopyButton
+              class="ml-auto"
+              :value="CREATE_COMMAND"
+              label="Copy" />
           </div>
-        </template>
-
-        <!-- Projects page without a selected project -->
-        <div v-else class="p-4 sm:p-10">
-          <DbEmptyState
-            title="Select a project"
-            description="Pick a project from the list, or create one to get started.">
-            <template #icon>
-              <FolderIcon class="h-5 w-5" />
-            </template>
-            <template #actions>
-              <DbButton
-                class="lg:hidden"
-                variant="primary"
-                @click="railOpen = true">
-                Choose project
-              </DbButton>
-            </template>
-          </DbEmptyState>
+          <pre
+            class="overflow-x-auto px-3 py-3 font-mono text-sm text-ink-strong"><code>{{ CREATE_COMMAND }}</code></pre>
         </div>
-      </section>
+      </div>
+
+      <!-- The tree -->
+      <template v-else-if="projects">
+        <DbSearchField
+          v-model="filter"
+          class="mb-4 w-full sm:w-[280px]"
+          placeholder="Filter projects and environments" />
+        <ProjectTree
+          v-if="rows.length > 0"
+          :rows="rows"
+          :filtering="filter.trim() !== ''"
+          @toggle="controller.toggleProject"
+          @show-all="controller.showAllEnvironments"
+          @open="controller.openEnvironment"
+          @project-access="controller.openProjectAccess"
+          @new-environment="
+            (project) => (nameDialog = { kind: 'new-environment', project })
+          "
+          @rename-project="
+            (project) => (nameDialog = { kind: 'rename-project', project })
+          "
+          @delete-project="
+            (project) => controller.startDelete({ kind: 'project', project })
+          "
+          @rename-environment="
+            (environment) =>
+              (nameDialog = { kind: 'rename-environment', environment })
+          "
+          @delete-environment="
+            (environment) =>
+              controller.startDelete({ kind: 'environment', environment })
+          " />
+        <p
+          v-else
+          class="rounded-card border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
+          data-testid="projects-no-match">
+          Nothing matches “{{ filter.trim() }}”.
+        </p>
+      </template>
     </div>
 
-    <!-- Narrow screens: the rail in a sheet -->
-    <DbSheet
-      :open="railOpen"
-      title="Projects and environments"
-      @close="railOpen = false">
-      <ProjectRail
-        class="flex min-h-0 flex-1 flex-col"
-        :controller="controller" />
-    </DbSheet>
-
-    <!-- Create project from the zero state -->
     <NameDialog
-      :open="showCreateProject"
-      title="New project"
-      label="Project name"
-      submit-label="Create"
-      hint="Names are unique on this server. Example: payment-service"
-      :action="controller.createProject"
-      @close="showCreateProject = false" />
+      :open="nameDialog !== null"
+      :title="nameDialogCopy.title"
+      :label="nameDialogCopy.label"
+      :initial-name="nameDialogCopy.initialName"
+      :submit-label="nameDialogCopy.submitLabel"
+      :hint="nameDialogCopy.hint"
+      :placeholder="nameDialogCopy.placeholder"
+      :action="controller.submitName"
+      @close="nameDialog = null" />
+
+    <DbConfirmDialog
+      :open="deleting !== null"
+      :title="
+        deleting?.kind === 'environment'
+          ? 'Delete environment'
+          : 'Delete project'
+      "
+      :description="
+        deleting?.kind === 'environment'
+          ? `Deleting '${deleting.environment.name}' permanently removes its secrets and runner tokens.`
+          : `Deleting '${deleting?.project.name}' permanently removes it with all environments, secrets, and scoped runner tokens.`
+      "
+      :confirm-word="
+        deleting?.kind === 'environment'
+          ? deleting.environment.name
+          : deleting?.project.name
+      "
+      :confirm-label="
+        deleting?.kind === 'environment'
+          ? 'Delete environment'
+          : 'Delete project'
+      "
+      :affected-counts="deleteCounts"
+      :loading="deleteLoading"
+      :error="deleteError"
+      @confirm="controller.confirmDelete"
+      @close="controller.cancelDelete" />
   </DashboardLayout>
 </template>

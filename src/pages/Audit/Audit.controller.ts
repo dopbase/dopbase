@@ -1,4 +1,5 @@
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import * as auditApi from "~/services/audit.api";
 import type { AuditEvent } from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
@@ -12,7 +13,9 @@ export const AUDIT_PAGE_SIZE = 25;
 /**
  * Audit screen controller: cursor-paginated event listing with filters for
  * action, project, environment, and actor. Changing any filter reloads
- * from the first page. "Load more" appends the next cursor page.
+ * from the first page. "Load more" appends the next cursor page. Filters
+ * can arrive in the address (`?projectId=…&environmentId=…`), as the
+ * project page's Activity tab links them.
  */
 export function useAuditController() {
   const auth = useAuthStore();
@@ -23,11 +26,16 @@ export function useAuditController() {
   const loadError = ref<string | null>(null);
   const hasLoaded = ref(false);
 
+  const route = useRoute();
+  const fromQuery = (key: string): string => {
+    const value = route.query[key];
+    return typeof value === "string" ? value : "";
+  };
   const filters = reactive({
-    action: "",
-    projectId: "",
-    environmentId: "",
-    actor: "",
+    action: fromQuery("action"),
+    projectId: fromQuery("projectId"),
+    environmentId: fromQuery("environmentId"),
+    actor: fromQuery("actor"),
   });
 
   const projects = ref<Project[]>([]);
@@ -80,9 +88,11 @@ export function useAuditController() {
       nextCursor.value = page.nextCursor;
       hasLoaded.value = true;
     } catch {
-      loadError.value = "Could not load audit events.";
+      // A newer filter already replaced this request.
+      if (version === requestVersion)
+        loadError.value = "Could not load audit events.";
     } finally {
-      loading.value = false;
+      if (version === requestVersion) loading.value = false;
     }
   }
 
@@ -101,7 +111,8 @@ export function useAuditController() {
       items.value.push(...page.items);
       nextCursor.value = page.nextCursor;
     } catch {
-      loadError.value = "Could not load more audit events.";
+      if (version === requestVersion)
+        loadError.value = "Could not load more audit events.";
     } finally {
       loadingMore.value = false;
     }

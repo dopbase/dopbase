@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { InfoIcon } from "~/assets/icons";
+import { AlertTriangleIcon, TerminalIcon } from "~/assets/icons";
 import { DbAlert, DbButton, DbCopyButton, DbModal } from "~/components/ui";
 
+/**
+ * OneTimeTokenDialog — shows a new token's plaintext once. It stays open
+ * until the person says they've stored it; after that the value is gone.
+ * Optional `usage` lines show how to use the token, and `scope` and
+ * `expires` replace the token id in the summary.
+ */
 const props = defineProps<{
   open: boolean;
   title: string;
@@ -10,6 +16,9 @@ const props = defineProps<{
   name: string;
   id: string;
   detail?: string;
+  scope?: string;
+  expires?: string;
+  usage?: string;
 }>();
 
 const emit = defineEmits<{ acknowledge: [] }>();
@@ -45,65 +54,73 @@ function handleCopyError(): void {
   <DbModal :open="open" :title="title" size="md" persistent>
     <div class="flex flex-col gap-4">
       <div
-        class="flex items-start gap-3 rounded-card border border-warn/30 bg-warn/10 p-3.5">
-        <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-warn/30 bg-canvas/40 text-warn">
-          <InfoIcon class="h-4 w-4" />
+        class="flex items-start gap-3 rounded-control bg-warn/15 px-4 py-3"
+        role="note">
+        <AlertTriangleIcon class="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+        <div class="text-sm leading-[22px]">
+          <p class="font-medium text-ink-strong">
+            You won't see this token again
+          </p>
+          <p class="text-ink">
+            Store it in your deploy platform's secret settings now. If it's
+            lost, revoke it and create a new one.
+            <span v-if="detail">{{ detail }}</span>
+          </p>
         </div>
-        <p class="text-sm text-ink">
-          Copy this token now. It is shown once and cannot be recovered.
-          <span v-if="detail">{{ detail }}</span>
-        </p>
+      </div>
+
+      <div
+        class="flex items-center gap-2 rounded-control border border-line bg-canvas py-1.5 pl-3 pr-1.5">
+        <input
+          ref="tokenInput"
+          :value="token"
+          readonly
+          aria-label="Generated token"
+          class="min-w-0 flex-1 bg-transparent font-mono text-sm text-ink-strong outline-none selection:bg-selection"
+          data-testid="one-time-token"
+          @focus="selectToken"
+          @click="selectToken" />
+        <DbCopyButton
+          :value="token"
+          label="Copy"
+          @copied="handleCopied"
+          @copy-error="handleCopyError" />
       </div>
 
       <section
-        class="overflow-hidden rounded-card border border-accent/35 bg-canvas"
-        aria-label="One-time token">
+        v-if="usage"
+        class="overflow-hidden rounded-control border border-line bg-canvas"
+        aria-label="Use it">
         <div
-          class="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
-          <span
-            class="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-accent-strong">
-            One-time token
-          </span>
-          <span class="text-xs text-ink-faint">plaintext</span>
-        </div>
-        <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-          <input
-            ref="tokenInput"
-            :value="token"
-            readonly
-            aria-label="Generated token"
-            class="min-w-0 flex-1 rounded-control border border-line bg-raised px-3 py-2.5 font-mono text-xs text-ink-strong outline-none selection:bg-selection"
-            data-testid="one-time-token"
-            @focus="selectToken"
-            @click="selectToken" />
+          class="flex items-center gap-2 border-b border-line-soft py-1 pl-3 pr-1 text-sm text-ink-muted">
+          <TerminalIcon class="h-4 w-4" />
+          Use it
           <DbCopyButton
-            class="justify-center sm:self-stretch"
-            :value="token"
-            label="Copy"
-            @copied="handleCopied"
-            @copy-error="handleCopyError" />
+            class="ml-auto"
+            :value="usage"
+            label="Copy usage"
+            icon-only />
         </div>
+        <pre
+          class="overflow-x-auto px-3 py-3 font-mono text-sm leading-[22px] text-ink-strong"
+          data-testid="token-usage"><code>{{ usage }}</code></pre>
       </section>
 
-      <div
-        class="gap-2 rounded-control bg-raised px-3.5 py-3 text-sm grid-cols-2">
-        <div class="min-w-0">
-          <p class="text-xs text-ink-muted">Name</p>
-          <p class="truncate font-mono text-xs text-ink-strong">{{ name }}</p>
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs text-ink-muted">Token ID</p>
-          <p class="truncate font-mono text-xs text-ink-strong">{{ id }}</p>
-        </div>
-      </div>
+      <dl class="grid grid-cols-[auto_auto_1fr] gap-x-6 gap-y-0.5 text-sm">
+        <dt class="text-ink-muted">Name</dt>
+        <dt class="text-ink-muted">{{ scope ? "Scope" : "Token ID" }}</dt>
+        <dt class="text-ink-muted">{{ expires ? "Expires" : "" }}</dt>
+        <dd class="truncate font-mono text-ink-strong">{{ name }}</dd>
+        <dd class="truncate font-mono text-ink-strong">{{ scope ?? id }}</dd>
+        <dd class="truncate font-mono text-ink-strong">{{ expires ?? "" }}</dd>
+      </dl>
 
       <DbAlert v-if="copyError">{{ copyError }}</DbAlert>
     </div>
 
     <template #footer>
       <DbButton variant="primary" @click="emit('acknowledge')">
-        I've stored it safely
+        I've stored it
       </DbButton>
     </template>
   </DbModal>

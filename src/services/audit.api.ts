@@ -37,7 +37,10 @@ export interface AuditPage {
 
 const BASE = "/api/v1/audit-events";
 
-export async function listAuditEvents(query: AuditQuery): Promise<AuditPage> {
+export async function listAuditEvents(
+  query: AuditQuery,
+  signal?: AbortSignal,
+): Promise<AuditPage> {
   const params = new URLSearchParams();
   if (query.cursor) params.set("cursor", query.cursor);
   if (query.limit) params.set("limit", String(query.limit));
@@ -48,6 +51,7 @@ export async function listAuditEvents(query: AuditQuery): Promise<AuditPage> {
   const search = params.toString();
   const { data } = await apiRequest<AuditPage>(
     search ? `${BASE}?${search}` : BASE,
+    { signal },
   );
   return data;
 }
