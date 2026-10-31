@@ -207,6 +207,11 @@ is refused with `422` `TOKEN_REPLACE_INVALID`.
   opened later can get one. That token is derived from the session's own, and
   both stay valid.
 - CLI sessions, runner tokens, and personal tokens use `Authorization: Bearer <token>`.
+- `POST /api/v1/auth/login` answers a wrong email or password with `401`
+  `AUTHENTICATION_INVALID`, worded the same either way. When 1 to 3 tries are
+  left before a pause, the message says so, for example
+  `Email or password is wrong. 2 more tries, then a 15-minute pause.` During
+  the pause it answers `429` `RATE_LIMITED` with how many minutes to wait.
 - A personal token acts for its account within its own scope and level. It
   never holds the account's capabilities, so it can't manage people, grants,
   projects, or tokens.
@@ -250,6 +255,12 @@ The CLI signs in through the Admin UI with a device flow:
 
 `GET /api/v1/auth/methods` is public and reports whether the server accepts
 passwords, shows the password form, and offers single sign-on.
+
+`POST /api/v1/auth/cli/device` takes an optional `client`, such as
+`dopbase 0.2.0 on macOS`, next to `hostname`. The server keeps printable text
+only, up to 80 characters. `POST /api/v1/auth/cli/inspect` returns it as
+`client` (or `null`), with `sessionDays`, the most days the approved CLI
+session lasts.
 
 ## Single sign-on
 

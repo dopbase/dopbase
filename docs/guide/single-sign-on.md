@@ -51,7 +51,8 @@ reverse proxy that terminates TLS, use the URL people open in their browser.
 4. Select **Test sign-in**. You sign in at the provider and return to the
    settings page. This links your root account to that identity and proves the
    settings work.
-5. Select **Turn on**. The sign-in page now shows a **Sign in with …** button.
+5. Select **Turn on**. The sign-in page now shows a **Continue with …** button
+   above the password form.
 
 [Sign in with Google](./sso-google) walks through these steps for Google,
 including the Google Cloud console side.
@@ -141,10 +142,12 @@ Turning single sign-on off lifts the requirement as well.
 ### Hide the password form
 
 With single sign-on on, root can turn on **Hide the password form**. The
-sign-in page then shows only the single sign-on button. Nothing else changes:
+sign-in page then says the server uses that provider and shows only its
+button. Nothing else changes:
 passwords still work in the CLI and the API, and **Require single sign-on**
-is the setting that turns them off. Root can still open the form at
-`/login?password`, which is how you get in when the provider is down.
+is the setting that turns them off. Root can still choose **Signing in as
+root? Use your password**, or open `/login?password`, which is how you get in
+when the provider is down.
 
 ### Confirming sensitive actions
 
@@ -198,7 +201,8 @@ they can sign in and link from the Account page.
 ## Turn it off or remove it
 
 **Turn off** keeps the settings and linked identities, and everyone signs in
-with a password. **Remove** deletes the provider and every linked identity.
+with a password. **Remove provider**, in its own card at the bottom of the
+page, deletes the provider and every linked identity.
 
 Accounts without a password cannot sign in while single sign-on is off or
 removed. The settings page shows how many there are; set them a password on the
