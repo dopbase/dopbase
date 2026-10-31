@@ -2,6 +2,7 @@
 import type { Component } from "vue";
 import {
   ArchiveIcon,
+  BotIcon,
   FolderIcon,
   HistoryIcon,
   KeyIcon,
@@ -34,6 +35,7 @@ const icons: Record<PageName, Component> = {
   projects: FolderIcon,
   audit: HistoryIcon,
   users: UserIcon,
+  agents: BotIcon,
   groups: UsersIcon,
   roles: SlidersHorizontalIcon,
   status: ServerIcon,

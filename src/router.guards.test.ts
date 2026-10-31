@@ -25,6 +25,12 @@ function makeRouter() {
       { path: "/backups", name: "backups", component: Page },
       { path: "/users", name: "users", component: Page },
       {
+        path: "/users/:userId",
+        name: "user",
+        component: Page,
+        meta: { page: "users" },
+      },
+      {
         path: "/:pathMatch(.*)*",
         name: "not-found",
         component: Page,
@@ -76,5 +82,16 @@ describe("installRouterGuards", () => {
     await router.push("/workspace");
 
     expect(router.currentRoute.value.name).toBe("not-found");
+  });
+
+  it("gates a detail page by the page it belongs to", async () => {
+    const router = makeRouter();
+
+    await router.push("/users/usr_1");
+    expect(router.currentRoute.value.name).toBe("no-access");
+
+    capabilities.add("users.view");
+    await router.push("/users/usr_2");
+    expect(router.currentRoute.value.name).toBe("user");
   });
 });

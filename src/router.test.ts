@@ -16,6 +16,15 @@ describe("project routes", () => {
     ["/projects/p/billing/e/env_1/tokens", "legacy-environment"],
     ["/projects/p/billing/e/env_1/import", "legacy-environment"],
     ["/status", "status"],
+    ["/users/usr_1", "user"],
+    ["/users/usr_1/access", "user-access"],
+    ["/users/usr_1/tokens", "user-tokens"],
+    ["/agents", "agents"],
+    ["/agents/usr_9/tokens", "agent-tokens"],
+    ["/groups/grp_1", "group"],
+    ["/groups/grp_1/access", "group-access"],
+    ["/roles/new", "role-new"],
+    ["/roles/role_1", "role"],
     // Legacy workspace URLs fall through to the not-found page.
     ["/workspace", "not-found"],
   ])("resolves %s", (path, routeName) => {

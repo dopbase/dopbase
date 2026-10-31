@@ -13,6 +13,8 @@ describe("canOpen", () => {
     ["status", [], true],
     ["users", [], false],
     ["users", ["users.view"], true],
+    ["agents", ["users.view"], true],
+    ["agents", ["groups.manage"], false],
     ["groups", ["groups.manage"], true],
     ["groups", ["users.view"], true],
     ["groups", ["users.manage"], false],
@@ -41,6 +43,7 @@ describe("visibleSections", () => {
       "projects",
       "audit",
       "users",
+      "agents",
       "groups",
       "roles",
       "status",
@@ -69,6 +72,10 @@ describe("visibleSections", () => {
       (section) => section.label === "People & access",
     );
 
-    expect(people?.items.map((item) => item.name)).toEqual(["users", "groups"]);
+    expect(people?.items.map((item) => item.name)).toEqual([
+      "users",
+      "agents",
+      "groups",
+    ]);
   });
 });

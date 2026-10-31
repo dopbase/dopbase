@@ -149,16 +149,72 @@ export const router = createRouter({
       name: "users",
       component: () => import("~/pages/Users/Users.page.vue"),
     },
+    // One user: Overview, Access, Groups, Tokens and Danger zone.
+    ...(
+      [
+        ["", "user"],
+        ["/access", "user-access"],
+        ["/groups", "user-groups"],
+        ["/tokens", "user-tokens"],
+        ["/danger", "user-danger"],
+      ] as const
+    ).map(([suffix, name]) => ({
+      path: `/users/:userId${suffix}`,
+      name,
+      component: () => import("~/pages/Users/User.page.vue"),
+      meta: { page: "users" },
+    })),
+    {
+      path: "/agents",
+      name: "agents",
+      component: () => import("~/pages/Agents/Agents.page.vue"),
+    },
+    ...(
+      [
+        ["", "agent"],
+        ["/tokens", "agent-tokens"],
+        ["/danger", "agent-danger"],
+      ] as const
+    ).map(([suffix, name]) => ({
+      path: `/agents/:agentId${suffix}`,
+      name,
+      component: () => import("~/pages/Agents/Agent.page.vue"),
+      meta: { page: "agents" },
+    })),
     {
       path: "/roles",
       name: "roles",
       component: () => import("~/pages/Roles/Roles.page.vue"),
     },
     {
+      path: "/roles/new",
+      name: "role-new",
+      component: () => import("~/pages/Roles/Role.page.vue"),
+      meta: { page: "roles" },
+    },
+    {
+      path: "/roles/:roleId",
+      name: "role",
+      component: () => import("~/pages/Roles/Role.page.vue"),
+      meta: { page: "roles" },
+    },
+    {
       path: "/groups",
       name: "groups",
       component: () => import("~/pages/Groups/Groups.page.vue"),
     },
+    ...(
+      [
+        ["", "group"],
+        ["/access", "group-access"],
+        ["/danger", "group-danger"],
+      ] as const
+    ).map(([suffix, name]) => ({
+      path: `/groups/:groupId${suffix}`,
+      name,
+      component: () => import("~/pages/Groups/Group.page.vue"),
+      meta: { page: "groups" },
+    })),
     {
       path: "/cli/approve",
       name: "cli-approve",

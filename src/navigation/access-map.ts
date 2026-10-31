@@ -8,12 +8,15 @@ import type { Capability } from "~/services/access.api";
  * account. The server still checks every request: this only decides what
  * the console offers.
  *
- * Keys are route names, and each page's path is `/<key>`.
+ * Keys are route names, and each page's path is `/<key>`. A detail route
+ * under a page (`/users/:userId`) names its page in `meta.page`, and the
+ * router guard checks that page.
  */
 export const pages = {
   projects: { label: "Projects", capabilities: [] },
   audit: { label: "Audit log", capabilities: [] },
   users: { label: "Users", capabilities: ["users.view"] },
+  agents: { label: "AI agents", capabilities: ["users.view"] },
   groups: { label: "Groups", capabilities: ["users.view", "groups.manage"] },
   roles: { label: "Roles", capabilities: ["roles.manage"] },
   status: { label: "Status", capabilities: [] },
@@ -32,7 +35,7 @@ export const sidebarSections: readonly {
   pages: readonly PageName[];
 }[] = [
   { label: "Workspace", pages: ["projects", "audit"] },
-  { label: "People & access", pages: ["users", "groups", "roles"] },
+  { label: "People & access", pages: ["users", "agents", "groups", "roles"] },
   { label: "Instance", pages: ["status", "backups", "sso"] },
 ];
 
