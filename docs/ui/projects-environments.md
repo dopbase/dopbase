@@ -47,9 +47,12 @@ Opening an environment shows one bar across the top:
 
 - **Where you are.** `payments / prod` is also the switcher. Click the project
   to change project, or the environment (or press **E**) to change
-  environment. The environment menu shows your level in each one. On a
-  phone both open as a sheet from the bottom of the screen, with rows big
-  enough to tap and a filter when the list is long.
+  environment. The environment menu shows your level in each one and
+  highlights the one you're on. Project managers also get **New
+  environment** at the bottom of it, so there's no trip to Settings to add
+  one. On a phone both open as a sheet from the bottom of the screen, with
+  rows big enough to tap and a filter when the list is long. Long names are
+  shortened in the bar; hover one to read it in full.
 - **Protection.** A protected environment gets an amber chip and an amber
   line across the top of the page. Nothing else in the console uses amber,
   so production never looks like dev.
@@ -70,6 +73,12 @@ the environment you last opened in the bar.
 | Settings | Name, environments, danger zone                    | Project manager                                 |
 
 A link to a tab you can't use opens Secrets instead.
+
+Runner token names follow the same rule as environment names: lowercase
+letters, numbers and single hyphens, starting with a letter, such as
+`deploy-prod`. The dialog that shows a new token gives the
+`export DOPBASE_TOKEN` line with the whole token, ready to paste. It's the
+only time the token is shown.
 
 ### Run
 
