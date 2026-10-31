@@ -114,6 +114,10 @@ All notable changes to Dopbase are documented in this file.
   checks out up to that event. **Verify chain** checks the whole log.
 - **Forgot password?** on the sign-in page explains who can help: an admin
   from Users, or root on the server with `dopbase admin reset-password`.
+- `GET /api/v1/users/identities` returns each account's `id` and `email` and
+  nothing else. The audit log's Actor filter uses it now, so it no longer
+  loads every account's groups, role, and sign-in details just to show
+  emails.
 
 ### Changed
 
