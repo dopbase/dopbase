@@ -22,3 +22,6 @@ export { default as DbSkeleton } from "./DbSkeleton.vue";
 export { default as DbSpinner } from "./DbSpinner.vue";
 export { default as DbSwitch } from "./DbSwitch.vue";
 export { default as DbTextarea } from "./DbTextarea.vue";
+export { default as DbAvatar } from "./DbAvatar.vue";
+export { default as DbFilterMenu } from "./DbFilterMenu.vue";
+export { default as DbTabNav } from "./DbTabNav.vue";
