@@ -269,7 +269,8 @@ pub async fn cli_cancel(
 
 /// Look up a browser CLI login
 ///
-/// Show where a pending request came from before approving it. Requires a
+/// Show where a pending request came from, which client sent it, and how
+/// long the CLI session it creates lasts, before approving it. Requires a
 /// browser session and the CSRF header. Wrong codes are rate limited.
 #[utoipa::path(
   post,

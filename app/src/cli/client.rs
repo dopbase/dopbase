@@ -660,7 +660,7 @@ async fn browser_approval(
     .request(
       Method::POST,
       api::auth::CLI_DEVICE,
-      Some(json!({"hostname":local_hostname(),"purpose":purpose})),
+      Some(json!({"hostname":local_hostname(),"client":client_name(),"purpose":purpose})),
     )
     .await?;
   let field = |name: &str| {
@@ -755,6 +755,17 @@ async fn poll_device_login(
       _ => bail!("server returned an unknown login status"),
     }
   }
+}
+
+/// Shown on the approval page, such as `dopbase 0.2.0 on macOS`.
+fn client_name() -> String {
+  let os = match env::consts::OS {
+    "macos" => "macOS",
+    "linux" => "Linux",
+    "windows" => "Windows",
+    other => other,
+  };
+  format!("dopbase {} on {os}", env!("CARGO_PKG_VERSION"))
 }
 
 fn local_hostname() -> Option<String> {
