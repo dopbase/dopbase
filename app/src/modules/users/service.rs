@@ -225,6 +225,20 @@ pub async fn list(
     .collect()
 }
 
+pub async fn identities(
+  state: &AppState,
+  identity: &AuthIdentity,
+) -> Result<Vec<UserIdentity>, HttpError> {
+  require_capability_browser(identity, Capability::UsersView)?;
+  Ok(
+    repository::identities(state.db.pool())
+      .await?
+      .into_iter()
+      .map(|(id, email)| UserIdentity { id, email })
+      .collect(),
+  )
+}
+
 pub async fn get(
   state: &AppState,
   identity: &AuthIdentity,

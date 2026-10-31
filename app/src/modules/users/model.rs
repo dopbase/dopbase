@@ -56,6 +56,16 @@ pub struct UserResponse {
   pub groups: Vec<GroupRef>,
 }
 
+/// Just enough of an account to name it.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserIdentity {
+  /// Unique user identifier with `usr_` prefix.
+  pub id: String,
+  /// User email address. For an AI agent, its name.
+  pub email: String,
+}
+
 /// Request to create a new user account.
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

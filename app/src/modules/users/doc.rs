@@ -10,6 +10,7 @@ use utoipa::OpenApi;
 #[openapi(
   paths(
     controller::list,
+    controller::identities,
     controller::get,
     controller::create,
     controller::update,
@@ -20,6 +21,7 @@ use utoipa::OpenApi;
   ),
   components(schemas(
     UserResponse,
+    UserIdentity,
     UserStatus,
     GroupRef,
     CreateUserRequest,
@@ -27,6 +29,7 @@ use utoipa::OpenApi;
     AdminRole,
     ErrorBody,
     HttpResponseFormat<Vec<UserResponse>>,
+    HttpResponseFormat<Vec<UserIdentity>>,
     HttpResponseFormat<UserResponse>,
     HttpResponseFormat<serde_json::Value>
   )),

@@ -34,6 +34,33 @@ pub async fn list(
   ))
 }
 
+/// List user identities
+///
+/// Return each account's id and email, ordered by email. Lighter than the
+/// full list, for screens that only need to name people, such as the audit
+/// log's Actor filter. Requires an authenticated browser session that can
+/// view users.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::users::IDENTITIES,
+  tag = "users",
+  security(("cookieAuth" = [])),
+  responses(
+    (status = 200, description = "User identities fetched", body = inline(HttpResponseFormat<Vec<UserIdentity>>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Administrator browser session is required", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn identities(
+  State(state): State<AppState>,
+  identity: AuthIdentity,
+) -> Result<HttpResponse<Vec<UserIdentity>>, crate::http::HttpError> {
+  Ok(HttpResponse::ok(
+    service::identities(&state, &identity).await?,
+    "USER_IDENTITIES_FETCHED",
+  ))
+}
+
 /// Show a user
 ///
 /// Fetch a single user account by its identifier. Requires an authenticated

@@ -172,7 +172,10 @@ streams the filtered list as JSON lines.
 
 User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
 last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
-`GET /api/v1/users/{id}` returns one account.
+`GET /api/v1/users/{id}` returns one account. `GET /api/v1/users/identities`
+returns only each account's `id` and `email`, ordered by email, for screens
+that just need to name people. It needs the same `users.view` capability and
+browser session as the full list.
 
 `POST /api/v1/users/{id}/disable` signs the account out everywhere and stops
 its tokens without deleting anything. `POST /api/v1/users/{id}/enable` lets it

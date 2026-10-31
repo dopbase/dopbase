@@ -734,6 +734,7 @@ async fn health_and_openapi_are_available() {
     "/api/v1/status",
     "/api/v1/instance/factory-reset",
     "/api/v1/users",
+    "/api/v1/users/identities",
     "/api/v1/users/{id}",
     "/api/v1/users/{id}/tokens",
     "/api/v1/users/{id}/tokens/{token_id}/revoke",
@@ -749,6 +750,7 @@ async fn health_and_openapi_are_available() {
   for schema in [
     "ErrorBody",
     "UserResponse",
+    "UserIdentity",
     "CreateUserRequest",
     "UpdateUserRequest",
     "AdminRole",

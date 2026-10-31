@@ -31,6 +31,13 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<UserRow>, sqlx::Error> {
   .await
 }
 
+/// Every account's id and email, by email.
+pub async fn identities(pool: &SqlitePool) -> Result<Vec<(String, String)>, sqlx::Error> {
+  sqlx::query_as("SELECT id, email FROM admins ORDER BY email")
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn find(
   pool: &SqlitePool,
   id: &str,

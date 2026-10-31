@@ -278,6 +278,7 @@ pub mod sso {
 
 pub mod users {
   pub const COLLECTION: &str = api_path!("/users");
+  pub const IDENTITIES: &str = api_path!("/users/identities");
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
   pub const DISABLE: &str = api_path!("/users/{id}/disable");

@@ -325,3 +325,45 @@ async fn users_list_the_groups_they_belong_to() {
   assert_eq!(body["data"]["groups"], listed["groups"]);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn user_identities_carry_only_id_and_email() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = send(
+    &router,
+    "GET",
+    "/api/v1/users/identities",
+    root.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let root_email = body["data"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .find(|user| user["id"] == root.id)
+    .unwrap()["email"]
+    .clone();
+  let mut expected = vec![
+    json!({"id":member.id,"email":"member@example.com"}),
+    json!({"id":root.id,"email":root_email}),
+  ];
+  expected.sort_by_key(|user| user["email"].as_str().unwrap().to_owned());
+  assert_eq!(body["data"], json!(expected));
+  // Same gate as the full list: a browser session that can view users.
+  let (status, _) = send(
+    &router,
+    "GET",
+    "/api/v1/users/identities",
+    member.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 403);
+  let (status, _) = send(&router, "GET", "/api/v1/users/identities", root.cli(), None).await;
+  assert_eq!(status, 403);
+  state.db.close().await;
+}
