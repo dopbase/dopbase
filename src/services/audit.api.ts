@@ -19,6 +19,12 @@ export interface AuditEvent {
   ipAddress: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
+  /**
+   * Position in the audit hash chain and the hash of this record. Absent
+   * for records written before the chain existed.
+   */
+  seq?: number | null;
+  recordHash?: string | null;
 }
 
 export interface AuditQuery {
@@ -53,5 +59,38 @@ export async function listAuditEvents(
     search ? `${BASE}?${search}` : BASE,
     { signal },
   );
+  return data;
+}
+
+/** The first record whose stored hashes don't match. */
+export interface ChainBreak {
+  seq: number;
+  id: string;
+  reason: string;
+}
+
+/** The outcome of recomputing every audit record's hash in order. */
+export interface ChainVerifyReport {
+  /** Every record matched and none sits outside the chain. */
+  ok: boolean;
+  /** Records checked before the first break. */
+  records: number;
+  headSeq: number | null;
+  headHash: string | null;
+  /** Records from before the chain, which it can't vouch for. */
+  legacy: number;
+  /** Records written outside the chain. Should stay at zero. */
+  unsequenced: number;
+  prunedSeq: number | null;
+  broken: ChainBreak | null;
+}
+
+/** Needs `audit.verify`. Reads no secret values. */
+export async function verifyAuditChain(
+  signal?: AbortSignal,
+): Promise<ChainVerifyReport> {
+  const { data } = await apiRequest<ChainVerifyReport>(`${BASE}/verify`, {
+    signal,
+  });
   return data;
 }
