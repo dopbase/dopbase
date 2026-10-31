@@ -17,7 +17,14 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
 import { formatLevel } from "~/utils/format";
-import { levelMeter, type LevelMeter } from "~/utils/level";
+import {
+  ENVIRONMENT_LEVELS,
+  grantSentence,
+  LEVEL_HINTS,
+  levelMeter,
+  PROJECT_LEVELS,
+  type LevelMeter,
+} from "~/utils/level";
 
 /** Someone a grant can be given to. */
 export interface Principal {
@@ -26,41 +33,8 @@ export interface Principal {
   label: string;
 }
 
-/** Levels a grant can give, by what it covers. */
-export const PROJECT_LEVELS: Level[] = [
-  "metadata",
-  "read",
-  "write",
-  "manage",
-  "project_manager",
-];
-export const ENVIRONMENT_LEVELS: Level[] = [
-  "none",
-  "metadata",
-  "read",
-  "write",
-  "manage",
-];
-
-export const LEVEL_HINTS: Record<Level, string> = {
-  none: "Hides this environment, even from a project grant.",
-  metadata: "See secret names, versions and history. No values.",
-  read: "Also reveal, export and run with values.",
-  write: "Also add, change, import and roll back secrets.",
-  manage: "Also runner tokens, renaming and protecting environments.",
-  project_manager:
-    "Everything here, including giving others access. Whole project only.",
-};
-
-/** What a level lets someone do, for the summary under the dialog. */
-const LEVEL_VERBS: Record<Level, string> = {
-  none: "no longer reach",
-  metadata: "see the secret names in",
-  read: "read secrets in",
-  write: "read and change secrets in",
-  manage: "manage",
-  project_manager: "manage, and give others access to,",
-};
+// The level lists and wording are shared with the people pages.
+export { ENVIRONMENT_LEVELS, LEVEL_HINTS, PROJECT_LEVELS };
 
 export interface AccessRow {
   grant: Grant;
@@ -216,14 +190,12 @@ export function useAccessPanelController() {
           ? grant.scopeType === "project"
           : grant.scopeId === environmentId.value),
     );
-    const verb =
-      principal.type === "group"
-        ? `Everyone in ${principal.label} will be able to`
-        : `${principal.label} will be able to`;
-    const sentence =
-      level.value === "none"
-        ? `${principal.type === "group" ? `Everyone in ${principal.label}` : principal.label} will no longer reach ${target}, even through a project grant.`
-        : `${verb} ${LEVEL_VERBS[level.value]} ${target}.`;
+    const sentence = grantSentence(
+      principal.label,
+      principal.type === "group",
+      level.value,
+      target,
+    );
     return replaces
       ? `${sentence} This replaces their current grant there.`
       : sentence;

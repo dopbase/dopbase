@@ -6,6 +6,7 @@ import * as usersApi from "~/services/users.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 import { mountController } from "~/tests/mount-controller";
+import { groupSummaryFixture, root, userFixture } from "~/tests/people";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { projectRef: "payments" } }),
@@ -87,43 +88,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue(access);
   vi.mocked(accessApi.fetchGroups).mockResolvedValue([
-    {
-      id: "grp_backend",
-      name: "Backend",
-      description: "",
-      memberCount: 2,
-      createdAt: "",
-      updatedAt: "",
-    },
+    groupSummaryFixture({ memberCount: 2 }),
   ]);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([
-    {
-      id: "usr_root",
-      email: "root@example.com",
-      role: "root",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
-    {
-      id: "usr_me",
-      email: "me@example.com",
-      role: "admin",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
-    {
-      id: "usr_member",
-      email: "member@example.com",
-      role: "member",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
+    root,
+    userFixture({ id: "usr_me", email: "me@example.com", role: "admin" }),
+    userFixture({ id: "usr_member", email: "member@example.com" }),
   ]);
 });
 
