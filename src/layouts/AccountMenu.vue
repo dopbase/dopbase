@@ -120,7 +120,7 @@ const itemClass =
           {{ email }}
         </span>
         <span
-          class="rounded-full bg-raised px-2 py-px text-sm font-medium leading-5 text-ink">
+          class="rounded-control bg-raised px-2 py-px text-sm font-medium leading-5 text-ink">
           {{ roleName }}
         </span>
       </span>

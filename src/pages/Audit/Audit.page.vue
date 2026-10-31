@@ -60,7 +60,7 @@ function toggle(event: AuditEvent): void {
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:p-8">
+    <div class="page-width py-6 lg:py-8">
       <header class="mb-6">
         <h1 class="text-lg font-semibold">Audit</h1>
         <p class="mt-0.5 text-sm text-ink-muted">

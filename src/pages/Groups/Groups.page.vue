@@ -92,7 +92,7 @@ async function submitDelete(): Promise<void> {
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:p-8">
+    <div class="page-width py-6 lg:py-8">
       <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="text-lg font-semibold text-ink-strong">Groups</h1>

@@ -125,7 +125,7 @@ const {
         class="flex items-center gap-3 rounded-card border border-line bg-panel px-4 py-3"
         data-testid="cli-account">
         <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-base font-semibold text-accent-strong"
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-accent/15 text-base font-semibold text-accent-strong"
           aria-hidden="true">
           {{ account.initial }}
         </div>
@@ -210,7 +210,7 @@ const {
       class="flex flex-col items-center gap-5 text-center"
       data-testid="cli-done">
       <div
-        class="flex h-14 w-14 items-center justify-center rounded-full"
+        class="flex h-14 w-14 items-center justify-center rounded-control"
         :class="
           step === 'approved' ? 'bg-ok/15 text-ok' : 'bg-crit/15 text-crit'
         ">
