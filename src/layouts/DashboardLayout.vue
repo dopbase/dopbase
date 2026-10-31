@@ -19,7 +19,6 @@ const {
   sections,
   activePage,
   showPersonalTokens,
-  instanceHost,
   sessionExpired,
   loggingOut,
   navOpen,
@@ -70,9 +69,9 @@ const {
             Dopbase
           </p>
           <p
-            class="truncate font-mono text-sm leading-[22px] text-ink-faint"
-            :title="instanceHost">
-            {{ instanceHost }}
+            class="truncate font-mono text-sm leading-5.5 text-ink-faint"
+            title="Admin Console">
+            Admin Console
           </p>
         </div>
       </div>

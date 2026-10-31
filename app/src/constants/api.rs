@@ -141,6 +141,9 @@ pub mod secrets {
   pub const VERSION_REVEAL: &str =
     api_path!("/environments/{environment_id}/secrets/{key}/versions/{version}/reveal");
   pub const ROLLBACK: &str = api_path!("/environments/{environment_id}/secrets/{key}/rollback");
+  pub const COPY: &str = api_path!("/environments/{environment_id}/secrets/{key}/copy");
+  /// Outside `/secrets/` so it never shadows a secret named `compare`.
+  pub const COMPARE: &str = api_path!("/environments/{environment_id}/compare");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
@@ -277,12 +280,22 @@ pub mod users {
   pub const COLLECTION: &str = api_path!("/users");
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
+  pub const DISABLE: &str = api_path!("/users/{id}/disable");
+  pub const ENABLE: &str = api_path!("/users/{id}/enable");
   pub const ACCESS: &str = api_path!("/users/{id}/access");
   pub const TOKENS: &str = api_path!("/users/{id}/tokens");
   pub const TOKEN_REVOKE: &str = api_path!("/users/{id}/tokens/{token_id}/revoke");
 
   pub fn item(id: &str) -> String {
     super::render(ITEM, &[("id", id)])
+  }
+
+  pub fn disable(id: &str) -> String {
+    super::render(DISABLE, &[("id", id)])
+  }
+
+  pub fn enable(id: &str) -> String {
+    super::render(ENABLE, &[("id", id)])
   }
 
   pub fn access(id: &str) -> String {

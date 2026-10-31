@@ -1,4 +1,5 @@
-import { createApp, h, nextTick } from "vue";
+/* eslint-disable vue/one-component-per-file */
+import { createApp, h } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DbCopyButton from "./DbCopyButton.vue";
 
@@ -40,12 +41,10 @@ describe("DbCopyButton", () => {
     const { host, onCopied } = mountButton({ writeText });
 
     host.querySelector("button")?.click();
-    await nextTick();
-    await nextTick();
 
+    await vi.waitFor(() => expect(host.textContent).toContain("Copied"));
     expect(writeText).toHaveBeenCalledWith("dbs_secret");
     expect(onCopied).toHaveBeenCalledOnce();
-    expect(host.textContent).toContain("Copied");
   });
 
   it("falls back to selection copying when the Clipboard API is unavailable", async () => {
@@ -57,10 +56,9 @@ describe("DbCopyButton", () => {
     const { host, onCopied } = mountButton(undefined);
 
     host.querySelector("button")?.click();
-    await nextTick();
 
+    await vi.waitFor(() => expect(onCopied).toHaveBeenCalledOnce());
     expect(execCommand).toHaveBeenCalledWith("copy");
-    expect(onCopied).toHaveBeenCalledOnce();
   });
 
   it("reports failure when both copy methods fail", async () => {
@@ -74,9 +72,26 @@ describe("DbCopyButton", () => {
     const { host, onCopyError } = mountButton({ writeText });
 
     host.querySelector("button")?.click();
-    await nextTick();
-    await nextTick();
 
-    expect(onCopyError).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(onCopyError).toHaveBeenCalledOnce());
+  });
+
+  it("draws an icon button that keeps its label for screen readers", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    app = createApp({
+      render: () =>
+        h(DbCopyButton, {
+          value: "dopbase run",
+          label: "Copy command",
+          iconOnly: true,
+        }),
+    });
+    app.mount(host);
+
+    const button = host.querySelector("button")!;
+    expect(button.getAttribute("aria-label")).toBe("Copy command");
+    expect(button.getAttribute("title")).toBe("Copy command");
+    expect(button.textContent?.trim()).toBe("");
   });
 });

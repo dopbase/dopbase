@@ -19,6 +19,11 @@ vi.mock("~/stores/auth.store", () => ({
   }),
 }));
 
+const { route } = vi.hoisted(() => ({
+  route: { query: {} as Record<string, string> },
+}));
+vi.mock("vue-router", () => ({ useRoute: () => route }));
+
 vi.mock("~/services/audit.api");
 vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
@@ -130,5 +135,35 @@ describe("useAuditController", () => {
     await c.load();
     expect(c.loadError.value).toBe("Could not load audit events.");
     expect(c.hasLoaded.value).toBe(false);
+  });
+
+  it("ignores a failure from a request a newer filter replaced", async () => {
+    let failFirst!: (cause: Error) => void;
+    vi.mocked(auditApi.listAuditEvents)
+      .mockReturnValueOnce(new Promise((_, reject) => (failFirst = reject)))
+      .mockResolvedValueOnce({ items: [event], nextCursor: null });
+    const c = useAuditController();
+    const first = c.load();
+    await c.load();
+
+    failFirst(new Error("stale"));
+    await first;
+
+    expect(c.loadError.value).toBeNull();
+    expect(c.loading.value).toBe(false);
+    expect(c.items.value).toHaveLength(1);
+  });
+
+  it("starts from filters in the address", () => {
+    route.query = { projectId: "prj_1", environmentId: "env_1", actor: "maya" };
+    const c = useAuditController();
+
+    expect(c.filters).toMatchObject({
+      projectId: "prj_1",
+      environmentId: "env_1",
+      actor: "maya",
+      action: "",
+    });
+    route.query = {};
   });
 });

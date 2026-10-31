@@ -1,565 +1,351 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { useUsersController } from "./Users.controller";
+import { STATUS_FILTERS, useUsersController } from "./Users.controller";
 import * as usersApi from "~/services/users.api";
-import * as tokensApi from "~/services/personal-tokens.api";
-import * as authApi from "~/services/auth.api";
 import * as rolesApi from "~/services/roles.api";
+import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
+import { mountController } from "~/tests/mount-controller";
+import {
+  adminRole,
+  lead,
+  maya,
+  memberRole,
+  reader,
+  reviewBot,
+  root,
+  settle,
+  signInAs,
+  userFixture,
+  viewerRole,
+} from "~/tests/people";
 
-vi.mock("vue", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("vue")>()),
-  onMounted: vi.fn(),
-}));
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push }),
 }));
-
 vi.mock("~/services/users.api");
-vi.mock("~/services/personal-tokens.api");
-vi.mock("~/services/auth.api");
 vi.mock("~/services/roles.api");
+vi.mock("~/services/auth.api");
+
+const ssoUser = userFixture({
+  id: "usr_sso",
+  email: "Sam@Example.com",
+  hasPassword: false,
+  ssoLinked: true,
+});
+const disabled = userFixture({
+  id: "usr_gone",
+  email: "gone@example.com",
+  status: "disabled",
+});
+
+const methods = (sso: { name: string } | null): authApi.AuthMethods => ({
+  password: true,
+  passwordForm: true,
+  sso,
+  cliBrowser: true,
+});
 
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([
-    {
-      id: "usr_root",
-      email: "root@example.com",
-      role: "root",
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-      hasPassword: true,
-      ssoLinked: false,
-    },
+    root,
+    lead,
+    maya,
+    reader,
+    reviewBot,
   ]);
-  vi.mocked(rolesApi.fetchRoles).mockResolvedValue([]);
-  vi.mocked(authApi.reauthenticate).mockReset();
+  vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+    adminRole,
+    memberRole,
+    viewerRole,
+  ]);
+  vi.mocked(authApi.fetchAuthMethods).mockResolvedValue(methods(null));
+  vi.mocked(usersApi.disableUser).mockResolvedValue(disabled);
 });
 
-function agentFixture({
-  id,
-  name,
-}: {
-  id: string;
-  name: string;
-}): usersApi.User {
-  return {
-    id,
-    email: name,
-    role: "ai_agent",
-    ownerId: "usr_root",
-    createdAt: "2026-08-01T00:00:00Z",
-    updatedAt: "2026-08-01T00:00:00Z",
-    hasPassword: false,
-    ssoLinked: false,
-  };
+async function mountAs(
+  capabilities: Parameters<typeof signInAs>[0] = ["users.view", "users.manage"],
+) {
+  signInAs(capabilities);
+  const { controller } = mountController(useUsersController);
+  await settle();
+  return controller;
 }
 
+const ids = (rows: { user: usersApi.User }[]) => rows.map((row) => row.user.id);
+const rowFor = (c: Awaited<ReturnType<typeof mountAs>>, id: string) =>
+  c.rows.value.find((row) => row.user.id === id)!;
+
 describe("useUsersController", () => {
-  it("offers the roles you may give people and creates users with one", async () => {
-    const base = {
-      description: "",
-      builtin: true,
-      capabilities: [],
-      maxLevel: "read" as const,
-      requiresOwner: false,
-      tokenScope: "data" as const,
-      tokenMaxLevel: "read" as const,
-      tokenDefaultTtlDays: 30,
-      tokenMaxTtlDays: 365,
-      rank: 10,
-      members: 0,
-      createdAt: "",
-      updatedAt: "",
-    };
-    vi.mocked(rolesApi.fetchRoles).mockResolvedValueOnce([
-      {
-        ...base,
-        id: "rol_member",
-        name: "Member",
-        signIn: "interactive",
-        assignable: true,
-      },
-      {
-        ...base,
-        id: "rol_auditor",
-        name: "Auditor",
-        signIn: "interactive",
-        assignable: false,
-      },
-      {
-        ...base,
-        id: "rol_ai_agent",
-        name: "AI agent",
-        signIn: "token_only",
-        assignable: true,
-      },
-    ]);
-    vi.mocked(usersApi.createUser).mockResolvedValueOnce(
-      (await usersApi.fetchUsers())[0],
-    );
-    const c = useUsersController();
-    await c.actions.load();
-    expect(c.state.roleOptions.map((option) => option.value)).toEqual([
-      "rol_member",
-    ]);
-    c.actions.openCreate();
-    c.state.email = "new@example.com";
-    c.state.password = "correct-horse-123";
-    await c.actions.save();
-    expect(usersApi.createUser).toHaveBeenCalledWith(
-      "new@example.com",
-      "correct-horse-123",
-      { roleId: "rol_member" },
-    );
-  });
-
-  it("loads non-revoked agent tokens for the agents list", async () => {
-    const agent = agentFixture({ id: "sa_agent_1", name: "indexer-agent" });
-    const unavailableAgent = agentFixture({
-      id: "sa_agent_2",
-      name: "sync-agent",
-    });
-    const root = (await usersApi.fetchUsers())[0];
-    vi.mocked(usersApi.fetchUsers).mockResolvedValueOnce([
-      root,
-      agent,
-      unavailableAgent,
-    ]);
-    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValueOnce([
-      {
-        id: "ait_active",
-        userId: agent.id,
-        scopeType: "all",
-        scopeId: "",
-        scopeLabel: "",
-        level: "metadata",
-        createdBy: null,
-        name: "active-token",
-        createdAt: "2026-08-01T00:00:00Z",
-        expiresAt: "2026-09-01T00:00:00Z",
-        lastUsedAt: null,
-        revokedAt: null,
-      },
-      {
-        id: "ait_revoked",
-        userId: agent.id,
-        scopeType: "all",
-        scopeId: "",
-        scopeLabel: "",
-        level: "metadata",
-        createdBy: null,
-        name: "revoked-token",
-        createdAt: "2026-07-01T00:00:00Z",
-        expiresAt: null,
-        lastUsedAt: null,
-        revokedAt: "2026-07-15T00:00:00Z",
-      },
-    ]);
-    vi.mocked(tokensApi.listPersonalTokens).mockRejectedValueOnce(
-      new Error("Network error"),
-    );
-
-    const c = useUsersController();
-    await c.actions.load();
-
-    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(agent.id);
-    expect(c.state.agentTokens[agent.id]?.map((token) => token.id)).toEqual([
-      "ait_active",
-    ]);
-    expect(c.state.agents).toEqual([agent, unavailableAgent]);
-    expect(c.state.users).toEqual([root]);
-    expect(c.state.agentTokens[unavailableAgent.id]).toBeNull();
-  });
-
-  it("computes canSave correctly for create and edit modes", () => {
-    const c = useUsersController();
-
-    // Create mode: initially empty email and password
-    c.actions.openCreate();
-    expect(c.state.canSave).toBe(false);
-
-    c.state.email = "admin@example.com";
-    expect(c.state.canSave).toBe(false);
-
-    c.state.password = "securepassword123";
-    expect(c.state.canSave).toBe(true);
-
-    // Edit mode: password is optional
-    c.actions.openEdit({
-      id: "usr_2",
-      email: "member@example.com",
-      role: "member",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    });
-    expect(c.state.canSave).toBe(true);
-
-    c.state.email = "   ";
-    expect(c.state.canSave).toBe(false);
-  });
-
-  it("validates email format and password length client-side", async () => {
-    const c = useUsersController();
-    c.actions.openCreate();
-    c.state.email = "invalid-email";
-    c.state.password = "short";
-
-    await c.actions.save();
-
-    expect(c.state.fieldErrors.email).toBe(
-      "Please enter a valid email address.",
-    );
-    expect(c.state.fieldErrors.password).toContain("at least 12 characters");
-    expect(usersApi.createUser).not.toHaveBeenCalled();
-    expect(c.state.error).toBeNull(); // Page error is untouched
-  });
-
-  it("maps server ApiError validation to fieldErrors without polluting page error", async () => {
-    const c = useUsersController();
-    c.actions.openCreate();
-    c.state.email = "valid@example.com";
-    c.state.password = "validpassword123";
-
-    vi.mocked(usersApi.createUser).mockRejectedValueOnce(
-      new ApiError(400, {
-        EMAIL_INVALID: "Please enter a valid email address.",
-      }),
-    );
-
-    await c.actions.save();
-
-    expect(c.state.fieldErrors.email).toBe(
-      "Please enter a valid email address.",
-    );
-    expect(c.state.error).toBeNull(); // Did not leak to background page
-    expect(c.state.showCreate).toBe(true); // Modal stayed open
-  });
-
-  it("maps password errors to fieldErrors.password", async () => {
-    const c = useUsersController();
-    c.actions.openCreate();
-    c.state.email = "valid@example.com";
-    c.state.password = "validpassword123";
-
-    vi.mocked(usersApi.createUser).mockRejectedValueOnce(
-      new ApiError(400, {
-        PASSWORD_TOO_SHORT: "Password must contain at least 12 characters.",
-      }),
-    );
-
-    await c.actions.save();
-
-    expect(c.state.fieldErrors.password).toBe(
-      "Password must contain at least 12 characters.",
-    );
-    expect(c.state.error).toBeNull();
-  });
-
-  it("maps unhandled server errors to formError inside the modal", async () => {
-    const c = useUsersController();
-    c.actions.openCreate();
-    c.state.email = "valid@example.com";
-    c.state.password = "validpassword123";
-
-    vi.mocked(usersApi.createUser).mockRejectedValueOnce(
-      new ApiError(500, {
-        INTERNAL_ERROR: "Database write failed.",
-      }),
-    );
-
-    await c.actions.save();
-
-    expect(c.state.formError).toBe("Database write failed.");
-    expect(c.state.error).toBeNull();
-  });
-
-  it("resets form errors on close and openCreate", () => {
-    const c = useUsersController();
-    c.actions.openCreate();
-    c.state.fieldErrors = { email: "Error" };
-    c.state.formError = "Form error";
-
-    c.actions.close();
-    expect(c.state.fieldErrors).toEqual({});
-    expect(c.state.formError).toBeNull();
-  });
-
-  it("handles user delete flow via confirmation dialog without browser dialog", async () => {
-    window.confirm = vi.fn();
-    const c = useUsersController();
-
-    const targetUser: usersApi.User = {
-      id: "usr_to_delete",
-      email: "delete-me@example.com",
-      role: "member",
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-      hasPassword: true,
-      ssoLinked: false,
-    };
-
-    // Prompt sets target
-    c.actions.promptDelete(targetUser);
-    expect(c.state.userToDelete).toEqual(targetUser);
-    expect(c.state.deleteUserError).toBeNull();
-
-    // Close cancels
-    c.actions.closeDeleteUser();
-    expect(c.state.userToDelete).toBeNull();
-
-    // Prompt again and confirm
-    c.actions.promptDelete(targetUser);
-    vi.mocked(usersApi.deleteUser).mockResolvedValueOnce(undefined);
-
-    await c.actions.confirmDeleteUser();
-
-    expect(usersApi.deleteUser).toHaveBeenCalledWith("usr_to_delete");
-    expect(c.state.userToDelete).toBeNull();
-    expect(window.confirm).not.toHaveBeenCalled();
-  });
-
-  it("surfaces delete user error inside confirmation dialog", async () => {
-    const c = useUsersController();
-    const targetUser: usersApi.User = {
-      id: "usr_fail",
-      email: "fail@example.com",
-      role: "member",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    };
-
-    c.actions.promptDelete(targetUser);
-    vi.mocked(usersApi.deleteUser).mockRejectedValueOnce(
-      new ApiError(400, { ERROR: "Cannot delete user." }),
-    );
-
-    await c.actions.confirmDeleteUser();
-
-    expect(c.state.deleteUserError).toBe("Cannot delete user.");
-    expect(c.state.userToDelete).toEqual(targetUser); // Dialog stays open
-  });
-
-  it("handles AI agent delete flow via confirmation dialog without browser dialog", async () => {
-    window.confirm = vi.fn();
-    const c = useUsersController();
-
-    const targetAgent = agentFixture({
-      id: "sa_to_delete",
-      name: "build-agent",
+  describe("the list", () => {
+    it("lists the people who sign in and leaves AI agents to their own page", async () => {
+      const c = await mountAs();
+      expect(ids(c.rows.value)).toEqual([
+        "usr_root",
+        "usr_lead",
+        "usr_maya",
+        "usr_reader",
+      ]);
     });
 
-    // Prompt sets target
-    c.actions.promptDeleteAgent(targetAgent);
-    expect(c.state.agentToDelete).toEqual(targetAgent);
-    expect(c.state.deleteAgentError).toBeNull();
+    it("marks a custom role apart from the ones Dopbase ships with", async () => {
+      const c = await mountAs();
+      expect(rowFor(c, "usr_reader")).toMatchObject({
+        roleName: "Viewer",
+        customRole: true,
+      });
+      expect(rowFor(c, "usr_maya")).toMatchObject({
+        roleName: "Member",
+        customRole: false,
+      });
+    });
 
-    // Close cancels
-    c.actions.closeDeleteAgent();
-    expect(c.state.agentToDelete).toBeNull();
+    it("falls back to the role row's name, then the fixed role, when the account has no role name", async () => {
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+        userFixture({ id: "usr_a", roleName: undefined }),
+        userFixture({ id: "usr_b", roleId: "rol_gone", roleName: undefined }),
+      ]);
+      const c = await mountAs();
+      expect(rowFor(c, "usr_a").roleName).toBe("Member");
+      expect(rowFor(c, "usr_b")).toMatchObject({
+        roleName: "member",
+        customRole: false,
+      });
+    });
 
-    // Prompt again and confirm
-    c.actions.promptDeleteAgent(targetAgent);
-    vi.mocked(usersApi.deleteUser).mockResolvedValueOnce(undefined);
+    it("tags root and your own row", async () => {
+      const c = await mountAs();
+      expect(rowFor(c, "usr_root")).toMatchObject({
+        isRoot: true,
+        isYou: false,
+      });
+      expect(rowFor(c, "usr_lead")).toMatchObject({
+        isRoot: false,
+        isYou: true,
+      });
+      expect(rowFor(c, "usr_maya")).toMatchObject({
+        isRoot: false,
+        isYou: false,
+      });
+    });
 
-    await c.actions.confirmDeleteAgent();
+    it("shows how each account signs in and when it last did", async () => {
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+        userFixture({
+          lastSignInAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+        }),
+        ssoUser,
+      ]);
+      const c = await mountAs();
+      expect(rowFor(c, "usr_maya")).toMatchObject({
+        signIn: "password",
+        lastSignIn: "2h ago",
+      });
+      expect(rowFor(c, "usr_sso")).toMatchObject({
+        signIn: "sso",
+        lastSignIn: "Never",
+      });
+    });
 
-    expect(usersApi.deleteUser).toHaveBeenCalledWith("sa_to_delete");
-    expect(c.state.agentToDelete).toBeNull();
-    expect(window.confirm).not.toHaveBeenCalled();
+    it("knows single sign-on is on when the server offers it", async () => {
+      vi.mocked(authApi.fetchAuthMethods).mockResolvedValue(
+        methods({ name: "Okta" }),
+      );
+      const c = await mountAs();
+      expect(c.ssoEnabled.value).toBe(true);
+    });
+
+    it("still lists people when roles and sign-in methods can't load", async () => {
+      vi.mocked(rolesApi.fetchRoles).mockRejectedValue(new Error("down"));
+      vi.mocked(authApi.fetchAuthMethods).mockRejectedValue(new Error("down"));
+      const c = await mountAs();
+      expect(c.loadError.value).toBeNull();
+      expect(c.roles.value).toEqual([]);
+      expect(c.ssoEnabled.value).toBe(false);
+      expect(rowFor(c, "usr_reader")).toMatchObject({
+        roleName: "Viewer",
+        customRole: false,
+      });
+    });
+
+    it("says so when the list can't load", async () => {
+      vi.mocked(usersApi.fetchUsers).mockRejectedValue(
+        new ApiError(500, { INTERNAL: "Boom." }),
+      );
+      const c = await mountAs();
+      expect(c.users.value).toEqual([]);
+      expect(c.loadError.value).toBe("Could not load users.");
+    });
+
+    it("keeps the list on screen when a refresh fails", async () => {
+      const c = await mountAs();
+      vi.mocked(usersApi.fetchUsers).mockRejectedValue(new Error("down"));
+      await c.load();
+      expect(c.loadError.value).toBe("Could not load users.");
+      expect(ids(c.rows.value)).toContain("usr_maya");
+    });
   });
 
-  it("surfaces delete AI agent error inside confirmation dialog", async () => {
-    const c = useUsersController();
-    const targetAgent = agentFixture({
-      id: "sa_fail",
-      name: "failing-agent",
+  describe("row actions", () => {
+    it("gives a manager every action on an ordinary account", async () => {
+      const c = await mountAs();
+      expect(rowFor(c, "usr_maya")).toMatchObject({
+        actions: ["disable", "delete"],
+        canEdit: true,
+      });
     });
 
-    c.actions.promptDeleteAgent(targetAgent);
-    vi.mocked(usersApi.deleteUser).mockRejectedValueOnce(
-      new ApiError(400, { ERROR: "Cannot delete AI agent." }),
-    );
+    it("never lets you change root or your own account", async () => {
+      const c = await mountAs();
+      expect(rowFor(c, "usr_root")).toMatchObject({
+        actions: [],
+        canEdit: false,
+      });
+      expect(rowFor(c, "usr_lead")).toMatchObject({
+        actions: [],
+        canEdit: false,
+      });
+    });
 
-    await c.actions.confirmDeleteAgent();
+    it("offers unlinking only to accounts linked to single sign-on", async () => {
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([maya, ssoUser]);
+      const c = await mountAs();
+      expect(rowFor(c, "usr_sso").actions).toEqual([
+        "unlink",
+        "disable",
+        "delete",
+      ]);
+      expect(rowFor(c, "usr_maya").actions).not.toContain("unlink");
+    });
 
-    expect(c.state.deleteAgentError).toBe("Cannot delete AI agent.");
-    expect(c.state.agentToDelete).toEqual(targetAgent); // Dialog stays open
+    it("offers to turn a disabled account back on instead of disabling it", async () => {
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([disabled]);
+      const c = await mountAs();
+      expect(rowFor(c, "usr_gone").actions).toEqual(["enable", "delete"]);
+    });
+
+    it("gives no actions to someone who can only view users", async () => {
+      const c = await mountAs(["users.view"]);
+      expect(c.canManage.value).toBe(false);
+      expect(c.rows.value.every((row) => row.actions.length === 0)).toBe(true);
+      expect(c.rows.value.every((row) => !row.canEdit)).toBe(true);
+    });
+
+    it("refreshes the list after disabling someone from it", async () => {
+      const c = await mountAs();
+      expect(usersApi.fetchUsers).toHaveBeenCalledTimes(1);
+
+      c.actions.ask("disable", maya);
+      await c.actions.confirm();
+
+      expect(usersApi.disableUser).toHaveBeenCalledWith("usr_maya");
+      expect(usersApi.fetchUsers).toHaveBeenCalledTimes(2);
+    });
   });
 
-  it("prompts for an agent token password and cancels without generating one", () => {
-    const c = useUsersController();
-    const targetAgent = agentFixture({
-      id: "sa_agent_1",
-      name: "indexer-agent",
+  describe("filters", () => {
+    beforeEach(() => {
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+        maya,
+        reader,
+        ssoUser,
+        disabled,
+      ]);
     });
 
-    c.actions.promptGetToken(targetAgent);
-    expect(c.state.showTokenReauth).toBe(true);
-    expect(c.state.agentForToken).toEqual(targetAgent);
-    expect(c.state.tokenPassword).toBe("");
-    expect(c.state.tokenPasswordError).toBeNull();
-    expect(c.state.tokenReauthError).toBeNull();
+    it("offers the three status filters", () => {
+      expect(STATUS_FILTERS.map((option) => option.value)).toEqual([
+        "active",
+        "disabled",
+        "sso",
+      ]);
+    });
 
-    c.actions.closeTokenReauth();
-    expect(c.state.showTokenReauth).toBe(false);
-    expect(c.state.agentForToken).toBeNull();
+    it("searches emails ignoring case and surrounding spaces", async () => {
+      const c = await mountAs();
+      c.filter.value = "  SAM@ ";
+      expect(ids(c.visibleRows.value)).toEqual(["usr_sso"]);
+    });
+
+    it("offers each role once, sorted, as a role filter", async () => {
+      const c = await mountAs();
+      expect(c.roleFilters.value).toEqual([
+        { value: "Member", label: "Member" },
+        { value: "Viewer", label: "Viewer" },
+      ]);
+    });
+
+    it("narrows the list to one role", async () => {
+      const c = await mountAs();
+      c.roleFilter.value = "Viewer";
+      expect(ids(c.visibleRows.value)).toEqual(["usr_reader"]);
+    });
+
+    it("narrows the list by status", async () => {
+      const c = await mountAs();
+      c.statusFilter.value = "disabled";
+      expect(ids(c.visibleRows.value)).toEqual(["usr_gone"]);
+      c.statusFilter.value = "active";
+      expect(ids(c.visibleRows.value)).toEqual([
+        "usr_maya",
+        "usr_reader",
+        "usr_sso",
+      ]);
+      c.statusFilter.value = "sso";
+      expect(ids(c.visibleRows.value)).toEqual(["usr_sso"]);
+    });
+
+    it("combines search, role and status", async () => {
+      const c = await mountAs();
+      c.filter.value = "example.com";
+      c.roleFilter.value = "Member";
+      c.statusFilter.value = "active";
+      expect(ids(c.visibleRows.value)).toEqual(["usr_maya", "usr_sso"]);
+    });
   });
 
-  it("requires a password before reauthenticating", async () => {
-    const c = useUsersController();
-    const targetAgent = agentFixture({
-      id: "sa_agent_1",
-      name: "indexer-agent",
+  describe("adding and editing", () => {
+    it("opens an empty dialog to add someone", async () => {
+      const c = await mountAs();
+      c.openEdit(maya);
+      c.dialogOpen.value = false;
+
+      c.openAdd();
+
+      expect(c.dialogOpen.value).toBe(true);
+      expect(c.editing.value).toBeNull();
     });
 
-    c.actions.promptGetToken(targetAgent);
-    await c.actions.confirmTokenReauthAndGenerate();
+    it("sends a new account straight to its Access tab", async () => {
+      const c = await mountAs();
+      const sam = userFixture({ id: "usr_sam", email: "sam@example.com" });
 
-    expect(c.state.tokenPasswordError).toBe("Password is required.");
-    expect(authApi.reauthenticate).not.toHaveBeenCalled();
-  });
+      c.openAdd();
+      await c.saved(sam);
 
-  it("surfaces a failed reauthentication and keeps the dialog open", async () => {
-    const c = useUsersController();
-    const targetAgent = agentFixture({
-      id: "sa_agent_1",
-      name: "indexer-agent",
+      expect(c.dialogOpen.value).toBe(false);
+      expect(push).toHaveBeenCalledWith({
+        name: "user-access",
+        params: { userId: "usr_sam" },
+      });
+      expect(usersApi.fetchUsers).toHaveBeenCalledTimes(1);
     });
 
-    c.actions.promptGetToken(targetAgent);
-    c.state.tokenPassword = "wrong-password";
-    vi.mocked(authApi.reauthenticate).mockRejectedValueOnce(
-      new ApiError(403, { ERROR: "Incorrect password." }),
-    );
+    it("stays on the list and refreshes it after an edit", async () => {
+      const c = await mountAs();
 
-    await c.actions.confirmTokenReauthAndGenerate();
+      c.openEdit(maya);
+      expect(c.editing.value).toStrictEqual(maya);
+      expect(c.dialogOpen.value).toBe(true);
+      await c.saved(maya);
 
-    expect(c.state.tokenReauthError).toBe("Incorrect password.");
-    expect(c.state.showTokenReauth).toBe(true);
-    expect(c.state.createdAgentToken).toBeNull();
-    expect(tokensApi.createPersonalToken).not.toHaveBeenCalled();
-  });
-
-  it("reauthenticates, revokes the active token, generates a new one, and acknowledges it", async () => {
-    const c = useUsersController();
-    const targetAgent = agentFixture({
-      id: "sa_agent_1",
-      name: "indexer-agent",
+      expect(c.dialogOpen.value).toBe(false);
+      expect(push).not.toHaveBeenCalled();
+      expect(usersApi.fetchUsers).toHaveBeenCalledTimes(2);
     });
-
-    c.actions.promptGetToken(targetAgent);
-    c.state.tokenPassword = "correct-password";
-    vi.mocked(authApi.reauthenticate).mockResolvedValueOnce(undefined);
-    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValueOnce([
-      {
-        id: "ait_old_active",
-        userId: "sa_agent_1",
-        scopeType: "all",
-        scopeId: "",
-        scopeLabel: "",
-        level: "metadata",
-        createdBy: null,
-        name: "token-1",
-        createdAt: "2026-08-01T00:00:00Z",
-        expiresAt: "2026-08-31T00:00:00Z",
-        lastUsedAt: null,
-        revokedAt: null,
-      },
-      {
-        id: "ait_old_revoked",
-        userId: "sa_agent_1",
-        scopeType: "all",
-        scopeId: "",
-        scopeLabel: "",
-        level: "metadata",
-        createdBy: null,
-        name: "token-0",
-        createdAt: "2026-07-01T00:00:00Z",
-        expiresAt: "2026-07-31T00:00:00Z",
-        lastUsedAt: null,
-        revokedAt: "2026-07-15T00:00:00Z",
-      },
-    ]);
-    vi.mocked(tokensApi.revokePersonalToken).mockResolvedValueOnce({
-      id: "ait_old_active",
-      userId: "sa_agent_1",
-      scopeType: "all",
-      scopeId: "",
-      scopeLabel: "",
-      level: "metadata",
-      createdBy: null,
-      name: "token-1",
-      createdAt: "2026-08-01T00:00:00Z",
-      expiresAt: "2026-08-31T00:00:00Z",
-      lastUsedAt: null,
-      revokedAt: "2026-08-02T00:00:00Z",
-    });
-    const createdResult: tokensApi.CreatedPersonalToken = {
-      token: {
-        id: "ait_new",
-        userId: "sa_agent_1",
-        scopeType: "all",
-        scopeId: "",
-        scopeLabel: "",
-        level: "metadata",
-        createdBy: null,
-        name: "token-new",
-        createdAt: "2026-08-02T00:00:00Z",
-        expiresAt: "2026-09-01T00:00:00Z",
-        lastUsedAt: null,
-        revokedAt: null,
-      },
-      plaintextToken: "dpp_abcdef1234567890",
-    };
-    vi.mocked(tokensApi.createPersonalToken).mockResolvedValueOnce(
-      createdResult,
-    );
-
-    await c.actions.confirmTokenReauthAndGenerate();
-
-    expect(authApi.reauthenticate).toHaveBeenCalledWith("correct-password");
-    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("sa_agent_1");
-    // Only the unrevoked token should be revoked.
-    expect(tokensApi.revokePersonalToken).toHaveBeenCalledTimes(1);
-    expect(tokensApi.revokePersonalToken).toHaveBeenCalledWith(
-      "sa_agent_1",
-      "ait_old_active",
-    );
-    expect(tokensApi.createPersonalToken).toHaveBeenCalledWith("sa_agent_1", {
-      name: expect.stringMatching(/^token-\d+$/),
-      level: "metadata",
-      expiresIn: "30d",
-    });
-    expect(c.state.showTokenReauth).toBe(false);
-    expect(c.state.createdAgentToken).toEqual(createdResult);
-    expect(c.state.agentTokens.sa_agent_1).toEqual([createdResult.token]);
-
-    c.actions.acknowledgeCreatedToken();
-    expect(c.state.createdAgentToken).toBeNull();
-    expect(c.state.agentForToken).toBeNull();
-  });
-
-  it("checks custom expiry before revoking an agent token", async () => {
-    const c = useUsersController();
-    c.actions.promptGetToken(
-      agentFixture({ id: "sa_agent_1", name: "indexer-agent" }),
-    );
-    c.state.tokenPassword = "correct-password";
-    c.state.tokenExpiryChoice = "custom";
-    c.state.tokenCustomAmount = "1096";
-    c.state.tokenCustomUnit = "d";
-    await c.actions.confirmTokenReauthAndGenerate();
-    expect(c.state.tokenExpiryError).toContain("1095");
-    expect(authApi.reauthenticate).not.toHaveBeenCalled();
-    expect(tokensApi.revokePersonalToken).not.toHaveBeenCalled();
   });
 });

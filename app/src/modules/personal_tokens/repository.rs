@@ -121,6 +121,22 @@ pub async fn revoke(
   )
 }
 
+/// The account's tokens other than `except` that are neither revoked nor
+/// expired at `now`, as (id, name).
+pub async fn live_except(
+  conn: &mut SqliteConnection,
+  user_id: &str,
+  except: &str,
+  now: &str,
+) -> Result<Vec<(String, String)>, sqlx::Error> {
+  sqlx::query_as("SELECT id, name FROM personal_tokens WHERE user_id = ? AND id <> ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at")
+    .bind(user_id)
+    .bind(except)
+    .bind(now)
+    .fetch_all(conn)
+    .await
+}
+
 /// The account a token would belong to, and its role's token policy.
 #[derive(sqlx::FromRow)]
 pub struct Holder {

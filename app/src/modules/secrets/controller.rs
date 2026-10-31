@@ -385,3 +385,71 @@ pub async fn runtime(
     "RUNTIME_SECRETS_FETCHED",
   ))
 }
+
+/// Compare environments
+///
+/// Line up every key of this environment and up to three others in its
+/// project. Each cell gives the key's version there and, where the caller
+/// has Read on both environments, whether the value matches this one.
+/// Values are never returned.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::secrets::COMPARE,
+  tag = "secrets",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "The base environment's id"), CompareQuery),
+  responses(
+    (status = 200, description = "Environments compared", body = inline(HttpResponseFormat<CompareResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "The caller cannot see one of the environments", body = crate::http::ErrorBody),
+    (status = 404, description = "An environment was not found", body = crate::http::ErrorBody),
+    (status = 422, description = "More than three environments, the base itself, or one from another project", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn compare(
+  State(state): State<AppState>,
+  identity: AuthIdentity,
+  Path(id): Path<String>,
+  Query(query): Query<CompareQuery>,
+) -> Result<HttpResponse<CompareResponse>, SecretError> {
+  Ok(HttpResponse::ok(
+    service::compare(&state, &identity, &id, query.with.as_deref()).await?,
+    "ENVIRONMENTS_COMPARED",
+  ))
+}
+
+/// Copy a secret from another environment
+///
+/// Store another environment's current value of this key here, as a new
+/// version. The value is copied on the server and never returned. Needs
+/// Read on the source and Write here, and is recorded in the audit log as
+/// `secret.copied`.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::secrets::COPY,
+  tag = "secrets",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "The environment to copy into"), ("key" = String, Path, description = "Secret key")),
+  request_body = CopySecretRequest,
+  responses(
+    (status = 200, description = "Secret copied", body = inline(HttpResponseFormat<SecretMetadata>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Read on the source or Write here is missing, or the CSRF token is invalid", body = crate::http::ErrorBody),
+    (status = 404, description = "The secret or an environment was not found", body = crate::http::ErrorBody),
+    (status = 409, description = "The secret changed since the caller loaded it", body = crate::http::ErrorBody),
+    (status = 422, description = "The source is this environment or another project's", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn copy(
+  State(state): State<AppState>,
+  headers: HeaderMap,
+  identity: AuthIdentity,
+  Path((id, key)): Path<(String, String)>,
+  axum::Json(request): axum::Json<CopySecretRequest>,
+) -> Result<HttpResponse<SecretMetadata>, SecretError> {
+  require_mutation(&identity, &headers)?;
+  Ok(HttpResponse::ok(
+    service::copy(&state, &identity, &id, key, request).await?,
+    "SECRET_COPIED",
+  ))
+}

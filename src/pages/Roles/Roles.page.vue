@@ -1,297 +1,187 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import {
-  CAPABILITY_LABELS,
-  ROLE_CAPABILITIES,
-  useRolesController,
-} from "./Roles.controller";
+import { useRolesController } from "./Roles.controller";
 import { DashboardLayout } from "~/layouts";
+import PageHeader from "~/components/app/PageHeader.vue";
 import {
   DbAlert,
-  DbBadge,
   DbButton,
-  DbCheckbox,
   DbConfirmDialog,
-  DbInput,
-  DbModal,
-  DbSelect,
+  DbLevelBadge,
+  DbMenu,
+  DbMenuItem,
   DbSkeleton,
 } from "~/components/ui";
-import { PlusIcon } from "~/assets/icons";
-import { errorMessage } from "~/services/api-errors";
-import type { Capability, Level } from "~/services/access.api";
-import type { Role, SignIn, TokenScope } from "~/services/roles.api";
-import { formatLevel } from "~/utils/format";
+import {
+  CopyIcon,
+  EyeIcon,
+  InfoIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+} from "~/assets/icons";
 
 /**
- * Roles lists every role. Root creates custom roles from scratch, such as a
- * Viewer that reads values but never changes them, and changes or deletes
- * them later. Built-in roles stay as they are.
+ * Roles lists every role: how deep into project data its holders reach,
+ * what else they may do, and who holds it. Root only.
  */
 const controller = useRolesController();
-const { roles, error } = controller;
-
-const LEVEL_OPTIONS = (
-  ["metadata", "read", "write", "manage", "project_manager"] as Level[]
-).map((value) => ({ value, label: formatLevel(value) }));
-const TOKEN_LEVEL_OPTIONS = LEVEL_OPTIONS.slice(0, 3);
-const SIGN_IN_OPTIONS = [
-  { value: "interactive", label: "People who sign in" },
-  {
-    value: "token_only",
-    label: "Accounts that only use tokens, like AI agents",
-  },
-];
-const TOKEN_SCOPE_OPTIONS = [
-  { value: "data", label: "Project data" },
-  { value: "audit", label: "The audit log only" },
-  { value: "none", label: "No tokens" },
-];
-
-const editing = ref<Role | null>(null);
-const showForm = ref(false);
-const name = ref("");
-const description = ref("");
-const capabilities = ref<Capability[]>([]);
-const maxLevel = ref<Level>("read");
-const signIn = ref<SignIn>("interactive");
-const tokenScope = ref<TokenScope>("data");
-const tokenMaxLevel = ref<Level>("read");
-const tokenDefaultTtlDays = ref("30");
-const tokenMaxTtlDays = ref("365");
-const saving = ref(false);
-const formError = ref<string | null>(null);
-const deleteTarget = ref<Role | null>(null);
-const deleting = ref(false);
-const deleteError = ref<string | null>(null);
-
-const holdsTokens = computed(() =>
-  capabilities.value.includes("tokens.personal"),
-);
-
-function open(role: Role | null): void {
-  editing.value = role;
-  name.value = role?.name ?? "";
-  description.value = role?.description ?? "";
-  capabilities.value = role ? [...role.capabilities] : ["tokens.personal"];
-  maxLevel.value = role?.maxLevel ?? "read";
-  signIn.value = role?.signIn ?? "interactive";
-  tokenScope.value = role?.tokenScope ?? "data";
-  tokenMaxLevel.value = role?.tokenMaxLevel ?? "read";
-  tokenDefaultTtlDays.value = String(role?.tokenDefaultTtlDays ?? 30);
-  tokenMaxTtlDays.value = String(role?.tokenMaxTtlDays ?? 365);
-  formError.value = null;
-  showForm.value = true;
-}
-
-function toggle(capability: Capability, on: boolean): void {
-  capabilities.value = on
-    ? [...capabilities.value, capability]
-    : capabilities.value.filter((item) => item !== capability);
-}
-
-async function submit(): Promise<void> {
-  saving.value = true;
-  formError.value = null;
-  try {
-    await controller.save(
-      {
-        name: name.value.trim(),
-        description: description.value.trim(),
-        capabilities: capabilities.value,
-        maxLevel: maxLevel.value,
-        signIn: signIn.value,
-        tokenScope: holdsTokens.value ? tokenScope.value : "none",
-        tokenMaxLevel: tokenMaxLevel.value,
-        tokenDefaultTtlDays: Number(tokenDefaultTtlDays.value),
-        tokenMaxTtlDays: Number(tokenMaxTtlDays.value),
-      },
-      editing.value?.id ?? null,
-    );
-    showForm.value = false;
-  } catch (cause) {
-    formError.value = errorMessage(cause, "Could not save the role.");
-  } finally {
-    saving.value = false;
-  }
-}
-
-async function confirmDelete(): Promise<void> {
-  if (!deleteTarget.value) return;
-  deleting.value = true;
-  deleteError.value = null;
-  try {
-    await controller.remove(deleteTarget.value);
-    deleteTarget.value = null;
-  } catch (cause) {
-    deleteError.value = errorMessage(cause, "Could not delete the role.");
-  } finally {
-    deleting.value = false;
-  }
-}
+const { roles, error, rows, deleting, deleteBusy, deleteError } = controller;
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:p-8">
-      <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 class="text-lg font-semibold text-ink-strong">Roles</h1>
-          <p class="mt-1 max-w-2xl text-sm text-ink-muted">
-            A role says what its holders may do on this instance and how deep
-            into project data their grants can reach. Changes apply on their
-            next request. Built-in roles can't change; create your own for
-            anything else.
-          </p>
-        </div>
-        <DbButton
-          size="sm"
-          variant="primary"
-          data-testid="new-role"
-          @click="open(null)">
-          <PlusIcon class="h-3.5 w-3.5" />
-          New role
-        </DbButton>
-      </header>
+    <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
+      <PageHeader
+        title="Roles"
+        subtitle="A role sets how far into project data its holders can reach and what else they may do here. Changes apply on their next request.">
+        <template #actions>
+          <DbButton
+            variant="primary"
+            data-testid="new-role"
+            @click="$router.push({ name: 'role-new' })">
+            <PlusIcon class="h-4 w-4" />
+            New role
+          </DbButton>
+        </template>
+      </PageHeader>
 
-      <DbAlert v-if="error" class="mb-4">{{ error }}</DbAlert>
+      <DbAlert v-if="error">{{ error }}</DbAlert>
 
-      <div v-if="roles === null" class="space-y-2">
-        <DbSkeleton v-for="i in 4" :key="i" class="h-16 w-full rounded-card" />
+      <div v-if="roles === null" class="flex flex-col gap-2">
+        <DbSkeleton
+          v-for="line in 4"
+          :key="line"
+          class="h-12 w-full rounded-control" />
       </div>
 
-      <div
-        v-else
-        class="overflow-hidden rounded-card border border-line bg-panel"
-        data-testid="roles-list">
+      <template v-else>
         <div
-          v-for="role in roles"
-          :key="role.id"
-          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-4 py-3 last:border-0">
-          <div class="min-w-0 flex-1 basis-full sm:basis-0">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <p class="text-sm font-medium text-ink-strong">
-                {{ role.name }}
-              </p>
-              <DbBadge v-if="role.builtin">built-in</DbBadge>
-              <DbBadge v-if="role.signIn === 'token_only'" tone="accent">
-                tokens only
-              </DbBadge>
-            </div>
-            <p v-if="role.description" class="text-xs text-ink-muted">
-              {{ role.description }}
-            </p>
-            <p class="mt-0.5 text-xs text-ink-faint">
-              Up to {{ formatLevel(role.maxLevel) }} ·
-              {{ role.capabilities.length }} capabilities ·
-              {{ role.members }}
-              {{ role.members === 1 ? "account" : "accounts" }}
-            </p>
-          </div>
-          <template v-if="!role.builtin">
-            <DbButton size="sm" variant="secondary" @click="open(role)">
-              Edit
-            </DbButton>
-            <DbButton
-              size="sm"
-              variant="danger"
-              @click="((deleteError = null), (deleteTarget = role))">
-              Delete
-            </DbButton>
-          </template>
+          class="hidden overflow-x-auto rounded-card border border-line bg-panel sm:block">
+          <table class="min-w-full text-left text-sm" data-testid="roles-table">
+            <thead>
+              <tr class="border-b border-line-soft bg-raised/50">
+                <th class="h-11 px-4 font-medium text-ink-muted">Role</th>
+                <th class="h-11 px-4 font-medium text-ink-muted">
+                  Reaches at most
+                </th>
+                <th class="h-11 px-4 font-medium text-ink-muted">
+                  Capabilities
+                </th>
+                <th class="h-11 px-4 font-medium text-ink-muted">Signs in</th>
+                <th class="h-11 px-4 font-medium text-ink-muted">Holders</th>
+                <th class="h-11 w-12 px-2">
+                  <span class="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in rows"
+                :key="row.role.id"
+                class="border-b border-line-soft last:border-b-0"
+                data-testid="role-row">
+                <td class="h-[56px] max-w-80 px-4">
+                  <span class="flex items-center gap-2">
+                    <RouterLink
+                      :to="row.to"
+                      class="truncate font-medium text-ink-strong hover:underline">
+                      {{ row.role.name }}
+                    </RouterLink>
+                    <span
+                      class="shrink-0 rounded-control px-1.5 py-0.5 font-mono text-xs"
+                      :class="
+                        row.role.builtin
+                          ? 'bg-raised text-ink-muted'
+                          : 'bg-accent-soft text-accent-strong'
+                      ">
+                      {{ row.role.builtin ? "built-in" : "custom" }}
+                    </span>
+                  </span>
+                  <p
+                    v-if="row.role.description"
+                    class="truncate text-xs text-ink-muted">
+                    {{ row.role.description }}
+                  </p>
+                </td>
+                <td class="px-4"><DbLevelBadge v-bind="row.reach" /></td>
+                <td class="px-4 font-mono text-ink">
+                  {{ row.capabilityCount }}
+                </td>
+                <td class="px-4 text-ink">{{ row.signsIn }}</td>
+                <td class="px-4 font-mono text-ink">{{ row.holders }}</td>
+                <td class="px-2 text-right">
+                  <DbMenu :label="`Actions for ${row.role.name}`">
+                    <DbMenuItem @select="$router.push(row.to)">
+                      <template #icon>
+                        <EyeIcon v-if="row.role.builtin" class="h-4 w-4" />
+                        <PencilIcon v-else class="h-4 w-4" />
+                      </template>
+                      {{ row.role.builtin ? "View" : "Edit" }}
+                    </DbMenuItem>
+                    <DbMenuItem @select="controller.duplicate(row.role)">
+                      <template #icon><CopyIcon class="h-4 w-4" /></template>
+                      Duplicate
+                    </DbMenuItem>
+                    <template v-if="!row.role.builtin">
+                      <div class="my-0.5 h-px bg-line-soft" role="separator" />
+                      <DbMenuItem
+                        tone="danger"
+                        @select="controller.askDelete(row.role)">
+                        <template #icon><TrashIcon class="h-4 w-4" /></template>
+                        Delete role
+                      </DbMenuItem>
+                    </template>
+                  </DbMenu>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </div>
+
+        <ul class="flex flex-col gap-2 sm:hidden" data-testid="roles-cards">
+          <li
+            v-for="row in rows"
+            :key="row.role.id"
+            class="rounded-card border border-line bg-panel p-3">
+            <RouterLink :to="row.to" class="flex flex-col gap-1.5">
+              <span
+                class="flex items-center gap-2 text-sm font-medium text-ink-strong">
+                {{ row.role.name }}
+                <span class="font-mono text-xs font-normal text-ink-muted">
+                  {{ row.role.builtin ? "built-in" : "custom" }}
+                </span>
+              </span>
+              <span
+                class="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                <DbLevelBadge v-bind="row.reach" />
+                {{ row.signsIn }} · {{ row.holders }}
+                {{ row.holders === 1 ? "holder" : "holders" }}
+              </span>
+            </RouterLink>
+          </li>
+        </ul>
+
+        <p
+          class="flex items-start gap-2 rounded-card border border-line bg-panel px-4 py-3 text-sm text-ink-muted">
+          <InfoIcon class="mt-0.5 h-4 w-4 shrink-0" />
+          Built-in roles can't be changed. Duplicate one to start a custom role.
+        </p>
+      </template>
     </div>
 
-    <DbModal
-      :open="showForm"
-      :title="editing ? `Edit ${editing.name}` : 'New role'"
-      size="lg"
-      @close="showForm = false">
-      <form class="flex flex-col gap-4" @submit.prevent="submit">
-        <div class="grid gap-3 sm:grid-cols-2">
-          <DbInput v-model="name" label="Name" placeholder="e.g. Viewer" />
-          <DbSelect
-            :model-value="maxLevel"
-            label="Reaches at most"
-            :options="LEVEL_OPTIONS"
-            @update:model-value="
-              (value: string) => (maxLevel = value as Level)
-            " />
-        </div>
-        <DbInput
-          v-model="description"
-          label="Description (optional)"
-          placeholder="What the role is for" />
-        <DbSelect
-          v-if="!editing"
-          :model-value="signIn"
-          label="Holders"
-          :options="SIGN_IN_OPTIONS"
-          @update:model-value="(value: string) => (signIn = value as SignIn)" />
-
-        <fieldset class="flex flex-col gap-2">
-          <legend class="mb-1 text-xs font-semibold text-ink-muted">
-            Holders can
-          </legend>
-          <DbCheckbox
-            v-for="capability in ROLE_CAPABILITIES"
-            :key="capability"
-            :model-value="capabilities.includes(capability)"
-            :label="CAPABILITY_LABELS[capability] ?? capability"
-            @update:model-value="(on: boolean) => toggle(capability, on)" />
-        </fieldset>
-
-        <div v-if="holdsTokens" class="grid gap-3 sm:grid-cols-2">
-          <DbSelect
-            :model-value="tokenScope"
-            label="Their tokens read"
-            :options="TOKEN_SCOPE_OPTIONS.slice(0, 2)"
-            @update:model-value="
-              (value: string) => (tokenScope = value as TokenScope)
-            " />
-          <DbSelect
-            v-if="tokenScope === 'data'"
-            :model-value="tokenMaxLevel"
-            label="Tokens reach at most"
-            :options="TOKEN_LEVEL_OPTIONS"
-            @update:model-value="
-              (value: string) => (tokenMaxLevel = value as Level)
-            " />
-          <DbInput
-            v-model="tokenDefaultTtlDays"
-            label="Tokens last, by default (days)"
-            type="number" />
-          <DbInput
-            v-model="tokenMaxTtlDays"
-            label="Tokens last at most (days)"
-            type="number" />
-        </div>
-
-        <p v-if="formError" class="text-xs text-crit">{{ formError }}</p>
-        <div class="flex justify-end gap-2">
-          <DbButton
-            variant="ghost"
-            :disabled="saving"
-            @click="showForm = false">
-            Cancel
-          </DbButton>
-          <DbButton variant="primary" type="submit" :loading="saving">
-            {{ editing ? "Save" : "Create role" }}
-          </DbButton>
-        </div>
-      </form>
-    </DbModal>
-
     <DbConfirmDialog
-      :open="deleteTarget !== null"
-      title="Delete role"
-      :description="`Delete '${deleteTarget?.name}'? Accounts must hold another role first.`"
-      :confirm-word="deleteTarget?.name"
+      :open="deleting !== null"
+      :title="`Delete ${deleting?.name ?? 'the role'}?`"
+      :description="
+        deleting?.members
+          ? `${deleting.members} ${deleting.members === 1 ? 'account holds' : 'accounts hold'} this role. Give them another role first.`
+          : 'Nobody holds this role. Deleting it can\'t be undone.'
+      "
+      :confirm-word="deleting?.name"
       confirm-label="Delete role"
-      :loading="deleting"
+      :loading="deleteBusy"
       :error="deleteError"
-      @confirm="confirmDelete"
-      @close="deleteTarget = null" />
+      @confirm="controller.confirmDelete"
+      @close="controller.cancelDelete" />
   </DashboardLayout>
 </template>

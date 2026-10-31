@@ -30,6 +30,7 @@ in your installed version.
 | Projects                                           | `/api/v1/projects`                                   |
 | Environments                                       | `/api/v1/environments`                               |
 | Secrets, import, export, and runtime values        | `/api/v1/environments/{id}/secrets`                  |
+| Comparing environments, copying a value across     | `/api/v1/environments/{id}/compare`                  |
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
@@ -166,6 +167,37 @@ supported yet: the list returns metadata re-serialized, so it does not match
 the stored bytes the hash covers. Verification reads no secret values. `dopbase audit
 verify` runs the same check from the terminal, and `dopbase audit export`
 streams the filtered list as JSON lines.
+
+## People, groups, and agent tokens
+
+User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
+last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
+`GET /api/v1/users/{id}` returns one account.
+
+`POST /api/v1/users/{id}/disable` signs the account out everywhere and stops
+its tokens without deleting anything. `POST /api/v1/users/{id}/enable` lets it
+sign in again, and its unexpired tokens work again. Both answer with the
+account, need `users.manage`, the CSRF header, and recent password
+confirmation, and change nothing when the account already has that status.
+They are audited as `user.disabled` and `user.enabled`. They are refused with:
+
+| Status | Code                     | Meaning                                         |
+| ------ | ------------------------ | ----------------------------------------------- |
+| `403`  | `SELF_DISABLE_FORBIDDEN` | The account is your own                         |
+| `403`  | `ROOT_PROTECTED`         | The account is root                             |
+| `403`  | `ACCESS_EXCEEDS_YOURS`   | The account has access or a role you don't have |
+| `404`  | `USER_NOT_FOUND`         | The account does not exist                      |
+
+`GET /api/v1/groups` lists each group with `members` (`id` and `email`) and
+`grants`. Groups carry `createdBy`, and each member in
+`GET /api/v1/groups/{id}` carries `addedAt` and `addedBy`. `createdBy` and
+`addedBy` are `{ "id", "email" }`, or `null` when that account is gone.
+
+`POST /api/v1/users/{id}/tokens` takes `"replaceExisting": true` for an AI
+agent: the new token is created and the agent's other live tokens are revoked
+in the same step, so it holds one token at a time. For anyone else's agent
+this also needs `tokens.revoke_others`. On an account that isn't an AI agent it
+is refused with `422` `TOKEN_REPLACE_INVALID`.
 
 ## Authentication
 

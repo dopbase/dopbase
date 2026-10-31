@@ -21,7 +21,6 @@ const { controller } = await vi.hoisted(async () => {
       ]),
       activePage: ref("projects"),
       showPersonalTokens: ref(true),
-      instanceHost: "secrets.acme.dev",
       loggingOut: ref(false),
       sessionExpired: ref(false),
       navOpen: ref(false),
@@ -132,8 +131,8 @@ describe("DashboardLayout", () => {
     expect(
       aside?.querySelector('[aria-current="page"]')?.textContent,
     ).toContain("Projects");
-    expect(aside?.textContent).toContain("secrets.acme.dev");
-    expect(aside?.textContent).not.toContain("admin console");
+    // The brand reads "Dopbase · Admin Console", not the instance address.
+    expect(aside?.textContent).toContain("Admin Console");
   });
 
   it("opens the account menu with its links and signs out from it", async () => {

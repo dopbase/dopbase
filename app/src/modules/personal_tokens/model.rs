@@ -48,6 +48,11 @@ pub struct CreatePersonalTokenRequest {
   /// the role's default.
   #[serde(default)]
   pub expires_in: Option<String>,
+  /// Revoke the account's other tokens that are still valid, in the same
+  /// step, so the new token replaces them. Each one is audited like a manual
+  /// revoke. For AI agents only. Defaults to `false`.
+  #[serde(default)]
+  pub replace_existing: bool,
 }
 
 /// A new token with its value.

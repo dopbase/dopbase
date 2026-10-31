@@ -1,12 +1,21 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h, nextTick } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Level } from "~/services/access.api";
 
 const { controller } = await vi.hoisted(async () => {
-  const { ref } = await import("vue");
+  const { computed, ref } = await import("vue");
+  const secrets = ref<{ key: string }[]>([]);
+  const filter = ref("");
   return {
     controller: {
-      secrets: ref([]),
+      secrets,
+      filter,
+      visibleSecrets: computed(() =>
+        secrets.value.filter((secret) => secret.key.includes(filter.value)),
+      ),
+      copiedKey: ref(null),
+      copyValue: vi.fn(),
       loading: ref(false),
       loadError: ref(null),
       actionError: ref(null),
@@ -41,6 +50,15 @@ const { controller } = await vi.hoisted(async () => {
 vi.mock("./SecretsPanel.controller", () => ({
   useSecretsPanelController: () => controller,
 }));
+vi.mock("./ImportSecretsDialog.controller", async () => {
+  const { ref } = await import("vue");
+  return {
+    useImportSecretsDialogController: () => ({
+      parsing: ref(false),
+      processFile: vi.fn(),
+    }),
+  };
+});
 vi.mock("vue-router", () => ({
   useRoute: () => ({ name: "environment", query: {}, params: {} }),
 }));
@@ -73,7 +91,7 @@ import SecretsPanel from "./SecretsPanel.vue";
 
 let app: ReturnType<typeof createApp> | null = null;
 
-function mountPanel() {
+function render(level?: Level) {
   const host = document.createElement("div");
   document.body.append(host);
   app = createApp({
@@ -81,15 +99,43 @@ function mountPanel() {
       h(SecretsPanel, {
         environmentId: "env_1",
         environmentName: "production",
+        environmentNames: ["dev", "production"],
         projectName: "payments",
+        level,
       }),
   });
   app.mount(host);
-  const add = Array.from(document.querySelectorAll("button")).find(
-    (button) => button.textContent?.trim() === "Add secret",
+  return host;
+}
+
+function button(text: string): HTMLButtonElement | undefined {
+  return Array.from(document.querySelectorAll("button")).find(
+    (candidate) => candidate.textContent?.trim() === text,
   );
-  add?.click();
+}
+
+/** Mounts an empty environment and opens Add secret from the checklist. */
+function mountPanel() {
+  render();
+  button("Or add secrets one at a time")?.click();
   return nextTick();
+}
+
+const API_KEY = {
+  key: "API_KEY",
+  version: 3,
+  createdAt: "2026-10-01T00:00:00Z",
+  updatedAt: "2026-10-23T00:00:00Z",
+};
+
+async function openRowMenu(key: string): Promise<HTMLElement> {
+  document
+    .querySelector<HTMLButtonElement>(
+      `button[aria-label="Actions for ${key}"]`,
+    )!
+    .click();
+  await nextTick();
+  return document.querySelector<HTMLElement>('[role="menu"]')!;
 }
 
 function inputValue(
@@ -105,6 +151,9 @@ afterEach(() => {
   app = null;
   document.body.innerHTML = "";
   controller.setSecret.mockClear();
+  controller.copyValue.mockClear();
+  controller.secrets.value = [];
+  controller.filter.value = "";
 });
 
 describe("SecretsPanel create dialog", () => {
@@ -173,22 +222,116 @@ describe("SecretsPanel create dialog", () => {
 });
 
 describe("SecretsPanel history", () => {
-  it("opens the history of a row from its History button", async () => {
-    controller.secrets.value = [
-      {
-        key: "API_KEY",
-        version: 3,
-        createdAt: "2026-10-01T00:00:00Z",
-        updatedAt: "2026-10-23T00:00:00Z",
-      },
-    ] as never;
-    await mountPanel();
+  it("opens the history of a row from its menu", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    render();
+    await nextTick();
     expect(history.key).toBeNull();
-    document
-      .querySelector<HTMLButtonElement>('button[aria-label="History API_KEY"]')!
+
+    const menu = await openRowMenu("API_KEY");
+    Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+      .find((item) => item.textContent?.trim() === "History")!
       .click();
     await nextTick();
+
     expect(history.key).toBe("API_KEY");
-    controller.secrets.value = [];
+  });
+});
+
+describe("SecretsPanel table", () => {
+  it("lists the row actions, delete last", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    render();
+    await nextTick();
+
+    const menu = await openRowMenu("API_KEY");
+
+    expect(
+      Array.from(menu.querySelectorAll('[role="menuitem"]')).map((item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(["Reveal", "Copy value", "History", "Edit value", "Delete"]);
+  });
+
+  it("copies a value from the row menu", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    render();
+    await nextTick();
+
+    const menu = await openRowMenu("API_KEY");
+    Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+      .find((item) => item.textContent?.trim() === "Copy value")!
+      .click();
+
+    expect(controller.copyValue).toHaveBeenCalledWith("API_KEY");
+  });
+
+  it("reveals a value by clicking its mask", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    render();
+    await nextTick();
+
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="Reveal API_KEY"]')!
+      .click();
+
+    expect(controller.reveal).toHaveBeenCalledWith("API_KEY");
+  });
+
+  it("offers only what a reader can do", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    render("read");
+    await nextTick();
+
+    expect(button("Add secret")).toBeUndefined();
+    expect(button("Import")).toBeUndefined();
+    const menu = await openRowMenu("API_KEY");
+    expect(
+      Array.from(menu.querySelectorAll('[role="menuitem"]')).map((item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(["Reveal", "Copy value", "History"]);
+  });
+
+  it("says when no key matches the filter", async () => {
+    controller.secrets.value = [API_KEY] as never;
+    controller.filter.value = "NOPE";
+    render();
+    await nextTick();
+
+    expect(
+      document.querySelector('[data-testid="secrets-no-match"]')?.textContent,
+    ).toContain("No keys match “NOPE”.");
+  });
+});
+
+describe("SecretsPanel empty environment", () => {
+  it("walks a writer through the first secrets", async () => {
+    render();
+    await nextTick();
+
+    const checklist = document.querySelector('[data-testid="first-run"]');
+    expect(checklist?.textContent).toContain(
+      "Get payments running with Dopbase",
+    );
+    expect(checklist?.textContent).toContain(
+      "payments, with dev and production.",
+    );
+    expect(checklist?.textContent).toContain(
+      "dopbase run payments/production -- npm run dev",
+    );
+    expect(
+      document.querySelector('[data-testid="secrets-toolbar"]'),
+    ).toBeNull();
+  });
+
+  it("tells a reader nobody has stored a secret yet", async () => {
+    render("read");
+    await nextTick();
+
+    expect(document.querySelector('[data-testid="first-run"]')).toBeNull();
+    expect(document.body.textContent).toContain(
+      "Nobody has stored a secret here yet.",
+    );
   });
 });

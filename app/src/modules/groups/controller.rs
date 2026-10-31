@@ -11,15 +11,15 @@ use axum::{
 
 /// List groups
 ///
-/// Return every group with its member count. Needs users.view or
-/// groups.manage from the Admin UI.
+/// Return every group with its members, grants, and creator. Needs
+/// users.view or groups.manage from the Admin UI.
 #[utoipa::path(
   get,
   path = crate::constants::api::groups::COLLECTION,
   tag = "groups",
   security(("cookieAuth" = [])),
   responses(
-    (status = 200, description = "Groups fetched", body = inline(HttpResponseFormat<Vec<GroupResponse>>)),
+    (status = 200, description = "Groups fetched", body = inline(HttpResponseFormat<Vec<GroupListItem>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "users.view or groups.manage from the Admin UI is required", body = crate::http::ErrorBody),
   ),
@@ -27,7 +27,7 @@ use axum::{
 pub async fn list(
   State(state): State<AppState>,
   identity: AuthIdentity,
-) -> Result<HttpResponse<Vec<GroupResponse>>, crate::http::HttpError> {
+) -> Result<HttpResponse<Vec<GroupListItem>>, crate::http::HttpError> {
   Ok(HttpResponse::ok(
     service::list(&state, &identity).await?,
     "GROUPS_FETCHED",

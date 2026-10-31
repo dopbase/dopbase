@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { useProjectAccessController } from "./ProjectAccess.controller";
+import { useAccessPanelController } from "./AccessPanel.controller";
 import * as accessApi from "~/services/access.api";
-import * as environmentsApi from "~/services/environments.api";
 import * as usersApi from "~/services/users.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 import { mountController } from "~/tests/mount-controller";
+import { groupSummaryFixture, root, userFixture } from "~/tests/people";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { projectRef: "payments" } }),
@@ -19,7 +19,6 @@ vi.mock("~/services/access.api", async (original) => ({
   setGrant: vi.fn(),
   removeGrant: vi.fn(),
 }));
-vi.mock("~/services/environments.api");
 vi.mock("~/services/users.api");
 
 const grant = (overrides: Partial<accessApi.Grant>): accessApi.Grant => ({
@@ -89,50 +88,19 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue(access);
   vi.mocked(accessApi.fetchGroups).mockResolvedValue([
-    {
-      id: "grp_backend",
-      name: "Backend",
-      description: "",
-      memberCount: 2,
-      createdAt: "",
-      updatedAt: "",
-    },
+    groupSummaryFixture({ memberCount: 2 }),
   ]);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([
-    {
-      id: "usr_root",
-      email: "root@example.com",
-      role: "root",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
-    {
-      id: "usr_me",
-      email: "me@example.com",
-      role: "admin",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
-    {
-      id: "usr_member",
-      email: "member@example.com",
-      role: "member",
-      createdAt: "",
-      updatedAt: "",
-      hasPassword: true,
-      ssoLinked: false,
-    },
+    root,
+    userFixture({ id: "usr_me", email: "me@example.com", role: "admin" }),
+    userFixture({ id: "usr_member", email: "member@example.com" }),
   ]);
 });
 
-describe("useProjectAccessController", () => {
+describe("useAccessPanelController", () => {
   it("lists project grants before environment grants", async () => {
     signIn(["users.view"]);
-    const { controller } = mountController(useProjectAccessController);
+    const { controller } = mountController(useAccessPanelController);
     await settle();
     expect(accessApi.fetchProjectAccess).toHaveBeenCalledWith(
       "payments",
@@ -146,7 +114,7 @@ describe("useProjectAccessController", () => {
 
   it("offers groups and users but never root or yourself", async () => {
     signIn(["users.view", "groups.manage"]);
-    const { controller } = mountController(useProjectAccessController);
+    const { controller } = mountController(useAccessPanelController);
     await settle();
     expect(controller.principals.value).toEqual([
       { type: "group", id: "grp_backend", label: "Backend" },
@@ -156,7 +124,7 @@ describe("useProjectAccessController", () => {
 
   it("lists nobody without the capabilities to see users and groups", async () => {
     signIn([]);
-    const { controller } = mountController(useProjectAccessController);
+    const { controller } = mountController(useAccessPanelController);
     await settle();
     expect(usersApi.fetchUsers).not.toHaveBeenCalled();
     expect(accessApi.fetchGroups).not.toHaveBeenCalled();
@@ -166,7 +134,7 @@ describe("useProjectAccessController", () => {
   it("grants on the whole project or one environment", async () => {
     signIn(["users.view"]);
     vi.mocked(accessApi.setGrant).mockResolvedValue(grant({}));
-    const { controller } = mountController(useProjectAccessController);
+    const { controller } = mountController(useAccessPanelController);
     await settle();
     const member = {
       type: "user" as const,
@@ -191,25 +159,95 @@ describe("useProjectAccessController", () => {
     });
   });
 
-  it("explains a removal or protection change the server refuses", async () => {
+  it("explains a removal the server refuses", async () => {
     signIn(["users.view"]);
     vi.mocked(accessApi.removeGrant).mockRejectedValueOnce(
       new ApiError(403, { SELF_GRANT: "You can't change your own access." }),
     );
-    vi.mocked(environmentsApi.setEnvironmentProtected).mockRejectedValueOnce(
-      new ApiError(403, { AUTHORIZATION_DENIED: "Not allowed." }),
-    );
-    const { controller } = mountController(useProjectAccessController);
+    const { controller } = mountController(useAccessPanelController);
     await settle();
     await controller.remove(access.grants[1]);
     expect(controller.actionError.value).toBe(
       "You can't change your own access.",
     );
-    await controller.setProtected("env_prod", false);
-    expect(environmentsApi.setEnvironmentProtected).toHaveBeenCalledWith(
-      "env_prod",
-      false,
+  });
+});
+
+describe("useAccessPanelController rows and dialog", () => {
+  it("shows where each grant applies and filters by who", async () => {
+    signIn(["users.view"]);
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+
+    expect(
+      controller.rows.value.map((row) => [row.where, row.whereProtected]),
+    ).toEqual([
+      ["Whole project", false],
+      ["prod", true],
+    ]);
+    expect(controller.canManage.value).toBe(true);
+
+    controller.filter.value = "nobody";
+    expect(controller.rows.value).toEqual([]);
+  });
+
+  it("says what a new grant will allow before giving it", async () => {
+    signIn(["users.view"]);
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+
+    controller.openGive();
+    controller.principalKey.value = "user:usr_member";
+    controller.where.value = "environment";
+    controller.environmentId.value = "env_prod";
+    controller.level.value = "write";
+
+    expect(controller.dialogSummary.value).toBe(
+      "member@example.com will be able to read and change secrets in payments / prod. This replaces their current grant there.",
     );
-    expect(controller.actionError.value).toBe("Not allowed.");
+    await expect(controller.submitDialog()).resolves.toBe(true);
+    expect(accessApi.setGrant).toHaveBeenCalledWith({
+      principalType: "user",
+      principalId: "usr_member",
+      scopeType: "environment",
+      scope: "env_prod",
+      level: "write",
+    });
+    expect(controller.dialog.value).toBeNull();
+  });
+
+  it("offers Project manager only on the whole project", async () => {
+    signIn(["users.view"]);
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+    controller.openGive();
+
+    expect(controller.levels.value).toContain("project_manager");
+    controller.level.value = "project_manager";
+    controller.where.value = "environment";
+    await settle();
+
+    expect(controller.levels.value).not.toContain("project_manager");
+    expect(controller.level.value).toBe("read");
+  });
+
+  it("changes the level of an existing grant in place", async () => {
+    signIn(["users.view"]);
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+    const projectGrant = controller.rows.value[0]!.grant;
+
+    controller.openChange(projectGrant);
+    controller.level.value = "manage";
+    await controller.submitDialog();
+
+    expect(accessApi.setGrant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        principalId: "usr_member",
+        scopeType: "project",
+        scope: "prj_pay",
+        level: "manage",
+      }),
+    );
   });
 });

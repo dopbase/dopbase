@@ -197,6 +197,19 @@ pub async fn create(
   require_recent_browser_auth(identity)?;
   let target = target(state, identity, id).await?;
   require_issuer(state, identity, &target).await?;
+  if request.replace_existing {
+    // People keep the tokens they made; only an AI agent's are swapped.
+    if target.holder.sign_in.as_deref() != Some("token_only") {
+      return Err(invalid(
+        "TOKEN_REPLACE_INVALID",
+        "Only an AI agent's tokens can be replaced. Revoke your own tokens one by one.",
+      ));
+    }
+    // Replacing revokes, so it needs what revoking needs.
+    if target.relation == Relation::Other {
+      require_capability(identity, Capability::TokensRevokeOthers)?;
+    }
+  }
   let name = request.name.trim();
   if name.is_empty() || name.chars().count() > 64 {
     return Err(invalid(
@@ -302,6 +315,25 @@ pub async fn create(
     }),
   )
   .await?;
+  if request.replace_existing {
+    let replaced = repository::live_except(&mut tx, &target.id, &token_id, &now).await?;
+    for (old_id, old_name) in replaced {
+      repository::revoke(&mut tx, &target.id, &old_id, &now).await?;
+      common::audit(
+        &mut tx,
+        identity.audit_actor_type(),
+        Some(target.actor_id),
+        Some(target.actor_email),
+        "personal_token.revoked",
+        None,
+        None,
+        Some("personal_token"),
+        Some(&old_id),
+        serde_json::json!({"userId": target.id, "user": target.holder.email, "name": old_name}),
+      )
+      .await?;
+    }
+  }
   let token = repository::find(&mut tx, &target.id, &token_id)
     .await?
     .ok_or_else(HttpError::internal)?;

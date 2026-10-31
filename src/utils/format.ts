@@ -34,6 +34,17 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** Formats an RFC 3339 timestamp as a date in the browser locale, e.g. `Jan 25, 2027`. */
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /** Zero-pads seconds for the reveal countdown, e.g. `28s`. */
 export function formatCountdown(seconds: number): string {
   return `${seconds}s`;

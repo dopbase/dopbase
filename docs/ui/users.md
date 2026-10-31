@@ -1,81 +1,93 @@
 ---
-title: "Admin UI: users and AI agents"
-description: "Add people and AI agents to Dopbase, give each one a role, and see where their access to projects comes from in the Admin UI."
+title: "Admin UI: users"
+description: "Add people to Dopbase, give each one a role, see where their access to projects comes from, and disable or delete accounts in the Admin UI."
 ---
 
-# Users and AI agents
+# Users
 
-Open **Users** to see everyone on the instance. Anyone with `users.view`, such
-as an admin or an auditor, can open it. Adding, changing, and removing accounts
-needs `users.manage`, and happens in the Admin UI only. There is no CLI command
-for it.
+Open **Users** to see everyone who signs in to the instance. Anyone with
+`users.view`, such as an admin or an auditor, can open it. Adding, changing,
+disabling, and removing accounts needs `users.manage`, and happens in the
+Admin UI only. There is no CLI command for it. Bots and CI jobs have their own
+page, [AI agents](./ai-agents).
+
+The table shows each person's role, their groups, how they sign in, and when
+they last signed in. Filter by email, or add a **Role** or **Status** chip to
+narrow the list to one role, or to active, disabled, or single sign-on
+accounts. On a phone the table becomes a list of cards.
 
 ## Roles
 
 Every account except root holds one role. The role decides what it may do on
 the instance and how deep into project data it can ever reach. Which projects
-it actually reaches comes from grants, given on each project's
-[Access](./project-access) page.
+it actually reaches comes from grants.
 
 - **Root** is the account created during setup. It can do everything, and
-  nobody else can change or delete it.
+  nobody else can change, disable, or delete it.
 - **Admin** manages people, groups, and the projects they manage, and creates
   projects.
 - **Member** works on the projects and environments they are given.
 - **Auditor** reads the whole audit log and who has access, and never sees a
   secret value.
-- **AI agent** uses tokens only and never reaches more than its owner.
 
-Root can add [custom roles](./roles). The role picker lists only roles within
-your own: an admin can't make someone an auditor, because auditors read the
-whole audit log and admins don't.
+Root can add [custom roles](./roles), which show a `custom` tag next to the
+role name. The role picker lists every role that signs in, but only roles
+within your own can be picked: an admin sees Auditor greyed out with "Your
+role can't give this one", because auditors read the whole audit log and
+admins don't.
 
 ## Add a person
 
-1. Choose **Add User**.
-2. Enter their email and a password. With single sign-on on, you can leave the
-   password empty and they sign in through the provider.
+1. Choose **Add user**.
+2. Enter their email and a temporary password. With single sign-on on, pick
+   **Single sign-on** instead and they sign in through the provider.
 3. Pick a role.
-4. Save and share the sign-in details securely.
+4. Choose **Add user**, then share the sign-in details securely.
 
-A new member reaches no project until someone gives them access. An admin that
-root adds starts as project manager of every project; an admin that another
-admin adds starts with nothing. Dopbase doesn't send invitation emails.
+You land on their **Access** tab, because a new person reaches no project
+until someone gives them access. An admin that root adds starts as project
+manager of every project; an admin that another admin adds starts with
+nothing. Dopbase doesn't send invitation emails.
 
-## Edit or remove someone
+## A person's page
 
-Choose **Edit** to change an email, role, or password. Leave the password empty
-to keep it. Changing someone signs them out everywhere, and changing their role
-drops their access to every project at once; their per-project grants stay.
+Choose someone's email to open their page. It has five tabs:
 
-Choose **Delete** and type the email to confirm. You can't delete or change
-your own role, and you can only manage people whose role and access are within
-your own. Someone who owns AI agents can't be deleted until the agents are
-deleted or given another owner.
+- **Overview**: email, role, the deepest level their role allows, how they
+  sign in, and how many grants and groups they have.
+- **Access**: every grant that reaches them, and where it comes from: direct,
+  or **via** a group, which links to the group. A note under the table says
+  when a grant on one environment overrides the grant on its project. Choose
+  **Give access** to give them a project or one environment, or use a row's
+  **⋯** menu to change the level or remove a direct grant. Grants that come
+  through a group are changed on the group.
+- **Groups**: the groups they belong to. **Add to a group** and **Take out**
+  need `groups.manage`.
+- **Tokens**: the personal tokens they made, with what each can do, where, and
+  when it was last used. People with `tokens.revoke_others` can revoke them.
+- **Danger zone**: unlink single sign-on, disable, or delete the account.
 
-## See where access comes from
+Choose **Edit** at the top to change their email, role, or password. Leave the
+password empty to keep it. Changing someone signs them out everywhere, and
+changing their role drops their access to every project at once; their grants
+stay. Nobody changes root or their own account from here.
 
-Choose **Access** beside someone to see their role's ceiling, their groups, and
-every grant that reaches them, their own and their groups'. Grants are changed
-on each project's [Access](./project-access) page.
+## Disable or turn back on
 
-## AI agents
+**Disable account**, from the Danger zone or a row's **⋯** menu, signs the
+person out everywhere and stops their tokens. Nothing is deleted: their role,
+grants, groups, and tokens stay, and AI agents they own stop working too. The
+row shows a red `disabled` tag.
 
-Choose **Add AI agent** and give it a name. AI agents have no email and no
-password, and you become the agent's owner. It reaches only what it is granted,
-never past Read, and never more than you do. If you are disabled, so is the
-agent.
+**Turn account back on** lets them sign in again with the access they had
+before. Tokens that haven't expired work again.
 
-Choose **Get token** beside an agent to create its personal token. Pick whether
-the token reads names only or values too, and when it expires, at most 90 days
-from now. If you have a password, you confirm it. A new token revokes the
-agent's previous one. Dopbase shows the token once, so copy it straight into a
-secret store.
+## Delete someone
 
-Give the agent access on a project's Access page before handing it the token.
-The [AI agent access guide](/guide/ai-agent-access) shows how to pass the token
-to an agent and what it can do with it.
-
-Choose **Delete** and type the agent's name to remove it with its tokens.
+Choose **Delete user** and type their email to confirm. Their grants, group
+memberships, and tokens go with the account; audit events stay. You can only
+manage people whose role and access are within your own. Someone who owns AI
+agents can't be deleted until the agents are given another owner on the
+[AI agents](./ai-agents) page.
 
 See [identity and access](/reference/identity) for every rule.

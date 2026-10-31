@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, toRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useSecretsPanelController } from "./SecretsPanel.controller";
+import { useImportSecretsDialogController } from "./ImportSecretsDialog.controller";
 import EnvFileEditor from "./EnvFileEditor.vue";
+import FirstRunChecklist from "./FirstRunChecklist.vue";
 import ImportSecretsDialog from "./ImportSecretsDialog.vue";
 import ExportSecretsDialog from "./ExportSecretsDialog.vue";
 import SecretHistoryDialog from "./SecretHistoryDialog.vue";
@@ -15,18 +17,26 @@ import {
   DbCopyButton,
   DbEmptyState,
   DbInput,
+  DbMenu,
+  DbMenuItem,
   DbModal,
+  DbSearchField,
+  DbSegment,
   DbSkeleton,
   DbTextarea,
 } from "~/components/ui";
 import {
+  CopyIcon,
+  DownloadIcon,
   EyeIcon,
   EyeOffIcon,
   HistoryIcon,
   KeyIcon,
   LockIcon,
   PencilIcon,
+  PlusIcon,
   TrashIcon,
+  UploadIcon,
 } from "~/assets/icons";
 import { formatRelativeTime } from "~/utils/format";
 import { reaches } from "~/services/access.api";
@@ -50,15 +60,25 @@ const props = defineProps<{
   environmentId: string;
   environmentName: string;
   projectName: string;
+  /** Every environment in the project, for the first-run checklist. */
+  environmentNames: string[];
   /** Your level here. Without one, every action shows. */
   level?: Level;
 }>();
+
 // The server checks every action; this only hides what would be refused.
 const canRead = computed(() => !props.level || reaches(props.level, "read"));
 const canWrite = computed(() => !props.level || reaches(props.level, "write"));
 
 const environmentIdRef = computed(() => props.environmentId);
 const controller = useSecretsPanelController(environmentIdRef);
+// Files dropped on the first-run checklist go through the same parsing and
+// review page as the Import dialog.
+const dropImport = useImportSecretsDialogController(
+  environmentIdRef,
+  toRef(props, "environmentName"),
+  ref(false),
+);
 const route = useRoute();
 // Returning from the full-page import sets an `imported` timestamp in the
 // query. Refetch so the table reflects what was just applied.
@@ -71,6 +91,9 @@ watch(
 // Destructure so refs auto-unwrap in the template.
 const {
   secrets,
+  filter,
+  visibleSecrets,
+  copiedKey,
   loading,
   loadError,
   actionError,
@@ -130,6 +153,26 @@ function onRolledBack(): void {
 }
 
 const view = ref<PanelView>("table");
+
+const viewOptions = computed(() =>
+  canWrite.value
+    ? [
+        { value: "table", label: "Table" },
+        { value: "editor", label: ".env" },
+      ]
+    : [{ value: "table", label: "Table" }],
+);
+
+/** An empty environment walks writers through their first secrets. */
+const showChecklist = computed(
+  () =>
+    view.value === "table" &&
+    canWrite.value &&
+    secrets.value !== null &&
+    secrets.value.length === 0 &&
+    !loading.value,
+);
+
 /** Pending view switch while an unsaved-editor discard is confirmed. */
 const discardTarget = ref<PanelView | null>(null);
 
@@ -275,68 +318,47 @@ async function confirmDelete(): Promise<void> {
 </script>
 
 <template>
-  <div class="@container flex flex-col gap-4">
-    <header class="flex flex-wrap items-center gap-2">
-      <h3 class="text-sm font-semibold">
-        Secrets
-        <DbBadge v-if="secrets" class="ml-1">
-          {{ secrets.length }}
-        </DbBadge>
-      </h3>
-      <div
-        class="ml-auto flex rounded-control border border-line bg-canvas p-0.5"
-        role="tablist"
-        aria-label="Secrets view">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="view === 'table'"
-          data-testid="secrets-view-table"
-          class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:py-2"
-          :class="
-            view === 'table'
-              ? 'bg-raised text-ink-strong'
-              : 'text-ink-muted hover:text-ink'
-          "
-          @click="switchView('table')">
-          Table
-        </button>
-        <button
-          v-if="canWrite"
-          type="button"
-          role="tab"
-          :aria-selected="view === 'editor'"
-          data-testid="secrets-view-editor"
-          class="cursor-pointer rounded px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:py-2"
-          :class="
-            view === 'editor'
-              ? 'bg-raised text-ink-strong'
-              : 'text-ink-muted hover:text-ink'
-          "
-          @click="switchView('editor')">
-          Edit as .env
-        </button>
-      </div>
-      <div
+  <div class="flex flex-col gap-4">
+    <div
+      v-if="!showChecklist"
+      class="flex flex-wrap items-center gap-2"
+      data-testid="secrets-toolbar">
+      <DbSearchField
         v-if="view === 'table'"
-        class="flex w-full flex-wrap items-center gap-2 @2xl:w-auto">
-        <DbButton
-          v-if="canRead"
-          size="sm"
-          variant="secondary"
-          @click="showExport = true">
-          Export
-        </DbButton>
-        <template v-if="canWrite">
-          <DbButton size="sm" variant="secondary" @click="showImport = true">
-            Import .env
+        v-model="filter"
+        class="w-full sm:w-[220px]"
+        placeholder="Filter keys" />
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <DbSegment
+          :model-value="view"
+          :options="viewOptions"
+          label="Show secrets as"
+          @update:model-value="switchView($event as PanelView)" />
+        <template v-if="view === 'table'">
+          <DbButton
+            v-if="canRead"
+            variant="ghost"
+            data-testid="secrets-export"
+            @click="showExport = true">
+            <DownloadIcon class="h-4 w-4" />
+            Export
           </DbButton>
-          <DbButton size="sm" variant="primary" @click="openCreate">
-            Add secret
-          </DbButton>
+          <template v-if="canWrite">
+            <DbButton data-testid="secrets-import" @click="showImport = true">
+              <UploadIcon class="h-4 w-4" />
+              Import
+            </DbButton>
+            <DbButton
+              variant="primary"
+              data-testid="secrets-add"
+              @click="openCreate">
+              <PlusIcon class="h-4 w-4" />
+              Add secret
+            </DbButton>
+          </template>
         </template>
       </div>
-    </header>
+    </div>
 
     <!-- Table view -->
     <template v-if="view === 'table'">
@@ -344,176 +366,164 @@ async function confirmDelete(): Promise<void> {
         {{ actionError }}
       </DbAlert>
 
-      <!-- Loading skeleton secrets table -->
       <div
         v-if="loading"
-        class="overflow-x-auto rounded-card border border-line bg-panel"
+        class="overflow-hidden rounded-card border border-line bg-panel"
         data-testid="secrets-skeleton">
-        <table class="min-w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-line">
-              <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
-                Key
-              </th>
-              <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
-                Version
-              </th>
-              <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
-                Updated
-              </th>
-              <th
-                class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="i in 5"
-              :key="i"
-              class="border-b border-line-soft last:border-b-0">
-              <td class="px-4 py-3">
-                <DbSkeleton class="h-4 w-36" />
-              </td>
-              <td class="hidden px-4 py-3 @xl:table-cell">
-                <DbSkeleton class="h-4 w-10 rounded-control" />
-              </td>
-              <td class="hidden px-4 py-3 @xl:table-cell">
-                <DbSkeleton class="h-4 w-20" />
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <DbSkeleton class="h-6 w-16 rounded-control" />
-                  <DbSkeleton class="h-6 w-6 rounded-control" />
-                  <DbSkeleton class="h-6 w-6 rounded-control" />
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div
+          v-for="i in 5"
+          :key="i"
+          class="flex h-12 items-center gap-6 border-b border-line-soft px-4 last:border-b-0">
+          <DbSkeleton class="h-4 w-40" />
+          <DbSkeleton class="h-4 w-32" />
+          <DbSkeleton class="ml-auto h-4 w-20" />
+        </div>
       </div>
 
       <DbAlert v-else-if="loadError">
         {{ loadError }}
       </DbAlert>
 
+      <FirstRunChecklist
+        v-else-if="showChecklist"
+        :project-name="projectName"
+        :environment-name="environmentName"
+        :environment-names="environmentNames"
+        :importing="dropImport.parsing.value"
+        @choose-file="showImport = true"
+        @drop-file="dropImport.processFile"
+        @paste-env="switchView('editor')"
+        @add-one="openCreate" />
+
       <DbEmptyState
         v-else-if="secrets && secrets.length === 0"
         title="No secrets in this environment"
-        :description="
-          canWrite
-            ? 'Add a single key, or import an existing .env file, values are encrypted before they are stored.'
-            : 'Nobody has stored a secret here yet.'
-        ">
+        description="Nobody has stored a secret here yet.">
         <template #icon>
           <KeyIcon class="h-5 w-5" />
-        </template>
-        <template v-if="canWrite" #actions>
-          <DbButton variant="secondary" size="sm" @click="showImport = true">
-            Import .env
-          </DbButton>
-          <DbButton variant="primary" size="sm" @click="openCreate">
-            Add secret
-          </DbButton>
         </template>
       </DbEmptyState>
 
       <div
-        v-else-if="secrets"
+        v-else-if="secrets && visibleSecrets"
         class="overflow-x-auto rounded-card border border-line bg-panel">
         <table class="min-w-full text-left text-sm" data-testid="secrets-table">
           <thead>
-            <tr class="border-b border-line">
-              <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
-                Key
+            <tr class="border-b border-line-soft">
+              <th class="h-11 px-4 font-medium text-ink-muted">Key</th>
+              <th
+                class="hidden h-11 px-4 font-medium text-ink-muted sm:table-cell">
+                Value
               </th>
               <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
-                Version
-              </th>
-              <th
-                class="hidden px-4 py-2.5 text-xs @xl:table-cell font-medium text-ink-muted">
+                class="hidden h-11 px-4 font-medium text-ink-muted md:table-cell">
                 Updated
               </th>
-              <th
-                class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
-                Actions
+              <th class="h-11 w-12 px-2">
+                <span class="sr-only">Actions</span>
               </th>
             </tr>
           </thead>
           <tbody>
-            <template v-for="secret in secrets" :key="secret.key">
+            <tr v-if="visibleSecrets.length === 0">
+              <td
+                colspan="4"
+                class="px-4 py-8 text-center text-ink-muted"
+                data-testid="secrets-no-match">
+                No keys match “{{ filter.trim() }}”.
+              </td>
+            </tr>
+            <template v-for="secret in visibleSecrets" :key="secret.key">
               <tr
-                class="border-b border-line-soft transition-colors last:border-b-0 hover:bg-raised/60">
-                <td class="w-full max-w-0 px-4 py-2.5">
+                class="group border-b border-line-soft transition-colors last:border-b-0 hover:bg-raised"
+                data-testid="secret-row">
+                <td class="h-12 w-full max-w-0 px-4 sm:w-[34%]">
                   <p
-                    class="truncate font-mono text-sm text-ink-strong"
+                    class="truncate font-mono text-sm leading-[22px] text-ink-strong"
                     :title="secret.key">
                     {{ secret.key }}
                   </p>
-                  <p
-                    class="whitespace-nowrap text-xs text-ink-muted @xl:hidden">
-                    v{{ secret.version }} ·
-                    {{ formatRelativeTime(secret.updatedAt) }}
+                  <p class="text-[13px] text-ink-muted md:hidden">
+                    {{ formatRelativeTime(secret.updatedAt) }} · v{{
+                      secret.version
+                    }}
                   </p>
                 </td>
-                <td class="hidden px-4 py-2.5 @xl:table-cell">
-                  <DbBadge>v{{ secret.version }}</DbBadge>
+                <td class="hidden h-12 px-4 sm:table-cell">
+                  <span
+                    v-if="copiedKey === secret.key"
+                    class="font-mono text-[13px] text-ok"
+                    role="status">
+                    Copied
+                  </span>
+                  <button
+                    v-else-if="canRead"
+                    type="button"
+                    class="cursor-pointer rounded-control px-1 font-mono text-[13px] leading-[22px] tracking-widest text-ink-muted transition-colors hover:text-ink-strong"
+                    :aria-label="
+                      revealedKey === secret.key
+                        ? `Hide ${secret.key}`
+                        : `Reveal ${secret.key}`
+                    "
+                    :title="revealedKey === secret.key ? 'Hide' : 'Reveal'"
+                    @click="
+                      revealedKey === secret.key
+                        ? hideRevealed()
+                        : reveal(secret.key)
+                    ">
+                    ••••••••••••••••
+                  </button>
+                  <span
+                    v-else
+                    class="text-[13px] text-ink-faint"
+                    title="Your access shows names only">
+                    Hidden
+                  </span>
                 </td>
                 <td
-                  class="hidden whitespace-nowrap px-4 py-2.5 text-sm text-ink-muted @xl:table-cell">
-                  {{ formatRelativeTime(secret.updatedAt) }}
+                  class="hidden h-12 whitespace-nowrap px-4 text-[13px] text-ink-muted md:table-cell">
+                  {{ formatRelativeTime(secret.updatedAt) }} · v{{
+                    secret.version
+                  }}
                 </td>
-                <td class="px-4 py-2.5">
-                  <div class="flex items-center justify-end gap-1">
-                    <button
-                      v-if="canRead && revealedKey !== secret.key"
-                      type="button"
-                      class="cursor-pointer rounded border border-line bg-raised px-2 py-1 font-mono text-xs text-ink transition-colors hover:border-accent/50 hover:text-ink-strong pointer-coarse:p-2"
-                      :aria-label="`Reveal ${secret.key}`"
-                      @click="reveal(secret.key)">
-                      <span class="flex items-center gap-1.5">
-                        <EyeIcon class="h-3.5 w-3.5" />
-                        <span class="hidden @xl:inline">reveal</span>
-                      </span>
-                    </button>
-                    <button
-                      v-else-if="canRead"
-                      type="button"
-                      class="cursor-pointer rounded border border-accent/50 bg-accent-soft px-2 py-1 font-mono text-xs text-accent-strong pointer-coarse:p-2"
-                      :aria-label="`Hide ${secret.key}`"
-                      @click="hideRevealed()">
-                      <span class="flex items-center gap-1.5">
-                        <EyeOffIcon class="h-3.5 w-3.5" />
-                        <span class="hidden @xl:inline">hide</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong pointer-coarse:p-2.5"
-                      :aria-label="`History ${secret.key}`"
-                      @click="openHistory(secret.key)">
-                      <HistoryIcon class="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      v-if="canWrite"
-                      type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-ink-strong pointer-coarse:p-2.5"
-                      :aria-label="`Edit ${secret.key}`"
-                      @click="openEdit(secret)">
-                      <PencilIcon class="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      v-if="canWrite"
-                      type="button"
-                      class="cursor-pointer rounded p-1.5 text-ink-muted transition-colors hover:text-crit pointer-coarse:p-2.5"
-                      :aria-label="`Delete ${secret.key}`"
-                      @click="deleteTarget = secret">
-                      <TrashIcon class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                <td class="h-12 px-2 text-right">
+                  <DbMenu :label="`Actions for ${secret.key}`">
+                    <template v-if="canRead">
+                      <DbMenuItem
+                        v-if="revealedKey !== secret.key"
+                        @select="reveal(secret.key)">
+                        <template #icon><EyeIcon class="h-4 w-4" /></template>
+                        Reveal
+                      </DbMenuItem>
+                      <DbMenuItem v-else @select="hideRevealed()">
+                        <template #icon
+                          ><EyeOffIcon class="h-4 w-4"
+                        /></template>
+                        Hide
+                      </DbMenuItem>
+                      <DbMenuItem @select="controller.copyValue(secret.key)">
+                        <template #icon><CopyIcon class="h-4 w-4" /></template>
+                        Copy value
+                      </DbMenuItem>
+                    </template>
+                    <DbMenuItem @select="openHistory(secret.key)">
+                      <template #icon><HistoryIcon class="h-4 w-4" /></template>
+                      History
+                    </DbMenuItem>
+                    <template v-if="canWrite">
+                      <DbMenuItem @select="openEdit(secret)">
+                        <template #icon
+                          ><PencilIcon class="h-4 w-4"
+                        /></template>
+                        Edit value
+                      </DbMenuItem>
+                      <div class="my-0.5 h-px bg-line-soft" role="separator" />
+                      <DbMenuItem tone="danger" @select="deleteTarget = secret">
+                        <template #icon><TrashIcon class="h-4 w-4" /></template>
+                        Delete
+                      </DbMenuItem>
+                    </template>
+                  </DbMenu>
                 </td>
               </tr>
               <!-- Revealed plaintext row: component memory only, auto-hides -->
@@ -672,7 +682,10 @@ async function confirmDelete(): Promise<void> {
           mono
           hint="Use letters, numbers, '_', and '-'. The first character cannot be a number." />
         <div v-else class="flex flex-col gap-1.5">
-          <div class="rounded-control bg-raised" data-testid="secret-key-field">
+          <!-- Read-only: outlined, not filled, like DbInput's readonly. -->
+          <div
+            class="rounded-control shadow-[inset_0_0_0_1px_var(--color-line)]"
+            data-testid="secret-key-field">
             <p class="px-3.5 pb-0.5 pt-2 text-xs font-semibold text-ink-muted">
               Key
             </p>
@@ -681,7 +694,7 @@ async function confirmDelete(): Promise<void> {
                 class="h-3.5 w-3.5 shrink-0 text-ink-faint"
                 aria-hidden="true" />
               <span
-                class="min-w-0 flex-1 truncate font-mono text-xs text-ink-strong"
+                class="min-w-0 flex-1 truncate font-mono text-xs text-ink"
                 :title="form.secret.key">
                 {{ form.secret.key }}
               </span>
@@ -767,6 +780,7 @@ async function confirmDelete(): Promise<void> {
     <ImportSecretsDialog
       :open="showImport"
       :environment-id="environmentId"
+      :environment-name="environmentName"
       @close="showImport = false" />
     <ExportSecretsDialog
       :open="showExport"

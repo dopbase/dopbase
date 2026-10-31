@@ -37,7 +37,6 @@ export function useDashboardLayoutController() {
   const showPersonalTokens = computed(
     () => !auth.isRoot && auth.can("tokens.personal"),
   );
-  const instanceHost = window.location.host;
   const sessionExpired = computed(() => auth.sessionExpired);
   const loggingOut = ref(false);
   const navOpen = ref(false);
@@ -88,7 +87,6 @@ export function useDashboardLayoutController() {
     sections,
     activePage,
     showPersonalTokens,
-    instanceHost,
     sessionExpired,
     loggingOut,
     navOpen,

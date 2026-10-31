@@ -49,7 +49,60 @@ All notable changes to Dopbase are documented in this file.
   grant below project manager stops reaching the environment. Only a grant
   on the environment itself or a project manager gets in.
 
+- A **Compare** tab on the project page lines up the open environment's keys
+  with others in the project. The environment in the switcher is the base, so
+  switching to staging re-bases the comparison on staging. It starts with one
+  other environment; **Add environment** adds up to three and goes away at
+  three. Each cell says Same, Differs, Not set or Set, with the version, and
+  never shows a value. Clicking a Not set cell fills it: match another
+  environment's value, copied on the server, or type its own. A note above
+  the table says set values can't be seen or changed here, and links to
+  **Secrets**.
+- New endpoints behind Compare. `GET /api/v1/environments/{id}/compare`
+  takes `with`, up to three environment ids, and returns each key's version
+  per environment and whether its value matches the base. Values are compared
+  only where you have Read on both. Matching goes through
+  `POST /api/v1/environments/{id}/secrets/{key}/copy`, which copies another
+  environment's value on the server, needs Read on the source and Write on
+  the target, and records `secret.copied`.
+
+- An **AI agents** page lists token-only accounts for bots and CI, with each
+  agent's owner, how far it reaches, and whether its token is active, about to
+  expire, or missing. An agent's own page has **Access**, **Tokens**, and
+  **Danger zone** tabs, **Activity** for its audit events, and **Transfer
+  owner**. **New token** replaces the agent's live token in one step, and the
+  copy dialog shows a `dopbase run` line for where the new token reaches.
+  `POST /api/v1/users/{id}/tokens` takes `"replaceExisting": true` for this;
+  it is refused with `TOKEN_REPLACE_INVALID` for anyone but an AI agent.
+- Each person has their own page with **Overview**, **Access**, **Groups**,
+  **Tokens**, and **Danger zone** tabs. Access shows where every grant comes
+  from, direct or through a group, notes when an environment grant overrides
+  its project grant, and gives, changes, or removes access from there. The
+  same **Give access** dialog is used for people, AI agents, and groups.
+- Disable an account without deleting it. Disabling signs the person out
+  everywhere and stops their tokens; **Turn account back on** restores the
+  access they had. `POST /api/v1/users/{id}/disable` and `/enable` back it,
+  audited as `user.disabled` and `user.enabled`. User responses add `status`,
+  `lastSignInAt`, and `groups`, and the Users table shows how each person
+  signs in and when they last did.
+- Each group has its own page with **Members**, **Access**, and **Danger
+  zone** tabs. **Add members** adds several people at once, and each member
+  shows who added them and when. `GET /api/v1/groups` now returns each group's
+  members and grants, groups carry `createdBy`, and members carry `addedBy`.
+- A role editor at **Roles › New role** groups capabilities under People,
+  Projects, Audit, Tokens, and Instance, and sets how far holders reach, what
+  their personal tokens can do, and how holders sign in. Built-in roles open
+  read only, and **Duplicate** starts a custom role from any role.
+
 ### Changed
+
+- **Users** is a table with filter chips for role and status, and a row menu
+  to edit, disable, or delete someone. AI agents moved to their own page, and
+  the sidebar lists **AI agents** under People & access.
+- **Groups** and **Roles** are tables. Groups shows members, where each group
+  reaches, and who created it; Roles shows each role's reach, capabilities,
+  sign-in, and holders. Their row menus hold the actions that used to sit in
+  dialogs.
 
 - `dopbase client status` shows the account's role, such as Member, Auditor,
   or Root, on a new **Role** line in place of **Identity**. It used to say
@@ -62,7 +115,7 @@ All notable changes to Dopbase are documented in this file.
 - Service accounts are now accounts with the AI agent role. The upgrade turns
   each one into an AI agent owned by root that still reads secret names on
   every project, and its `dpa_` tokens keep working as personal tokens. New
-  agents are added on the Users page with a name and no password, start with
+  agents are added on the AI agents page with a name and no password, start with
   no access, and never reach more than the person who owns them. An owner
   can't be deleted while they own agents; give the agents another owner
   first. The `/api/v1/service-accounts` endpoints are gone: use
@@ -136,11 +189,84 @@ All notable changes to Dopbase are documented in this file.
   shows a **No access** screen that names the missing capability, instead of
   sending you to Projects. The sidebar and the router read the same
   capability map, so the nav never offers a page the router would refuse.
+- **Projects** is now a tree. Each project opens like a folder and lists its
+  environments with a protected chip, your level and the last change, six at
+  a time with **Show all**, and the filter box searches projects and
+  environments together. Project and environment actions moved into a ⋯
+  menu, and the project rail is gone.
+- Environment pages are addressed by name, such as
+  `/projects/payments/prod/secrets` and `.../tokens`. Old
+  `/projects/p/.../e/env_...` links look the environment up and redirect.
+  Renaming an environment now breaks links to its old name, as renaming a
+  project already did.
+- The project page has a context bar: the `payments / prod` breadcrumb
+  switches project or environment (press E for the environment menu), a
+  protected environment gets an amber chip and an amber line across the top,
+  and your level sits on the right, next to **Run**, which opens the command
+  to run an app with this environment's values from the CLI, Docker or
+  GitHub Actions. Tabs below it show Secrets, Tokens (with Manage), Access
+  (project managers, or `access.report` to read), Activity, and Settings
+  (project managers).
+- The **Secrets** table has a key filter, a Table and .env switch, and one ⋯
+  menu per row with Reveal, Copy value, History, Edit value and Delete, in
+  that order. Clicking the masked value still reveals it. Copy value copies
+  without showing the value and is recorded like a reveal.
+- An empty environment shows a first-run checklist to anyone who can write
+  there: drop, choose or paste a `.env` file, and copy the `dopbase login`
+  and `dopbase run` commands for that environment.
+- The **Tokens** tab has a filter, a level meter for what each token can do,
+  and expiry in amber during a token's last week. New runner tokens pick
+  7 days, 30 days, 90 days, a year or a custom lifetime, and the dialog says
+  what the token will read and until when. The new token's dialog shows the
+  `export DOPBASE_TOKEN` and `dopbase run` lines to use it, with the
+  whole token so the lines can be pasted as they are; agent and personal
+  tokens get the same dialog. Both dialogs open wide, so the token, the
+  commands and the details fit without crowding.
+- Runner token names follow the same rule as project and environment
+  names: lowercase letters, numbers and single hyphens, starting with a
+  letter, at most 63 characters. The API refuses other names with
+  `TOKEN_NAME_INVALID`; tokens that already exist keep their names.
+- Read-only fields, such as the environment in **New runner token** and
+  the key in **Edit value**, are outlined instead of filled and show a
+  lock, at the same height as the fields you can edit.
+- **Access** moved inside the project page, at `/projects/<project>/access`.
+  Give access uses one card per level, and says what the grant will allow
+  and whether it replaces an existing one. Each grant's ⋯ menu changes its
+  level or removes it.
+- New **Activity** tab: the audit trail for this environment, widened to the
+  whole project or narrowed by action and actor, with a link to the full
+  audit log carrying the same filters. The audit log now reads those filters
+  from its address.
+- New **Settings** tab for project managers: rename the project, protect,
+  rename or delete each environment with its secret and runner token
+  counts, and a danger zone that says what deleting the project removes.
+- Corners are smaller across the console: cards and dialogs round at 6px,
+  and nothing rounds past that.
+- Every page now uses the same content column, centred beside the sidebar
+  and up to 1440px wide, so wide screens no longer stretch tables edge to
+  edge or leave a large gap, and the project tabs line up with each other
+  and with the other pages. The sidebar stays pinned to the left edge.
+- The project page fits a phone screen: the tabs scroll sideways, the
+  project tree shows a compact environment count, Access, Tokens and
+  Activity keep names and actors readable, and the Run command wraps. The
+  project and environment switchers open a sheet from the bottom of the
+  screen instead of a dropdown, and your level and **Run** share one
+  left-aligned row at the same height.
+- The environment switcher highlights the environment you're on, opens
+  with it focused, and ends with **New environment** for project
+  managers, so adding one no longer means a trip to Settings. Long project
+  and environment names are shortened in the context bar instead of
+  pushing **Run** off the row, and wrap in dialogs and on phones.
+- Switching environment clears the old table straight away instead of
+  showing its rows until the new ones load, and a filter change cancels
+  the activity page still loading. A runner token created while you switch
+  environment still shows its value once. A project manager can open
+  Access and Settings before the project has any environments.
 
 ### Fixed
 
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
-  pool` while loading `sqlx-macros`. The release profile now strips only the
+pool` while loading `sqlx-macros`. The release profile now strips only the
   final binary and leaves proc-macro libraries unstripped.
 
 ## 0.1.10 - 2026-10-26

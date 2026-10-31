@@ -2,9 +2,12 @@
 export const MIN_PASSWORD_LENGTH = 12;
 export const MAX_PASSWORD_LENGTH = 128;
 export const MAX_SECRET_KEY_LENGTH = 128;
+export const MAX_SLUG_LENGTH = 63;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SECRET_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** The server's slug rule (`app/src/utils/slug.rs`). */
+const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 export function isValidEmail(value: string): boolean {
   const email = value.trim();
@@ -32,6 +35,14 @@ export function isValidSecretKey(value: string): boolean {
     value.length <= MAX_SECRET_KEY_LENGTH &&
     SECRET_KEY_PATTERN.test(value)
   );
+}
+
+/**
+ * Project, environment and runner token names: lowercase letters, numbers
+ * and single hyphens, starting with a letter, at most 63 characters.
+ */
+export function isValidSlug(value: string): boolean {
+  return value.length <= MAX_SLUG_LENGTH && SLUG_PATTERN.test(value);
 }
 
 /**

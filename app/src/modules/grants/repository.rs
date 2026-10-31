@@ -98,6 +98,16 @@ pub async fn for_group(
   Ok(responses(rows))
 }
 
+/// The grants of every group, each group's by scope.
+pub async fn for_groups(pool: &SqlitePool) -> Result<Vec<GrantResponse>, sqlx::Error> {
+  let rows = sqlx::query_as(&format!(
+    "{SELECT} WHERE g.principal_type = 'group' ORDER BY scope_label"
+  ))
+  .fetch_all(pool)
+  .await?;
+  Ok(responses(rows))
+}
+
 pub async fn groups_of(
   pool: &SqlitePool,
   user_id: &str,

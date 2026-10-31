@@ -17,6 +17,12 @@ export interface User {
   updatedAt: string;
   hasPassword: boolean;
   ssoLinked: boolean;
+  /** A disabled account can't sign in, and its tokens stop working. */
+  status: "active" | "disabled";
+  /** The last interactive sign-in, or null if they never signed in. */
+  lastSignInAt: string | null;
+  /** The groups the account belongs to. */
+  groups: { id: string; name: string }[];
 }
 const BASE = "/api/v1/users";
 export async function fetchUsers(): Promise<User[]> {
@@ -67,6 +73,28 @@ export async function unlinkUserSso(id: string): Promise<User> {
   const { data } = await apiRequest<User>(
     `${BASE}/${encodeURIComponent(id)}/sso`,
     { method: "DELETE" },
+  );
+  return data;
+}
+
+export async function fetchUser(id: string): Promise<User> {
+  const { data } = await apiRequest<User>(`${BASE}/${encodeURIComponent(id)}`);
+  return data;
+}
+
+/** Stop an account signing in; its sessions end and its tokens stop. */
+export async function disableUser(id: string): Promise<User> {
+  const { data } = await apiRequest<User>(
+    `${BASE}/${encodeURIComponent(id)}/disable`,
+    { method: "POST" },
+  );
+  return data;
+}
+
+export async function enableUser(id: string): Promise<User> {
+  const { data } = await apiRequest<User>(
+    `${BASE}/${encodeURIComponent(id)}/enable`,
+    { method: "POST" },
   );
   return data;
 }

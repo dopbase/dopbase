@@ -41,7 +41,8 @@ export function installRouterGuards(router: Router): void {
           };
         }
       }
-      if (!canOpen(to.name, auth.can)) {
+      // Detail routes are gated by the page they belong to.
+      if (!canOpen(to.meta.page ?? to.name, auth.can)) {
         return {
           name: "no-access",
           params: { pathMatch: to.path.slice(1).split("/") },

@@ -1,8 +1,10 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
-use crate::{constants::tokens::GRANT_ID_PREFIX, services::token};
+use crate::{
+  constants::tokens::GRANT_ID_PREFIX, modules::grants::model::GroupRef, services::token,
+};
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,a.status,a.last_sign_in_at";
 
 #[derive(sqlx::FromRow)]
 pub struct UserRow {
@@ -16,6 +18,8 @@ pub struct UserRow {
   pub has_password: bool,
   pub sso_linked: bool,
   pub owner_id: Option<String>,
+  pub status: String,
+  pub last_sign_in_at: Option<String>,
 }
 
 /// Root first, then by role rank, each by email.
@@ -37,6 +41,42 @@ pub async fn find(
   .bind(id)
   .fetch_optional(pool)
   .await
+}
+
+/// Every group membership as (user id, group), each user's by group name.
+pub async fn memberships(pool: &SqlitePool) -> Result<Vec<(String, GroupRef)>, sqlx::Error> {
+  let rows: Vec<(String, String, String)> = sqlx::query_as(
+    "SELECT m.user_id, g.id, g.name FROM group_members m JOIN groups g ON g.id = m.group_id ORDER BY g.name",
+  )
+  .fetch_all(pool)
+  .await?;
+  Ok(
+    rows
+      .into_iter()
+      .map(|(user_id, id, name)| (user_id, GroupRef { id, name }))
+      .collect(),
+  )
+}
+
+/// Sets `status` and returns false when the account already had it. Root
+/// is never disabled.
+pub async fn set_status(
+  conn: &mut SqliteConnection,
+  id: &str,
+  status: &str,
+  now: &str,
+) -> Result<bool, sqlx::Error> {
+  Ok(
+    sqlx::query("UPDATE admins SET status=?,updated_at=? WHERE id=? AND is_root=0 AND status<>?")
+      .bind(status)
+      .bind(now)
+      .bind(id)
+      .bind(status)
+      .execute(conn)
+      .await?
+      .rows_affected()
+      == 1,
+  )
 }
 
 /// The email, root flag, role id, and whether the role signs in with tokens

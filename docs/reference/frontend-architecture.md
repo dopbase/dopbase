@@ -121,32 +121,49 @@ Its Foundations page uses the same tokens as `src/style.css`, and its
 Components page holds the shared set every screen is built from. Each Figma
 component maps to one component in code:
 
-| Figma component                              | Code                                                 | Status                    |
-| -------------------------------------------- | ---------------------------------------------------- | ------------------------- |
-| Button                                       | `DbButton`                                           | Exists; restyle to Figma  |
-| IconButton                                   | `DbButton` with an icon slot                         | To build                  |
-| Badge                                        | `DbBadge`                                            | Exists                    |
-| LevelBadge, RoleChip                         | `DbLevelBadge`, `DbRoleChip`                         | To build                  |
-| EnvPill, EnvSwitcher, EnvMenu                | `DbEnvPill`, `DbEnvSwitcher`, `DbEnvMenu`            | To build                  |
-| Kbd, Avatar                                  | `DbKbd`, `DbAvatar`                                  | To build                  |
-| Input, Select, Checkbox, Switch              | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`      | Exist; restyle to Figma   |
-| SearchField                                  | `DbInput` with a search icon                         | To build                  |
-| RadioCard, Segment, Tab, FilterChip          | `DbRadioCard`, `DbSegment`, `DbTabs`, `DbFilterChip` | To build                  |
-| SelectMenu, SelectOption, Combobox           | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`       | To build                  |
-| Menu, MenuItem, row ⋯ menu                   | `DbMenu`, `DbMenuItem`, `DbRowMenu`                  | To build                  |
-| Toast                                        | `DbToast` and a `useToast` store                     | To build                  |
-| Alert                                        | `DbAlert`                                            | Exists; add the warn tone |
-| EmptyState                                   | `DbEmptyState`                                       | Exists                    |
-| CopyField, CodeSnippet                       | `DbCopyButton`, `DbCode`                             | Exist; restyle to Figma   |
-| Table rows on every screen                   | `DbTable`                                            | To build                  |
-| Modal, Drawer, mobile Sheet                  | `DbModal`, `DbSheet`                                 | Exist                     |
-| PageHeader, Card, Stat                       | `DbPageHeader`, `DbCard`, `DbStat`                   | To build                  |
-| Sidebar, SidebarItem, AccountMenu            | `DashboardNav`, `AccountMenu` in `src/layouts`       | Exist                     |
-| ProjectTabs                                  | `src/pages/Projects/components`                      | Rebuild with Projects     |
-| ProjectTreeRow, EnvTreeRow, ProjectAccordion | `src/pages/Projects/components`                      | Rebuild with Projects     |
+| Figma component                              | Code                                               | Status                    |
+| -------------------------------------------- | -------------------------------------------------- | ------------------------- |
+| Button                                       | `DbButton`                                         | Exists; restyle to Figma  |
+| IconButton                                   | `DbMenu`'s ⋯ trigger, `DbCopyButton` `icon-only`   | Partly built              |
+| Badge                                        | `DbBadge`                                          | Exists                    |
+| LevelBadge, RoleChip                         | `DbLevelBadge` (with `levelMeter()`), `DbRoleChip` | LevelBadge exists         |
+| EnvSwitcher, EnvMenu                         | `ContextBar` in `src/pages/Projects/components`    | Exist                     |
+| Kbd                                          | `DbKbd`                                            | Exists                    |
+| Input, Select, Checkbox, Switch              | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`    | Exist; restyle to Figma   |
+| SearchField                                  | `DbSearchField`                                    | Exists                    |
+| Segment                                      | `DbSegment`                                        | Exists                    |
+| RadioCard                                    | `DbRadioCard`                                      | Exists                    |
+| Tab, FilterChip                              | `ProjectTabs`; filter chips inside `ActivityPanel` | Built where used          |
+| SelectMenu, SelectOption, Combobox           | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`     | To build                  |
+| Menu, MenuItem, row ⋯ menu                   | `DbMenu` (⋯ trigger by default), `DbMenuItem`      | Exist                     |
+| Toast                                        | `DbToast` and a `useToast` store                   | To build                  |
+| Alert                                        | `DbAlert`                                          | Exists; add the warn tone |
+| EmptyState                                   | `DbEmptyState`                                     | Exists                    |
+| CopyField, CodeSnippet                       | `DbCopyButton`, `DbCode`                           | Exist; restyle to Figma   |
+| Table rows on every screen                   | `DbTable`                                          | To build                  |
+| Modal, Drawer, mobile Sheet                  | `DbModal`, `DbSheet` (`side="left"` or `"bottom"`) | Exist                     |
+| PageHeader, Card, Stat                       | `DbPageHeader`, `DbCard`, `DbStat`                 | To build                  |
+| Sidebar, SidebarItem, AccountMenu            | `DashboardNav`, `AccountMenu` in `src/layouts`     | Exist                     |
+| ProjectTabs, Context bar                     | `ProjectTabs`, `ContextBar`                        | Exist                     |
+| ProjectTreeRow, EnvTreeRow, ProjectAccordion | `ProjectTree` in `src/pages/Projects/components`   | Exist                     |
 
 Sidebar and project pieces know about Dopbase, so they live with their layout or
 page rather than in `src/components/ui`.
+
+Every signed-in page puts its content in one column: the `page-width`
+utility in `src/style.css` centres it in the area beside the sidebar, 1440px
+at most, with the same side padding everywhere. The sidebar stays pinned to
+the left edge at every width. Bars that run edge to edge, such as the project context
+bar and tabs, keep their border full width and put their contents in the
+same column, so headers and tables line up from tab to tab. The "13 Proposals ·
+Wide-screen layout" page in Figma compares the alternatives and lists the
+research behind this choice: an edge-pinned nav is the easiest mouse target,
+and centred content keeps the work where the eyes rest.
+
+Corners stay small. `--radius-card` and Tailwind's own `rounded-lg` and up
+are capped at 6px in `src/style.css`, and `--radius-control` is 5px. Use
+`rounded-full` only for dots, thin bars and radio buttons, where it never
+reads as a rounded box.
 
 ## Brand and icons
 
@@ -171,24 +188,35 @@ file here. Delete an icon file once nothing imports it.
 
 ## Routes
 
-`/status` (the Status page) replaced `/instance`, which now redirects to it.
-Project pages move next, with the project page rebuild. They will be addressed
-by project name and environment name, and each project tab gets its own path:
+Project pages are addressed by project name and environment name, and each
+project tab has its own path:
 
 ```text
-/projects
-/projects/:project
-/projects/:project/:env/secrets
-/projects/:project/:env/tokens
-/projects/:project/:env/activity
-/projects/:project/access
-/projects/:project/settings
+/projects                              the project tree
+/projects/:projectRef                  opens the first environment
+/projects/:projectRef/:env/secrets     route "environment"
+/projects/:projectRef/:env/tokens      route "environment-tokens"
+/projects/:projectRef/:env/activity    route "environment-activity"
+/projects/:projectRef/:env/import      route "environment-import"
+/projects/:projectRef/access           route "project-access"
+/projects/:projectRef/settings         route "project-settings"
+/status                                was /instance
 ```
 
-The old project paths will keep working through redirects:
-`/projects/p/:projectRef`, `/projects/p/:projectRef/e/:environmentId` and its
-`tokens` and `import` children, and `/projects/p/:projectRef/access`. The
-selection still lives only in the URL.
+Every project route renders `Project.page.vue`; `Project.controller.ts` maps
+the route name to a tab and decides which tabs the viewer gets. Access and
+Settings have no environment in the address, so the controller keeps the one
+last opened in the context bar. The selection still lives only in the URL.
+
+Older addresses still work. `/instance`, `/projects/p/:projectRef` and
+`/projects/p/:projectRef/access` are plain redirects.
+`/projects/p/:projectRef/e/:environmentId` (and its `tokens` and `import`
+children) runs `redirectLegacyEnvironment` in `src/router.legacy.ts`, which
+looks the id up and moves to the named address, or to the project if the
+environment is gone. Because `p` is a fixed segment, a project literally named `p` can't open `/projects/p/access` or `/projects/p/settings`; the legacy redirect wins there.
+
+Machines should keep using the immutable `env_...` id, which survives
+renames.
 
 ## Capability map
 

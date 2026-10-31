@@ -598,7 +598,7 @@ dopbase token personal create --name siem --audit --expires-in 90d
 `--project` and `--env` for every project you reach. `--expires-in` defaults to
 your role's default and can't be `never`. `--audit` is for roles whose tokens
 read the audit log, such as Auditor. The value is shown once. Tokens for AI
-agent accounts are created on the [Users](/ui/users) page.
+agent accounts are created on the [AI agents](/ui/ai-agents) page.
 
 ## Access
 

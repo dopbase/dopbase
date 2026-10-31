@@ -15,9 +15,15 @@ export function useImportSecretsController() {
   const { runWithReauth } = useReauthentication();
   let operationScope = new AbortController();
 
+  const environmentName = computed(() =>
+    typeof route.params.environmentName === "string"
+      ? route.params.environmentName
+      : null,
+  );
+  // The URL names the environment; the parsed file carries its id.
   const environmentId = computed(() =>
-    typeof route.params.environmentId === "string"
-      ? route.params.environmentId
+    importStore.pending?.environmentName === environmentName.value
+      ? (importStore.pending?.environmentId ?? null)
       : null,
   );
   const projectRef = computed(() =>
@@ -28,7 +34,6 @@ export function useImportSecretsController() {
   const valid = computed(
     () =>
       environmentId.value !== null &&
-      importStore.pending?.environmentId === environmentId.value &&
       (importStore.pending?.entries.length ?? 0) > 0,
   );
 
@@ -167,6 +172,7 @@ export function useImportSecretsController() {
 
   return {
     environmentId,
+    environmentName,
     projectRef,
     fileName,
     keys,

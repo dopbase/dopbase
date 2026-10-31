@@ -6,13 +6,25 @@ description: "Set, reveal, replace, and delete secrets in the Dopbase Admin UI. 
 # Managing secrets
 
 The Secrets tab lists the secrets of one environment. The list shows key names
-and metadata. Values stay hidden until you explicitly reveal one.
+and metadata. Values stay hidden until you explicitly reveal one. Type in
+**Filter keys** to narrow the list.
+
+Every row has a **⋯** menu with **Reveal**, **Copy value**, **History**,
+**Edit value** and, last and in red, **Delete**. You only see the items your
+level allows.
+
+## An empty environment
+
+An environment without secrets shows a short checklist to anyone who can
+write there. Drop a `.env` file on it, choose one, or paste it into the
+`.env` view. The checklist also shows the `dopbase login` and `dopbase run`
+commands for this environment. It goes away once the first secret is saved.
 
 ## Set and delete
 
 - **Set a secret** by key name. Dopbase encrypts the value on the server before
   it is stored. Setting an existing key replaces its value.
-- **Delete** a secret with its row action, after a confirmation.
+- **Delete** a secret from its row menu, after a confirmation.
 
 Every change is an individual record. Replacing `STRIPE_SECRET_KEY` does not
 touch `DATABASE_URL`, and each change lands in the [audit log](./audit-instance).
@@ -21,7 +33,7 @@ Deleting a secret also deletes its version history.
 
 ## History and rollback
 
-Each save creates a new version. Open **History** on a row, or **See history**
+Each save creates a new version. Choose **History** in a row's menu, or **See history**
 in the update dialog, to list the versions of that secret, newest first. Each
 row shows the change (created, updated, imported, or rolled back from an
 earlier version), who made it, and when. The current version is marked
@@ -44,12 +56,18 @@ already started with `dopbase run` keep the old value until they restart.
 
 ## Revealing a value
 
-Reveal shows the plaintext next to the key, with a countdown starting at
+Click the dots in the Value column, or choose **Reveal** in the row menu.
+Reveal shows the plaintext under the key, with a countdown starting at
 thirty seconds. When the countdown ends, the value hides itself. Switching
 environments or leaving the page hides it immediately too.
 
 Copying the value does not extend the timer. The page keeps the revealed
 plaintext only in memory and removes it when reloaded.
+
+**Copy value** puts the value on your clipboard without showing it. It counts
+as a reveal: it asks for your password when needed, and the audit log records
+it. Some browsers block copying after the password prompt; reveal the value
+and copy it from there instead.
 
 ## Password re-confirmation
 
@@ -66,7 +84,7 @@ successful preview creates an audit event without changing secrets or layout.
 
 ## Editing a whole environment as `.env`
 
-Use **Edit as .env** to edit several values together. The editor loads every
+Switch the view from **Table** to **.env** to edit several values together. The editor loads every
 secret in the environment as `.env` text:
 
 ```text

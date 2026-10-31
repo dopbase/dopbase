@@ -21,6 +21,8 @@ pub const MAX_PENDING_SSO_FLOWS: i64 = 1_000;
 pub const MAX_PENDING_SSO_FLOWS_PER_CLIENT: i64 = 20;
 
 pub const MAX_SECRETS_PER_ENVIRONMENT: usize = 1_000;
+/// How many environments one comparison reads against its base.
+pub const MAX_COMPARE_ENVIRONMENTS: usize = 3;
 pub const MAX_SECRET_COLLECTION_BYTES: usize = 2 * 1024 * 1024;
 /// Upper bound for a stored `.env` editor layout (comments, ordering, and
 /// empty `KEY=` slots — never secret values).

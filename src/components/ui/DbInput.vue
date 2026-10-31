@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
-import { EyeIcon, EyeOffIcon } from "~/assets/icons";
+import { EyeIcon, EyeOffIcon, LockIcon } from "~/assets/icons";
 
 /**
  * DbInput — labeled text input with inline validation and hint slots.
- * Password inputs get a built-in show/hide (eye) toggle.
+ * Password inputs get a built-in show/hide (eye) toggle. A read-only field
+ * keeps the same size but drops the fill for an outline and a lock, so it
+ * sits level with editable fields without looking like one.
  * Presentation-only. Validation messages are passed in as props.
  */
 const props = withDefaults(
@@ -19,6 +21,8 @@ const props = withDefaults(
     hint?: string | null;
     mono?: boolean;
     disabled?: boolean;
+    /** Shown and selectable, but not editable. */
+    readonly?: boolean;
     required?: boolean;
     autofocus?: boolean;
     min?: number;
@@ -76,11 +80,15 @@ function toggleReveal(): void {
     <!-- The label sits inside the filled, borderless input. The fill
          lightens on focus. -->
     <div
-      class="rounded-control bg-raised transition-colors duration-150 focus-within:bg-line"
+      class="rounded-control transition-colors duration-150"
       :class="[
+        readonly
+          ? 'shadow-[inset_0_0_0_1px_var(--color-line)]'
+          : 'bg-raised focus-within:bg-line',
         error ? 'bg-crit/20 focus-within:bg-crit/25' : '',
         disabled ? 'opacity-50' : '',
-      ]">
+      ]"
+      :data-readonly="readonly ? '' : undefined">
       <label
         v-if="label"
         :for="id"
@@ -100,6 +108,7 @@ function toggleReveal(): void {
           :placeholder="resolvedPlaceholder"
           :autocomplete="autocomplete"
           :disabled="disabled"
+          :readonly="readonly"
           :required="required"
           :autofocus="autofocus"
           :min="min"
@@ -109,10 +118,15 @@ function toggleReveal(): void {
           :aria-describedby="error ? `${id}-error` : undefined"
           class="h-full w-full bg-transparent pl-3.5 pr-3.5 text-base text-ink-strong outline-none sm:text-sm placeholder:text-ink-faint disabled:cursor-default"
           :class="[
-            isPassword ? 'pr-10' : '',
+            isPassword || readonly ? 'pr-10' : '',
             mono ? 'font-mono sm:text-xs' : '',
+            readonly ? 'cursor-default text-ink' : '',
           ]"
           @input="onInput" />
+        <LockIcon
+          v-if="readonly"
+          class="pointer-events-none absolute right-3.5 h-3.5 w-3.5 text-ink-faint"
+          aria-hidden="true" />
         <button
           v-if="isPassword"
           type="button"

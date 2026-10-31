@@ -108,7 +108,10 @@ onBeforeUnmount(() => {
         tabindex="-1">
         <header
           class="flex shrink-0 items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
-          <h2 class="text-[15px] font-semibold text-ink-strong">{{ title }}</h2>
+          <h2
+            class="min-w-0 text-[15px] font-semibold text-ink-strong [overflow-wrap:anywhere]">
+            {{ title }}
+          </h2>
           <button
             v-if="!persistent"
             type="button"
