@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use axum::{
   Router,
-  routing::{delete, get},
+  routing::{delete, get, post},
 };
 pub mod controller;
 pub mod doc;
@@ -23,5 +23,13 @@ pub fn routes() -> Router<AppState> {
     .route(
       crate::constants::api::users::SSO,
       delete(controller::unlink_sso),
+    )
+    .route(
+      crate::constants::api::users::DISABLE,
+      post(controller::disable),
+    )
+    .route(
+      crate::constants::api::users::ENABLE,
+      post(controller::enable),
     )
 }

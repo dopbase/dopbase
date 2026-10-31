@@ -7,7 +7,7 @@ use crate::{
   extractors::{require_capability_browser, require_mutation, require_recent_browser_auth},
   http::HttpError,
   models::{AdminRole, AuthIdentity},
-  modules::common,
+  modules::{common, grants, grants::model::GroupRef},
   services::{
     authx::{self, Access, Capability, Catalog},
     token,
@@ -16,6 +16,7 @@ use crate::{
 };
 use axum::http::HeaderMap;
 use chrono::Utc;
+use std::collections::HashMap;
 
 fn actor(identity: &AuthIdentity) -> (&str, &str) {
   match identity {
@@ -141,7 +142,9 @@ pub(crate) async fn require_within(
     return Ok(());
   }
   let mut conn = state.db.pool().acquire().await?;
-  let target = authx::load_access(&mut conn, target_id)
+  // A disabled account keeps its role, so judge it by that: otherwise
+  // anyone could re-enable an account that reaches further than they do.
+  let target = authx::account_access(&mut conn, target_id)
     .await?
     .unwrap_or_else(Access::none);
   if !access.includes(&target) {
@@ -171,9 +174,15 @@ fn parse_role(value: &str) -> Result<AdminRole, HttpError> {
   AdminRole::parse(value).ok_or_else(HttpError::internal)
 }
 
-fn user(row: UserRow) -> Result<UserResponse, HttpError> {
+fn user(
+  row: UserRow,
+  groups: Vec<GroupRef>,
+) -> Result<UserResponse, HttpError> {
   Ok(UserResponse {
     role: parse_role(&row.role)?,
+    status: UserStatus::parse(&row.status).ok_or_else(HttpError::internal)?,
+    last_sign_in_at: row.last_sign_in_at,
+    groups,
     id: row.id,
     email: row.email,
     role_id: row.role_id,
@@ -190,11 +199,11 @@ async fn fetch_user(
   state: &AppState,
   id: &str,
 ) -> Result<UserResponse, HttpError> {
-  repository::find(state.db.pool(), id)
+  let row = repository::find(state.db.pool(), id)
     .await?
-    .map(user)
-    .transpose()?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))
+    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
+  let groups = grants::repository::groups_of(state.db.pool(), id).await?;
+  user(row, groups)
 }
 
 pub async fn list(
@@ -202,10 +211,17 @@ pub async fn list(
   identity: &AuthIdentity,
 ) -> Result<Vec<UserResponse>, HttpError> {
   require_capability_browser(identity, Capability::UsersView)?;
+  let mut groups: HashMap<String, Vec<GroupRef>> = HashMap::new();
+  for (user_id, group) in repository::memberships(state.db.pool()).await? {
+    groups.entry(user_id).or_default().push(group);
+  }
   repository::list(state.db.pool())
     .await?
     .into_iter()
-    .map(user)
+    .map(|row| {
+      let mine = groups.remove(&row.id).unwrap_or_default();
+      user(row, mine)
+    })
     .collect()
 }
 
@@ -536,5 +552,69 @@ pub async fn unlink_sso(
     require_within(state, identity, id).await?;
   }
   crate::modules::sso::service::unlink(state, identity, id, &target.email).await?;
+  fetch_user(state, id).await
+}
+
+/// Disable an account, or enable it again. A disabled account can't sign
+/// in, its sessions end, and its tokens are refused until it is enabled.
+/// Asking for the status it already has changes nothing.
+pub async fn set_status(
+  state: &AppState,
+  identity: &AuthIdentity,
+  headers: &HeaderMap,
+  id: &str,
+  status: UserStatus,
+) -> Result<UserResponse, HttpError> {
+  require_mutation(identity, headers)?;
+  require_recent_browser_auth(identity)?;
+  require_capability_browser(identity, Capability::UsersManage)?;
+  let (actor_id, actor_email) = actor(identity);
+  let disable = status == UserStatus::Disabled;
+  if id == actor_id {
+    return Err(HttpError::forbidden(
+      "SELF_DISABLE_FORBIDDEN",
+      if disable {
+        "You cannot disable your own account."
+      } else {
+        "You cannot enable your own account."
+      },
+    ));
+  }
+  let (email, is_root, _, _) = repository::account(state.db.pool(), id)
+    .await?
+    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
+  if is_root {
+    return Err(HttpError::forbidden(
+      "ROOT_PROTECTED",
+      "The root administrator cannot be modified.",
+    ));
+  }
+  require_within(state, identity, id).await?;
+  let (value, action) = if disable {
+    ("disabled", "user.disabled")
+  } else {
+    ("active", "user.enabled")
+  };
+  let now = Utc::now().to_rfc3339();
+  let mut tx = state.db.pool().begin().await?;
+  if repository::set_status(&mut tx, id, value, &now).await? {
+    if disable {
+      repository::revoke_sessions(&mut tx, id, &now).await?;
+    }
+    common::audit(
+      &mut tx,
+      identity.audit_actor_type(),
+      Some(actor_id),
+      Some(actor_email),
+      action,
+      None,
+      None,
+      Some("admin"),
+      Some(id),
+      serde_json::json!({"email":email}),
+    )
+    .await?;
+  }
+  tx.commit().await?;
   fetch_user(state, id).await
 }

@@ -1,6 +1,25 @@
-use crate::models::AdminRole;
+use crate::{models::AdminRole, modules::grants::model::GroupRef};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+/// Whether an account can sign in and use its tokens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UserStatus {
+  Active,
+  /// Can't sign in, and its sessions and tokens are refused.
+  Disabled,
+}
+
+impl UserStatus {
+  pub fn parse(value: &str) -> Option<Self> {
+    match value {
+      "active" => Some(Self::Active),
+      "disabled" => Some(Self::Disabled),
+      _ => None,
+    }
+  }
+}
 
 /// User account representation.
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -28,6 +47,13 @@ pub struct UserResponse {
   pub sso_linked: bool,
   /// The accountable person behind an AI agent account.
   pub owner_id: Option<String>,
+  /// `active` or `disabled`.
+  pub status: UserStatus,
+  /// ISO 8601 time of the last password, single sign-on, or CLI browser
+  /// sign-in. Empty until the first one.
+  pub last_sign_in_at: Option<String>,
+  /// The groups the account belongs to, by name.
+  pub groups: Vec<GroupRef>,
 }
 
 /// Request to create a new user account.

@@ -189,6 +189,8 @@ pub(crate) async fn issue_session(
     },
   )
   .await?;
+  // Only a new session counts as signing in; confirming one does not.
+  repository::mark_signed_in(tx, admin_id, &now.to_rfc3339()).await?;
   Ok(IssuedSession {
     id: session_id,
     token: raw,

@@ -1398,6 +1398,8 @@ mod sso_passwords;
 mod sso_presets;
 #[path = "modules/tokens/names.rs"]
 mod tokens_names;
+#[path = "modules/users/lifecycle.rs"]
+mod users_lifecycle;
 
 #[tokio::test]
 async fn audit_records_store_the_client_ip_through_trusted_proxies_only() {

@@ -65,6 +65,20 @@ pub async fn insert_session(
   Ok(())
 }
 
+/// Records an interactive sign-in on the account.
+pub async fn mark_signed_in(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+  now: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query("UPDATE admins SET last_sign_in_at=? WHERE id=?")
+    .bind(now)
+    .bind(admin_id)
+    .execute(conn)
+    .await?;
+  Ok(())
+}
+
 pub async fn revoke_session(
   conn: &mut SqliteConnection,
   session_id: &str,

@@ -2,6 +2,7 @@ use super::{controller, model::*};
 use crate::{
   http::{ErrorBody, HttpResponseFormat},
   models::AdminRole,
+  modules::grants::model::GroupRef,
 };
 use utoipa::OpenApi;
 
@@ -13,10 +14,14 @@ use utoipa::OpenApi;
     controller::create,
     controller::update,
     controller::delete,
-    controller::unlink_sso
+    controller::unlink_sso,
+    controller::disable,
+    controller::enable
   ),
   components(schemas(
     UserResponse,
+    UserStatus,
+    GroupRef,
     CreateUserRequest,
     UpdateUserRequest,
     AdminRole,
