@@ -180,3 +180,118 @@ async fn group_members_reach_what_the_group_is_granted() {
   assert_eq!(left, 0);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let alice = person(&router, &root, "alice@example.com", "member").await;
+  let bob = person(&router, &root, "bob@example.com", "member").await;
+  let create = |by, name: &'static str| {
+    send(
+      &router,
+      "POST",
+      "/api/v1/groups",
+      by,
+      Some(json!({"name":name})),
+    )
+  };
+  let (status, body) = create(lead.browser(), "Backend").await;
+  assert_eq!(status, 201, "{body}");
+  assert_eq!(
+    body["data"]["group"]["createdBy"],
+    json!({"id":lead.id,"email":"lead@example.com"})
+  );
+  let backend = body["data"]["group"]["id"].as_str().unwrap().to_owned();
+  let (status, _) = create(root.browser(), "Empty").await;
+  assert_eq!(status, 201);
+  let members = format!("/api/v1/groups/{backend}/members");
+  for (by, user) in [(&lead, &bob), (&root, &alice)] {
+    let (status, body) = send(
+      &router,
+      "PUT",
+      &format!("{members}/{}", user.id),
+      by.browser(),
+      None,
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+  }
+  grant(
+    &router,
+    &root,
+    ("group", &backend),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+
+  let (status, body) = send(&router, "GET", "/api/v1/groups", lead.browser(), None).await;
+  assert_eq!(status, 200, "{body}");
+  let listed = &body["data"][0];
+  assert_eq!(listed["name"], "Backend");
+  assert_eq!(listed["memberCount"], 2);
+  assert_eq!(listed["createdBy"]["id"], lead.id.as_str());
+  assert_eq!(
+    listed["members"],
+    json!([
+      {"id":alice.id,"email":"alice@example.com"},
+      {"id":bob.id,"email":"bob@example.com"},
+    ])
+  );
+  assert_eq!(listed["grants"].as_array().unwrap().len(), 1);
+  assert_eq!(listed["grants"][0]["principalId"], backend.as_str());
+  assert_eq!(listed["grants"][0]["scopeLabel"], "payments");
+  let empty = &body["data"][1];
+  assert_eq!(empty["createdBy"]["email"], "admin@example.com");
+  assert_eq!(empty["members"], json!([]));
+  assert_eq!(empty["grants"], json!([]));
+
+  let (_, detail) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/groups/{backend}"),
+    lead.browser(),
+    None,
+  )
+  .await;
+  let added_by = |index: usize| detail["data"]["members"][index]["addedBy"].clone();
+  assert_eq!(
+    added_by(0),
+    json!({"id":root.id,"email":"admin@example.com"})
+  );
+  assert_eq!(
+    added_by(1),
+    json!({"id":lead.id,"email":"lead@example.com"})
+  );
+
+  // Once the lead's account is gone, the group no longer names them.
+  let (status, _) = send(
+    &router,
+    "DELETE",
+    &format!("/api/v1/users/{}", lead.id),
+    root.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  let (_, detail) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/groups/{backend}"),
+    root.browser(),
+    None,
+  )
+  .await;
+  assert!(detail["data"]["group"]["createdBy"].is_null(), "{detail}");
+  assert!(
+    detail["data"]["members"][1]["addedBy"].is_null(),
+    "{detail}"
+  );
+  assert_eq!(
+    detail["data"]["members"][0]["addedBy"]["id"],
+    root.id.as_str()
+  );
+  state.db.close().await;
+}

@@ -9,7 +9,10 @@ use crate::{
   models::AuthIdentity,
   modules::{
     common,
-    grants::{self, model::ScopeType},
+    grants::{
+      self,
+      model::{GrantResponse, ScopeType},
+    },
   },
   services::{
     authx::{self, Capability, Level},
@@ -19,7 +22,7 @@ use crate::{
 };
 use axum::http::HeaderMap;
 use chrono::Utc;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 fn not_found() -> HttpError {
   HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")
@@ -110,12 +113,36 @@ async fn detail(
   })
 }
 
+/// Every group with its members and grants, in three queries however many
+/// groups there are.
 pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
-) -> Result<Vec<GroupResponse>, HttpError> {
+) -> Result<Vec<GroupListItem>, HttpError> {
   require_view(identity)?;
-  Ok(repository::list(state.db.pool()).await?)
+  let pool = state.db.pool();
+  let mut members: HashMap<String, Vec<AccountRef>> = HashMap::new();
+  for (group_id, member) in repository::all_members(pool).await? {
+    members.entry(group_id).or_default().push(member);
+  }
+  let mut grants: HashMap<String, Vec<GrantResponse>> = HashMap::new();
+  for grant in grants::repository::for_groups(pool).await? {
+    grants
+      .entry(grant.principal_id.clone())
+      .or_default()
+      .push(grant);
+  }
+  Ok(
+    repository::list(pool)
+      .await?
+      .into_iter()
+      .map(|group| GroupListItem {
+        members: members.remove(&group.id).unwrap_or_default(),
+        grants: grants.remove(&group.id).unwrap_or_default(),
+        group,
+      })
+      .collect(),
+  )
 }
 
 pub async fn get(

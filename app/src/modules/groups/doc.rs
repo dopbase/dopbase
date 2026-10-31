@@ -14,13 +14,15 @@ use utoipa::OpenApi;
     controller::remove_member
   ),
   components(schemas(
+    AccountRef,
     GroupResponse,
+    GroupListItem,
     GroupMember,
     GroupDetailResponse,
     CreateGroupRequest,
     UpdateGroupRequest,
     ErrorBody,
-    HttpResponseFormat<Vec<GroupResponse>>,
+    HttpResponseFormat<Vec<GroupListItem>>,
     HttpResponseFormat<GroupDetailResponse>,
     HttpResponseFormat<serde_json::Value>
   )),
