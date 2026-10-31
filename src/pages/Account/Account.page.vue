@@ -3,27 +3,26 @@ import { useAccountController } from "./Account.controller";
 import SsoLinkCard from "./components/SsoLinkCard.vue";
 import PersonalTokensCard from "./components/PersonalTokensCard.vue";
 import { DashboardLayout } from "~/layouts";
-import {
-  DbAlert,
-  DbBadge,
-  DbButton,
-  DbCode,
-  DbCopyButton,
-  DbInput,
-} from "~/components/ui";
-import { TerminalIcon, UserIcon } from "~/assets/icons";
+import PageHeader from "~/components/app/PageHeader.vue";
+import { DbAlert, DbButton, DbInput, DbModal, DbTabNav } from "~/components/ui";
 
 /**
- * Account — profile overview, active session security status,
- * password rotation, and offline emergency recovery.
+ * Account — your profile and sign-in, and the tokens your role may hold.
+ * Each tab has its own address.
  */
+const controller = useAccountController();
 const {
+  activeTab,
+  tabs,
+  subtitle,
+  groups,
+  canOpenGroups,
+  passwordOpen,
   email,
   formattedRole,
   lastLoginAt,
   formattedLastLogin,
   fullLastLogin,
-  recentAuthentication,
   needsCurrentPassword,
   currentPassword,
   newPassword,
@@ -31,172 +30,164 @@ const {
   fieldErrors,
   formError,
   submitting,
-  submit,
-} = useAccountController();
+} = controller;
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="page-width py-6 lg:py-8">
-      <!-- Header -->
-      <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-2.5">
-            <h1 class="text-lg font-semibold text-ink-strong">Account</h1>
-            <DbBadge :tone="recentAuthentication ? 'ok' : 'neutral'">
-              {{
-                recentAuthentication
-                  ? "Recently authenticated"
-                  : "Active session"
-              }}
-            </DbBadge>
-          </div>
-          <p class="mt-1 text-sm text-ink-muted">
-            Manage your personal profile, credentials, and active session.
-          </p>
-        </div>
-      </header>
+    <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
+      <PageHeader title="Account" :subtitle="subtitle" />
 
-      <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        <!-- Left column: Profile & Offline Recovery -->
-        <div class="space-y-6 lg:col-span-1">
-          <!-- Profile Card -->
-          <section
-            class="rounded-card border border-line bg-panel p-5 shadow-xs"
-            aria-labelledby="profile-heading">
-            <div class="flex items-center gap-3.5">
-              <div
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-line bg-raised text-ink-muted">
-                <UserIcon class="h-6 w-6" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <p
-                  class="truncate font-mono text-xs font-semibold text-ink-strong"
-                  :title="email">
-                  {{ email }}
-                </p>
-                <p class="mt-0.5 text-xs text-ink-muted">
-                  {{ formattedRole }}
-                </p>
-              </div>
+      <DbTabNav
+        v-if="tabs.length > 1"
+        :tabs="tabs"
+        :active="activeTab"
+        label="Account sections" />
+
+      <template v-if="activeTab === 'profile'">
+        <section
+          class="flex flex-col gap-3.5 rounded-card border border-line bg-panel px-5 py-4"
+          aria-labelledby="profile-heading"
+          data-testid="account-profile">
+          <h2
+            id="profile-heading"
+            class="text-[15px] font-semibold leading-[22px] text-ink-strong">
+            Profile
+          </h2>
+          <dl class="flex flex-col gap-3.5 text-sm">
+            <div class="flex gap-3">
+              <dt class="w-28 shrink-0 text-ink-muted sm:w-32">Email</dt>
+              <dd class="min-w-0 break-all font-mono text-ink-strong">
+                {{ email }}
+              </dd>
             </div>
-
-            <div
-              class="mt-4 space-y-3 border-t border-line-soft pt-4 mb-2 text-xs">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-ink-muted">Last sign in</span>
+            <div class="flex items-center gap-3">
+              <dt class="w-28 shrink-0 text-ink-muted sm:w-32">Role</dt>
+              <dd>
                 <span
-                  v-if="lastLoginAt"
-                  class="font-mono text-ink"
-                  :title="fullLastLogin">
-                  {{ formattedLastLogin }}
+                  class="inline-flex rounded-control bg-raised px-2 py-px text-sm font-medium text-ink">
+                  {{ formattedRole }}
                 </span>
-                <span v-else class="text-ink-faint">—</span>
-              </div>
+              </dd>
             </div>
-          </section>
-        </div>
-
-        <!-- Right column: Password Rotation -->
-        <div class="space-y-6 lg:col-span-2">
-          <SsoLinkCard />
-
-          <PersonalTokensCard />
-
-          <!-- Offline Recovery Card -->
-          <section
-            class="rounded-card border border-line bg-panel p-5 shadow-xs"
-            aria-labelledby="recovery-heading">
-            <div class="flex items-center gap-2">
-              <TerminalIcon class="h-4 w-4 text-ink-muted" />
-              <h2
-                id="recovery-heading"
-                class="text-sm font-semibold text-ink-strong">
-                Offline Recovery
-              </h2>
+            <div v-if="groups" class="flex gap-3">
+              <dt class="w-28 shrink-0 text-ink-muted sm:w-32">Groups</dt>
+              <dd class="min-w-0">
+                <span v-if="groups.length === 0" class="text-ink-muted">
+                  None
+                </span>
+                <template v-for="(group, index) in groups" :key="group.id">
+                  <RouterLink
+                    v-if="canOpenGroups"
+                    :to="{ name: 'group', params: { groupId: group.id } }"
+                    class="text-accent-strong hover:underline">
+                    {{ group.name }}
+                  </RouterLink>
+                  <span v-else class="text-accent-strong">{{
+                    group.name
+                  }}</span>
+                  <span v-if="index < groups.length - 1" class="text-ink-muted"
+                    >,
+                  </span>
+                </template>
+              </dd>
             </div>
-            <p class="mt-2 text-xs leading-relaxed text-ink-muted">
-              Lost access? Reset credentials directly on the host server using
-              the CLI:
+            <div v-if="lastLoginAt" class="flex gap-3">
+              <dt class="w-28 shrink-0 text-ink-muted sm:w-32">Last sign-in</dt>
+              <dd class="text-ink-strong" :title="fullLastLogin">
+                {{ formattedLastLogin }} · this browser
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <SsoLinkCard />
+
+        <section
+          class="flex flex-wrap items-center gap-3 rounded-card border border-line bg-panel px-5 py-4"
+          aria-labelledby="password-heading">
+          <div class="min-w-0 flex-1">
+            <h2
+              id="password-heading"
+              class="text-[15px] font-semibold leading-[22px] text-ink-strong">
+              Password
+            </h2>
+            <p class="text-sm text-ink-muted">
+              {{
+                needsCurrentPassword
+                  ? "Changing it signs you out everywhere, this browser too."
+                  : "You sign in with single sign-on. A password lets you in when the provider is down."
+              }}
             </p>
+          </div>
+          <DbButton
+            data-testid="open-password"
+            @click="controller.openPassword">
+            {{ needsCurrentPassword ? "Change password" : "Set a password" }}
+          </DbButton>
+        </section>
+      </template>
 
-            <div
-              class="mt-3 flex items-center justify-between gap-2 rounded-control border border-line bg-raised/70 px-3 py-2">
-              <DbCode class="truncate text-xs"
-                >dopbase admin reset-password</DbCode
-              >
-              <DbCopyButton value="dopbase admin reset-password" />
-            </div>
-          </section>
-
-          <section
-            class="rounded-card border border-line bg-panel p-6 shadow-xs"
-            aria-labelledby="password-heading">
-            <div class="border-b border-line-soft pb-4">
-              <h2
-                id="password-heading"
-                class="text-sm font-semibold text-ink-strong">
-                {{
-                  needsCurrentPassword ? "Change password" : "Set a password"
-                }}
-              </h2>
-              <p class="mt-1 text-xs text-ink-muted">
-                {{
-                  needsCurrentPassword
-                    ? "Rotating your password immediately invalidates all active sessions across devices, including this one."
-                    : "Your account signs in with single sign-on only. A password lets you sign in when the provider is unavailable. Saving it signs you out everywhere."
-                }}
-              </p>
-            </div>
-
-            <form
-              class="mt-5 flex flex-col gap-4"
-              novalidate
-              data-testid="change-password-form"
-              @submit.prevent="submit">
-              <DbInput
-                v-if="needsCurrentPassword"
-                v-model="currentPassword"
-                label="Current password"
-                name="currentPassword"
-                type="password"
-                autocomplete="current-password"
-                :error="fieldErrors.currentPassword" />
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <DbInput
-                  v-model="newPassword"
-                  label="New password"
-                  name="newPassword"
-                  type="password"
-                  autocomplete="new-password"
-                  hint="12–128 characters."
-                  :error="fieldErrors.newPassword" />
-                <DbInput
-                  v-model="confirmPassword"
-                  label="Confirm new password"
-                  name="confirmPassword"
-                  type="password"
-                  autocomplete="new-password"
-                  :error="fieldErrors.confirmPassword" />
-              </div>
-
-              <DbAlert v-if="formError" tone="error">
-                {{ formError }}
-              </DbAlert>
-
-              <div
-                class="mt-2 flex items-center justify-end border-t border-line-soft pt-4">
-                <DbButton variant="primary" type="submit" :loading="submitting">
-                  {{
-                    needsCurrentPassword ? "Change password" : "Set password"
-                  }}
-                </DbButton>
-              </div>
-            </form>
-          </section>
-        </div>
-      </div>
+      <PersonalTokensCard v-else />
     </div>
+
+    <DbModal
+      :open="passwordOpen"
+      :title="needsCurrentPassword ? 'Change password' : 'Set a password'"
+      @close="passwordOpen = false">
+      <form
+        id="change-password"
+        class="flex flex-col gap-4"
+        novalidate
+        data-testid="change-password-form"
+        @submit.prevent="controller.submit">
+        <p class="text-sm text-ink-muted">
+          {{
+            needsCurrentPassword
+              ? "Saving it ends every session, including this one. You'll sign in again with the new password."
+              : "Saving it ends every session, including this one."
+          }}
+        </p>
+        <DbInput
+          v-if="needsCurrentPassword"
+          v-model="currentPassword"
+          label="Current password"
+          name="currentPassword"
+          type="password"
+          autocomplete="current-password"
+          :error="fieldErrors.currentPassword" />
+        <DbInput
+          v-model="newPassword"
+          label="New password"
+          name="newPassword"
+          type="password"
+          autocomplete="new-password"
+          hint="12 to 128 characters."
+          :error="fieldErrors.newPassword" />
+        <DbInput
+          v-model="confirmPassword"
+          label="Confirm new password"
+          name="confirmPassword"
+          type="password"
+          autocomplete="new-password"
+          :error="fieldErrors.confirmPassword" />
+        <DbAlert v-if="formError">{{ formError }}</DbAlert>
+      </form>
+      <template #footer>
+        <DbButton
+          variant="ghost"
+          :disabled="submitting"
+          @click="passwordOpen = false">
+          Cancel
+        </DbButton>
+        <DbButton
+          variant="primary"
+          type="submit"
+          form="change-password"
+          :loading="submitting">
+          {{ needsCurrentPassword ? "Change password" : "Set password" }}
+        </DbButton>
+      </template>
+    </DbModal>
   </DashboardLayout>
 </template>

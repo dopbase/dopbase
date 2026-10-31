@@ -6,7 +6,8 @@ import { acquireScrollLock, releaseScrollLock } from "~/composable/scroll-lock";
 /**
  * DbSheet — a panel that slides in over the page. From the left it is a
  * full-height column, used where a desktop column (the app sidebar) folds
- * away on narrow screens. From the bottom it is a phone picker, used where
+ * away on narrow screens. From the right it is a detail drawer, such as
+ * one audit event. From the bottom it is a phone picker, used where
  * a desktop dropdown would be too small to tap. Renders via Teleport,
  * closes on Escape and backdrop click, and shares the body scroll lock
  * with DbModal.
@@ -15,7 +16,7 @@ const props = withDefaults(
   defineProps<{
     open: boolean;
     title: string;
-    side?: "left" | "bottom";
+    side?: "left" | "right" | "bottom";
   }>(),
   { side: "left" },
 );
@@ -29,8 +30,17 @@ const bottom = computed(() => props.side === "bottom");
 const offscreen = computed(() =>
   bottom.value
     ? "opacity-0 [&>[role=dialog]]:translate-y-full motion-reduce:[&>[role=dialog]]:translate-y-0"
-    : "opacity-0 [&>[role=dialog]]:-translate-x-full motion-reduce:[&>[role=dialog]]:translate-x-0",
+    : props.side === "right"
+      ? "opacity-0 [&>[role=dialog]]:translate-x-full motion-reduce:[&>[role=dialog]]:translate-x-0"
+      : "opacity-0 [&>[role=dialog]]:-translate-x-full motion-reduce:[&>[role=dialog]]:translate-x-0",
 );
+const panelClass = computed(() => {
+  if (bottom.value)
+    return "max-h-[85dvh] w-full rounded-t-card border-t border-line pb-[env(safe-area-inset-bottom)]";
+  if (props.side === "right")
+    return "ml-auto h-full w-[min(32rem,100vw)] border-l border-line";
+  return "h-full w-[min(20rem,85vw)] border-r border-line";
+});
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") emit("close");
@@ -77,11 +87,7 @@ onBeforeUnmount(() => {
         <div
           ref="panel"
           class="flex flex-col bg-panel shadow-2xl focus:outline-none"
-          :class="
-            bottom
-              ? 'max-h-[85dvh] w-full rounded-t-card border-t border-line pb-[env(safe-area-inset-bottom)]'
-              : 'h-full w-[min(20rem,85vw)] border-r border-line'
-          "
+          :class="panelClass"
           role="dialog"
           aria-modal="true"
           :aria-label="title"

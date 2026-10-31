@@ -146,11 +146,23 @@ export const router = createRouter({
       path: "/instance",
       redirect: { name: "status" },
     },
-    {
-      path: "/account",
-      name: "account",
+    // Account: Profile & sign-in, then Personal tokens or, for roles whose
+    // tokens read the audit log, Audit tokens.
+    ...(
+      [
+        ["", "account"],
+        ["/tokens", "account-tokens"],
+        ["/audit-tokens", "account-audit-tokens"],
+      ] as const
+    ).map(([suffix, name]) => ({
+      path: `/account${suffix}`,
+      name,
       component: () => import("~/pages/Account/Account.page.vue"),
-    },
+      meta: { page: "account" },
+      // Older links point at the tokens card by hash.
+      beforeEnter: (to: { hash: string }) =>
+        to.hash === "#personal-tokens" ? { name: "account-tokens" } : true,
+    })),
     {
       path: "/users",
       name: "users",
