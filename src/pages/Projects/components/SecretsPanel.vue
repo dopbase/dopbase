@@ -682,7 +682,10 @@ async function confirmDelete(): Promise<void> {
           mono
           hint="Use letters, numbers, '_', and '-'. The first character cannot be a number." />
         <div v-else class="flex flex-col gap-1.5">
-          <div class="rounded-control bg-raised" data-testid="secret-key-field">
+          <!-- Read-only: outlined, not filled, like DbInput's readonly. -->
+          <div
+            class="rounded-control shadow-[inset_0_0_0_1px_var(--color-line)]"
+            data-testid="secret-key-field">
             <p class="px-3.5 pb-0.5 pt-2 text-xs font-semibold text-ink-muted">
               Key
             </p>
@@ -691,7 +694,7 @@ async function confirmDelete(): Promise<void> {
                 class="h-3.5 w-3.5 shrink-0 text-ink-faint"
                 aria-hidden="true" />
               <span
-                class="min-w-0 flex-1 truncate font-mono text-xs text-ink-strong"
+                class="min-w-0 flex-1 truncate font-mono text-xs text-ink"
                 :title="form.secret.key">
                 {{ form.secret.key }}
               </span>
