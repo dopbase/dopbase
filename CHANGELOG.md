@@ -136,6 +136,65 @@ All notable changes to Dopbase are documented in this file.
   shows a **No access** screen that names the missing capability, instead of
   sending you to Projects. The sidebar and the router read the same
   capability map, so the nav never offers a page the router would refuse.
+- **Projects** is now a tree. Each project opens like a folder and lists its
+  environments with a protected chip, your level and the last change, six at
+  a time with **Show all**, and the filter box searches projects and
+  environments together. Project and environment actions moved into a ⋯
+  menu, and the project rail is gone.
+- Environment pages are addressed by name, such as
+  `/projects/payments/prod/secrets` and `.../tokens`. Old
+  `/projects/p/.../e/env_...` links look the environment up and redirect.
+  Renaming an environment now breaks links to its old name, as renaming a
+  project already did.
+- The project page has a context bar: the `payments / prod` breadcrumb
+  switches project or environment (press E for the environment menu), a
+  protected environment gets an amber chip and an amber line across the top,
+  and your level sits on the right, next to **Run**, which opens the command
+  to run an app with this environment's values from the CLI, Docker or
+  GitHub Actions. Tabs below it show Secrets, Tokens (with Manage), Access
+  (project managers, or `access.report` to read), Activity, and Settings
+  (project managers).
+- The **Secrets** table has a key filter, a Table and .env switch, and one ⋯
+  menu per row with Reveal, Copy value, History, Edit value and Delete, in
+  that order. Clicking the masked value still reveals it. Copy value copies
+  without showing the value and is recorded like a reveal.
+- An empty environment shows a first-run checklist to anyone who can write
+  there: drop, choose or paste a `.env` file, and copy the `dopbase login`
+  and `dopbase run` commands for that environment.
+- The **Tokens** tab has a filter, a level meter for what each token can do,
+  and expiry in amber during a token's last week. New runner tokens pick
+  7 days, 30 days, 90 days, a year or a custom lifetime, and the dialog says
+  what the token will read and until when. The new token's dialog shows the
+  `export DOPBASE_TOKEN` and `dopbase run` lines to use it; agent and
+  personal tokens get the same dialog.
+- **Access** moved inside the project page, at `/projects/<project>/access`.
+  Give access uses one card per level, and says what the grant will allow
+  and whether it replaces an existing one. Each grant's ⋯ menu changes its
+  level or removes it.
+- New **Activity** tab: the audit trail for this environment, widened to the
+  whole project or narrowed by action and actor, with a link to the full
+  audit log carrying the same filters. The audit log now reads those filters
+  from its address.
+- New **Settings** tab for project managers: rename the project, protect,
+  rename or delete each environment with its secret and runner token
+  counts, and a danger zone that says what deleting the project removes.
+- Corners are smaller across the console: cards and dialogs round at 6px,
+  and nothing rounds past that.
+- Every page now uses the same content column, centred beside the sidebar
+  and up to 1440px wide, so wide screens no longer stretch tables edge to
+  edge or leave a large gap, and the project tabs line up with each other
+  and with the other pages. The sidebar stays pinned to the left edge.
+- The project page fits a phone screen: the tabs scroll sideways, the
+  project tree shows a compact environment count, Access, Tokens and
+  Activity keep names and actors readable, and the Run command wraps. The
+  project and environment switchers open a sheet from the bottom of the
+  screen instead of a dropdown, and your level and **Run** share one
+  left-aligned row at the same height.
+- Switching environment clears the old table straight away instead of
+  showing its rows until the new ones load, and a filter change cancels
+  the activity page still loading. A runner token created while you switch
+  environment still shows its value once. A project manager can open
+  Access and Settings before the project has any environments.
 
 ### Fixed
 
