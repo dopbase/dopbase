@@ -1,20 +1,26 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
-import {
-  factoryReset,
-  fetchFactoryResetPreview,
-  fetchStatus,
-} from "~/services/instance.api";
+import { useReauthentication } from "~/composable/reauthentication";
+import { factoryReset, fetchStatus } from "~/services/instance.api";
 import type { StatusResponse } from "~/services/instance.api";
+import { downloadMasterKeyBlob } from "~/services/backups.api";
+import { errorMessage, isAbortError } from "~/services/api-errors";
+import { saveBlob } from "~/utils/download";
 import {
   formatDateTime,
   formatDuration,
   formatRelativeTime,
 } from "~/utils/format";
 
+/** What the user types to confirm a factory reset. */
+export const RESET_PHRASE = "FACTORY RESET";
+
+export type HealthTone = "ok" | "crit" | "neutral";
+
 /**
- * Instance screen controller: safe, read-only server status.
+ * Status screen controller: safe, read-only server status, plus the
+ * root-only master key download and factory reset.
  *
  * The API deliberately exposes no database paths, key paths, or private
  * configuration — and the UI never offers configuration edits, because
@@ -23,18 +29,33 @@ import {
 export function useInstanceController() {
   const router = useRouter();
   const auth = useAuthStore();
+  const { runWithReauth } = useReauthentication();
   const status = ref<StatusResponse | null>(null);
   const loading = ref(false);
   const loadError = ref<string | null>(null);
-  const resetPreview = ref<Awaited<
-    ReturnType<typeof fetchFactoryResetPreview>
-  > | null>(null);
+
+  const isRoot = computed(() => auth.isRoot);
+
+  const downloadingMasterKey = ref(false);
+  const masterKeyMessage = ref<{ text: string; tone: "ok" | "crit" } | null>(
+    null,
+  );
+
   const resetPassword = ref("");
   const resetConfirmation = ref("");
   const resetAcknowledged = ref(false);
   const resetLoading = ref(false);
   const resetError = ref<string | null>(null);
   const resetComplete = ref(false);
+
+  /** The reset button stays off until every safeguard is filled in. */
+  const canReset = computed(
+    () =>
+      isRoot.value &&
+      resetAcknowledged.value &&
+      resetConfirmation.value === RESET_PHRASE &&
+      resetPassword.value !== "",
+  );
 
   const bootTime = computed(() => {
     if (!status.value) return null;
@@ -63,6 +84,22 @@ export function useInstanceController() {
     return formatRelativeTime(bootTime.value);
   });
 
+  /** The "What's stored" grid, in the order the status API counts them. */
+  const counts = computed(() => {
+    const current = status.value;
+    if (!current) return [];
+    return [
+      { label: "Projects", value: current.projects },
+      { label: "Environments", value: current.environments },
+      { label: "Secrets", value: current.secrets },
+      { label: "People", value: current.humanUsers },
+      { label: "AI agents", value: current.aiAgents },
+      { label: "Runner tokens", value: current.activeRunnerTokens },
+      { label: "AI agent tokens", value: current.activeAgentTokens },
+      { label: "Backups", value: current.backups },
+    ];
+  });
+
   async function load(): Promise<void> {
     loading.value = true;
     loadError.value = null;
@@ -77,15 +114,32 @@ export function useInstanceController() {
 
   onMounted(load);
 
-  async function loadResetPreview(): Promise<void> {
+  /** Root takes another copy of the key that every backup needs. */
+  async function downloadMasterKey(): Promise<void> {
+    if (!isRoot.value) return;
+    downloadingMasterKey.value = true;
+    masterKeyMessage.value = null;
     try {
-      resetPreview.value = await fetchFactoryResetPreview();
-    } catch {
-      resetError.value = "Only the root administrator can load reset details.";
+      await runWithReauth(async () => {
+        saveBlob(await downloadMasterKeyBlob(), "master.key");
+      });
+      masterKeyMessage.value = {
+        text: "Master key downloaded. Store it apart from your backups.",
+        tone: "ok",
+      };
+    } catch (cause: unknown) {
+      if (isAbortError(cause)) return;
+      masterKeyMessage.value = {
+        text: errorMessage(cause, "Could not download the master key."),
+        tone: "crit",
+      };
+    } finally {
+      downloadingMasterKey.value = false;
     }
   }
 
   async function performReset(): Promise<void> {
+    if (!canReset.value) return;
     resetLoading.value = true;
     resetError.value = null;
     try {
@@ -99,16 +153,29 @@ export function useInstanceController() {
       await router.push({ name: "setup" });
     } catch {
       resetError.value =
-        "Factory reset was not completed. Verify the password and confirmation.";
+        "Factory reset was not completed. Check the password and the confirmation.";
     } finally {
       resetLoading.value = false;
     }
   }
 
-  function healthTone(value: string): "ok" | "crit" | "neutral" {
+  function healthTone(value: string): HealthTone {
     if (value === "healthy" || value === "available") return "ok";
     if (value === "unhealthy" || value === "unavailable") return "crit";
     return "neutral";
+  }
+
+  /** "healthy" reads as "Healthy" in a stat card. */
+  function healthLabel(value: string): string {
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : "Unknown";
+  }
+
+  /** The short chip beside a health value. */
+  function healthBadge(value: string): string {
+    const tone = healthTone(value);
+    if (tone === "ok") return "ok";
+    if (tone === "crit") return "down";
+    return "unknown";
   }
 
   return {
@@ -117,21 +184,26 @@ export function useInstanceController() {
     loadError,
     load,
     healthTone,
+    healthLabel,
+    healthBadge,
+    counts,
     bootTime,
     formattedUptime,
     formattedObservedAt,
     relativeObservedAt,
     relativeBootTime,
-    resetPreview,
+    isRoot,
+    downloadingMasterKey,
+    masterKeyMessage,
+    downloadMasterKey,
     resetPassword,
     resetConfirmation,
     resetAcknowledged,
     resetLoading,
     resetError,
     resetComplete,
-    loadResetPreview,
+    canReset,
     performReset,
-    isRoot: auth.isRoot,
   };
 }
 

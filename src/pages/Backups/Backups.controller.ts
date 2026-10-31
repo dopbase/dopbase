@@ -11,10 +11,12 @@ import {
 } from "~/services/backups.api";
 import { useReauthentication } from "~/composable/reauthentication";
 import { errorMessage, isAbortError } from "~/services/api-errors";
+import { saveBlob } from "~/utils/download";
 
 /**
  * Backups page controller: manages snapshot creation, listing, file upload,
- * point-in-time restoration, and deletion.
+ * point-in-time restoration, and deletion. Each row's ⋯ menu calls
+ * `triggerDownload`, `openRestoreDialog` or `openDeleteDialog`.
  */
 export function useBackupsController() {
   const { runWithReauth } = useReauthentication();
@@ -174,24 +176,16 @@ export function useBackupsController() {
     downloadingMasterKey.value = true;
     try {
       await runWithReauth(async () => {
-        const blob = await downloadMasterKeyBlob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", "master.key");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        actionMessage.value = {
-          text: "Master key downloaded. Keep this file safe and confidential.",
-          tone: "ok",
-        };
+        saveBlob(await downloadMasterKeyBlob(), "master.key");
       });
+      actionMessage.value = {
+        text: "Master key downloaded. Store it apart from your backups.",
+        tone: "ok",
+      };
     } catch (cause: unknown) {
       if (isAbortError(cause)) return;
       actionMessage.value = {
-        text: errorMessage(cause, "Failed to download master key."),
+        text: errorMessage(cause, "Could not download the master key."),
         tone: "crit",
       };
     } finally {
