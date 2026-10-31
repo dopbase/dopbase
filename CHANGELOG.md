@@ -165,8 +165,17 @@ All notable changes to Dopbase are documented in this file.
   and expiry in amber during a token's last week. New runner tokens pick
   7 days, 30 days, 90 days, a year or a custom lifetime, and the dialog says
   what the token will read and until when. The new token's dialog shows the
-  `export DOPBASE_TOKEN` and `dopbase run` lines to use it; agent and
-  personal tokens get the same dialog.
+  `export DOPBASE_TOKEN` and `dopbase run` lines to use it, with the
+  whole token so the lines can be pasted as they are; agent and personal
+  tokens get the same dialog. Both dialogs open wide, so the token, the
+  commands and the details fit without crowding.
+- Runner token names follow the same rule as project and environment
+  names: lowercase letters, numbers and single hyphens, starting with a
+  letter, at most 63 characters. The API refuses other names with
+  `TOKEN_NAME_INVALID`; tokens that already exist keep their names.
+- Read-only fields, such as the environment in **New runner token** and
+  the key in **Edit value**, are outlined instead of filled and show a
+  lock, at the same height as the fields you can edit.
 - **Access** moved inside the project page, at `/projects/<project>/access`.
   Give access uses one card per level, and says what the grant will allow
   and whether it replaces an existing one. Each grant's ⋯ menu changes its
@@ -190,6 +199,11 @@ All notable changes to Dopbase are documented in this file.
   project and environment switchers open a sheet from the bottom of the
   screen instead of a dropdown, and your level and **Run** share one
   left-aligned row at the same height.
+- The environment switcher highlights the environment you're on, opens
+  with it focused, and ends with **New environment** for project
+  managers, so adding one no longer means a trip to Settings. Long project
+  and environment names are shortened in the context bar instead of
+  pushing **Run** off the row, and wrap in dialogs and on phones.
 - Switching environment clears the old table straight away instead of
   showing its rows until the new ones load, and a filter change cancels
   the activity page still loading. A runner token created while you switch
@@ -199,7 +213,7 @@ All notable changes to Dopbase are documented in this file.
 ### Fixed
 
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
-  pool` while loading `sqlx-macros`. The release profile now strips only the
+pool` while loading `sqlx-macros`. The release profile now strips only the
   final binary and leaves proc-macro libraries unstripped.
 
 ## 0.1.10 - 2026-10-26
