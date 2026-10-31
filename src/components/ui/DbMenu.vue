@@ -111,17 +111,28 @@ function onViewportChange(): void {
   close();
 }
 
+/**
+ * The list is fixed to where its trigger was, so it closes when the page
+ * scrolls. Scrolling the list itself, by wheel, touch, or arrow keys
+ * moving focus, keeps it open.
+ */
+function onScroll(event: Event): void {
+  const target = event.target;
+  if (target instanceof Node && panel.value?.contains(target)) return;
+  close();
+}
+
 function listen(on: boolean): void {
   if (on) {
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeydown);
-    window.addEventListener("scroll", onViewportChange, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onViewportChange);
     return;
   }
   document.removeEventListener("mousedown", onPointerDown);
   document.removeEventListener("keydown", onKeydown);
-  window.removeEventListener("scroll", onViewportChange, true);
+  window.removeEventListener("scroll", onScroll, true);
   window.removeEventListener("resize", onViewportChange);
 }
 
@@ -173,7 +184,7 @@ provide(menuCloseKey, () => close(true));
       v-if="open"
       :id="menuId"
       ref="panel"
-      class="fixed z-40 flex max-h-[min(24rem,70vh)] min-w-48 max-w-[min(20rem,calc(100vw-1rem))] flex-col gap-0.5 overflow-y-auto rounded-card border border-line bg-panel p-1 shadow-xl"
+      class="fixed z-40 flex max-h-[min(24rem,70vh)] min-w-48 max-w-[min(20rem,calc(100vw-1rem))] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-card border border-line bg-panel p-1 shadow-xl"
       :style="position"
       role="menu"
       data-testid="menu">

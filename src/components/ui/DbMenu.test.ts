@@ -97,6 +97,20 @@ describe("DbMenu", () => {
     expect(onRename).not.toHaveBeenCalled();
   });
 
+  it("stays open while its own list scrolls, and closes when the page does", async () => {
+    const { trigger } = mountMenu();
+    trigger.click();
+    await nextTick();
+
+    menu()!.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(menu()).not.toBeNull();
+
+    document.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(menu()).toBeNull();
+  });
+
   it("styles destructive items as danger", async () => {
     const { trigger } = mountMenu();
     trigger.click();
