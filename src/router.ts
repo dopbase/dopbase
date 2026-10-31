@@ -31,6 +31,13 @@ export const router = createRouter({
       meta: { public: true, guestOnly: true },
     },
     {
+      // "Forgot password?" and "Trouble signing in?": who can help.
+      path: "/login/help",
+      name: "login-help",
+      component: () => import("~/pages/Login/LoginHelp.page.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/login/sso",
       name: "login-sso",
       component: () => import("~/pages/Login/SsoHandoff.page.vue"),

@@ -17,6 +17,14 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("~/services/auth.api");
+vi.mock("~/services/health.api", () => ({
+  fetchHealth: vi.fn().mockResolvedValue({
+    product: "dopbase",
+    version: "0.2.0",
+    apiVersion: "v1",
+    status: "ok",
+  }),
+}));
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -98,27 +106,67 @@ describe("useLoginController", () => {
     expect(c.formError.value).toBeNull();
   });
 
-  it("keeps invalid credentials generic", async () => {
+  it("shows the server's wording for a wrong email or password", async () => {
+    // The server says the same for an unknown email and a wrong password,
+    // and adds how many tries are left.
     vi.mocked(authApi.login).mockRejectedValueOnce(
-      new ApiError(401, { AUTHENTICATION_INVALID: "wrong" }),
+      new ApiError(401, {
+        AUTHENTICATION_INVALID:
+          "Email or password is wrong. 2 more tries, then a 5-minute pause.",
+      }),
     );
     const c = useLoginController();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
-    expect(c.formError.value).toBe("The email or password is incorrect.");
+    expect(c.formError.value).toBe(
+      "Email or password is wrong. 2 more tries, then a 5-minute pause.",
+    );
     expect(c.fieldErrors.value.email).toBeUndefined();
   });
 
-  it("maps rate limiting to a retry message", async () => {
+  it("falls back to a plain message when the server sends none", async () => {
+    vi.mocked(authApi.login).mockRejectedValueOnce(new Error("offline"));
+    const c = useLoginController();
+    c.email.value = "a@b.c";
+    c.password.value = "pw";
+    await c.submit();
+    expect(c.formError.value).toBe("Email or password is wrong.");
+  });
+
+  it("says how long to wait once sign-in is paused", async () => {
     vi.mocked(authApi.login).mockRejectedValueOnce(
-      new ApiError(429, { RATE_LIMITED: "slow down" }),
+      new ApiError(429, {
+        RATE_LIMITED: "Too many tries. Wait 5 minutes, then try again.",
+      }),
     );
     const c = useLoginController();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
-    expect(c.formError.value).toContain("Too many login attempts");
+    expect(c.formError.value).toBe(
+      "Too many tries. Wait 5 minutes, then try again.",
+    );
+  });
+
+  it("names the server and its version for the page", async () => {
+    const c = useLoginController();
+    await c.loadMethods();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(c.host).toBe(window.location.host);
+    expect(c.version.value).toBe("0.2.0");
+  });
+
+  it("notices Caps Lock from key events in the password field", () => {
+    const c = useLoginController();
+    const press = (on: boolean) =>
+      ({
+        getModifierState: (key: string) => key === "CapsLock" && on,
+      }) as unknown as KeyboardEvent;
+    c.trackCapsLock(press(true));
+    expect(c.capsLock.value).toBe(true);
+    c.trackCapsLock(press(false));
+    expect(c.capsLock.value).toBe(false);
   });
 
   it("offers single sign-on only when the server has it on", async () => {

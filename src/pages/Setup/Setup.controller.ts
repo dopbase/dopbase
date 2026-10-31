@@ -2,6 +2,9 @@ import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "~/services/http.client";
 import { bootstrapRestore } from "~/services/bootstrap.api";
+import { downloadMasterKeyBlob } from "~/services/backups.api";
+import { errorMessage } from "~/services/api-errors";
+import { copyText } from "~/utils/clipboard";
 import { useAuthStore } from "~/stores/auth.store";
 import {
   isValidEmail,
@@ -10,9 +13,21 @@ import {
   validatePasswordLength,
 } from "~/utils/validation";
 
+import {
+  bytesToHex,
+  groupKey,
+  maskKey,
+  passwordStrength,
+  recoveryKitFileName,
+  recoveryKitText,
+  STRENGTH_LABELS,
+} from "./recovery-kit";
+
 export { MIN_PASSWORD_LENGTH } from "~/utils/validation";
 
 export type SetupMode = "setup" | "restore";
+/** The root account first, then the recovery kit. */
+export type SetupStep = "account" | "recovery";
 
 /**
  * First-run setup controller: claims the uninitialized server with the
@@ -25,6 +40,8 @@ export function useSetupController() {
   const auth = useAuthStore();
 
   const mode = ref<SetupMode>("setup");
+  const step = ref<SetupStep>("account");
+  const host = window.location.host;
 
   // Setup form state
   const setupToken = ref("");
@@ -52,6 +69,11 @@ export function useSetupController() {
     () =>
       confirmPassword.value === "" || password.value === confirmPassword.value,
   );
+
+  const strength = computed(() =>
+    passwordStrength(password.value, MIN_PASSWORD_LENGTH),
+  );
+  const strengthLabel = computed(() => STRENGTH_LABELS[strength.value]);
 
   // Fill the setup link values, then remove them from the address bar.
   const query = { ...route.query };
@@ -129,12 +151,82 @@ export function useSetupController() {
         email: email.value.trim().toLowerCase(),
         password: password.value,
       });
-      router.push({ name: "projects" });
+      // Root is signed in now. Before the console, save the recovery kit.
+      step.value = "recovery";
+      void loadRecoveryKey();
     } catch (error) {
       mapApiError(error);
     } finally {
       submitting.value = false;
     }
+  }
+
+  // Recovery kit
+  const masterKey = ref<string | null>(null);
+  const keyLoading = ref(false);
+  const keyError = ref<string | null>(null);
+  const keyRevealed = ref(false);
+  const keyCopied = ref(false);
+  const kitDownloaded = ref(false);
+  /** "I've stored the recovery kit outside this server." */
+  const kitStored = ref(false);
+
+  const shownKey = computed(() =>
+    masterKey.value
+      ? keyRevealed.value
+        ? groupKey(masterKey.value)
+        : maskKey(masterKey.value)
+      : "",
+  );
+  const canContinue = computed(
+    () => masterKey.value !== null && kitStored.value,
+  );
+
+  async function loadRecoveryKey(): Promise<void> {
+    keyLoading.value = true;
+    keyError.value = null;
+    try {
+      const blob = await downloadMasterKeyBlob();
+      masterKey.value = bytesToHex(new Uint8Array(await blob.arrayBuffer()));
+    } catch (cause) {
+      keyError.value = errorMessage(
+        cause,
+        "Could not read the master key from the server.",
+      );
+    } finally {
+      keyLoading.value = false;
+    }
+  }
+
+  async function copyKey(): Promise<void> {
+    if (!masterKey.value) return;
+    keyCopied.value = await copyText(masterKey.value);
+  }
+
+  /** Saves the kit as a text file, the way the browser saves downloads. */
+  function downloadKit(): void {
+    if (!masterKey.value) return;
+    const text = recoveryKitText({
+      host,
+      origin: window.location.origin,
+      email: email.value.trim().toLowerCase(),
+      key: masterKey.value,
+      createdAt: new Date(),
+    });
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = recoveryKitFileName(host);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    kitDownloaded.value = true;
+  }
+
+  /** Into the console, once the kit is stored (or skipped after an error). */
+  async function finish(): Promise<void> {
+    await router.push({ name: "projects" });
   }
 
   function onFileSelected(file: File | null): void {
@@ -216,6 +308,23 @@ export function useSetupController() {
 
   return {
     mode,
+    step,
+    host,
+    strength,
+    strengthLabel,
+    masterKey,
+    keyLoading,
+    keyError,
+    keyRevealed,
+    keyCopied,
+    kitDownloaded,
+    kitStored,
+    shownKey,
+    canContinue,
+    loadRecoveryKey,
+    copyKey,
+    downloadKit,
+    finish,
     setupToken,
     email,
     password,

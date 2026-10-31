@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchAuthMethods, ssoStartUrl } from "~/services/auth.api";
+import { fetchHealth } from "~/services/health.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 import { ssoErrorMessage } from "~/utils/sso";
@@ -31,6 +32,17 @@ export function useLoginController() {
     () => passwordFormAllowed.value || route.query.password !== undefined,
   );
   const ssoError = computed(() => ssoErrorMessage(route.query.sso_error));
+  /** The server this page belongs to, so people know where they sign in. */
+  const host = window.location.host;
+  /** The server's version for the footer; empty until it answers. */
+  const version = ref("");
+  /** Caps Lock is on while the password field has focus. */
+  const capsLock = ref(false);
+
+  /** Reads Caps Lock from a key event in the password field. */
+  function trackCapsLock(event: KeyboardEvent): void {
+    capsLock.value = event.getModifierState?.("CapsLock") ?? false;
+  }
 
   function safeRedirect(): string | null {
     const redirect = route.query.redirect;
@@ -43,6 +55,11 @@ export function useLoginController() {
   const ssoHref = computed(() => ssoStartUrl(safeRedirect() ?? undefined));
 
   async function loadMethods(): Promise<void> {
+    void fetchHealth()
+      .then((health) => {
+        version.value = health.version;
+      })
+      .catch(() => undefined);
     try {
       const methods = await fetchAuthMethods();
       ssoName.value = methods.sso?.name ?? null;
@@ -84,15 +101,20 @@ export function useLoginController() {
           : "Password sign-in is turned off. Use single sign-on.";
         return;
       }
+      // The server words these the same for an unknown email and a wrong
+      // password, and says how many tries are left or how long to wait.
       if (error.hasCode("RATE_LIMITED")) {
         formError.value =
-          "Too many login attempts. Wait a moment and try again.";
+          error.message ||
+          "Too many tries. Wait a few minutes, then try again.";
+        return;
+      }
+      if (error.hasCode("AUTHENTICATION_INVALID") && error.message) {
+        formError.value = error.message;
         return;
       }
     }
-    // AUTHENTICATION_INVALID and unknown failures get one generic message —
-    // the server deliberately does not reveal whether the email exists.
-    formError.value = "The email or password is incorrect.";
+    formError.value = "Email or password is wrong.";
   }
 
   async function submit(): Promise<void> {
@@ -122,5 +144,9 @@ export function useLoginController() {
     ssoHref,
     ssoError,
     loadMethods,
+    host,
+    version,
+    capsLock,
+    trackCapsLock,
   };
 }
