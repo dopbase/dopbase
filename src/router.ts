@@ -74,6 +74,11 @@ export const router = createRouter({
       component: () => import("~/pages/Projects/Project.page.vue"),
     },
     {
+      path: "/projects/:projectRef/:environmentName/compare",
+      name: "environment-compare",
+      component: () => import("~/pages/Projects/Project.page.vue"),
+    },
+    {
       path: "/projects/:projectRef/:environmentName/activity",
       name: "environment-activity",
       component: () => import("~/pages/Projects/Project.page.vue"),

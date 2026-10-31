@@ -4,6 +4,7 @@ import { useProjectController } from "./Project.controller";
 import ContextBar from "./components/ContextBar.vue";
 import ProjectTabs from "./components/ProjectTabs.vue";
 import SecretsPanel from "./components/SecretsPanel.vue";
+import ComparePanel from "./components/ComparePanel.vue";
 import TokensPanel from "./components/TokensPanel.vue";
 import AccessPanel from "./components/AccessPanel.vue";
 import ActivityPanel from "./components/ActivityPanel.vue";
@@ -18,8 +19,8 @@ import { useSingleKeyShortcut } from "~/composable";
 /**
  * Project — one project, seen from one environment: the context bar
  * (where you are, your level, Run), the project tabs, and the tab's
- * content. Secrets, Tokens and Activity belong to the environment; Access
- * and Settings to the whole project.
+ * content. Secrets, Compare, Tokens and Activity belong to the
+ * environment; Access and Settings to the whole project.
  *
  * A protected environment draws an amber rail across the top. Nothing
  * else in the console uses amber, so production never looks like dev.
@@ -153,6 +154,13 @@ useSingleKeyShortcut("e", () => contextBar.value?.openEnvironmentMenu());
             :project-name="projectName"
             :level="environment.level" />
         </div>
+
+        <ComparePanel
+          v-else-if="environment && activeTab === 'compare'"
+          :environment="environment"
+          :environments="environments"
+          :can-create-environment="managesProject && project !== null"
+          @new-environment="showCreateEnvironment = true" />
 
         <TokensPanel
           v-else-if="environment && activeTab === 'tokens' && tabReady"

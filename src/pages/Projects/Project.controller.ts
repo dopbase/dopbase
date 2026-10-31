@@ -8,11 +8,12 @@ import { useAuthStore } from "~/stores/auth.store";
 import { levelMeter } from "~/utils/level";
 
 export type ProjectTab =
-  "secrets" | "tokens" | "access" | "activity" | "settings";
+  "secrets" | "compare" | "tokens" | "access" | "activity" | "settings";
 
 /** Tabs that belong to one environment, and the route each one uses. */
 const ENVIRONMENT_ROUTES = {
   secrets: "environment",
+  compare: "environment-compare",
   tokens: "environment-tokens",
   activity: "environment-activity",
 } as const;
@@ -25,6 +26,7 @@ const PROJECT_ROUTES = {
 
 const TAB_FOR_ROUTE: Record<string, ProjectTab> = {
   environment: "secrets",
+  "environment-compare": "compare",
   "environment-tokens": "tokens",
   "environment-activity": "activity",
   "project-access": "access",
@@ -39,8 +41,9 @@ const TAB_FOR_ROUTE: Record<string, ProjectTab> = {
 const lastEnvironment = new Map<string, string>();
 
 /**
- * Project controller: one project's page. Secrets, Tokens and Activity are
- * addressed per environment (`/projects/:projectRef/:environmentName/<tab>`);
+ * Project controller: one project's page. Secrets, Compare, Tokens and
+ * Activity are addressed per environment
+ * (`/projects/:projectRef/:environmentName/<tab>`);
  * Access and Settings cover the whole project
  * (`/projects/:projectRef/<tab>`) and keep the environment last opened.
  * It loads the project list for the switcher and the project's
@@ -259,6 +262,11 @@ export function useProjectController() {
           to: environmentLocation(name, "secrets"),
         },
         {
+          key: "compare",
+          label: "Compare",
+          to: environmentLocation(name, "compare"),
+        },
+        {
           key: "tokens",
           label: "Tokens",
           to: environmentLocation(name, "tokens"),
@@ -295,8 +303,9 @@ export function useProjectController() {
     const tab = activeTab.value;
     if (tab === "tokens" && reaches(target.level ?? "manage", "manage")) {
       void router.push(environmentLocation(target.name, "tokens"));
-    } else if (tab === "activity") {
-      void router.push(environmentLocation(target.name, "activity"));
+    } else if (tab === "activity" || tab === "compare") {
+      // Compare re-bases on the environment you switch to.
+      void router.push(environmentLocation(target.name, tab));
     } else {
       void router.push(environmentLocation(target.name, "secrets"));
     }

@@ -8,6 +8,7 @@ describe("project routes", () => {
     ["/projects/billing/access", "project-access"],
     ["/projects/billing/settings", "project-settings"],
     ["/projects/billing/prod/activity", "environment-activity"],
+    ["/projects/billing/prod/compare", "environment-compare"],
     ["/projects/billing/prod/secrets", "environment"],
     ["/projects/billing/prod/tokens", "environment-tokens"],
     ["/projects/billing/prod/import", "environment-import"],

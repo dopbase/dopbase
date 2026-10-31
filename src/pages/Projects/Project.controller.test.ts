@@ -118,13 +118,18 @@ describe("useProjectController", () => {
     const c = await loaded();
     expect(c.tabs.value.map((tab) => tab.key)).toEqual([
       "secrets",
+      "compare",
       "tokens",
       "activity",
     ]);
 
     route.params = { projectRef: "payments", environmentName: "prod" };
     await nextTick();
-    expect(c.tabs.value.map((tab) => tab.key)).toEqual(["secrets", "activity"]);
+    expect(c.tabs.value.map((tab) => tab.key)).toEqual([
+      "secrets",
+      "compare",
+      "activity",
+    ]);
   });
 
   it("shows Access and Settings to project managers", async () => {
@@ -135,6 +140,7 @@ describe("useProjectController", () => {
 
     expect(c.tabs.value.map((tab) => tab.key)).toEqual([
       "secrets",
+      "compare",
       "tokens",
       "access",
       "activity",
@@ -257,6 +263,22 @@ describe("useProjectController", () => {
     c.switchEnvironment(prod);
     expect(push).toHaveBeenLastCalledWith({
       name: "environment",
+      params: { projectRef: "payments", environmentName: "prod" },
+    });
+  });
+
+  it("stays on Compare when switching environment, re-based on the new one", async () => {
+    at("environment-compare", {
+      projectRef: "payments",
+      environmentName: "dev",
+    });
+    const c = await loaded();
+    expect(c.activeTab.value).toBe("compare");
+
+    c.switchEnvironment(prod);
+
+    expect(push).toHaveBeenLastCalledWith({
+      name: "environment-compare",
       params: { projectRef: "payments", environmentName: "prod" },
     });
   });
