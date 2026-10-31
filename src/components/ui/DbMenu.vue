@@ -40,7 +40,7 @@ const position = ref<CSSProperties>({});
 function items(): HTMLElement[] {
   return Array.from(
     panel.value?.querySelectorAll<HTMLElement>(
-      '[role="menuitem"]:not([disabled])',
+      ':is([role="menuitem"], [role="menuitemradio"]):not([disabled])',
     ) ?? [],
   );
 }
@@ -131,7 +131,11 @@ watch(open, async (isOpen) => {
   place();
   await nextTick();
   place();
-  items()[0]?.focus();
+  // A pick-one menu opens on its current choice, like a native select.
+  const list = items();
+  (
+    list.find((item) => item.getAttribute("aria-checked") === "true") ?? list[0]
+  )?.focus();
 });
 
 onBeforeUnmount(() => listen(false));
@@ -140,7 +144,7 @@ provide(menuCloseKey, () => close(true));
 </script>
 
 <template>
-  <span ref="anchor" class="inline-flex">
+  <span ref="anchor" class="inline-flex min-w-0 max-w-full">
     <slot
       name="trigger"
       :open="open"

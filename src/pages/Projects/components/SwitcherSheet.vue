@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { CheckIcon, FolderIcon, LayersIcon, LockIcon } from "~/assets/icons";
+import {
+  CheckIcon,
+  FolderIcon,
+  LayersIcon,
+  LockIcon,
+  PlusIcon,
+} from "~/assets/icons";
 import { DbSearchField, DbSheet } from "~/components/ui";
 
 export interface SwitcherItem {
@@ -22,9 +28,11 @@ const props = defineProps<{
   kind: "project" | "environment";
   items: SwitcherItem[] | null;
   currentId: string | null;
+  /** A create action under the list, such as New environment. */
+  actionLabel?: string;
 }>();
 
-const emit = defineEmits<{ select: [id: string]; close: [] }>();
+const emit = defineEmits<{ select: [id: string]; action: []; close: [] }>();
 
 /** Lists longer than this get a filter. */
 const FILTER_AFTER = 7;
@@ -67,17 +75,31 @@ function choose(id: string): void {
       <li v-for="item in visible" :key="item.id">
         <button
           type="button"
-          class="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-raised active:bg-raised"
+          class="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-2 text-left transition-colors"
+          :class="
+            item.id === currentId
+              ? 'bg-accent-soft'
+              : 'hover:bg-raised active:bg-raised'
+          "
           :aria-current="item.id === currentId ? 'true' : undefined"
           @click="choose(item.id)">
           <LockIcon v-if="item.protected" class="h-4 w-4 shrink-0 text-warn" />
           <FolderIcon
             v-else-if="kind === 'project'"
-            class="h-4 w-4 shrink-0 text-ink-muted" />
-          <LayersIcon v-else class="h-4 w-4 shrink-0 text-ink-muted" />
+            class="h-4 w-4 shrink-0"
+            :class="
+              item.id === currentId ? 'text-accent-strong' : 'text-ink-muted'
+            " />
+          <LayersIcon
+            v-else
+            class="h-4 w-4 shrink-0"
+            :class="
+              item.id === currentId ? 'text-accent-strong' : 'text-ink-muted'
+            " />
           <span class="min-w-0 flex-1">
+            <!-- Wraps rather than truncates: a phone has room for the whole name. -->
             <span
-              class="block truncate font-mono text-sm font-medium leading-[22px] text-ink-strong">
+              class="block font-mono text-sm font-medium leading-[22px] text-ink-strong [overflow-wrap:anywhere]">
               {{ item.name }}
             </span>
             <span
@@ -106,5 +128,15 @@ function choose(id: string): void {
         Nothing matches "{{ filter.trim() }}".
       </li>
     </ul>
+    <div v-if="actionLabel" class="shrink-0 border-t border-line-soft p-2">
+      <button
+        type="button"
+        class="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-control px-2 text-left text-sm font-medium text-ink transition-colors hover:bg-raised active:bg-raised"
+        data-testid="switcher-action"
+        @click="emit('action')">
+        <PlusIcon class="h-4 w-4 shrink-0 text-ink-muted" />
+        {{ actionLabel }}
+      </button>
+    </div>
   </DbSheet>
 </template>

@@ -5,14 +5,17 @@ import { menuCloseKey } from "./menu";
 /**
  * DbMenuItem — one action in a `DbMenu`. Emits `select` and closes the
  * menu. The danger tone is for destructive actions, which go last.
- * Presentation-only.
+ * `selected` marks the current choice in a menu that picks one of many,
+ * such as a switcher, with a tinted row. Presentation-only.
  */
 withDefaults(
   defineProps<{
     tone?: "default" | "danger";
     disabled?: boolean;
+    /** Set (true or false) in a pick-one menu; true on the current choice. */
+    selected?: boolean;
   }>(),
-  { tone: "default", disabled: false },
+  { tone: "default", disabled: false, selected: undefined },
 );
 
 const emit = defineEmits<{ select: [] }>();
@@ -27,20 +30,29 @@ function choose(): void {
 <template>
   <button
     type="button"
-    role="menuitem"
+    :role="selected === undefined ? 'menuitem' : 'menuitemradio'"
+    :aria-checked="selected"
     tabindex="-1"
     :disabled="disabled"
-    class="flex h-9 w-full cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-control px-2.5 text-left text-sm font-medium leading-5 outline-none transition-colors focus-visible:bg-raised disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+    class="flex h-9 w-full cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-control px-2.5 text-left text-sm font-medium leading-5 outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
     :class="
       tone === 'danger'
         ? 'text-crit hover:bg-crit/10 focus-visible:bg-crit/10'
-        : 'text-ink hover:bg-raised hover:text-ink-strong focus-visible:text-ink-strong'
+        : selected
+          ? 'bg-accent-soft text-ink-strong focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent'
+          : 'text-ink hover:bg-raised hover:text-ink-strong focus-visible:bg-raised focus-visible:text-ink-strong'
     "
     @click="choose">
     <span
       v-if="$slots.icon"
       class="flex h-4 w-4 shrink-0 items-center justify-center"
-      :class="tone === 'danger' ? 'text-crit' : 'text-ink-muted'"
+      :class="
+        tone === 'danger'
+          ? 'text-crit'
+          : selected
+            ? 'text-accent-strong'
+            : 'text-ink-muted'
+      "
       aria-hidden="true">
       <slot name="icon" />
     </span>

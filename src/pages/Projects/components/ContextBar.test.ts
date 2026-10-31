@@ -45,6 +45,7 @@ const prod = environment("env_2", "prod", { protected: true, level: "read" });
 let app: ReturnType<typeof createApp> | null = null;
 const onSwitchEnvironment = vi.fn();
 const onSwitchProject = vi.fn();
+const onNewEnvironment = vi.fn();
 
 /** Renders a component into the page and keeps it for `afterEach`. */
 function mount(component: Component, props: Record<string, unknown>) {
@@ -64,8 +65,10 @@ function mountBar(): HTMLElement {
     environment: dev,
     meter: { label: "Manage", filled: 4, strong: true },
     showRun: true,
+    canCreateEnvironment: true,
     onSwitchEnvironment,
     onSwitchProject,
+    onNewEnvironment,
   });
 }
 
@@ -96,6 +99,41 @@ describe("ContextBar", () => {
 
     expect(document.querySelector('[role="menu"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="switcher-sheet"]')).toBeNull();
+    expect(
+      document
+        .querySelector('[role="menuitemradio"][aria-checked="true"]')
+        ?.textContent?.trim(),
+    ).toContain("dev");
+  });
+
+  it("offers New environment from the switcher", async () => {
+    const host = mountBar();
+    host
+      .querySelector<HTMLButtonElement>('[data-testid="environment-switcher"]')!
+      .click();
+    await nextTick();
+
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="new-environment"]')!
+      .click();
+
+    expect(onNewEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it("offers New environment under the list on phones", async () => {
+    narrow.value = true;
+    const host = mountBar();
+    host
+      .querySelector<HTMLButtonElement>('[data-testid="environment-switcher"]')!
+      .click();
+    await nextTick();
+
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="switcher-action"]')!
+      .click();
+    await nextTick();
+
+    expect(onNewEnvironment).toHaveBeenCalledOnce();
   });
 
   it("opens a bottom sheet on phones and switches environment", async () => {

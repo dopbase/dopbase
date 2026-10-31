@@ -17,7 +17,10 @@ defineProps<{
       class="flex h-11 w-11 items-center justify-center rounded-control border border-line bg-raised text-ink-muted">
       <slot name="icon" />
     </div>
-    <h3 class="text-base font-semibold text-ink-strong">{{ title }}</h3>
+    <h3
+      class="text-base font-semibold text-ink-strong [overflow-wrap:anywhere]">
+      {{ title }}
+    </h3>
     <p v-if="description" class="max-w-md text-sm text-ink-muted">
       {{ description }}
     </p>

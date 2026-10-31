@@ -6,6 +6,7 @@ import {
   FolderIcon,
   LayersIcon,
   LockIcon,
+  PlusIcon,
   TerminalIcon,
 } from "~/assets/icons";
 import {
@@ -39,12 +40,15 @@ const props = defineProps<{
   meter: LevelMeter | null;
   /** Show Run, which opens how to run an app with this environment. */
   showRun: boolean;
+  /** Offer New environment in the environment switcher. */
+  canCreateEnvironment?: boolean;
 }>();
 
 const emit = defineEmits<{
   "switch-project": [project: Project];
   "switch-environment": [environment: Environment];
   run: [];
+  "new-environment": [];
 }>();
 
 const projectTrigger = ref<HTMLButtonElement | null>(null);
@@ -94,6 +98,11 @@ function selectProject(id: string): void {
   if (target) emit("switch-project", target);
 }
 
+function newEnvironment(): void {
+  sheet.value = null;
+  emit("new-environment");
+}
+
 function selectEnvironment(id: string): void {
   const target = props.environments?.find((candidate) => candidate.id === id);
   if (target) emit("switch-environment", target);
@@ -120,11 +129,13 @@ defineExpose({ openEnvironmentMenu });
               class="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-control px-1.5 py-1 transition-colors hover:bg-raised pointer-coarse:min-h-11"
               v-bind="triggerAttrs('project', attrs)"
               :aria-label="`Project ${projectName}. Switch project`"
+              :title="projectName"
               data-testid="project-switcher"
               @click="openSwitcher('project', toggle)">
               <FolderIcon class="h-4 w-4 shrink-0 text-ink-muted" />
+              <!-- Long names truncate; the menu and the title show them whole. -->
               <span
-                class="truncate text-[15px] font-semibold leading-5 text-ink-strong">
+                class="truncate text-[15px] font-semibold leading-5 text-ink-strong sm:max-w-64">
                 {{ projectName }}
               </span>
               <ChevronDownIcon class="h-4 w-4 shrink-0 text-ink-muted" />
@@ -133,6 +144,8 @@ defineExpose({ openEnvironmentMenu });
           <DbMenuItem
             v-for="candidate in projects ?? []"
             :key="candidate.id"
+            :selected="candidate.id === projectId"
+            :title="candidate.name"
             @select="emit('switch-project', candidate)">
             <template #icon><FolderIcon class="h-4 w-4" /></template>
             <span class="font-mono">{{ candidate.name }}</span>
@@ -147,7 +160,9 @@ defineExpose({ openEnvironmentMenu });
           </p>
         </DbMenu>
 
-        <span class="text-[15px] leading-6 text-ink-muted" aria-hidden="true"
+        <span
+          class="shrink-0 text-[15px] leading-6 text-ink-muted"
+          aria-hidden="true"
           >/</span
         >
 
@@ -164,6 +179,7 @@ defineExpose({ openEnvironmentMenu });
               "
               v-bind="triggerAttrs('environment', attrs)"
               :aria-label="`Environment ${environment.name}${environment.protected ? ', protected' : ''}. Switch environment`"
+              :title="environment.name"
               data-testid="environment-switcher"
               @click="openSwitcher('environment', toggle)">
               <LockIcon
@@ -171,12 +187,13 @@ defineExpose({ openEnvironmentMenu });
                 class="h-4 w-4 shrink-0 text-warn" />
               <LayersIcon v-else class="h-4 w-4 shrink-0 text-ink-muted" />
               <span
-                class="truncate font-mono text-sm font-medium leading-[22px] text-ink-strong">
+                class="truncate font-mono text-sm font-medium leading-[22px] text-ink-strong sm:max-w-56">
                 {{ environment.name }}
               </span>
+              <!-- Phones keep the lock and the amber chip, not the word. -->
               <span
                 v-if="environment.protected"
-                class="text-[13px] leading-[22px] text-warn">
+                class="hidden shrink-0 text-[13px] leading-[22px] text-warn sm:inline">
                 Protected
               </span>
               <ChevronDownIcon class="h-4 w-4 shrink-0 text-ink-muted" />
@@ -185,6 +202,8 @@ defineExpose({ openEnvironmentMenu });
           <DbMenuItem
             v-for="candidate in environments ?? []"
             :key="candidate.id"
+            :selected="candidate.id === environment.id"
+            :title="candidate.name"
             @select="emit('switch-environment', candidate)">
             <template #icon>
               <LockIcon v-if="candidate.protected" class="h-4 w-4 text-warn" />
@@ -202,6 +221,15 @@ defineExpose({ openEnvironmentMenu });
                 class="h-4 w-4 text-accent-strong" />
             </template>
           </DbMenuItem>
+          <template v-if="canCreateEnvironment">
+            <div class="my-0.5 h-px bg-line-soft" role="separator" />
+            <DbMenuItem
+              data-testid="new-environment"
+              @select="emit('new-environment')">
+              <template #icon><PlusIcon class="h-4 w-4" /></template>
+              New environment
+            </DbMenuItem>
+          </template>
         </DbMenu>
         <span v-if="environment" class="hidden sm:inline-flex" title="Press E">
           <DbKbd>E</DbKbd>
@@ -245,7 +273,9 @@ defineExpose({ openEnvironmentMenu });
       kind="environment"
       :items="environmentItems"
       :current-id="environment?.id ?? null"
+      :action-label="canCreateEnvironment ? 'New environment' : undefined"
       @select="selectEnvironment"
+      @action="newEnvironment"
       @close="closeSheet" />
   </div>
 </template>

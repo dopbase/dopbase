@@ -80,7 +80,9 @@ useSingleKeyShortcut("e", () => contextBar.value?.openEnvironmentMenu());
         :environment="environment"
         :meter="meter"
         :show-run="environment !== null"
+        :can-create-environment="managesProject && project !== null"
         @run="runOpen = true"
+        @new-environment="showCreateEnvironment = true"
         @switch-project="controller.switchProject"
         @switch-environment="controller.switchEnvironment" />
       <ProjectTabs v-if="tabs.length > 0" :tabs="tabs" :active="activeTab" />
