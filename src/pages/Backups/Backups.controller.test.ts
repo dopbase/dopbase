@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { useBackupsController } from "./Backups.controller";
 import * as backupsApi from "~/services/backups.api";
+import { ApiError } from "~/services/http.client";
+import { saveBlob } from "~/utils/download";
 
 vi.mock("vue", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vue")>()),
@@ -9,6 +11,7 @@ vi.mock("vue", async (importOriginal) => ({
 }));
 
 vi.mock("~/services/backups.api");
+vi.mock("~/utils/download");
 
 const sampleBackup: backupsApi.BackupItem = {
   key: "backup_test.dop",
@@ -159,5 +162,74 @@ describe("useBackupsController", () => {
     expect(c.backups.value).toEqual([]);
     expect(c.deleteTarget.value).toBeNull();
     expect(c.actionMessage.value?.tone).toBe("ok");
+  });
+
+  describe("row menu", () => {
+    it("downloads the backup file from its own URL", () => {
+      vi.mocked(backupsApi.downloadBackupUrl).mockReturnValueOnce(
+        "/api/v1/backups/backup_test.dop",
+      );
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => {});
+
+      const c = useBackupsController();
+      c.triggerDownload(sampleBackup.key);
+
+      expect(backupsApi.downloadBackupUrl).toHaveBeenCalledWith(
+        sampleBackup.key,
+      );
+      const link = click.mock.contexts[0] as HTMLAnchorElement;
+      expect(link.getAttribute("href")).toBe("/api/v1/backups/backup_test.dop");
+      expect(link.getAttribute("download")).toBe(sampleBackup.key);
+      expect(document.querySelector("a[download]")).toBeNull();
+      click.mockRestore();
+    });
+
+    it("keeps the restore dialog open with the server's reason", async () => {
+      vi.mocked(backupsApi.restoreBackup).mockRejectedValueOnce(
+        new ApiError(400, {}, "This backup was made with another master key."),
+      );
+
+      const c = useBackupsController();
+      c.openRestoreDialog(sampleBackup);
+      await c.submitRestore();
+
+      expect(c.restoreTarget.value).toEqual(sampleBackup);
+      expect(c.restoreError.value).toBe(
+        "This backup was made with another master key.",
+      );
+      expect(backupsApi.fetchBackups).not.toHaveBeenCalled();
+    });
+
+    it("keeps the backup listed when deleting fails", async () => {
+      vi.mocked(backupsApi.deleteBackup).mockRejectedValueOnce(
+        new ApiError(500, {}, "The file is in use."),
+      );
+
+      const c = useBackupsController();
+      c.backups.value = [sampleBackup];
+      c.openDeleteDialog(sampleBackup);
+      await c.submitDelete();
+
+      expect(c.backups.value).toEqual([sampleBackup]);
+      expect(c.deleteTarget.value).toEqual(sampleBackup);
+      expect(c.deleteError.value).toBe("The file is in use.");
+    });
+  });
+
+  it("saves the master key from the banner", async () => {
+    const key = new Blob(["key"]);
+    vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(key);
+
+    const c = useBackupsController();
+    await c.triggerDownloadMasterKey();
+
+    expect(saveBlob).toHaveBeenCalledWith(key, "master.key");
+    expect(c.actionMessage.value).toEqual({
+      text: "Master key downloaded. Store it apart from your backups.",
+      tone: "ok",
+    });
+    expect(c.downloadingMasterKey.value).toBe(false);
   });
 });

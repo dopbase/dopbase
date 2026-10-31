@@ -124,6 +124,10 @@ export interface CliLoginRequest {
   expiresAt: string;
   /** `reauth` confirms a terminal that is already signed in. */
   purpose: "login" | "reauth";
+  /** `dopbase 0.2.0 on macOS`, when the CLI said. Older CLIs don't. */
+  client?: string | null;
+  /** How long the CLI session an approval starts lasts. */
+  sessionDays?: number;
 }
 
 export async function fetchAuthMethods(): Promise<AuthMethods> {

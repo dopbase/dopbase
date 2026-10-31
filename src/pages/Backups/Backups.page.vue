@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import {
-  ArchiveIcon,
   DownloadIcon,
   KeyIcon,
   PlusIcon,
@@ -11,22 +10,23 @@ import {
 } from "~/assets/icons";
 import {
   DbAlert,
-  DbBadge,
   DbButton,
-  DbCode,
   DbConfirmDialog,
-  DbEmptyState,
   DbInput,
+  DbMenu,
+  DbMenuItem,
   DbModal,
   DbSkeleton,
 } from "~/components/ui";
+import PageHeader from "~/components/app/PageHeader.vue";
 import { DashboardLayout } from "~/layouts";
-import { formatBytes, formatDateTime, formatRelativeTime } from "~/utils";
+import { formatBytes, formatDateTime } from "~/utils";
 import { useBackupsController } from "./Backups.controller";
 
 /**
- * Backups page: encrypted full system snapshot management.
- * Users can create new snapshots, upload backups, restore, and download them.
+ * Backups: encrypted snapshots of the database. Download, Restore and
+ * Delete sit in each row's ⋯ menu; the master key banner stays on top
+ * because no backup restores elsewhere without it.
  */
 const {
   backups,
@@ -35,7 +35,6 @@ const {
   loadError,
   actionMessage,
   downloadingMasterKey,
-  load,
   // Create
   createModalOpen,
   customName,
@@ -103,260 +102,198 @@ function chooseKeyFile(): void {
 
 <template>
   <DashboardLayout>
-    <div class="page-width py-6 lg:py-8">
-      <!-- Header -->
-      <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-2.5">
-            <h1 class="text-lg font-semibold text-ink-strong">Backups</h1>
-            <DbBadge v-if="hasLoaded" tone="neutral">
-              {{ backups.length }}
-              {{ backups.length === 1 ? "snapshot" : "snapshots" }}
-            </DbBadge>
-          </div>
-          <p class="mt-0.5 text-sm text-ink-muted">
-            Full system encrypted snapshots for disaster recovery.
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+    <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
+      <PageHeader
+        title="Backups"
+        subtitle="Encrypted snapshots of the database. Restoring needs the master key that made them.">
+        <template #actions>
+          <DbButton data-testid="upload-backup" @click="openUploadModal">
+            <UploadIcon class="h-4 w-4" />
+            Upload
+          </DbButton>
           <DbButton
-            size="sm"
-            variant="secondary"
-            :loading="loading"
-            @click="load">
-            <RefreshIcon class="h-3.5 w-3.5" />
-            Refresh
+            variant="primary"
+            data-testid="create-backup"
+            @click="openCreateModal">
+            <PlusIcon class="h-4 w-4" />
+            Create backup
           </DbButton>
-          <DbButton size="sm" variant="secondary" @click="openUploadModal">
-            <UploadIcon class="h-3.5 w-3.5" />
-            Upload backup
-          </DbButton>
-          <DbButton size="sm" variant="primary" @click="openCreateModal">
-            <PlusIcon class="h-3.5 w-3.5" />
-            New backup
-          </DbButton>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
-      <!-- Master Key Notice Card -->
+      <!-- Master key banner -->
       <div
-        class="mb-6 flex flex-col gap-3 rounded-card border border-accent/25 bg-accent/5 p-4.5">
-        <div class="flex items-start gap-3">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-accent/30 bg-accent-soft text-accent-strong">
-            <KeyIcon class="h-4 w-4" />
-          </div>
-          <div class="text-xs leading-relaxed">
-            <p class="font-semibold text-ink-strong">Encryption Key Notice</p>
-            <p class="mt-0.5 text-ink-muted">
-              All snapshots are encrypted with this server's master key
-              (<DbCode>~/.dopbase/master.key</DbCode>). Download and safeguard
-              this key to decrypt and restore backups on a fresh server.
+        class="flex flex-col gap-3 rounded-card bg-warn/15 px-4 py-3 sm:flex-row sm:items-center"
+        data-testid="master-key-banner">
+        <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+          <KeyIcon class="mt-0.5 h-4 w-4 shrink-0 text-warn sm:mt-0" />
+          <div class="min-w-0 text-sm">
+            <p class="font-semibold text-ink-strong">
+              Keep the master key with your backups
+            </p>
+            <p class="text-ink">
+              Without it, no backup can be restored on another server.
             </p>
           </div>
         </div>
-        <div class="shrink-0 sm:self-end">
-          <DbButton
-            class="w-full sm:w-auto"
-            size="sm"
-            variant="secondary"
-            :loading="downloadingMasterKey"
-            title="Download this server's master encryption key (master.key)"
-            @click="triggerDownloadMasterKey">
-            <KeyIcon class="h-3.5 w-3.5" />
-            Download Master Key
-          </DbButton>
-        </div>
+        <DbButton
+          class="w-full shrink-0 sm:w-auto"
+          :loading="downloadingMasterKey"
+          @click="triggerDownloadMasterKey">
+          <DownloadIcon class="h-4 w-4" />
+          Download master key
+        </DbButton>
       </div>
 
-      <!-- Feedback alerts -->
       <DbAlert
         v-if="actionMessage"
-        class="mb-4"
         :tone="actionMessage.tone === 'ok' ? 'success' : 'error'">
         {{ actionMessage.text }}
       </DbAlert>
+      <DbAlert v-if="loadError">{{ loadError }}</DbAlert>
 
-      <DbAlert v-if="loadError" class="mb-4" tone="error">
-        {{ loadError }}
-      </DbAlert>
-
-      <!-- Loading skeleton placeholder state -->
       <div
         v-if="loading && !hasLoaded"
-        class="overflow-hidden rounded-card border border-line bg-panel"
+        class="flex flex-col gap-2"
         data-testid="backups-skeleton">
-        <div class="overflow-x-auto">
-          <table class="w-full table-fixed text-left text-sm">
-            <thead>
-              <tr
-                class="border-b border-line bg-panel/50 text-xs font-medium text-ink-muted">
-                <th class="px-4 py-3.5 sm:px-5">Backup</th>
-                <th class="hidden w-28 px-5 py-3.5 sm:table-cell">Size</th>
-                <th class="hidden w-40 px-5 py-3.5 sm:table-cell">Created</th>
-                <th class="w-36 px-2 py-3.5 text-right sm:w-56 sm:px-5">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-line-soft">
-              <tr v-for="i in 4" :key="i">
-                <td class="px-4 py-3.5 sm:px-5">
-                  <div class="flex items-center gap-2.5">
-                    <DbSkeleton class="h-4 w-4 shrink-0 rounded" />
-                    <DbSkeleton class="h-4 w-48" />
-                  </div>
-                </td>
-                <td class="hidden px-5 py-3.5 sm:table-cell">
-                  <DbSkeleton class="h-4 w-16" />
-                </td>
-                <td class="hidden px-5 py-3.5 sm:table-cell">
-                  <DbSkeleton class="h-4 w-24" />
-                </td>
-                <td class="px-4 py-3.5 text-right sm:px-5">
-                  <div class="flex items-center justify-end gap-1">
-                    <DbSkeleton class="h-8 w-24 rounded-control" />
-                    <DbSkeleton class="h-8 w-20 rounded-control" />
-                    <DbSkeleton class="h-8 w-8 rounded-control" />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DbSkeleton
+          v-for="line in 4"
+          :key="line"
+          class="h-12 w-full rounded-control" />
       </div>
 
-      <!-- Empty state -->
-      <DbEmptyState
-        v-else-if="hasLoaded && backups.length === 0"
-        title="No backups found"
-        description="Create your first encrypted snapshot to safeguard projects, environments, and secrets.">
-        <template #icon>
-          <ArchiveIcon class="h-6 w-6" />
-        </template>
-        <template #actions>
-          <DbButton size="sm" variant="primary" @click="openCreateModal">
-            <PlusIcon class="h-3.5 w-3.5" />
-            Create backup
-          </DbButton>
-          <DbButton size="sm" variant="secondary" @click="openUploadModal">
-            <UploadIcon class="h-3.5 w-3.5" />
-            Upload backup
-          </DbButton>
-        </template>
-      </DbEmptyState>
-
-      <!-- Backups Table -->
       <div
-        v-else
-        class="overflow-hidden rounded-card border border-line bg-panel"
-        data-testid="backups-table">
-        <div class="overflow-x-auto">
-          <table class="w-full table-fixed text-left text-sm">
+        v-else-if="hasLoaded && backups.length === 0 && !loadError"
+        class="rounded-card border border-dashed border-line px-6 py-10 text-center">
+        <p class="text-sm font-medium text-ink-strong">No backups yet</p>
+        <p class="mt-1 text-sm text-ink-muted">
+          Create one before an upgrade or a big change, or upload one from
+          another server.
+        </p>
+      </div>
+
+      <template v-else-if="backups.length > 0">
+        <!-- Table on wider screens -->
+        <div
+          class="hidden overflow-x-auto rounded-card border border-line bg-panel sm:block">
+          <table
+            class="w-full table-fixed text-left text-sm"
+            data-testid="backups-table">
             <thead>
-              <tr
-                class="border-b border-line bg-panel/50 text-xs font-medium text-ink-muted">
-                <th class="px-4 py-3.5 sm:px-5">Backup</th>
-                <th class="hidden w-28 px-5 py-3.5 sm:table-cell">Size</th>
-                <th class="hidden w-40 px-5 py-3.5 sm:table-cell">Created</th>
-                <th class="w-36 px-2 py-3.5 text-right sm:w-56 sm:px-5">
-                  Actions
+              <tr class="border-b border-line-soft bg-raised/50">
+                <th class="h-11 px-4 font-medium text-ink-muted">Backup</th>
+                <th class="h-11 w-28 px-4 font-medium text-ink-muted">Size</th>
+                <th class="h-11 w-48 px-4 font-medium text-ink-muted">
+                  Created
+                </th>
+                <th class="h-11 w-12 px-2">
+                  <span class="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-line-soft">
+            <tbody>
               <tr
                 v-for="backup in backups"
                 :key="backup.key"
-                class="transition-colors hover:bg-raised/40">
-                <td class="px-4 py-3.5 sm:px-5">
-                  <div class="flex items-center gap-2.5">
-                    <ArchiveIcon class="h-4 w-4 shrink-0 text-ink-muted" />
-                    <div class="min-w-0">
-                      <p
-                        class="truncate font-mono text-xs font-semibold text-ink-strong"
-                        :title="backup.key">
-                        {{ backup.key }}
-                      </p>
-                      <p class="text-xs text-ink-muted sm:hidden">
-                        {{ formatBytes(backup.size) }} ·
-                        {{ formatRelativeTime(backup.createdAt) }}
-                      </p>
-                    </div>
-                  </div>
+                class="border-b border-line-soft last:border-b-0"
+                data-testid="backup-row">
+                <td class="h-[52px] px-4">
+                  <p
+                    class="truncate font-mono text-ink-strong"
+                    :title="backup.key">
+                    {{ backup.key }}
+                  </p>
                 </td>
-                <td
-                  class="hidden px-5 py-3.5 font-mono text-xs text-ink-muted sm:table-cell">
-                  {{ formatBytes(backup.size) }}
+                <td class="px-4 text-ink">{{ formatBytes(backup.size) }}</td>
+                <td class="px-4 text-ink">
+                  {{ formatDateTime(backup.createdAt) }}
                 </td>
-                <td
-                  class="hidden px-5 py-3.5 text-xs text-ink-muted sm:table-cell">
-                  <span :title="formatDateTime(backup.createdAt)">
-                    {{ formatRelativeTime(backup.createdAt) }}
-                  </span>
-                </td>
-                <td class="px-2 py-3.5 text-right sm:px-5">
-                  <div class="flex items-center justify-end gap-1">
-                    <DbButton
-                      size="sm"
-                      variant="ghost"
-                      title="Download backup archive"
-                      aria-label="Download backup"
-                      @click="triggerDownload(backup.key)">
-                      <DownloadIcon class="h-3.5 w-3.5" />
-                      <span class="hidden sm:inline">Download</span>
-                    </DbButton>
-                    <DbButton
-                      size="sm"
-                      variant="ghost"
-                      title="Restore system from this backup"
-                      aria-label="Restore backup"
-                      @click="openRestoreDialog(backup)">
-                      <RefreshIcon class="h-3.5 w-3.5 text-accent" />
-                      <span class="hidden text-accent sm:inline">Restore</span>
-                    </DbButton>
-                    <DbButton
-                      size="sm"
-                      variant="ghost"
-                      title="Delete backup archive"
-                      aria-label="Delete backup"
-                      @click="openDeleteDialog(backup)">
-                      <TrashIcon class="h-3.5 w-3.5 text-crit" />
-                    </DbButton>
-                  </div>
+                <td class="px-2 text-right">
+                  <DbMenu :label="`Actions for ${backup.key}`">
+                    <DbMenuItem @select="triggerDownload(backup.key)">
+                      <template #icon>
+                        <DownloadIcon class="h-4 w-4" />
+                      </template>
+                      Download
+                    </DbMenuItem>
+                    <DbMenuItem @select="openRestoreDialog(backup)">
+                      <template #icon><RefreshIcon class="h-4 w-4" /></template>
+                      Restore
+                    </DbMenuItem>
+                    <div class="my-0.5 h-px bg-line-soft" role="separator" />
+                    <DbMenuItem
+                      tone="danger"
+                      @select="openDeleteDialog(backup)">
+                      <template #icon><TrashIcon class="h-4 w-4" /></template>
+                      Delete backup
+                    </DbMenuItem>
+                  </DbMenu>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+
+        <!-- Cards on phones -->
+        <ul class="flex flex-col gap-2 sm:hidden" data-testid="backups-cards">
+          <li
+            v-for="backup in backups"
+            :key="backup.key"
+            class="flex items-start gap-2 rounded-card border border-line bg-panel p-3">
+            <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <span
+                class="font-mono text-sm text-ink-strong [overflow-wrap:anywhere]">
+                {{ backup.key }}
+              </span>
+              <span class="text-xs text-ink-muted">
+                {{ formatBytes(backup.size) }} ·
+                {{ formatDateTime(backup.createdAt) }}
+              </span>
+            </div>
+            <DbMenu :label="`Actions for ${backup.key}`">
+              <DbMenuItem @select="triggerDownload(backup.key)">
+                <template #icon><DownloadIcon class="h-4 w-4" /></template>
+                Download
+              </DbMenuItem>
+              <DbMenuItem @select="openRestoreDialog(backup)">
+                <template #icon><RefreshIcon class="h-4 w-4" /></template>
+                Restore
+              </DbMenuItem>
+              <div class="my-0.5 h-px bg-line-soft" role="separator" />
+              <DbMenuItem tone="danger" @select="openDeleteDialog(backup)">
+                <template #icon><TrashIcon class="h-4 w-4" /></template>
+                Delete backup
+              </DbMenuItem>
+            </DbMenu>
+          </li>
+        </ul>
+      </template>
     </div>
 
-    <!-- Create Backup Modal -->
+    <!-- Create -->
     <DbModal
       :open="createModalOpen"
-      title="Create New Backup"
+      title="Create backup"
       size="sm"
       @close="closeCreateModal">
       <form class="flex flex-col gap-4" @submit.prevent="submitCreate">
-        <p class="text-xs text-ink-muted">
-          Creates a point-in-time snapshot of the database. The archive is
-          encrypted with the server master key.
+        <p class="text-sm text-ink-muted">
+          Takes a snapshot of the database now, encrypted with this server's
+          master key.
         </p>
 
         <DbInput
           v-model="customName"
-          label="Backup name (optional)"
-          placeholder="e.g. pre_deployment_v2"
+          label="Name (optional)"
+          placeholder="before-upgrade"
           mono
           :error="createError"
-          hint="Leave empty to use an automatic timestamped name." />
+          hint="Leave it empty to name it by date and time." />
 
         <div
           class="mt-2 flex items-center justify-end gap-2 border-t border-line-soft pt-3">
           <DbButton
             variant="ghost"
-            type="button"
             :disabled="creating"
             @click="closeCreateModal">
             Cancel
@@ -368,18 +305,17 @@ function chooseKeyFile(): void {
       </form>
     </DbModal>
 
-    <!-- Upload Backup Modal -->
+    <!-- Upload -->
     <DbModal
       :open="uploadModalOpen"
-      title="Upload Backup"
+      title="Upload backup"
       size="md"
       @close="closeUploadModal">
       <div class="flex flex-col gap-4">
-        <p class="text-xs text-ink-muted">
+        <p class="text-sm text-ink-muted">
           Upload an encrypted
-          <code class="font-mono text-ink-strong">.dop</code> backup file.
-          Dopbase will verify its authentication tag before adding it to the
-          available backups.
+          <code class="font-mono text-ink-strong">.dop</code> backup. Dopbase
+          checks it can be decrypted before adding it to the list.
         </p>
 
         <input
@@ -389,35 +325,29 @@ function chooseKeyFile(): void {
           class="hidden"
           @change="handleFileInputChange" />
 
-        <div
-          class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-line p-6 text-center transition-colors hover:border-accent hover:bg-raised/20"
+        <button
+          type="button"
+          class="flex cursor-pointer flex-col items-center justify-center rounded-card border border-dashed border-line p-6 text-center transition-colors hover:border-accent hover:bg-raised/20"
           @click="chooseFile">
-          <UploadIcon class="h-8 w-8 text-ink-muted" />
-          <p class="mt-2 break-all text-sm font-medium text-ink-strong">
-            {{
-              selectedFile
-                ? selectedFile.name
-                : "Click to select a .dop backup file"
-            }}
-          </p>
-          <p v-if="selectedFile" class="mt-1 font-mono text-xs text-ink-muted">
+          <UploadIcon class="h-6 w-6 text-ink-muted" />
+          <span class="mt-2 break-all text-sm font-medium text-ink-strong">
+            {{ selectedFile ? selectedFile.name : "Choose a .dop file" }}
+          </span>
+          <span
+            v-if="selectedFile"
+            class="mt-1 font-mono text-xs text-ink-muted">
             {{ formatBytes(selectedFile.size) }}
-          </p>
-          <p v-else class="mt-1 text-xs text-ink-muted">
-            Select an encrypted .dop backup file.
-          </p>
-        </div>
+          </span>
+        </button>
 
-        <!-- Cross-Server Master Key option -->
-        <div class="rounded-lg border border-line bg-panel/50 p-3">
-          <p class="text-xs font-medium text-ink-strong">
-            Cross-Server Master Key (optional)
+        <div class="rounded-card border border-line p-3">
+          <p class="text-sm font-medium text-ink-strong">
+            Master key from another server (optional)
           </p>
-          <p class="mt-0.5 text-xs text-ink-muted">
-            If this backup was created on a different Dopbase instance, provide
-            its master key. Dopbase will safely re-key the snapshot using this
-            server's master key so it can be restored seamlessly without
-            changing this server's key.
+          <p class="mt-0.5 text-sm text-ink-muted">
+            If another Dopbase server made this backup, add its master key.
+            Dopbase re-encrypts the backup with this server's key, which stays
+            the same.
           </p>
           <input
             ref="keyFileInputRef"
@@ -425,14 +355,8 @@ function chooseKeyFile(): void {
             class="hidden"
             @change="handleKeyFileInputChange" />
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <DbButton
-              variant="secondary"
-              size="sm"
-              type="button"
-              @click="chooseKeyFile">
-              {{
-                selectedKeyFile ? "Change key file" : "Select master.key file"
-              }}
+            <DbButton size="sm" @click="chooseKeyFile">
+              {{ selectedKeyFile ? "Change key file" : "Choose master.key" }}
             </DbButton>
             <span
               v-if="selectedKeyFile"
@@ -442,50 +366,45 @@ function chooseKeyFile(): void {
               }})
             </span>
             <span v-else class="text-xs text-ink-faint">
-              Or paste 64-char hex key below
+              or paste the 64-character hex key below
             </span>
           </div>
           <DbInput
             v-if="!selectedKeyFile"
             v-model="keyHex"
             class="mt-2"
-            label="Hex Master Key (optional)"
+            label="Hex master key (optional)"
             name="keyHex"
-            placeholder="e.g. 4a2f8b..."
+            placeholder="4a2f8b…"
             mono />
         </div>
 
-        <DbAlert v-if="uploadError" tone="error">
-          {{ uploadError }}
-        </DbAlert>
+        <DbAlert v-if="uploadError">{{ uploadError }}</DbAlert>
 
         <div
           class="mt-2 flex items-center justify-end gap-2 border-t border-line-soft pt-3">
           <DbButton
             variant="ghost"
-            type="button"
             :disabled="uploading"
             @click="closeUploadModal">
             Cancel
           </DbButton>
           <DbButton
             variant="primary"
-            type="button"
             :disabled="!selectedFile"
             :loading="uploading"
             @click="submitUpload">
-            Upload &amp; Verify
+            Upload
           </DbButton>
         </div>
       </div>
     </DbModal>
 
-    <!-- Restore Confirmation Dialog -->
     <DbConfirmDialog
       :open="!!restoreTarget"
-      title="Restore System Snapshot?"
-      :description="`Restoring from &quot;${restoreTarget?.key}&quot; will overwrite all current projects, environments, and secrets with the snapshot data. Your current session will be preserved.`"
-      confirm-label="Restore Snapshot"
+      title="Restore this backup?"
+      :description="`Everything in ${restoreTarget?.key ?? 'the backup'} replaces the current projects, environments and secrets. You stay signed in.`"
+      confirm-label="Restore"
       confirm-word="RESTORE"
       tone="danger"
       :loading="restoring"
@@ -493,12 +412,12 @@ function chooseKeyFile(): void {
       @confirm="submitRestore"
       @close="closeRestoreDialog" />
 
-    <!-- Delete Confirmation Dialog -->
     <DbConfirmDialog
       :open="!!deleteTarget"
-      title="Delete Backup?"
-      :description="`Are you sure you want to permanently delete backup file &quot;${deleteTarget?.key}&quot;?`"
-      confirm-label="Delete Backup"
+      :title="`Delete ${deleteTarget?.key ?? 'the backup'}?`"
+      description="The file is removed from this server. Copies you downloaded aren't affected."
+      :confirm-word="deleteTarget?.key"
+      confirm-label="Delete backup"
       tone="danger"
       :loading="deleting"
       :error="deleteError"

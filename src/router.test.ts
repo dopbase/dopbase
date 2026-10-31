@@ -25,6 +25,9 @@ describe("project routes", () => {
     ["/groups/grp_1/access", "group-access"],
     ["/roles/new", "role-new"],
     ["/roles/role_1", "role"],
+    ["/account", "account"],
+    ["/account/tokens", "account-tokens"],
+    ["/account/audit-tokens", "account-audit-tokens"],
     // Legacy workspace URLs fall through to the not-found page.
     ["/workspace", "not-found"],
   ])("resolves %s", (path, routeName) => {
@@ -36,6 +39,25 @@ describe("project routes", () => {
       projectRef: "billing",
       environmentName: "prod",
     });
+  });
+});
+
+describe("account routes", () => {
+  it.each(["/account", "/account/tokens", "/account/audit-tokens"])(
+    "opens %s as the account page",
+    (path) => {
+      expect(router.resolve(path).meta.page).toBe("account");
+    },
+  );
+
+  it("sends the old personal tokens link to the tokens tab", () => {
+    const resolved = router.resolve("/account#personal-tokens");
+    const enter = resolved.matched[0]?.beforeEnter as unknown as (
+      to: typeof resolved,
+    ) => unknown;
+
+    expect(enter(resolved)).toEqual({ name: "account-tokens" });
+    expect(enter(router.resolve("/account"))).toBe(true);
   });
 });
 

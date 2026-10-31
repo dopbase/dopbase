@@ -20,75 +20,72 @@ accounts.
 From anywhere in the Admin UI, click **Backups** under **Instance** in the
 sidebar. Only root sees it.
 
-The Backups dashboard displays:
+The page shows:
 
-- A list of all available `.dop` backup archives stored on the server (`~/.dopbase/backups/`).
-- File size, creation timestamp, and quick action controls (Download, Restore, Delete) for each backup.
-- A button to **Create Backup** on demand.
-- A button to **Upload Backup** from your computer.
+- A banner reminding you to keep the master key with your backups, with
+  **Download master key**.
+- A table of the `.dop` archives stored on the server (`~/.dopbase/backups/`),
+  with each one's size and when it was made. Each row's **⋯** menu holds
+  **Download**, **Restore**, and **Delete backup**. On a phone the table
+  becomes cards with the same menu.
+- **Create backup** and **Upload** at the top.
 
 ## Creating a backup
 
-1. Click **Create Backup**.
-2. Optionally enter a custom name prefix (e.g. `pre-v2-deploy`). If left blank,
-   Dopbase automatically generates a timestamped name
-   (`dopbase_backup_YYYYMMDD_HHMMSS.dop`).
-3. Click **Create Snapshot**.
+1. Choose **Create backup**.
+2. Optionally enter a name prefix (e.g. `pre-v2-deploy`). Left blank, Dopbase
+   generates a timestamped name (`dopbase_backup_YYYYMMDD_HHMMSS.dop`).
+3. Confirm.
 
-The server creates a consistent SQLite snapshot, wraps it in an XChaCha20-Poly1305
-envelope using the server's master key, and stores it in the server backups
-directory. The new backup appears immediately in the backups list.
+The server creates a consistent SQLite snapshot, wraps it in an
+XChaCha20-Poly1305 envelope using the server's master key, and stores it in the
+server backups directory. The new backup appears in the list right away.
 
 ## Downloading the master encryption key
 
 Every Dopbase instance generates a 32-byte master encryption key stored at
-`~/.dopbase/master.key`. This key encrypts all `.dop` backup containers and derives
-the keys that protect stored project secrets.
+`~/.dopbase/master.key`. This key encrypts all `.dop` backup containers and
+derives the keys that protect stored project secrets.
 
-To download a copy for safe keeping:
-
-1. Click **Download Master Key** in the header actions toolbar.
-2. If your session requires re-authentication, enter your administrator password to confirm.
-3. Your browser downloads `master.key`. Store this file securely in a password manager or vault.
+Choose **Download master key** in the banner, or **Download** on the master
+key card on [Status](./audit-instance#instance-status), and confirm your
+password if asked. Your browser saves `master.key`. Store it in a password
+manager or vault, not on the server. The recovery kit saved during
+[setup](./setup-and-sign-in#save-the-recovery-kit) holds the same key in hex.
 
 > [!IMPORTANT]
 > To restore a `.dop` backup on a new or different Dopbase server, the matching
-> `master.key` is required. Without it, the new server cannot decrypt the backup
+> master key is required. Without it, the new server cannot decrypt the backup
 > or the secrets stored within it.
 
 ## Downloading a backup
 
-Click the **Download** icon next to any backup in the list to download the
-encrypted `.dop` archive to your local device. Because the archive is encrypted
-with the server's master key, it is safe to store in off-site backup storage or
-cold storage.
+Choose **Download** in a backup's **⋯** menu to save the encrypted `.dop`
+archive. Because it is encrypted with the server's master key, it is safe to
+keep in off-site or cold storage.
 
 ## Uploading a backup
 
-You can upload `.dop` files previously downloaded or transferred from another
-server:
+You can upload `.dop` files downloaded earlier or moved from another server:
 
-1. Click **Upload Backup**.
-2. Select or drag-and-drop the `.dop` file from your device.
-3. **Cross-Server Restores (Optional)**: If the backup was created on a different
-   Dopbase server, provide its master key (either by selecting its `master.key` file
-   or pasting its 64-character hex key).
-4. Click **Upload & Verify**.
+1. Choose **Upload**.
+2. Pick the `.dop` file.
+3. If the backup was made on a different server, give its master key: its
+   `master.key` file or the 64-character hex key.
+4. Confirm.
 
-Dopbase verifies the cryptographic authentication tag of the archive using the
-provided master key (or this server's master key) before accepting it into the
-available backups list. Corrupted, modified, or incompatible backups are rejected
-immediately.
+Dopbase checks the archive's authentication tag with the given master key, or
+this server's, before adding it to the list. Corrupted, modified, or
+incompatible backups are rejected.
 
 ## Restoring from a backup
 
 Restoring replaces the entire server state with the snapshot contents:
 
-1. Locate the desired backup in the table, or upload a `.dop` file via **Upload Backup**.
-2. Click the **Restore** button next to the backup.
-3. A confirmation dialog appears, warning that restoring will replace current
-   projects, environments, and secrets with the snapshot data.
-4. Type `RESTORE` to confirm and click **Restore Snapshot**.
+1. Find the backup in the table, or upload one first.
+2. Choose **Restore** in its **⋯** menu.
+3. The dialog warns that current projects, environments, and secrets will be
+   replaced. Type `RESTORE` and confirm.
 
 During restoration:
 
@@ -104,6 +101,11 @@ During restoration:
 > or modified since the snapshot was taken will be lost unless you have exported
 > them or backed them up previously.
 
+## Deleting a backup
+
+Choose **Delete backup** in its **⋯** menu and type the file name to confirm.
+The file is removed from this server; copies you downloaded aren't affected.
+
 ## Restoring on first-run setup
 
 On fresh storage, `dopbase server start` without `DOPBASE_ROOT_EMAIL` opens
@@ -115,9 +117,10 @@ When initializing a brand-new Dopbase instance, start the existing web setup
 listener with `dopbase server setup --web`. It prints a setup link and token.
 
 1. Open the setup link in your browser.
-2. Select the **Restore from Backup** tab.
+2. Switch to **Restore from backup**.
 3. Enter the one-time setup token printed by the server.
 4. Choose your `.dop` backup file.
-5. If migrating from another server, select its `master.key` file or paste the 64-character hex key under **Source Master Key**.
-6. Click **Restore System**.
+5. If migrating from another server, give its master key: the `master.key`
+   file, or the 64-character key from its recovery kit.
+6. Choose **Restore backup**.
 7. Once complete, you will be redirected to the sign-in screen to log in with your restored administrator credentials.

@@ -71,6 +71,8 @@ The current pre-release schema is assembled in this order:
 20261026065132_environment_protection.up.sql
 20261026085441_personal_tokens.up.sql
 20261026093115_audit_read_all.up.sql
+20261031120000_admin_last_sign_in.up.sql
+20261031120100_cli_device_client.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -105,6 +107,9 @@ all-projects tokens back and drops people's personal tokens.
 `audit_read_all` gives the Auditor role `audit.read_all`, so it keeps reading
 every audit event now that `audit.read` alone is limited to the reader's
 projects, and `tokens.personal`, so auditors can hold audit tokens.
+`admin_last_sign_in` records when each account last signed in.
+`cli_device_client` stores the client name a browser CLI login sends, such
+as `dopbase 0.2.0 on macOS`, for the approval page.
 
 The database test suite applies all migrations, rolls back to version zero,
 and reapplies them.

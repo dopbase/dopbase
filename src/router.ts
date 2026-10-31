@@ -31,6 +31,13 @@ export const router = createRouter({
       meta: { public: true, guestOnly: true },
     },
     {
+      // "Forgot password?" and "Trouble signing in?": who can help.
+      path: "/login/help",
+      name: "login-help",
+      component: () => import("~/pages/Login/LoginHelp.page.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/login/sso",
       name: "login-sso",
       component: () => import("~/pages/Login/SsoHandoff.page.vue"),
@@ -139,11 +146,23 @@ export const router = createRouter({
       path: "/instance",
       redirect: { name: "status" },
     },
-    {
-      path: "/account",
-      name: "account",
+    // Account: Profile & sign-in, then Personal tokens or, for roles whose
+    // tokens read the audit log, Audit tokens.
+    ...(
+      [
+        ["", "account"],
+        ["/tokens", "account-tokens"],
+        ["/audit-tokens", "account-audit-tokens"],
+      ] as const
+    ).map(([suffix, name]) => ({
+      path: `/account${suffix}`,
+      name,
       component: () => import("~/pages/Account/Account.page.vue"),
-    },
+      meta: { page: "account" },
+      // Older links point at the tokens card by hash.
+      beforeEnter: (to: { hash: string }) =>
+        to.hash === "#personal-tokens" ? { name: "account-tokens" } : true,
+    })),
     {
       path: "/users",
       name: "users",

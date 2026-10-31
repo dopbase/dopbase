@@ -9,7 +9,9 @@ import {
 } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import {
+  DEFAULT_SESSION_DAYS,
   displayCode,
+  formatCountdown,
   normalizeCode,
   useCliApproveController,
 } from "./CliApprove.controller";
@@ -331,5 +333,71 @@ describe("useCliApproveController", () => {
     left.unmount();
     vi.advanceTimersByTime(10_000);
     expect(left.close).not.toHaveBeenCalled();
+  });
+
+  it("names the client and how long the session lasts", async () => {
+    query.value = { code: "WDJB-MJHT" };
+    vi.mocked(authApi.inspectCliLogin).mockResolvedValueOnce({
+      ...pending,
+      client: "dopbase 0.2.0 on macOS",
+      sessionDays: 30,
+    });
+    const { controller } = mountController(useCliApproveController);
+    await settle();
+    expect(controller.request.value?.client).toBe("dopbase 0.2.0 on macOS");
+    expect(controller.machine.value).toBe("dev-box");
+    expect(controller.sessionDays.value).toBe(30);
+  });
+
+  it("assumes the usual session length when an older server doesn't say", async () => {
+    query.value = { code: "WDJB-MJHT" };
+    vi.mocked(authApi.inspectCliLogin).mockResolvedValueOnce(pending);
+    const { controller } = mountController(useCliApproveController);
+    await settle();
+    expect(controller.sessionDays.value).toBe(DEFAULT_SESSION_DAYS);
+  });
+
+  it("counts down to expiry and stops offering approval at zero", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-10-24T10:09:57Z"));
+    query.value = { code: "WDJB-MJHT" };
+    vi.mocked(authApi.inspectCliLogin).mockResolvedValueOnce(pending);
+    const { controller } = mountController(useCliApproveController);
+    await vi.waitFor(() => expect(controller.step.value).toBe("review"));
+    expect(controller.expiresIn.value).toBe("0:03");
+    vi.advanceTimersByTime(3000);
+    expect(controller.step.value).toBe("expired");
+    expect(controller.secondsLeft.value).toBe(0);
+  });
+
+  it("counts the request's lifetime when this clock disagrees with the server", async () => {
+    // The fixture's deadline is long past by this machine's clock, yet the
+    // server just said the request is pending.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-11-30T00:00:00Z"));
+    query.value = { code: "WDJB-MJHT" };
+    vi.mocked(authApi.inspectCliLogin).mockResolvedValueOnce(pending);
+    const { controller } = mountController(useCliApproveController);
+    await vi.waitFor(() => expect(controller.step.value).toBe("review"));
+    expect(controller.expiresIn.value).toBe("10:00");
+  });
+
+  it("starting over clears the countdown", async () => {
+    query.value = { code: "WDJB-MJHT" };
+    vi.mocked(authApi.inspectCliLogin).mockResolvedValueOnce(pending);
+    const { controller } = mountController(useCliApproveController);
+    await settle();
+    expect(controller.secondsLeft.value).not.toBeNull();
+    controller.startOver();
+    expect(controller.secondsLeft.value).toBeNull();
+    expect(controller.step.value).toBe("enter");
+  });
+});
+
+describe("formatCountdown", () => {
+  it("shows minutes and two-digit seconds, never below zero", () => {
+    expect(formatCountdown(272)).toBe("4:32");
+    expect(formatCountdown(5)).toBe("0:05");
+    expect(formatCountdown(-3)).toBe("0:00");
   });
 });

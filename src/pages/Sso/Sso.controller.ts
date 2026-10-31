@@ -86,6 +86,42 @@ export function useSsoController() {
     () => findPreset(preset.value)?.issuer ?? "",
   );
   const presetHint = computed(() => findPreset(preset.value)?.hint ?? "");
+  /** The summary card's title: the preset's name, or the button label for the generic one. */
+  const providerName = computed(() => {
+    const current = provider.value;
+    if (!current) return "";
+    const entry = presets.value.find((item) => item.id === current.preset);
+    return entry && entry.id !== GENERIC_PRESET
+      ? entry.label
+      : current.displayName;
+  });
+
+  /** One line under the provider's name saying where setup stands. */
+  const providerSummary = computed(() => {
+    const current = provider.value;
+    if (!current) return "";
+    if (status.value === "enabled") {
+      const linked = current.linkedAccounts;
+      return linked === 1
+        ? "Provider is on. 1 person has linked their account."
+        : `Provider is on. ${linked} people have linked their account.`;
+    }
+    if (status.value === "ready") {
+      return "Provider is off. The last test sign-in worked, so you can turn it on.";
+    }
+    return "Run a test sign-in before you turn it on.";
+  });
+
+  /** What removing the provider costs, for the danger card. */
+  const removeSummary = computed(() => {
+    const linked = provider.value?.linkedAccounts ?? 0;
+    const unlinks =
+      linked === 0
+        ? "No accounts are linked yet."
+        : `Unlinks ${linked} ${linked === 1 ? "account" : "accounts"}.`;
+    return `${unlinks} People without a password can't sign in until you set one.`;
+  });
+
   /** Without an HTTPS public URL nothing here can be set up. */
   const blocked = computed(
     () => settings.value !== null && !settings.value.publicUrlSecure,
@@ -344,6 +380,9 @@ export function useSsoController() {
   return {
     settings,
     provider,
+    providerName,
+    providerSummary,
+    removeSummary,
     status,
     loading,
     loadError,

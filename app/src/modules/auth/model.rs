@@ -96,6 +96,10 @@ pub enum DevicePurpose {
 pub struct DeviceStartRequest {
   /// Shown to the approver so they can tell which machine asked.
   pub hostname: Option<String>,
+  /// Shown to the approver so they can tell which program asked, such as
+  /// `dopbase 0.2.0 on macOS`. Trimmed to 80 printable characters.
+  #[schema(example = "dopbase 0.2.0 on macOS")]
+  pub client: Option<String>,
   /// `reauth` needs the CLI session's bearer token. Defaults to `login`.
   #[serde(default)]
   pub purpose: Option<DevicePurpose>,
@@ -138,8 +142,15 @@ pub struct UserCodeRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DeviceRequestDetails {
   pub hostname: Option<String>,
+  /// The program that asked, as the CLI reported it. Null for older clients.
+  #[schema(example = "dopbase 0.2.0 on macOS")]
+  pub client: Option<String>,
   pub ip_address: Option<String>,
   pub created_at: String,
   pub expires_at: String,
   pub purpose: DevicePurpose,
+  /// How many days the CLI session that approving a login creates can last
+  /// at most. It also ends after a shorter stretch without use.
+  #[schema(example = 90)]
+  pub session_days: u32,
 }

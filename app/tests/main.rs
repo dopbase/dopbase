@@ -1213,6 +1213,55 @@ async fn password_reverification_is_rate_limited() {
 }
 
 #[tokio::test]
+async fn wrong_logins_count_down_the_same_way_for_unknown_emails() {
+  let (_directory, state, router) = test_app().await;
+  bootstrap_admin(&state, &router).await;
+  let login = |email: &'static str, password: &'static str| {
+    let router = router.clone();
+    async move {
+      let (status, body, _) = call(
+        &router,
+        "POST",
+        "/api/v1/auth/login",
+        None,
+        Some(json!({"email":email,"password":password,"sessionKind":"cli"})),
+      )
+      .await;
+      (status, body)
+    }
+  };
+  let expected = [
+    "Email or password is wrong.",
+    "Email or password is wrong. 3 more tries, then a 15-minute pause.",
+    "Email or password is wrong. 2 more tries, then a 15-minute pause.",
+    "Email or password is wrong. 1 more try, then a 15-minute pause.",
+    "Email or password is wrong.",
+  ];
+  for message in expected {
+    let (status, known) = login("admin@example.com", "wrong-password").await;
+    assert_eq!(status, 401);
+    assert_eq!(known["error"]["AUTHENTICATION_INVALID"], message);
+    // An unknown email reads the same, so replies do not reveal accounts.
+    let (status, unknown) = login("ghost@example.com", "wrong-password").await;
+    assert_eq!(status, 401);
+    assert_eq!(unknown, known);
+  }
+  for (email, password) in [
+    ("admin@example.com", "wrong-password"),
+    ("admin@example.com", "correct-horse-123"),
+    ("ghost@example.com", "wrong-password"),
+  ] {
+    let (status, body) = login(email, password).await;
+    assert_eq!(status, 429, "{email}");
+    assert_eq!(
+      body["error"]["RATE_LIMITED"], "Too many tries. Wait 15 minutes, then try again.",
+      "{email}"
+    );
+  }
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn security_headers_are_applied_to_every_response() {
   let (_directory, state, router, _token, _environment_id) = admin_environment().await;
   let (status, _, headers) = call(&router, "GET", "/api/v1/health", None, None).await;

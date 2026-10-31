@@ -261,4 +261,67 @@ describe("useSsoController", () => {
     expect(c.presetHint.value).toBe("Use the issuer.");
     expect(c.issuerPlaceholder.value).toBe("https://idp.example.com");
   });
+
+  describe("summary and danger cards", () => {
+    it.each([
+      ["untested", {}, "Run a test sign-in before you turn it on."],
+      [
+        "off after a good test",
+        { verifiedAt: "2026-10-24T10:05:00Z" },
+        "Provider is off. The last test sign-in worked, so you can turn it on.",
+      ],
+      [
+        "on with one linked person",
+        {
+          enabled: true,
+          verifiedAt: "2026-10-24T10:05:00Z",
+          linkedAccounts: 1,
+        },
+        "Provider is on. 1 person has linked their account.",
+      ],
+      [
+        "on with several linked people",
+        {
+          enabled: true,
+          verifiedAt: "2026-10-24T10:05:00Z",
+          linkedAccounts: 4,
+        },
+        "Provider is on. 4 people have linked their account.",
+      ],
+    ] as const)(
+      "says where setup stands when %s",
+      async (_, overrides, line) => {
+        const c = await mounted(configured(overrides));
+        expect(c.providerSummary.value).toBe(line);
+      },
+    );
+
+    it("names the provider by its preset, or by the button label when generic", async () => {
+      const google = await mounted(configured());
+      expect(google.providerName.value).toBe("Google");
+
+      const generic = await mounted(
+        configured({ preset: "generic", displayName: "Company login" }),
+      );
+      expect(generic.providerName.value).toBe("Company login");
+    });
+
+    it("counts the accounts that removing the provider unlinks", async () => {
+      const none = await mounted(configured());
+      expect(none.removeSummary.value).toBe(
+        "No accounts are linked yet. People without a password can't sign in until you set one.",
+      );
+
+      const some = await mounted(configured({ linkedAccounts: 4 }));
+      expect(some.removeSummary.value).toBe(
+        "Unlinks 4 accounts. People without a password can't sign in until you set one.",
+      );
+    });
+
+    it("has nothing to summarise before a provider is saved", async () => {
+      const c = await mounted(empty);
+      expect(c.providerName.value).toBe("");
+      expect(c.providerSummary.value).toBe("");
+    });
+  });
 });

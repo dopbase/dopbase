@@ -22,9 +22,9 @@ use axum::{
   request_body = LoginRequest,
   responses(
     (status = 200, description = "Session started", body = inline(HttpResponseFormat<LoginResponse>)),
-    (status = 401, description = "The email or password is incorrect", body = crate::http::ErrorBody),
+    (status = 401, description = "The email or password is wrong. Unknown emails get the same reply. With 1 to 3 tries left, the message says how many remain before a pause", body = crate::http::ErrorBody),
     (status = 422, description = "Login input is invalid", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many login attempts. Try again later", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many tries. The message says how many minutes to wait", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn login(
@@ -269,7 +269,8 @@ pub async fn cli_cancel(
 
 /// Look up a browser CLI login
 ///
-/// Show where a pending request came from before approving it. Requires a
+/// Show where a pending request came from, which client sent it, and how
+/// long the CLI session it creates lasts, before approving it. Requires a
 /// browser session and the CSRF header. Wrong codes are rate limited.
 #[utoipa::path(
   post,

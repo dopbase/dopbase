@@ -24,6 +24,26 @@ async fn five_failures_lock_a_key_until_it_is_cleared() {
 }
 
 #[tokio::test]
+async fn remaining_tries_and_wait_follow_the_failures() {
+  let limiter = RateLimiter::default();
+  let key = "login:victim@lab.invalid";
+  assert_eq!(limiter.remaining(key).await, 5);
+  assert_eq!(limiter.retry_after(key).await, None);
+  for left in (0..5).rev() {
+    fail(&limiter, key, 1).await;
+    assert_eq!(limiter.remaining(key).await, left);
+  }
+  let wait = limiter.retry_after(key).await.unwrap();
+  assert!(wait <= RateLimiter::window());
+  assert!(wait > RateLimiter::window() - std::time::Duration::from_secs(60));
+  assert_eq!(limiter.remaining("login:other@lab.invalid").await, 5);
+
+  limiter.clear(key).await;
+  assert_eq!(limiter.remaining(key).await, 5);
+  assert_eq!(limiter.retry_after(key).await, None);
+}
+
+#[tokio::test]
 async fn checks_alone_do_not_take_buckets() {
   let limiter = RateLimiter::with_capacity(10, 100);
   fail(&limiter, "victim", 5).await;

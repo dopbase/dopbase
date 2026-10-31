@@ -21,47 +21,65 @@ Everyone can open the Audit log page. What it lists depends on your role:
 The line under the page title says which applies to you.
 
 Dopbase records sensitive actions such as secret changes, imports, exports,
-reveals, token creation and revocation, deletions, and sign-ins. The Audit page
-lists the events newest first, twenty-five at a time, with a **Load more**
-control for the next page.
+reveals, token creation and revocation, deletions, and sign-ins. The page lists
+them newest first, twenty-five at a time, with **Load more** for the next page.
+Each row shows when it happened, the action, who did it (with a tag when it
+came through a personal or runner token), and where. On a phone the rows
+become cards.
 
-Four filters narrow the list:
+Three filter chips narrow the list. Choose **+ Action**, **+ Actor**, or
+**+ Where** and pick a value; the chip then reads, say, `Action:
+secret.revealed`, and its **×** clears it. Filters live in the address, so a
+filtered view can be shared, and the **Activity** links on agent and account
+pages open the log already filtered to that actor.
 
-| Filter      | Answers                                          |
-| ----------- | ------------------------------------------------ |
-| Action      | "Show me every reveal" or every delete           |
-| Project     | Everything that happened inside one project      |
-| Environment | One environment only                             |
-| Actor       | The person, AI agent, or runner token that acted |
+| Filter | Answers                                          |
+| ------ | ------------------------------------------------ |
+| Action | "Show me every reveal" or every delete           |
+| Actor  | The person, AI agent, or runner token that acted |
+| Where  | One project, or one environment inside it        |
 
-Changing any filter reloads the list from the start.
+### An event's details
+
+Choose a row to open its details on the right: the actor, the credential it
+used, where it happened, the secret key or resource, and the address it came
+from. Below that, the whole event as JSON with a copy button. Events never
+contain secret values.
+
+People with `audit.verify`, such as root and auditors, also see whether the
+hash chain checks out up to that event, for example `Chain verified up to
+#4812 · sha256 9f2c…a71e`, or where it breaks. **Verify chain** at the top
+checks the whole log at once.
 
 The event names and their meanings are documented in
-[audit events](/reference/audit-events). If you are looking for the history of
-one specific value, filter by environment and action rather than scrolling.
+[audit events](/reference/audit-events).
 
 ## Instance status
 
 The Status page lives at `/status`, and old `/instance` links still open it.
-It reports:
+Four cards at the top show the running version, whether storage is healthy,
+whether the master key is available, and how long the server has been up. If
+the master key shows a problem, nothing that needs encryption or decryption
+works, and the fix lives on the host, not in the browser. **Refresh** reloads
+them.
 
-- The running Dopbase version
-- How long the server has been running and when the summary was updated
-- Whether storage is healthy
-- Whether the master key is available. If this shows a
-  problem, nothing that needs encryption or decryption will work, and the
-  fix lives on the host, not in the browser.
+Root sees **Download** on the master key card. It saves `master.key`, the same
+file the setup recovery kit and the Backups page give you. You confirm your
+password first.
 
-The page reports project, environment, secret, people, AI-agent, active
-runner-token, active AI-agent-token, and backup counts.
+**What's stored** counts projects, environments, secrets, people, AI agents,
+active runner tokens, active AI agent tokens, and backups.
 
 Configuration still loads at startup and requires a restart to change. See
 [self-hosting operations](/self-hosting/operations).
 
-## Danger Zone
+## Factory reset
 
-Root also sees **Danger Zone** on the Status page. Its factory-reset action
-permanently removes accounts, project data, audit history, and server backups.
-Reading the status summary does not reset anything.
+Root also sees a **Factory reset** card at the bottom. It deletes everything
+counted above, plus sessions and the audit log, and the server goes back to
+first-run setup. Configuration and the master key stay, and backups you
+downloaded aren't touched. **Reset this instance** stays off until you tick
+**I've downloaded a backup and the master key**, type `FACTORY RESET`, and
+enter the root password.
 
 Read [factory reset](/self-hosting/factory-reset) before using this action.

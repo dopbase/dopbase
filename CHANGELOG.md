@@ -94,7 +94,49 @@ All notable changes to Dopbase are documented in this file.
   their personal tokens can do, and how holders sign in. Built-in roles open
   read only, and **Duplicate** starts a custom role from any role.
 
+- Setup asks root to save a recovery kit before the console opens. Right
+  after the root account is created, it shows the master key (hidden until
+  you choose to show it), downloads a text kit with the key, the server's
+  address and the restore steps, and keeps **Continue** off until you confirm
+  the kit is stored outside the server. Root can download the key again from
+  **Status**.
+- The CLI approval page says who is asking before you approve: the machine,
+  the client (for example `dopbase 0.2.0 on macOS`), the address, when it was
+  requested, and a countdown to expiry, beside a mirror of what the terminal
+  should show. **It doesn't match** denies it, and an expired request says how
+  to get a new code. `dopbase login --browser` now sends `client`, and
+  `POST /api/v1/auth/cli/inspect` returns `client` and `sessionDays`.
+- A wrong password now says how many tries are left before a 15-minute pause,
+  and the pause says how long to wait. The wording is the same for an unknown
+  email, so the sign-in page still doesn't reveal who has an account.
+- The audit log opens an event's details in a side panel: actor, credential,
+  where, resource, address, the event as JSON, and whether the hash chain
+  checks out up to that event. **Verify chain** checks the whole log.
+- **Forgot password?** on the sign-in page explains who can help: an admin
+  from Users, or root on the server with `dopbase admin reset-password`.
+
 ### Changed
+
+- Sign in, Setup, and CLI approval share a new split layout. Sign in names
+  the server and its version, puts single sign-on above the form as
+  **Continue with …**, warns when Caps Lock is on, and, when passwords are
+  off, says so and offers only the provider, with a password link for root.
+  Setup shows a checklist of the steps beside the form and rates the root
+  password as you type.
+- **Status** shows version, storage, master key and uptime as cards, the
+  counts under **What's stored**, and **Factory reset** as a card at the
+  bottom that stays off until you tick the box, type `FACTORY RESET`, and
+  enter the root password.
+- **Backups** puts a master key reminder at the top and each backup's
+  Download, Restore, and Delete in a row menu. Deleting a backup asks for its
+  file name.
+- **Single sign-on** splits into provider, policy, and remove-provider cards,
+  and the summary says how many people have linked their account.
+- **Audit log** filters with Action, Actor, and Where chips that live in the
+  address.
+- **Account** has tabs with their own addresses: Profile & sign-in, and
+  Personal tokens or Audit tokens. **New token** starts from an AI agent or
+  script preset and sums up what the token can do, where, and until when.
 
 - **Users** is a table with filter chips for role and status, and a row menu
   to edit, disable, or delete someone. AI agents moved to their own page, and

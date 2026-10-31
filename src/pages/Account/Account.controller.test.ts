@@ -1,19 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
 import { useAccountController } from "./Account.controller";
 import * as authApi from "~/services/auth.api";
+import * as accessApi from "~/services/access.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
 import { browserSession } from "~/tests/browser-session";
+import { mountController } from "~/tests/mount-controller";
+import { accessFixture, settle, signInAs } from "~/tests/people";
 
-const routerPush = vi.hoisted(() => vi.fn());
+const { routerPush, routerReplace, route } = vi.hoisted(() => ({
+  routerPush: vi.fn(),
+  routerReplace: vi.fn(),
+  route: { name: "account" as string | undefined, query: {} },
+}));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: routerPush }),
-  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace }),
+  useRoute: () => route,
 }));
 
 vi.mock("~/services/auth.api");
+vi.mock("~/services/access.api");
+
+/** maya with personal tokens that reach data, or read the audit log. */
+function signInWithTokens(tokenScope: "data" | "audit"): void {
+  signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  useAuthStore().session!.tokenScope = tokenScope;
+}
 
 function signIn(store: ReturnType<typeof useAuthStore>): Promise<void> {
   vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
@@ -22,7 +37,8 @@ function signIn(store: ReturnType<typeof useAuthStore>): Promise<void> {
 
 beforeEach(() => {
   setActivePinia(createPinia());
-  routerPush.mockReset();
+  vi.clearAllMocks();
+  route.name = "account";
 });
 
 describe("useAccountController", () => {
@@ -111,5 +127,92 @@ describe("useAccountController", () => {
     await c.submit();
     expect(c.fieldErrors.value.currentPassword).toBeUndefined();
     expect(authApi.changePassword).toHaveBeenCalledWith("", "brandnewpassword");
+  });
+
+  it("opens the password dialog with an empty form", async () => {
+    await signIn(useAuthStore());
+    const c = useAccountController();
+    c.newPassword.value = "leftover";
+    c.fieldErrors.value = { newPassword: "Too short." };
+
+    c.openPassword();
+
+    expect(c.passwordOpen.value).toBe(true);
+    expect(c.newPassword.value).toBe("");
+    expect(c.fieldErrors.value).toEqual({});
+  });
+
+  it("shows Profile and Personal tokens for roles whose tokens reach data", () => {
+    signInWithTokens("data");
+    const c = useAccountController();
+
+    expect(c.tabs.value).toEqual([
+      { key: "profile", label: "Profile & sign-in", to: { name: "account" } },
+      {
+        key: "tokens",
+        label: "Personal tokens",
+        to: { name: "account-tokens" },
+      },
+    ]);
+    expect(c.subtitle.value).toBe("Your profile, sign-in and personal tokens.");
+  });
+
+  it("shows Audit tokens in place of Personal tokens for audit roles", () => {
+    signInWithTokens("audit");
+    route.name = "account-audit-tokens";
+    const c = useAccountController();
+
+    expect(c.tabs.value.map((tab) => tab.label)).toEqual([
+      "Profile & sign-in",
+      "Audit tokens",
+    ]);
+    expect(c.activeTab.value).toBe("audit-tokens");
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("moves a personal tokens address to Audit tokens for audit roles", () => {
+    signInWithTokens("audit");
+    route.name = "account-tokens";
+    useAccountController();
+
+    expect(routerReplace).toHaveBeenCalledWith({
+      name: "account-audit-tokens",
+    });
+  });
+
+  it("keeps root and roles without tokens on the profile", async () => {
+    signInAs([], { role: "root" });
+    route.name = "account-tokens";
+    const c = useAccountController();
+    await nextTick();
+
+    expect(c.tabs.value.map((tab) => tab.key)).toEqual(["profile"]);
+    expect(c.activeTab.value).toBe("profile");
+    expect(c.subtitle.value).toBe("Your profile and sign-in.");
+    expect(routerReplace).toHaveBeenCalledWith({ name: "account" });
+  });
+
+  it("lists the groups you belong to", async () => {
+    signInWithTokens("data");
+    vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(
+      accessFixture({ groups: [{ id: "grp_backend", name: "Backend" }] }),
+    );
+    const { controller } = mountController(useAccountController);
+    await settle();
+
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("me");
+    expect(controller.groups.value).toEqual([
+      { id: "grp_backend", name: "Backend" },
+    ]);
+    expect(controller.canOpenGroups.value).toBe(false);
+  });
+
+  it("leaves groups out when your access can't be read", async () => {
+    signInWithTokens("data");
+    vi.mocked(accessApi.fetchUserAccess).mockRejectedValue(new Error("down"));
+    const { controller } = mountController(useAccountController);
+    await settle();
+
+    expect(controller.groups.value).toBeNull();
   });
 });

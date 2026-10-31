@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { useInstanceController } from "./Instance.controller";
+import { RESET_PHRASE, useInstanceController } from "./Instance.controller";
 import { DashboardLayout } from "~/layouts";
-import { DbAlert, DbBadge, DbButton, DbSkeleton } from "~/components/ui";
-import { RefreshIcon, ServerIcon } from "~/assets/icons";
+import PageHeader from "~/components/app/PageHeader.vue";
+import {
+  DbAlert,
+  DbBadge,
+  DbButton,
+  DbCheckbox,
+  DbInput,
+  DbSkeleton,
+} from "~/components/ui";
+import {
+  BoxIcon,
+  ClockIcon,
+  DownloadIcon,
+  KeyIcon,
+  RefreshIcon,
+  ServerIcon,
+} from "~/assets/icons";
 
 /**
- * Instance — read-only server status: version, database health,
- * master-key availability, uptime, observed date, and resource metrics.
+ * Status: the server's version, storage and master key health, uptime and
+ * what it stores. Root also gets the master key download and the factory
+ * reset card.
  */
 const {
   status,
@@ -14,284 +30,214 @@ const {
   loadError,
   load,
   healthTone,
+  healthLabel,
+  healthBadge,
+  counts,
   formattedUptime,
   formattedObservedAt,
-  relativeObservedAt,
   relativeBootTime,
-  resetPreview,
+  isRoot,
+  downloadingMasterKey,
+  masterKeyMessage,
+  downloadMasterKey,
   resetPassword,
   resetConfirmation,
   resetAcknowledged,
   resetLoading,
   resetError,
   resetComplete,
-  loadResetPreview,
+  canReset,
   performReset,
-  isRoot,
 } = useInstanceController();
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="page-width py-6 lg:py-8">
-      <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-2.5">
-            <h1 class="text-lg font-semibold text-ink-strong">Instance</h1>
-            <DbBadge tone="neutral">Self-hosted</DbBadge>
-          </div>
-          <p class="mt-1 text-sm text-ink-muted">
-            Read-only status and operational telemetry for this server.
-          </p>
-        </div>
-        <DbButton
-          size="sm"
-          variant="secondary"
-          :loading="loading"
-          @click="load">
-          <RefreshIcon class="h-3.5 w-3.5" />
-          Refresh
-        </DbButton>
-      </header>
+    <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
+      <PageHeader
+        title="Status"
+        subtitle="Health of this server. Configuration loads at startup, so changes need a restart.">
+        <template #actions>
+          <DbButton :loading="loading" @click="load">
+            <RefreshIcon class="h-4 w-4" />
+            Refresh
+          </DbButton>
+        </template>
+      </PageHeader>
 
-      <DbAlert v-if="loadError" class="mb-6">{{ loadError }}</DbAlert>
+      <DbAlert v-if="loadError">{{ loadError }}</DbAlert>
+      <DbAlert
+        v-if="masterKeyMessage"
+        :tone="masterKeyMessage.tone === 'ok' ? 'success' : 'error'"
+        data-testid="master-key-message">
+        {{ masterKeyMessage.text }}
+      </DbAlert>
 
-      <!-- Skeleton loading state -->
+      <!-- First load -->
       <div
         v-if="loading && !status"
-        class="space-y-6"
+        class="flex flex-col gap-5"
         data-testid="instance-skeleton">
-        <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
           <div
             v-for="i in 4"
             :key="i"
-            class="rounded-card border border-line bg-panel p-4 space-y-2.5">
-            <DbSkeleton class="h-3 w-16" />
+            class="flex flex-col gap-2.5 rounded-card border border-line bg-panel px-4 py-3.5">
+            <DbSkeleton class="h-4 w-20" />
             <DbSkeleton class="h-6 w-24" />
-            <DbSkeleton class="h-3 w-20" />
           </div>
         </div>
-
-        <DbSkeleton class="h-10 w-full rounded-card" />
-
-        <div class="space-y-3">
-          <DbSkeleton class="h-4 w-28" />
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div
-              v-for="i in 8"
-              :key="i"
-              class="rounded-card border border-line bg-panel p-4 space-y-2">
-              <DbSkeleton class="h-3 w-20" />
-              <DbSkeleton class="h-7 w-12" />
-            </div>
-          </div>
-        </div>
+        <DbSkeleton class="h-52 w-full rounded-card" />
       </div>
 
-      <!-- Loaded status content -->
-      <div v-else-if="status" class="space-y-6" data-testid="instance-content">
-        <!-- System Health 4-card grid -->
+      <template v-else-if="status">
         <div
-          class="grid grid-cols-2 gap-3.5 lg:grid-cols-4"
+          class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4"
           data-testid="instance-cards">
-          <!-- Version -->
           <div
-            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-xs text-ink-muted">Core version</p>
-            <p class="my-1 font-mono text-lg font-semibold text-ink-strong">
-              v{{ status.version }}
+            class="flex min-w-0 flex-col gap-1.5 rounded-card border border-line bg-panel px-4 py-3.5">
+            <p class="flex items-center gap-1.5 text-sm text-ink-muted">
+              <BoxIcon class="h-3.5 w-3.5 shrink-0" />
+              Version
             </p>
-            <p class="text-xs text-ink-muted">
-              {{
-                status.initializationState === "initialized"
-                  ? "Setup complete"
-                  : status.initializationState
-              }}
+            <p
+              class="truncate text-lg font-semibold text-ink-strong"
+              :title="`Seen ${formattedObservedAt}`">
+              {{ status.version }}
             </p>
           </div>
 
-          <!-- Database -->
           <div
-            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-xs text-ink-muted">Database</p>
-            <div class="my-1 flex items-center">
+            class="flex min-w-0 flex-col gap-1.5 rounded-card border border-line bg-panel px-4 py-3.5">
+            <p class="flex items-center gap-1.5 text-sm text-ink-muted">
+              <ServerIcon class="h-3.5 w-3.5 shrink-0" />
+              Storage
+            </p>
+            <p class="flex flex-wrap items-center gap-2">
+              <span class="text-lg font-semibold text-ink-strong">
+                {{ healthLabel(status.databaseHealth) }}
+              </span>
               <DbBadge :tone="healthTone(status.databaseHealth)">
-                {{ status.databaseHealth }}
+                {{ healthBadge(status.databaseHealth) }}
               </DbBadge>
-            </div>
-            <p class="text-xs text-ink-muted">SQLite WAL storage</p>
+            </p>
           </div>
 
-          <!-- Master key -->
           <div
-            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-xs text-ink-muted">Master key</p>
-            <div class="my-1 flex items-center">
+            class="flex min-w-0 flex-col gap-1.5 rounded-card border border-line bg-panel px-4 py-3.5"
+            data-testid="master-key-card">
+            <p class="flex items-center gap-1.5 text-sm text-ink-muted">
+              <KeyIcon class="h-3.5 w-3.5 shrink-0" />
+              Master key
+            </p>
+            <p class="flex flex-wrap items-center gap-2">
+              <span class="text-lg font-semibold text-ink-strong">
+                {{ healthLabel(status.keyAvailability) }}
+              </span>
               <DbBadge :tone="healthTone(status.keyAvailability)">
-                {{ status.keyAvailability }}
+                {{ healthBadge(status.keyAvailability) }}
               </DbBadge>
-            </div>
-            <p class="text-xs text-ink-muted">Envelope encryption</p>
+            </p>
+            <DbButton
+              v-if="isRoot"
+              class="mt-1 self-start"
+              size="sm"
+              :loading="downloadingMasterKey"
+              data-testid="download-master-key"
+              @click="downloadMasterKey">
+              <DownloadIcon class="h-3.5 w-3.5" />
+              Download
+            </DbButton>
           </div>
 
-          <!-- Uptime -->
           <div
-            class="flex flex-col justify-between rounded-card border border-line bg-panel p-4">
-            <p class="text-xs text-ink-muted">Uptime</p>
-            <p class="my-1 font-mono text-lg font-semibold text-ink-strong">
+            class="flex min-w-0 flex-col gap-1.5 rounded-card border border-line bg-panel px-4 py-3.5">
+            <p class="flex items-center gap-1.5 text-sm text-ink-muted">
+              <ClockIcon class="h-3.5 w-3.5 shrink-0" />
+              Uptime
+            </p>
+            <p
+              class="truncate text-lg font-semibold text-ink-strong"
+              :title="`Started ${relativeBootTime}`">
               {{ formattedUptime }}
             </p>
-            <p class="text-xs text-ink-muted">Started {{ relativeBootTime }}</p>
           </div>
         </div>
 
-        <!-- Telemetry timestamp banner -->
-        <div
-          class="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line-soft bg-raised/40 px-4 py-2.5 text-xs text-ink-muted">
-          <div class="flex items-start gap-2">
-            <span
-              class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full bg-ok" />
-            <span
-              >Observed {{ formattedObservedAt }} ({{
-                relativeObservedAt
-              }})</span
-            >
-          </div>
-          <span>Configuration is restart-only</span>
-        </div>
-
-        <!-- Capacity & Resources section -->
-        <section class="space-y-3">
+        <section
+          class="flex flex-col gap-3.5 rounded-card border border-line bg-panel p-4 sm:p-5"
+          data-testid="instance-content">
           <div>
-            <h2 class="text-sm font-semibold text-ink-strong">
-              Resources & Capacity
+            <h2 class="text-[15px] font-semibold text-ink-strong">
+              What's stored
             </h2>
-            <p class="mt-0.5 text-xs text-ink-muted">
-              Current count of entities managed across this instance.
+            <p class="text-sm text-ink-muted">
+              Counts across the whole instance.
             </p>
           </div>
-
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <div
-              v-for="item in [
-                {
-                  label: 'Projects',
-                  value: status.projects,
-                  hint: 'Active projects',
-                },
-                {
-                  label: 'Environments',
-                  value: status.environments,
-                  hint: 'Project environments',
-                },
-                {
-                  label: 'Secrets',
-                  value: status.secrets,
-                  hint: 'Encrypted items',
-                },
-                {
-                  label: 'Backups',
-                  value: status.backups,
-                  hint: 'Database snapshots',
-                },
-                {
-                  label: 'Users',
-                  value: status.humanUsers,
-                  hint: 'Human accounts',
-                },
-                {
-                  label: 'AI agents',
-                  value: status.aiAgents,
-                  hint: 'Service identities',
-                },
-                {
-                  label: 'Runner tokens',
-                  value: status.activeRunnerTokens,
-                  hint: 'CI/CD credentials',
-                },
-                {
-                  label: 'Agent tokens',
-                  value: status.activeAgentTokens,
-                  hint: 'API credentials',
-                },
-              ]"
+              v-for="item in counts"
               :key="item.label"
-              class="rounded-card border border-line bg-panel p-4 transition-colors hover:border-line-strong/60">
-              <p class="text-xs text-ink-muted">{{ item.label }}</p>
-              <p
-                class="mt-1 font-mono text-2xl font-semibold tracking-tight text-ink-strong">
+              class="flex min-w-0 flex-col gap-0.5 rounded-control bg-editor px-3.5 py-2.5 text-sm">
+              <dt class="truncate text-ink-muted">{{ item.label }}</dt>
+              <dd class="font-mono font-semibold text-ink-strong">
                 {{ item.value }}
-              </p>
-              <p class="mt-0.5 text-[11px] text-ink-muted/80">
-                {{ item.hint }}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
         </section>
-      </div>
+      </template>
 
-      <!-- Unavailable empty state -->
-      <div v-else class="flex flex-col items-center gap-3 py-16 text-ink-muted">
+      <div
+        v-else-if="!loadError"
+        class="flex flex-col items-center gap-3 py-16 text-ink-muted">
         <ServerIcon class="h-6 w-6" />
         <p class="text-sm">Status unavailable.</p>
       </div>
 
-      <!-- Danger zone for root user -->
       <section
         v-if="isRoot"
-        class="mt-10 rounded-card border border-crit/40 bg-crit/5 p-4 sm:p-5">
-        <h2 class="text-sm font-semibold text-crit">Danger Zone</h2>
-        <p class="mt-2 text-sm text-ink-muted">
-          Factory reset permanently deletes all projects, secrets, users,
-          sessions, audit history, and server backups. It also deletes the root
-          account and returns this instance to first-install setup.
-        </p>
-        <p class="mt-2 text-xs text-ink-muted">
-          Server configuration and the master key remain. Downloaded backups are
-          not affected.
-        </p>
-        <DbButton class="mt-4" variant="danger" @click="loadResetPreview">
-          Review factory reset
-        </DbButton>
-        <div
-          v-if="resetPreview"
-          class="mt-4 space-y-3 border-t border-crit/20 pt-4">
-          <p class="font-mono text-xs text-ink-muted">
-            Users {{ resetPreview.users }} · AI agents
-            {{ resetPreview.aiAgents }} · Projects {{ resetPreview.projects }} ·
-            Environments {{ resetPreview.environments }} · Secrets
-            {{ resetPreview.secrets }} · Backups {{ resetPreview.backups }}
+        class="flex flex-col gap-3.5 rounded-card border border-crit/60 bg-panel p-4 sm:p-5"
+        data-testid="factory-reset">
+        <div>
+          <h2 class="text-[15px] font-semibold text-crit">Factory reset</h2>
+          <p class="text-sm text-ink-muted">
+            Deletes everything counted above, plus sessions and the audit log.
+            The server goes back to first-run setup. Configuration and the
+            master key stay, and downloaded backups aren't touched. Only root
+            sees this card.
           </p>
-          <label class="flex items-start gap-2 text-sm">
-            <input
-              v-model="resetAcknowledged"
-              class="mt-1 shrink-0"
-              type="checkbox" />
-            I understand this permanently deletes the instance data.
-          </label>
-          <input
+        </div>
+        <DbCheckbox
+          v-model="resetAcknowledged"
+          label="I've downloaded a backup and the master key" />
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <DbInput
             v-model="resetConfirmation"
-            class="w-full rounded-control border border-line bg-panel px-3 py-2 font-mono text-base sm:text-sm"
-            placeholder="Type FACTORY RESET" />
-          <input
+            :label="`Type ${RESET_PHRASE}`"
+            name="resetConfirmation"
+            autocomplete="off"
+            mono />
+          <DbInput
             v-model="resetPassword"
-            class="w-full rounded-control border border-line bg-panel px-3 py-2 text-base sm:text-sm"
+            label="Root password"
+            name="resetPassword"
             type="password"
-            placeholder="Root password" />
-          <p v-if="resetError" class="text-sm text-crit">{{ resetError }}</p>
-          <p v-if="resetComplete" class="text-sm text-ink-strong">
-            Reset complete. The server is ready for setup again.
-          </p>
+            autocomplete="current-password" />
+        </div>
+        <DbAlert v-if="resetError">{{ resetError }}</DbAlert>
+        <DbAlert v-if="resetComplete" tone="success">
+          Reset done. The server is ready for setup again.
+        </DbAlert>
+        <div class="flex justify-end">
           <DbButton
             variant="danger"
             :loading="resetLoading"
-            :disabled="
-              !resetAcknowledged ||
-              resetConfirmation !== 'FACTORY RESET' ||
-              !resetPassword
-            "
+            :disabled="!canReset"
+            data-testid="factory-reset-submit"
             @click="performReset">
-            Permanently reset instance
+            Reset this instance
           </DbButton>
         </div>
       </section>
