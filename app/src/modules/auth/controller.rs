@@ -22,9 +22,9 @@ use axum::{
   request_body = LoginRequest,
   responses(
     (status = 200, description = "Session started", body = inline(HttpResponseFormat<LoginResponse>)),
-    (status = 401, description = "The email or password is incorrect", body = crate::http::ErrorBody),
+    (status = 401, description = "The email or password is wrong. Unknown emails get the same reply. With 1 to 3 tries left, the message says how many remain before a pause", body = crate::http::ErrorBody),
     (status = 422, description = "Login input is invalid", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many login attempts. Try again later", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many tries. The message says how many minutes to wait", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn login(

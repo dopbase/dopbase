@@ -127,6 +127,34 @@ impl RateLimiter {
     entry.failures += 1;
   }
 
+  /// How long a key's failures count, which is also the longest a locked
+  /// key waits.
+  pub const fn window() -> Duration {
+    WINDOW
+  }
+
+  /// Failures `key` may still have before `check` refuses it.
+  pub async fn remaining(
+    &self,
+    key: &str,
+  ) -> u32 {
+    match self.entries.lock().await.get(key) {
+      Some(entry) if !entry.expired() => MAX_FAILURES.saturating_sub(entry.failures),
+      _ => MAX_FAILURES,
+    }
+  }
+
+  /// How long until `check` lets a locked `key` through again; `None` when
+  /// it is not locked.
+  pub async fn retry_after(
+    &self,
+    key: &str,
+  ) -> Option<Duration> {
+    let entries = self.entries.lock().await;
+    let entry = entries.get(key).filter(|entry| entry.locked())?;
+    Some(WINDOW.saturating_sub(entry.started.elapsed()))
+  }
+
   pub async fn clear(
     &self,
     key: &str,

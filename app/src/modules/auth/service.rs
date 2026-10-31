@@ -27,6 +27,24 @@ pub struct LoginResult {
   pub response: LoginResponse,
   pub cookie_token: Option<String>,
 }
+/// Whole minutes in `duration`, rounded up.
+fn whole_minutes(duration: std::time::Duration) -> u64 {
+  let seconds = duration.as_secs() + u64::from(duration.subsec_nanos() > 0);
+  seconds.div_ceil(60)
+}
+
+/// The same words for an unknown email and a wrong password, so the reply
+/// says nothing about which accounts exist. Near the limit it says what
+/// happens next.
+fn wrong_credentials(remaining: u32) -> String {
+  if !(1..=3).contains(&remaining) {
+    return "Email or password is wrong.".to_owned();
+  }
+  let tries = if remaining == 1 { "try" } else { "tries" };
+  let pause = whole_minutes(crate::services::cache::RateLimiter::window());
+  format!("Email or password is wrong. {remaining} more {tries}, then a {pause}-minute pause.")
+}
+
 pub async fn login(
   state: &AppState,
   request: LoginRequest,
@@ -34,10 +52,21 @@ pub async fn login(
   let email = common::validate_email(&request.email)?;
   let limit_key = format!("login:{email}");
   if !state.rate_limiter.check(&limit_key).await {
+    let message = match state.rate_limiter.retry_after(&limit_key).await {
+      Some(wait) => {
+        let minutes = whole_minutes(wait).max(1);
+        format!(
+          "Too many tries. Wait {minutes} {}, then try again.",
+          if minutes == 1 { "minute" } else { "minutes" }
+        )
+      }
+      // Refused because the limiter is full, not because of this email.
+      None => "Too many login attempts. Please try again later.".to_owned(),
+    };
     return Err(HttpError::new(
       axum::http::StatusCode::TOO_MANY_REQUESTS,
       RATE_LIMITED,
-      "Too many login attempts. Please try again later.",
+      message,
     ));
   }
   let admin = repository::admin_by_email(state.db.pool(), &email).await?;
@@ -61,9 +90,10 @@ pub async fn login(
       serde_json::json!({}),
     )
     .await;
+    let remaining = state.rate_limiter.remaining(&limit_key).await;
     return Err(HttpError::unauthorized(
       AUTHENTICATION_INVALID,
-      "The email or password is incorrect.",
+      &wrong_credentials(remaining),
     ));
   }
   state.rate_limiter.clear(&limit_key).await;
