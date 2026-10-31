@@ -81,7 +81,10 @@ beforeEach(() => {
       updatedAt: "",
     },
   ]);
-  vi.mocked(usersApi.fetchUsers).mockResolvedValue([maya, reviewBot]);
+  vi.mocked(usersApi.fetchUserIdentities).mockResolvedValue([
+    { id: maya.id, email: maya.email },
+    { id: reviewBot.id, email: reviewBot.email },
+  ]);
 });
 
 describe("useAuditController", () => {
@@ -184,7 +187,7 @@ describe("useAuditController", () => {
     route.query = { actor: "usr_gone" };
     const c = await mounted();
 
-    expect(usersApi.fetchUsers).not.toHaveBeenCalled();
+    expect(usersApi.fetchUserIdentities).not.toHaveBeenCalled();
     expect(c.actorOptions.value).toEqual([
       { value: "usr_1", label: "a@b.c" },
       { value: "usr_gone", label: "usr_gone" },
