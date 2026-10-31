@@ -11,7 +11,7 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 
 | Area                  | Events                                                                                                                                                                                                                                              |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Secrets               | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.version_revealed`, `secret.rolled_back`, `secret.imported`, `secret.import_previewed`, `secret.exported`, `secret.runtime_accessed`                                |
+| Secrets               | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.version_revealed`, `secret.rolled_back`, `secret.imported`, `secret.import_previewed`, `secret.exported`, `secret.runtime_accessed`, `secret.copied`               |
 | Projects              | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                                                                                                                      |
 | Environments          | `environment.created`, `environment.renamed`, `environment.deleted`, `environment.protected`, `environment.unprotected`                                                                                                                             |
 | Runner tokens         | `token.created`, `token.revoked`                                                                                                                                                                                                                    |
@@ -42,6 +42,12 @@ Successful import previews record `secret.import_previewed`. The record
 identifies the actor and environment and includes only the import mode and
 submitted entry count in its metadata. It contains no submitted values or
 comparison results. Applying an import records `secret.imported`.
+
+Copying a value from another environment records `secret.copied` on the
+target environment, with the key, the new `version`, `fromEnvironmentId` and
+`fromVersion`. It stores no value. Comparing environments is not audited, the
+same as listing secrets: it needs Read on both environments and returns only
+whether values match.
 
 Revealing an earlier version records `secret.version_revealed` with the key
 and version. A rollback records `secret.rolled_back` with the key, the

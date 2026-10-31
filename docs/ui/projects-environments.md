@@ -67,6 +67,7 @@ the environment you last opened in the bar.
 | Tab      | Shows                                              | Who sees it                                     |
 | -------- | -------------------------------------------------- | ----------------------------------------------- |
 | Secrets  | The environment's secrets                          | Everyone who reaches the environment            |
+| Compare  | Keys across this and up to 3 other environments    | Everyone who reaches the environment            |
 | Tokens   | Runner tokens for this environment                 | Manage on the environment                       |
 | Access   | Who reaches the project ([more](./project-access)) | Project manager, or `access.report` to read     |
 | Activity | The audit trail for this project                   | Everyone; you see what your audit access covers |
@@ -90,6 +91,35 @@ Run `dopbase env default payments/prod` once and a plain
 use the environment's immutable ID with a runner token in `DOPBASE_TOKEN`, so
 renaming the environment never breaks a deploy. If you manage the environment,
 it also names the runner token deploys used last, and when it expires.
+
+### Compare
+
+Compare lines up this environment's keys with up to three others in the
+project. The environment open in the bar is the base: open `payments / prod`
+and every column is read against prod, switch to staging and staging becomes
+the base. Compare stays open as you switch, and the environment you left takes
+the new base's place in the columns.
+
+**Compare with** starts with one other environment and remembers your choice
+for the project in this browser. **Add environment** adds more, up to three;
+at three it goes away until you remove one with its ×.
+
+Values never appear. Each cell says **Set** (with its version) or **Not set**
+for the base, and **Same**, **Differs**, **Not set** or **Set** for the
+others. The server compares values only where you have Read on both
+environments. With **Names only** somewhere, that column says which keys
+exist but not whether they match. **Differences** shows only keys missing
+somewhere or different from the base, and **All keys** shows the rest too.
+
+Compare doesn't show or change values that are already set, and a note above
+the table says so. Seeing or editing a value happens on the **Secrets** tab,
+where revealing asks for your password and is recorded in the audit log.
+
+Click a **Not set** cell to fill it, where you can write. **Match prod** (or
+whichever environment has the key) copies that value on the server, so nobody
+sees it, and the audit log records it as `secret.copied`. **Use its own
+value** lets you type one instead. Either way it lands as a new version that
+History can roll back.
 
 ### Activity
 
