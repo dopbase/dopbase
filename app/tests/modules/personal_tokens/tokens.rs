@@ -303,3 +303,94 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   assert_eq!(status, 200);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn replacing_an_agent_s_token_revokes_its_other_live_tokens_in_one_step() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let owner = person(&router, &root, "lead@example.com", "admin").await;
+  let (_, body) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    owner.browser(),
+    Some(json!({"email":"deploy-bot","role":"ai_agent"})),
+  )
+  .await;
+  let agent = body["data"]["id"].as_str().unwrap().to_owned();
+  let mut old = Vec::new();
+  for name in ["first", "second", "stale"] {
+    let (status, body) = token(&router, &owner, &agent, json!({"name":name,"level":"read"})).await;
+    assert_eq!(status, 201, "{body}");
+    old.push((
+      body["data"]["token"]["id"].as_str().unwrap().to_owned(),
+      plaintext(&body),
+    ));
+  }
+  // An expired token is left as it is.
+  sqlx::query("UPDATE personal_tokens SET expires_at = '2000-01-01T00:00:00+00:00' WHERE id = ?")
+    .bind(&old[2].0)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let projects = |bearer: &str| {
+    let bearer = bearer.to_owned();
+    let router = router.clone();
+    async move {
+      send(&router, "GET", "/api/v1/projects", As::Token(&bearer), None)
+        .await
+        .0
+    }
+  };
+  assert_eq!(projects(&old[0].1).await, 200);
+
+  let (status, body) = token(
+    &router,
+    &owner,
+    &agent,
+    json!({"name":"rotated","level":"read","replaceExisting":true}),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let rotated = plaintext(&body);
+  assert_eq!(projects(&rotated).await, 200);
+  assert_eq!(projects(&old[0].1).await, 401);
+  assert_eq!(projects(&old[1].1).await, 401);
+  let revoked: Vec<String> = sqlx::query_scalar(
+    "SELECT resource_id FROM audit_events WHERE action = 'personal_token.revoked' AND json_extract(metadata, '$.userId') = ? ORDER BY seq",
+  )
+  .bind(&agent)
+  .fetch_all(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(revoked, [old[0].0.clone(), old[1].0.clone()]);
+  let stale: Option<String> =
+    sqlx::query_scalar("SELECT revoked_at FROM personal_tokens WHERE id = ?")
+      .bind(&old[2].0)
+      .fetch_one(state.db.pool())
+      .await
+      .unwrap();
+  assert!(stale.is_none());
+
+  // A person's tokens are theirs to revoke one by one.
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (_, body) = token(
+    &router,
+    &member,
+    "me",
+    json!({"name":"laptop","level":"read"}),
+  )
+  .await;
+  let laptop = plaintext(&body);
+  let (status, body) = token(
+    &router,
+    &member,
+    "me",
+    json!({"name":"desktop","level":"read","replaceExisting":true}),
+  )
+  .await;
+  assert_eq!(status, 422, "{body}");
+  assert!(body["error"]["TOKEN_REPLACE_INVALID"].is_string(), "{body}");
+  assert_eq!(projects(&laptop).await, 200);
+  state.db.close().await;
+}

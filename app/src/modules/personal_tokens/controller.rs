@@ -42,7 +42,9 @@ pub async fn list(
 /// Create a token for yourself (`me`), which needs tokens.personal, or for
 /// an AI agent account you own or manage. A token reaches at most what its
 /// account reaches, within its own scope and level, and always expires.
-/// Browser sessions need recent authentication and the CSRF header.
+/// With `replaceExisting`, an AI agent's other valid tokens are revoked in
+/// the same step. Browser sessions need recent authentication and the CSRF
+/// header.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::TOKENS,
@@ -56,7 +58,7 @@ pub async fn list(
     (status = 403, description = "The caller can't create tokens for this account", body = crate::http::ErrorBody),
     (status = 404, description = "The user, project, or environment was not found", body = crate::http::ErrorBody),
     (status = 409, description = "A token with this name already exists", body = crate::http::ErrorBody),
-    (status = 422, description = "The name, scope, level, or expiry is invalid", body = crate::http::ErrorBody),
+    (status = 422, description = "The name, scope, level, or expiry is invalid, or replaceExisting was asked for a person's tokens", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn create(
