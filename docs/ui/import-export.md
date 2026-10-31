@@ -11,6 +11,7 @@ Dopbase. Export gets values back out when something needs the file form.
 ## Importing a `.env` file
 
 1. Open the environment that should receive the values and choose **Import**.
+   An empty environment also takes a file dropped on its checklist.
 2. Pick the file. Parsing happens in your browser. Nothing is uploaded yet.
    Lines that cannot be parsed are skipped and counted, with the reasons
    listed.
