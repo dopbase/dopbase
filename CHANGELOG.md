@@ -66,7 +66,43 @@ All notable changes to Dopbase are documented in this file.
   environment's value on the server, needs Read on the source and Write on
   the target, and records `secret.copied`.
 
+- An **AI agents** page lists token-only accounts for bots and CI, with each
+  agent's owner, how far it reaches, and whether its token is active, about to
+  expire, or missing. An agent's own page has **Access**, **Tokens**, and
+  **Danger zone** tabs, **Activity** for its audit events, and **Transfer
+  owner**. **New token** replaces the agent's live token in one step, and the
+  copy dialog shows a `dopbase run` line for where the new token reaches.
+  `POST /api/v1/users/{id}/tokens` takes `"replaceExisting": true` for this;
+  it is refused with `TOKEN_REPLACE_INVALID` for anyone but an AI agent.
+- Each person has their own page with **Overview**, **Access**, **Groups**,
+  **Tokens**, and **Danger zone** tabs. Access shows where every grant comes
+  from, direct or through a group, notes when an environment grant overrides
+  its project grant, and gives, changes, or removes access from there. The
+  same **Give access** dialog is used for people, AI agents, and groups.
+- Disable an account without deleting it. Disabling signs the person out
+  everywhere and stops their tokens; **Turn account back on** restores the
+  access they had. `POST /api/v1/users/{id}/disable` and `/enable` back it,
+  audited as `user.disabled` and `user.enabled`. User responses add `status`,
+  `lastSignInAt`, and `groups`, and the Users table shows how each person
+  signs in and when they last did.
+- Each group has its own page with **Members**, **Access**, and **Danger
+  zone** tabs. **Add members** adds several people at once, and each member
+  shows who added them and when. `GET /api/v1/groups` now returns each group's
+  members and grants, groups carry `createdBy`, and members carry `addedBy`.
+- A role editor at **Roles › New role** groups capabilities under People,
+  Projects, Audit, Tokens, and Instance, and sets how far holders reach, what
+  their personal tokens can do, and how holders sign in. Built-in roles open
+  read only, and **Duplicate** starts a custom role from any role.
+
 ### Changed
+
+- **Users** is a table with filter chips for role and status, and a row menu
+  to edit, disable, or delete someone. AI agents moved to their own page, and
+  the sidebar lists **AI agents** under People & access.
+- **Groups** and **Roles** are tables. Groups shows members, where each group
+  reaches, and who created it; Roles shows each role's reach, capabilities,
+  sign-in, and holders. Their row menus hold the actions that used to sit in
+  dialogs.
 
 - `dopbase client status` shows the account's role, such as Member, Auditor,
   or Root, on a new **Role** line in place of **Identity**. It used to say
@@ -79,7 +115,7 @@ All notable changes to Dopbase are documented in this file.
 - Service accounts are now accounts with the AI agent role. The upgrade turns
   each one into an AI agent owned by root that still reads secret names on
   every project, and its `dpa_` tokens keep working as personal tokens. New
-  agents are added on the Users page with a name and no password, start with
+  agents are added on the AI agents page with a name and no password, start with
   no access, and never reach more than the person who owns them. An owner
   can't be deleted while they own agents; give the agents another owner
   first. The `/api/v1/service-accounts` endpoints are gone: use
