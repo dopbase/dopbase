@@ -370,7 +370,8 @@ const config = defineConfig({
           text: "Administration",
           items: [
             { text: "Project access", link: "/ui/project-access" },
-            { text: "Users and AI agents", link: "/ui/users" },
+            { text: "Users", link: "/ui/users" },
+            { text: "AI agents", link: "/ui/ai-agents" },
             { text: "Groups", link: "/ui/groups" },
             { text: "Roles", link: "/ui/roles" },
             { text: "Backups and restoration", link: "/ui/backups" },

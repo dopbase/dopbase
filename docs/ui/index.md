@@ -28,7 +28,8 @@ commands. CLI changes appear in the UI.
 | [Backups and restoration](./backups)                 | Create and restore full encrypted server snapshots (`.dop` archives)             |
 | [Audit and instance status](./audit-instance)        | Read the audit log and check server health                                       |
 | [Project access](./project-access)                   | Decide who reaches a project and protect production                              |
-| [Users and AI agents](./users)                       | Add people and AI agents and give them a role                                    |
+| [Users](./users)                                     | Add people, give them a role, and disable or delete accounts                     |
+| [AI agents](./ai-agents)                             | Add accounts for bots and CI, and create or replace their token                  |
 | [Groups](./groups)                                   | Give a team access to projects at once                                           |
 | [Roles](./roles)                                     | Create custom roles, as root                                                     |
 | [Account settings](./account)                        | Manage profile details, update passwords, and view session status                |
@@ -36,7 +37,7 @@ commands. CLI changes appear in the UI.
 ## Finding your way around
 
 The sidebar groups pages into **Workspace** (Projects, Audit log), **People &
-access** (Users, Groups, Roles) and **Instance** (Status, Backups, Single
+access** (Users, AI agents, Groups, Roles) and **Instance** (Status, Backups, Single
 sign-on). It only lists pages your role can open, and a group with none of
 them doesn't show. If you follow a link to a page your role can't open, the
 console says which capability it needs instead of sending you somewhere else.
@@ -55,7 +56,7 @@ buttons stay in view.
 ## Who can sign in
 
 Setup creates the protected root account. People with `users.manage`, such as
-admins, add other people and AI agents from **Users**, and each person sees
+admins, add other people from **Users** and AI agents from **AI agents**, and each person sees
 only the projects and pages their role and grants allow. AI agents use personal
 tokens and never sign in. Applications use environment-scoped runner tokens.
 See [identity and access](/reference/identity).

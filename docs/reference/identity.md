@@ -261,7 +261,7 @@ it, never more than its role's read ceiling, and never more than its owner
 reaches. A disabled owner disables the agent.
 
 Owners, and people who manage accounts, create the agent's tokens on the
-[Users](/ui/users) page. A person who owns agents can't be deleted until the
+[AI agents](/ui/ai-agents) page. A person who owns agents can't be deleted until the
 agents are deleted or given another owner. See
 [AI agent access](/guide/ai-agent-access) for both ways to give an agent
 access: your own personal token, or a shared agent account.
