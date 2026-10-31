@@ -1382,6 +1382,8 @@ mod groups_members;
 mod personal_tokens_tokens;
 #[path = "modules/roles/custom.rs"]
 mod roles_custom;
+#[path = "modules/secrets/compare.rs"]
+mod secrets_compare;
 #[path = "modules/secrets/import.rs"]
 mod secrets_import;
 #[path = "modules/secrets/versions.rs"]

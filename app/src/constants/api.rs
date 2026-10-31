@@ -141,6 +141,9 @@ pub mod secrets {
   pub const VERSION_REVEAL: &str =
     api_path!("/environments/{environment_id}/secrets/{key}/versions/{version}/reveal");
   pub const ROLLBACK: &str = api_path!("/environments/{environment_id}/secrets/{key}/rollback");
+  pub const COPY: &str = api_path!("/environments/{environment_id}/secrets/{key}/copy");
+  /// Outside `/secrets/` so it never shadows a secret named `compare`.
+  pub const COMPARE: &str = api_path!("/environments/{environment_id}/compare");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
