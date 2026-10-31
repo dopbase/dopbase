@@ -3,10 +3,24 @@ import {
   isSafeRedirect,
   isValidEmail,
   isValidSecretKey,
+  isValidSlug,
   validatePasswordLength,
 } from "./validation";
 
 describe("shared validation", () => {
+  it("accepts the same slugs as the server", () => {
+    expect(isValidSlug("deploy-prod")).toBe(true);
+    expect(isValidSlug("ci2")).toBe(true);
+    expect(isValidSlug("a".repeat(63))).toBe(true);
+    expect(isValidSlug("a".repeat(64))).toBe(false);
+    expect(isValidSlug("deploy prod")).toBe(false);
+    expect(isValidSlug("Deploy")).toBe(false);
+    expect(isValidSlug("2-deploy")).toBe(false);
+    expect(isValidSlug("deploy--prod")).toBe(false);
+    expect(isValidSlug("deploy-")).toBe(false);
+    expect(isValidSlug("deploy_prod")).toBe(false);
+  });
+
   it("accepts bounded email addresses and trims input", () => {
     expect(isValidEmail(" admin@example.com ")).toBe(true);
     expect(isValidEmail("admin@example")).toBe(false);

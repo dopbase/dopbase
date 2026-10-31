@@ -18,6 +18,7 @@ import {
   DbSkeleton,
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
+import { isValidSlug } from "~/utils/validation";
 import {
   ActivityIcon,
   CopyIcon,
@@ -116,8 +117,15 @@ const createSummary = computed(() => {
 const createdScope = ref("");
 
 async function submitCreate(): Promise<void> {
-  if (newName.value.trim() === "") {
+  const name = newName.value.trim();
+  if (name === "") {
     createError.value = "Enter a token name.";
+    return;
+  }
+  // Same rule as environment names, so a name works in scripts and logs.
+  if (!isValidSlug(name)) {
+    createError.value =
+      "Use lowercase letters, numbers and single hyphens, starting with a letter. 63 characters at most.";
     return;
   }
   createError.value = null;
@@ -136,7 +144,7 @@ async function submitCreate(): Promise<void> {
   }
   createdScope.value = scope.value;
   try {
-    await controller.create(newName.value.trim(), expiresIn);
+    await controller.create(name, expiresIn);
     showCreate.value = false;
   } catch {
     // Keep the dialog open because controller.actionError shows the error.
@@ -160,7 +168,7 @@ async function confirmRevoke(): Promise<void> {
 const createdUsage = computed(() =>
   created.value
     ? [
-        `export DOPBASE_TOKEN=${created.value.plaintextToken.slice(0, 12)}…`,
+        `export DOPBASE_TOKEN=${created.value.plaintextToken}`,
         `dopbase run ${created.value.token.environmentId} -- ./start.sh`,
       ].join("\n")
     : "",
@@ -300,29 +308,33 @@ const expiresClass: Record<string, string> = {
     <DbModal
       :open="showCreate"
       title="New runner token"
+      size="xl"
       @close="!creating && (showCreate = false)">
       <form
         id="new-runner-token"
         class="flex flex-col gap-4"
         novalidate
         @submit.prevent="submitCreate">
-        <DbInput
-          v-model="newName"
-          label="Name"
-          name="tokenName"
-          placeholder="deploy-prod"
-          mono
-          :error="createError"
-          hint="Name it after the app or pipeline that will use it."
-          @input="createError = null" />
-        <div class="rounded-control bg-raised px-3.5 py-2">
-          <p class="text-xs font-semibold text-ink-muted">Environment</p>
-          <p class="font-mono text-sm text-ink-strong">
-            {{ environmentName
-            }}<span v-if="protected" class="font-sans text-ink-muted">
-              (protected)</span
-            >
-          </p>
+        <!-- Side by side once the dialog is wide enough. -->
+        <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
+          <DbInput
+            v-model="newName"
+            label="Name"
+            name="tokenName"
+            placeholder="deploy-prod"
+            mono
+            :error="createError"
+            hint="Lowercase letters, numbers and hyphens. Name it after the app or pipeline that will use it."
+            @input="createError = null" />
+          <DbInput
+            :model-value="
+              protected ? `${environmentName} (protected)` : environmentName
+            "
+            label="Environment"
+            name="tokenEnvironment"
+            mono
+            readonly
+            :title="environmentName" />
         </div>
         <div class="flex flex-col gap-1.5">
           <p class="text-sm text-ink-muted">Can</p>

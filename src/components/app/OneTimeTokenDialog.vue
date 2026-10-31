@@ -51,7 +51,7 @@ function handleCopyError(): void {
 </script>
 
 <template>
-  <DbModal :open="open" :title="title" size="md" persistent>
+  <DbModal :open="open" :title="title" size="xl" persistent>
     <div class="flex flex-col gap-4">
       <div
         class="flex items-start gap-3 rounded-control bg-warn/15 px-4 py-3"
@@ -106,13 +106,24 @@ function handleCopyError(): void {
           data-testid="token-usage"><code>{{ usage }}</code></pre>
       </section>
 
-      <dl class="grid grid-cols-[auto_auto_1fr] gap-x-6 gap-y-0.5 text-sm">
-        <dt class="text-ink-muted">Name</dt>
-        <dt class="text-ink-muted">{{ scope ? "Scope" : "Token ID" }}</dt>
-        <dt class="text-ink-muted">{{ expires ? "Expires" : "" }}</dt>
-        <dd class="truncate font-mono text-ink-strong">{{ name }}</dd>
-        <dd class="truncate font-mono text-ink-strong">{{ scope ?? id }}</dd>
-        <dd class="truncate font-mono text-ink-strong">{{ expires ?? "" }}</dd>
+      <!-- One row when there's room; each pair wraps whole on a phone. -->
+      <dl class="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+        <div class="min-w-0">
+          <dt class="text-ink-muted">Name</dt>
+          <dd class="font-mono text-ink-strong [overflow-wrap:anywhere]">
+            {{ name }}
+          </dd>
+        </div>
+        <div class="min-w-0">
+          <dt class="text-ink-muted">{{ scope ? "Scope" : "Token ID" }}</dt>
+          <dd class="font-mono text-ink-strong [overflow-wrap:anywhere]">
+            {{ scope ?? id }}
+          </dd>
+        </div>
+        <div v-if="expires" class="min-w-0">
+          <dt class="text-ink-muted">Expires</dt>
+          <dd class="font-mono text-ink-strong">{{ expires }}</dd>
+        </div>
       </dl>
 
       <DbAlert v-if="copyError">{{ copyError }}</DbAlert>

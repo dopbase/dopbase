@@ -70,6 +70,7 @@ afterEach(() => {
   app = null;
   document.body.innerHTML = "";
   controller.rows.value = [];
+  controller.created.value = null;
   vi.clearAllMocks();
 });
 
@@ -142,7 +143,11 @@ describe("TokensPanel", () => {
     expect(
       document.querySelector('[data-testid="token-summary"]')?.textContent,
     ).toContain("deploy-prod can read every value in payments / prod until");
-    expect(document.body.textContent).toContain("prod (protected)");
+    const environment = document.querySelector<HTMLInputElement>(
+      'input[name="tokenEnvironment"]',
+    )!;
+    expect(environment.value).toBe("prod (protected)");
+    expect(environment.readOnly).toBe(true);
 
     document
       .querySelector<HTMLButtonElement>('[role="radio"][data-value="30d"]')!
@@ -153,5 +158,37 @@ describe("TokensPanel", () => {
     await nextTick();
 
     expect(controller.create).toHaveBeenCalledWith("deploy-prod", "30d");
+  });
+
+  it("refuses a name an environment couldn't have", async () => {
+    mountPanel();
+    button("New runner token")?.click();
+    await nextTick();
+
+    const name = document.querySelector<HTMLInputElement>(
+      'input[name="tokenName"]',
+    )!;
+    name.value = "Deploy prod";
+    name.dispatchEvent(new Event("input"));
+    document
+      .querySelector<HTMLFormElement>("#new-runner-token")!
+      .requestSubmit();
+    await nextTick();
+
+    expect(controller.create).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain(
+      "Use lowercase letters, numbers and single hyphens",
+    );
+  });
+
+  it("puts the whole token in the usage lines", async () => {
+    mountPanel();
+    const plaintext = "dbs_0123456789abcdefghijklmnopqrstuvwxyz";
+    controller.created.value = { token, plaintextToken: plaintext } as never;
+    await nextTick();
+
+    expect(
+      document.querySelector('[data-testid="token-usage"]')?.textContent,
+    ).toContain(`export DOPBASE_TOKEN=${plaintext}`);
   });
 });
