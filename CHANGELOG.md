@@ -49,6 +49,23 @@ All notable changes to Dopbase are documented in this file.
   grant below project manager stops reaching the environment. Only a grant
   on the environment itself or a project manager gets in.
 
+- A **Compare** tab on the project page lines up the open environment's keys
+  with others in the project. The environment in the switcher is the base, so
+  switching to staging re-bases the comparison on staging. It starts with one
+  other environment; **Add environment** adds up to three and goes away at
+  three. Each cell says Same, Differs, Not set or Set, with the version, and
+  never shows a value. Clicking a Not set cell fills it: match another
+  environment's value, copied on the server, or type its own. A note above
+  the table says set values can't be seen or changed here, and links to
+  **Secrets**.
+- New endpoints behind Compare. `GET /api/v1/environments/{id}/compare`
+  takes `with`, up to three environment ids, and returns each key's version
+  per environment and whether its value matches the base. Values are compared
+  only where you have Read on both. Matching goes through
+  `POST /api/v1/environments/{id}/secrets/{key}/copy`, which copies another
+  environment's value on the server, needs Read on the source and Write on
+  the target, and records `secret.copied`.
+
 ### Changed
 
 - `dopbase client status` shows the account's role, such as Member, Auditor,
