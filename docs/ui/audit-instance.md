@@ -57,15 +57,42 @@ The event names and their meanings are documented in
 ## Instance status
 
 The Status page lives at `/status`, and old `/instance` links still open it.
-Four cards at the top show the running version, whether storage is healthy,
-whether the master key is available, and how long the server has been up. If
-the master key shows a problem, nothing that needs encryption or decryption
-works, and the fix lives on the host, not in the browser. **Refresh** reloads
-them.
+It runs the server's health checks and refreshes every 30 seconds while it is
+open. If a refresh fails, the page keeps the last results and says what time
+they are from. Health checks need the `instance.view` capability; without it
+the page shows only what's stored.
 
-Root sees **Download** on the master key card. It saves `master.key`, the same
-file the setup recovery kit and the Backups page give you. You confirm your
-password first.
+The banner at the top sums up the checks: how many need attention and how
+many passed, or that everything looks good. It also shows the version and how
+long the server has been up, and, when the `update_check` setting is on,
+whether a newer release is out. When the master key file on disk no longer
+matches the key the server is using, the banner turns red and says so first.
+The server keeps working on the key it loaded, but it won't start again until
+the right file is back in place.
+
+Below the banner, four cards show the readings behind the checks:
+
+- **Database**: how long a query takes and how big the database is.
+- **Master key**: whether the key file still matches the key in use.
+- **Disk**: free space where the data lives.
+- **Audit log**: whether the hash chain verified, and when. The chain is
+  walked when you open the page, and the result is reused for up to 10
+  minutes.
+
+**Last 24 hours** sits beside them: secret reads with an hourly chart, failed
+sign-ins, requests refused by the sign-in limits, and live browser and CLI
+sessions. The emails and addresses behind failed sign-ins need `audit.read`.
+
+**Needs attention** lists the failing checks, most severe first, each with a
+button that fixes it when you can use one: **Create backup**, **Review
+tokens**, **How to set it**, and so on. Passing checks fold into one line;
+**Show all** opens them. When every check passes, the card lists them all
+with what each one saw. Root also gets **Download key in use** when the key
+file changed. You confirm your password first.
+
+**Run checks** runs everything again now, including the audit chain walk. It
+works once every 10 seconds. **Copy diagnostics** copies a plain-text report
+of the page to paste into an issue.
 
 **What's stored** counts projects, environments, secrets, people, AI agents,
 active runner tokens, active AI agent tokens, and backups.
@@ -78,7 +105,8 @@ Configuration still loads at startup and requires a restart to change. See
 Root also sees a **Factory reset** card at the bottom. It deletes everything
 counted above, plus sessions and the audit log, and the server goes back to
 first-run setup. Configuration and the master key stay, and backups you
-downloaded aren't touched. **Reset this instance** stays off until you tick
+downloaded aren't touched. The steps stay folded until you choose **Show
+reset steps**. **Reset this instance** stays off until you tick
 **I've downloaded a backup and the master key**, type `FACTORY RESET`, and
 enter the root password.
 
