@@ -355,6 +355,7 @@ async fn activity_counts_reads_failed_sign_ins_refusals_and_sessions() {
   assert_eq!(activity["secretReads"]["total"], 1);
   assert_eq!(activity["secretReads"]["hourly"][23], 1);
   assert_eq!(activity["secretReads"]["people"], 1);
+  assert_eq!(activity["secretReads"]["aiAgents"], 0);
   assert_eq!(activity["secretReads"]["runnerTokens"], 0);
   assert_eq!(activity["failedSignIns"]["total"], 5);
   assert_eq!(
@@ -733,4 +734,57 @@ async fn http_and_a_missing_public_url_only_matter_off_this_machine() {
     }
     state.db.close().await;
   }
+}
+
+#[tokio::test]
+async fn secret_reads_by_ai_agents_are_not_counted_as_people() {
+  let (_dir, state, router) = test_app().await;
+  let (root, environments) = instance(&state, &router).await;
+  let dev = &environments["payments/dev"];
+  put_secret(&router, &root, dev, "API_KEY").await;
+  let (status_code, agent) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    root.browser(),
+    Some(json!({"email":"deploy-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status_code, 201, "{agent}");
+  let agent_id = agent["data"]["id"].as_str().unwrap();
+  let (status_code, body) = super::grants_access::grant(
+    &router,
+    &root,
+    ("user", agent_id),
+    ("environment", Some(dev.as_str())),
+    "read",
+  )
+  .await;
+  assert_eq!(status_code, 200, "{body}");
+  let (status_code, token) = send(
+    &router,
+    "POST",
+    &format!("/api/v1/users/{agent_id}/tokens"),
+    root.browser(),
+    Some(json!({"name":"default","level":"read"})),
+  )
+  .await;
+  assert_eq!(status_code, 201, "{token}");
+  let token = token["data"]["plaintextToken"].as_str().unwrap();
+  let (status_code, body) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/environments/{dev}/secrets/runtime"),
+    super::grants_access::As::Token(token),
+    None,
+  )
+  .await;
+  assert_eq!(status_code, 200, "{body}");
+
+  let reads = &status(&router, &root).await["activity"]["secretReads"];
+  assert_eq!(reads["total"], 1);
+  assert_eq!(reads["aiAgents"], 1);
+  assert_eq!(reads["people"], 0);
+  assert_eq!(reads["runnerTokens"], 0);
+  state.db.close().await;
 }

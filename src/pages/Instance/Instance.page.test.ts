@@ -82,6 +82,7 @@ const base: instanceApi.StatusResponse = {
       hourly: Array(24).fill(2),
       runnerTokens: 3,
       people: 2,
+      aiAgents: 0,
     },
     failedSignIns: { total: 0, hourly: [], accounts: [], addresses: [] },
     rateLimited: { total: 0, hourly: [] },

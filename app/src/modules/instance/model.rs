@@ -213,8 +213,10 @@ pub struct SecretReads {
   pub hourly: Vec<i64>,
   /// Distinct runner tokens that read secrets.
   pub runner_tokens: i64,
-  /// Distinct accounts that read secrets.
+  /// Distinct people who read secrets.
   pub people: i64,
+  /// Distinct AI agents that read secrets.
+  pub ai_agents: i64,
 }
 
 #[derive(Serialize, ToSchema)]

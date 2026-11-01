@@ -885,10 +885,16 @@ pub async fn activity(
       .fetch_all(pool)
       .await?,
   );
+  // AI agents read through personal tokens like people can, so their role
+  // tells them apart.
   let readers: Vec<(String, i64)> = sqlx::query_as(&format!(
-    "SELECT CASE actor_type WHEN 'runner' THEN 'runner' ELSE 'person' END,
-            COUNT(DISTINCT actor_id) FROM audit_events
-      WHERE action IN ({SECRET_READS}) AND created_at >= ? GROUP BY 1"
+    "SELECT CASE WHEN e.actor_type = 'runner' THEN 'runner'
+                 WHEN r.sign_in = 'token_only' THEN 'agent'
+                 ELSE 'person' END,
+            COUNT(DISTINCT e.actor_id) FROM audit_events e
+       LEFT JOIN admins a ON a.id = e.actor_id
+       LEFT JOIN roles r ON r.id = a.role_id
+      WHERE e.action IN ({SECRET_READS}) AND e.created_at >= ? GROUP BY 1"
   ))
   .bind(start.to_rfc3339())
   .fetch_all(pool)
@@ -949,6 +955,7 @@ pub async fn activity(
       hourly: reads,
       runner_tokens: readers_of("runner"),
       people: readers_of("person"),
+      ai_agents: readers_of("agent"),
     },
     failed_sign_ins: FailedSignIns {
       total: failures.iter().sum(),

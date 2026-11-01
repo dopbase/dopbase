@@ -64,6 +64,7 @@ export interface StatusActivity {
     hourly: number[];
     runnerTokens: number;
     people: number;
+    aiAgents: number;
   };
   failedSignIns: {
     total: number;

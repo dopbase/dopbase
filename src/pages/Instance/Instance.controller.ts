@@ -342,6 +342,9 @@ export function useInstanceController() {
       secretReads.people
         ? plural(secretReads.people, "person", "people")
         : null,
+      secretReads.aiAgents
+        ? plural(secretReads.aiAgents, "AI agent", "AI agents")
+        : null,
     ].filter((part): part is string => part !== null);
     let signInDetail = "None in the last day";
     if (failedSignIns.total > 0) {

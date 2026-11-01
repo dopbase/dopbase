@@ -106,6 +106,7 @@ const mockStatus: instanceApi.StatusResponse = {
       hourly: Array.from({ length: 24 }, (_, hour) => hour),
       runnerTokens: 3,
       people: 2,
+      aiAgents: 0,
     },
     failedSignIns: {
       total: 3,
@@ -361,6 +362,26 @@ describe("useInstanceController", () => {
       },
     ]);
     expect(c.activityTiles.value[0].hourly).toHaveLength(24);
+  });
+
+  it("names AI agents that read secrets apart from people", async () => {
+    signInAs(["instance.view"]);
+    vi.mocked(instanceApi.fetchStatus).mockResolvedValue({
+      ...mockStatus,
+      activity: {
+        ...mockStatus.activity!,
+        secretReads: {
+          total: 9,
+          hourly: [],
+          runnerTokens: 0,
+          people: 0,
+          aiAgents: 1,
+        },
+      },
+    });
+    const c = await mounted();
+
+    expect(c.activityTiles.value[0].detail).toBe("By 1 AI agent");
   });
 
   it("splits failing checks from passing ones and folds the passing", async () => {

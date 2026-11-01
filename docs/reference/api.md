@@ -286,10 +286,10 @@ Accounts holding `instance.view` also get:
   cards. `masterKey.file` compares the key file on disk with the key the
   server loaded at startup (`matches`, `changed`, `missing`, or
   `unreadable`). `disk` is `null` where free space can't be read.
-- `activity`: the last 24 hours in hourly buckets: secret reads, failed
-  sign-ins, requests refused by the sign-in rate limits, and live browser and
-  CLI sessions. The rate-limit count lives in memory and starts again when
-  the server restarts.
+- `activity`: the last 24 hours in hourly buckets: secret reads (with how
+  many runner tokens, people and AI agents read), failed sign-ins, requests
+  refused by the sign-in rate limits, and live browser and CLI sessions. The
+  rate-limit count lives in memory and starts again when the server restarts.
 
 With the opt-in `update_check` setting on (`DOPBASE_UPDATE_CHECK=true`), the
 server asks GitHub for the latest release and adds a `version.latest` check
