@@ -10,3 +10,5 @@ package.dev.json
 target/
 .claude/
 .vscode/
+.playwright-mcp
+app/docs
