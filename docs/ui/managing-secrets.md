@@ -36,9 +36,9 @@ keys with their versions, all ticked. Untick what doesn't belong and choose
 **Copy**. Keys the environment already has are left alone. The same box for a
 `.env` file and the import command sit underneath.
 
-Someone who can see the environment but not write to it is told so, with
-**See who has access** to find a project manager on the project's **Access**
-tab.
+Someone who can see the environment but not write to it is told so and sent
+to a project manager. If they can open the project's **Access** tab, **See who
+has access** takes them there to find one.
 
 ## Set and delete
 

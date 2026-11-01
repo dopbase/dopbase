@@ -128,7 +128,7 @@ import SecretsPanel from "./SecretsPanel.vue";
 
 let app: ReturnType<typeof createApp> | null = null;
 
-function render(level?: Level) {
+function render(level?: Level, canOpenAccess = false) {
   const host = document.createElement("div");
   document.body.append(host);
   app = createApp({
@@ -139,6 +139,7 @@ function render(level?: Level) {
         environmentNames: ["dev", "production"],
         projectName: "payments",
         level,
+        canOpenAccess,
       }),
   });
   app.mount(host);
@@ -444,7 +445,7 @@ describe("SecretsPanel empty environment", () => {
   });
 
   it("tells a reader why they can't add secrets and where to ask", async () => {
-    render("read");
+    render("read", true);
     await nextTick();
 
     expect(document.querySelector('[data-testid="first-run"]')).toBeNull();
@@ -460,5 +461,18 @@ describe("SecretsPanel empty environment", () => {
       name: "project-access",
       params: { projectRef: "payments" },
     });
+  });
+
+  it("offers no Access link to a reader who can't open the Access tab", async () => {
+    render("read");
+    await nextTick();
+
+    const state = document.querySelector(
+      '[data-testid="secrets-read-only-empty"]',
+    );
+    expect(state?.textContent).toContain(
+      "A project manager of payments can add them",
+    );
+    expect(button("See who has access")).toBeUndefined();
   });
 });

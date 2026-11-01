@@ -70,6 +70,8 @@ const props = defineProps<{
   environmentNames: string[];
   /** Your level here. Without one, every action shows. */
   level?: Level;
+  /** Whether you can open the project's Access tab. */
+  canOpenAccess?: boolean;
 }>();
 
 // The server checks every action; this only hides what would be refused.
@@ -463,7 +465,7 @@ async function confirmDelete(): Promise<void> {
           <span class="font-mono">{{ projectName }}</span> can add them or
           change your access.
         </p>
-        <DbButton class="mt-1" @click="openProjectAccess">
+        <DbButton v-if="canOpenAccess" class="mt-1" @click="openProjectAccess">
           <ShieldIcon class="h-4 w-4" />
           See who has access
         </DbButton>

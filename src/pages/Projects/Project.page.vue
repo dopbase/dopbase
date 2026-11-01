@@ -183,7 +183,8 @@ useSingleKeyShortcut("e", () => contextBar.value?.openEnvironmentMenu());
             :environment-name="environment.name"
             :environment-names="environmentNames"
             :project-name="projectName"
-            :level="environment.level" />
+            :level="environment.level"
+            :can-open-access="tabs.some((tab) => tab.key === 'access')" />
         </div>
 
         <ComparePanel
