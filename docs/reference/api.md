@@ -31,6 +31,7 @@ in your installed version.
 | Environments                                       | `/api/v1/environments`                               |
 | Secrets, import, export, and runtime values        | `/api/v1/environments/{id}/secrets`                  |
 | Comparing environments, copying a value across     | `/api/v1/environments/{id}/compare`                  |
+| Copying keys from another environment              | `/api/v1/environments/{id}/copy-secrets`             |
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
@@ -93,6 +94,30 @@ Successful previews record `secret.import_previewed` with the actor,
 project/environment, mode, and submitted entry count. They do not change
 secrets, versions, or layout. If the audit event cannot be saved, the server
 returns an error without the comparison results.
+
+## Copying keys between environments
+
+`POST /api/v1/environments/{id}/copy-secrets` with
+`{ "from": "env_918201", "keys": ["API_KEY", "DATABASE_URL"], "values": false }`
+creates those keys in this environment from another one in the same project,
+in one transaction. Without `values`, or with `false`, each key starts with an
+empty value and Names only on the source is enough. With `values: true` each
+key gets the source's current value, copied on the server and never returned,
+which needs Read on the source. Writing needs Write here. Keys this
+environment already has are skipped, never overwritten. The response lists
+`copiedKeys` and `skippedKeys`.
+
+It is refused, without writing anything, with:
+
+| Status | Code                    | Meaning                                                    |
+| ------ | ----------------------- | ---------------------------------------------------------- |
+| `404`  | `SECRET_NOT_FOUND`      | A key does not exist in the source                         |
+| `422`  | `COPY_KEYS_REQUIRED`    | `keys` is empty                                            |
+| `422`  | `COPY_SOURCE_INVALID`   | The source is this environment or in another project       |
+| `422`  | `SECRET_LIMIT_EXCEEDED` | The copy would pass the environment's secret or size limit |
+
+Environment responses include `secretCount`, the number of secrets the
+environment holds.
 
 ## Secret versions
 

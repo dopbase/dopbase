@@ -9,20 +9,20 @@ Audit records answer who performed a sensitive action, where it happened, and wh
 
 ## Audit events in {{version}}
 
-| Area                  | Events                                                                                                                                                                                                                                              |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Secrets               | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.version_revealed`, `secret.rolled_back`, `secret.imported`, `secret.import_previewed`, `secret.exported`, `secret.runtime_accessed`, `secret.copied`               |
-| Projects              | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                                                                                                                      |
-| Environments          | `environment.created`, `environment.renamed`, `environment.deleted`, `environment.protected`, `environment.unprotected`                                                                                                                             |
-| Runner tokens         | `token.created`, `token.revoked`                                                                                                                                                                                                                    |
-| Authentication        | `login.succeeded`, `login.failed`, `logout.succeeded`, `cli_login.approved`, `cli_login.denied`                                                                                                                                                     |
-| Single sign-on        | `sso_provider.created`, `sso_provider.updated`, `sso_provider.verified`, `sso_provider.enabled`, `sso_provider.disabled`, `sso_provider.deleted`, `sso_provider.policy_changed`, `sso_identity.linked`, `sso_identity.unlinked`, `sso_login.failed` |
-| Administrator & users | `admin.bootstrapped`, `admin.created`, `admin.updated`, `admin.deleted`, `admin.reauthenticated`, `admin.password_changed`, `user.disabled`, `user.enabled`                                                                                         |
-| Access                | `grant.set`, `grant.removed`, `group.created`, `group.updated`, `group.deleted`, `group_member.added`, `group_member.removed`                                                                                                                       |
-| Roles                 | `role.created`, `role.updated`, `role.deleted`                                                                                                                                                                                                      |
-| Personal tokens       | `personal_token.created`, `personal_token.revoked`                                                                                                                                                                                                  |
-| Backups               | `backup.created`, `backup.downloaded`, `backup.uploaded`, `backup.restored`, `backup.deleted`, `master_key.downloaded`, `backup.restored_bootstrap`                                                                                                 |
-| Audit log             | `audit.pruned`                                                                                                                                                                                                                                      |
+| Area                  | Events                                                                                                                                                                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secrets               | `secret.created`, `secret.updated`, `secret.deleted`, `secret.revealed`, `secret.version_revealed`, `secret.rolled_back`, `secret.imported`, `secret.import_previewed`, `secret.exported`, `secret.runtime_accessed`, `secret.copied`, `secret.bulk_copied` |
+| Projects              | `project.created`, `project.renamed`, `project.deleted`, `project.initialized`                                                                                                                                                                              |
+| Environments          | `environment.created`, `environment.renamed`, `environment.deleted`, `environment.protected`, `environment.unprotected`                                                                                                                                     |
+| Runner tokens         | `token.created`, `token.revoked`                                                                                                                                                                                                                            |
+| Authentication        | `login.succeeded`, `login.failed`, `logout.succeeded`, `cli_login.approved`, `cli_login.denied`                                                                                                                                                             |
+| Single sign-on        | `sso_provider.created`, `sso_provider.updated`, `sso_provider.verified`, `sso_provider.enabled`, `sso_provider.disabled`, `sso_provider.deleted`, `sso_provider.policy_changed`, `sso_identity.linked`, `sso_identity.unlinked`, `sso_login.failed`         |
+| Administrator & users | `admin.bootstrapped`, `admin.created`, `admin.updated`, `admin.deleted`, `admin.reauthenticated`, `admin.password_changed`, `user.disabled`, `user.enabled`                                                                                                 |
+| Access                | `grant.set`, `grant.removed`, `group.created`, `group.updated`, `group.deleted`, `group_member.added`, `group_member.removed`                                                                                                                               |
+| Roles                 | `role.created`, `role.updated`, `role.deleted`                                                                                                                                                                                                              |
+| Personal tokens       | `personal_token.created`, `personal_token.revoked`                                                                                                                                                                                                          |
+| Backups               | `backup.created`, `backup.downloaded`, `backup.uploaded`, `backup.restored`, `backup.deleted`, `master_key.downloaded`, `backup.restored_bootstrap`                                                                                                         |
+| Audit log             | `audit.pruned`                                                                                                                                                                                                                                              |
 
 A successful login records `login.succeeded` with the session kind and, for
 single sign-on and browser CLI logins, a `method` of `sso` or `browser`.
@@ -48,6 +48,12 @@ target environment, with the key, the new `version`, `fromEnvironmentId` and
 `fromVersion`. It stores no value. Comparing environments is not audited, the
 same as listing secrets: it needs Read on both environments and returns only
 whether values match.
+
+Copying several keys from another environment at once records one
+`secret.bulk_copied` event on the target environment. Its metadata has
+`fromEnvironmentId`, `values` (whether values came along), `copied` (each
+created key with the source version it came from), and `skipped` (keys the
+target already had). It stores no value.
 
 Revealing an earlier version records `secret.version_revealed` with the key
 and version. A rollback records `secret.rolled_back` with the key, the

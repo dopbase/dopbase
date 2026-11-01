@@ -117,7 +117,7 @@ When initializing a brand-new Dopbase instance, start the existing web setup
 listener with `dopbase server setup --web`. It prints a setup link and token.
 
 1. Open the setup link in your browser.
-2. Switch to **Restore from backup**.
+2. Switch to **Restore a backup**.
 3. Enter the one-time setup token printed by the server.
 4. Choose your `.dop` backup file.
 5. If migrating from another server, give its master key: the `master.key`

@@ -30,10 +30,10 @@ A row's **⋯** menu has **Rename**, **Add members**, **Give access**, and
 - **Members** lists who's in the group, their role, and who added them and
   when. Choose **Add members**, tick any number of people, and confirm. A member's **⋯** menu opens their page or takes them out of the
   group. Root never joins groups, because root already reaches everything.
-- **Access** lists the group's grants. Choose **Give access** to give it a
-  project or one environment, or use a row's **⋯** menu to change the level or
-  remove it. The same grants show as **via** the group on each member's
-  Access tab.
+- **Access** lists the group's grants. **Give access** opens the page
+  described in [Users](./users.md#giving-access), and a row's **⋯** menu
+  changes the level or removes it. Tick several rows to remove them together.
+  The same grants show as **via** the group on each member's Access tab.
 - **Danger zone** deletes the group.
 
 To change a group's access, you must manage the project involved. Once root
