@@ -106,6 +106,19 @@ describe("ContextBar", () => {
     ).toContain("dev");
   });
 
+  it("shows the open environment's ID next to the switchers", () => {
+    const host = mountBar();
+
+    const ids = host.querySelectorAll('[data-testid="environment-id"]');
+    // One chip sits in the breadcrumb, the other in the phone row; CSS
+    // shows one of them.
+    expect(ids).toHaveLength(2);
+    expect(host.querySelector("nav")?.textContent).toContain("env_1");
+    expect(
+      host.querySelector('[data-testid="context-actions"]')?.textContent,
+    ).toContain("env_1");
+  });
+
   it("offers New environment from the switcher", async () => {
     const host = mountBar();
     host
@@ -118,6 +131,76 @@ describe("ContextBar", () => {
       .click();
 
     expect(onNewEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it("says No environments in a project without any", async () => {
+    const host = mount(ContextBar, {
+      projectName: "payments",
+      projectId: "prj_1",
+      projects: [payments],
+      environments: [],
+      environment: null,
+      meter: null,
+      showRun: false,
+      canCreateEnvironment: true,
+      onNewEnvironment,
+    });
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-testid="environment-switcher"]',
+    )!;
+    expect(trigger.textContent).toContain("No environments");
+    expect(host.querySelector('[data-testid="run-open"]')).toBeNull();
+
+    trigger.click();
+    await nextTick();
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="new-environment"]')!
+      .click();
+
+    expect(onNewEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it("opens New environment straight away on phones when there are none", async () => {
+    narrow.value = true;
+    const host = mount(ContextBar, {
+      projectName: "payments",
+      projectId: "prj_1",
+      projects: [payments],
+      environments: [],
+      environment: null,
+      meter: null,
+      showRun: false,
+      canCreateEnvironment: true,
+      onNewEnvironment,
+    });
+
+    host
+      .querySelector<HTMLButtonElement>('[data-testid="environment-switcher"]')!
+      .click();
+    await nextTick();
+
+    expect(document.querySelector('[data-testid="switcher-sheet"]')).toBeNull();
+    expect(onNewEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it("shows No environments as plain text to people who can't add one", () => {
+    const host = mount(ContextBar, {
+      projectName: "payments",
+      projectId: "prj_1",
+      projects: [payments],
+      environments: [],
+      environment: null,
+      meter: null,
+      showRun: false,
+      canCreateEnvironment: false,
+    });
+
+    expect(
+      host.querySelector('[data-testid="no-environments"]')?.textContent,
+    ).toContain("No environments");
+    expect(
+      host.querySelector('[data-testid="environment-switcher"]'),
+    ).toBeNull();
   });
 
   it("offers New environment under the list on phones", async () => {

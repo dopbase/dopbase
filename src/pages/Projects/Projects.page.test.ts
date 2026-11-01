@@ -135,6 +135,26 @@ describe("Projects page", () => {
     expect(tree?.textContent).toContain("protected");
     expect(tree?.textContent).toContain("Names only");
     expect(tree?.textContent).toContain("Show all 8 environments");
+    expect(tree?.textContent).toContain("Environment ID");
+    expect(
+      tree?.querySelector('[data-testid="environment-id"]')?.textContent,
+    ).toContain("env_1");
+  });
+
+  it("copies an environment's ID without opening it", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const host = mountPage();
+
+    host
+      .querySelector<HTMLButtonElement>('[data-testid="environment-id"]')!
+      .click();
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("env_1"));
+    expect(controller.openEnvironment).not.toHaveBeenCalled();
   });
 
   it("opens an environment from its row", () => {

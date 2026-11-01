@@ -16,12 +16,13 @@ import {
 } from "~/assets/icons";
 import { DbLevelBadge, DbMenu, DbMenuItem } from "~/components/ui";
 import type { Environment, Project } from "~/services";
+import EnvironmentId from "./EnvironmentId.vue";
 
 /**
  * ProjectTree — projects as folders that open like an accordion, with
  * their environments nested inside. Renders the rows the controller built
  * and reports what was clicked. A project row only names the project and
- * counts its environments; access and dates live on environment rows.
+ * counts its environments; IDs, access and dates live on environment rows.
  */
 defineProps<{
   rows: ProjectRow[];
@@ -56,8 +57,9 @@ const envLabel = (row: EnvironmentRow): string =>
       class="hidden h-[34px] items-center gap-4 border-b border-line-soft bg-panel pl-[34px] pr-3 text-sm font-medium leading-5 text-ink-muted sm:flex"
       aria-hidden="true">
       <span class="min-w-0 flex-1">Project / environment</span>
-      <span class="w-[190px] shrink-0">Your access</span>
-      <span class="hidden w-[110px] shrink-0 md:block">Updated</span>
+      <span class="hidden w-[110px] shrink-0 xl:block"> Environment ID </span>
+      <span class="w-[140px] shrink-0">Your access</span>
+      <span class="hidden w-[72px] shrink-0 md:block">Updated</span>
       <span class="w-8 shrink-0" />
     </div>
 
@@ -162,11 +164,16 @@ const envLabel = (row: EnvironmentRow): string =>
                 <ChevronRightIcon class="h-3.5 w-3.5" />
               </span>
             </RouterLink>
-            <span class="hidden w-[190px] shrink-0 sm:block">
+            <!-- Only from xl: below it the column squeezes names to nothing.
+                 The context bar shows the ID once the environment is open. -->
+            <span class="hidden w-[104px] shrink-0 xl:flex">
+              <EnvironmentId :id="env.environment.id" />
+            </span>
+            <span class="hidden w-[140px] shrink-0 sm:flex">
               <DbLevelBadge v-if="env.meter" v-bind="env.meter" />
             </span>
             <span
-              class="hidden w-[110px] shrink-0 text-sm leading-[22px] text-ink md:block">
+              class="hidden w-[72px] shrink-0 text-sm leading-5.5 text-ink md:block">
               {{ env.updated }}
             </span>
             <DbMenu
