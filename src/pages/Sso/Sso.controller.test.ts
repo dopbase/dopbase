@@ -264,11 +264,15 @@ describe("useSsoController", () => {
 
   describe("summary and danger cards", () => {
     it.each([
-      ["untested", {}, "Run a test sign-in before you turn it on."],
+      [
+        "untested",
+        {},
+        "Saved. Run a test sign-in as root before you turn it on. Nobody else sees a change yet.",
+      ],
       [
         "off after a good test",
         { verifiedAt: "2026-10-24T10:05:00Z" },
-        "Provider is off. The last test sign-in worked, so you can turn it on.",
+        "The last test sign-in worked, so you can turn it on.",
       ],
       [
         "on with one linked person",
@@ -277,7 +281,7 @@ describe("useSsoController", () => {
           verifiedAt: "2026-10-24T10:05:00Z",
           linkedAccounts: 1,
         },
-        "Provider is on. 1 person has linked their account.",
+        "1 person has linked their account.",
       ],
       [
         "on with several linked people",
@@ -286,7 +290,7 @@ describe("useSsoController", () => {
           verifiedAt: "2026-10-24T10:05:00Z",
           linkedAccounts: 4,
         },
-        "Provider is on. 4 people have linked their account.",
+        "4 people have linked their account.",
       ],
     ] as const)(
       "says where setup stands when %s",
@@ -318,10 +322,12 @@ describe("useSsoController", () => {
       );
     });
 
-    it("has nothing to summarise before a provider is saved", async () => {
+    it("points to the form before a provider is saved", async () => {
       const c = await mounted(empty);
       expect(c.providerName.value).toBe("");
-      expect(c.providerSummary.value).toBe("");
+      expect(c.providerSummary.value).toBe(
+        "Fill in the provider below and save. Then run a test sign-in before you turn it on.",
+      );
     });
   });
 });
