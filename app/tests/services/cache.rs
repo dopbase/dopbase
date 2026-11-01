@@ -93,3 +93,17 @@ async fn new_keys_are_refused_once_locked_buckets_fill_the_hard_cap() {
   limiter.clear("locked-0").await;
   assert!(limiter.check("newcomer").await);
 }
+
+#[tokio::test]
+async fn refused_checks_are_counted_by_hour_for_a_day() {
+  let limiter = RateLimiter::default();
+  assert_eq!(limiter.refusals_by_hour(), vec![0; 24]);
+  fail(&limiter, "login:victim@lab.invalid", 5).await;
+  assert!(limiter.check("login:other@lab.invalid").await);
+  assert!(!limiter.check("login:victim@lab.invalid").await);
+  assert!(!limiter.check("login:victim@lab.invalid").await);
+  let refusals = limiter.refusals_by_hour();
+  assert_eq!(refusals.len(), 24);
+  assert_eq!(refusals[23], 2);
+  assert_eq!(refusals.iter().sum::<u64>(), 2);
+}
