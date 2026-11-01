@@ -279,6 +279,20 @@ describe("useAccessGrantsPanel", () => {
     expect(changed).toHaveBeenCalledOnce();
   });
 
+  it("closes the confirm when every grant went but the reload fails", async () => {
+    vi.mocked(accessApi.removeGrant).mockResolvedValue();
+    const changed = vi.fn().mockRejectedValue(new Error("offline"));
+    const { panel: p } = panel([direct, prodOverride], maya, changed);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    await expect(p.confirmRemove()).resolves.toBeUndefined();
+    expect(p.removing.value).toBeNull();
+    expect(p.removeError.value).toBeNull();
+    expect(p.removeBusy.value).toBe(false);
+    expect(p.selectedRows.value).toEqual([]);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
   it("says how far it got and keeps the rest when one removal fails", async () => {
     vi.mocked(accessApi.removeGrant)
       .mockResolvedValueOnce()

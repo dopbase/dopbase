@@ -246,6 +246,18 @@ export function useAccessGrantsPanel(
       : `${who} loses access to ${formatList(list.map(rowLabel))} on their next request. Other grants they hold stay.`;
   });
 
+  /**
+   * Tells the page to reload. The page reports its own reload errors, and a
+   * failed reload says nothing about whether the removal worked.
+   */
+  async function reload(): Promise<void> {
+    try {
+      await changed();
+    } catch {
+      // Already reported by the page, if at all.
+    }
+  }
+
   async function confirmRemove(): Promise<void> {
     const todo = removing.value;
     if (!todo || todo.length === 0) return;
@@ -261,10 +273,6 @@ export function useAccessGrantsPanel(
           done += 1;
         }
       });
-      const gone = todo.map((row) => row.grant.id);
-      selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
-      removing.value = null;
-      await changed();
     } catch (cause) {
       // Cancelling the sign-in prompt says nothing unless some went already.
       const aborted =
@@ -284,10 +292,16 @@ export function useAccessGrantsPanel(
       removeError.value = aborted
         ? `Removed ${done} of ${todo.length}. Confirm again to remove the rest.`
         : `Removed ${done} of ${todo.length}. ${rowLabel(todo[done]!)} failed: ${errorMessage(cause, "Could not remove that access.")}`;
-      await Promise.resolve(changed()).catch(() => undefined);
+      await reload();
+      return;
     } finally {
       removeBusy.value = false;
     }
+    // Every grant is gone, so the confirm closes whatever the reload does.
+    const gone = todo.map((row) => row.grant.id);
+    selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
+    removing.value = null;
+    await reload();
   }
 
   return {
