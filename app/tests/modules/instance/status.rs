@@ -388,6 +388,42 @@ async fn checks_and_activity_need_instance_view() {
 }
 
 #[tokio::test]
+async fn only_viewers_who_get_the_checks_walk_the_audit_chain() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = with_role(&router, &root, "member@example.com", "rol_member").await;
+  // Nothing is cached yet, so a walk here would fill the cache.
+  status(&router, &member).await;
+
+  sqlx::query("DROP TRIGGER audit_events_sealed_immutable")
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  sqlx::query(
+    "UPDATE audit_events SET metadata = '{\"tampered\":true}' WHERE seq = (SELECT MIN(seq) FROM audit_events)",
+  )
+  .execute(state.db.pool())
+  .await
+  .unwrap();
+  // Root's read walks the chain for the first time and sees the change.
+  let data = status(&router, &root).await;
+  assert_eq!(check(&data, "audit.chain")["status"], "crit");
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn reads_that_find_no_cached_audit_result_share_one_walk() {
+  let (_dir, state, _router) = test_app().await;
+  let pool = state.db.pool();
+  let (first, second) = tokio::join!(state.status.audit(pool), state.status.audit(pool));
+  assert_eq!(first.checked_at, second.checked_at);
+  // Run checks still walks again.
+  let forced = state.status.refresh(pool).await;
+  assert!(forced.checked_at > first.checked_at);
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn run_checks_rewalks_the_cached_audit_chain_once_per_interval() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;

@@ -43,8 +43,7 @@ pub async fn public_status(
   identity: &AuthIdentity,
 ) -> Result<super::model::StatusResponse, HttpError> {
   require_metadata_access(identity)?;
-  let audit = state.status.audit(state.db.pool()).await;
-  Ok(build_status(state, identity, &audit).await)
+  Ok(build_status(state, identity, AuditRead::Cached).await)
 }
 
 /// Run every check now, including the audit chain walk the page otherwise
@@ -63,14 +62,19 @@ pub async fn run_checks(
       "Checks just ran. Wait a few seconds and try again.",
     ));
   }
-  let audit = state.status.refresh(state.db.pool()).await;
-  Ok(build_status(state, identity, &audit).await)
+  Ok(build_status(state, identity, AuditRead::Fresh).await)
+}
+
+/// Where the audit chain result comes from.
+enum AuditRead {
+  Cached,
+  Fresh,
 }
 
 async fn build_status(
   state: &AppState,
   identity: &AuthIdentity,
-  audit: &crate::services::status::AuditCheck,
+  audit: AuditRead,
 ) -> super::model::StatusResponse {
   let pool = state.db.pool();
   // A failed count is reported as null; it never fails the response.
@@ -117,6 +121,11 @@ async fn build_status(
     .unwrap_or(0);
   let (summary, checks, health, activity, latest_release) = match identity {
     AuthIdentity::Admin { access, .. } if access.has(Capability::InstanceView) => {
+      // Only viewers who get the checks back pay for the chain walk.
+      let audit = match audit {
+        AuditRead::Cached => state.status.audit(pool).await,
+        AuditRead::Fresh => state.status.refresh(pool).await,
+      };
       let viewer = super::checks::Viewer {
         token_names: access.has(Capability::TokensRevokeOthers),
         sign_in_details: access.has(Capability::AuditRead),
@@ -131,7 +140,7 @@ async fn build_status(
       } else {
         None
       };
-      let report = super::checks::run(state, audit, release.as_ref(), &viewer).await;
+      let report = super::checks::run(state, &audit, release.as_ref(), &viewer).await;
       let latest_release =
         release
           .and_then(|release| release.last)

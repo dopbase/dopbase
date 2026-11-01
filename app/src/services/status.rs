@@ -69,6 +69,9 @@ pub struct ReleaseState {
 #[derive(Clone)]
 pub struct StatusMonitor {
   inner: Arc<Mutex<State>>,
+  /// Held for the length of an audit chain walk, so only one runs at a time
+  /// and `inner` stays free for everything else meanwhile.
+  walk: Arc<Mutex<()>>,
   release_url: Arc<std::sync::RwLock<String>>,
 }
 
@@ -76,6 +79,7 @@ impl Default for StatusMonitor {
   fn default() -> Self {
     Self {
       inner: Arc::default(),
+      walk: Arc::default(),
       release_url: Arc::new(std::sync::RwLock::new(RELEASE_API_URL.to_owned())),
     }
   }
@@ -91,30 +95,49 @@ struct State {
 
 impl StatusMonitor {
   /// The cached audit chain result, verified now when there is none or it
-  /// is older than [`AUDIT_CHECK_INTERVAL`].
+  /// is older than [`AUDIT_CHECK_INTERVAL`]. While another request is
+  /// already walking the chain, an older result is returned rather than
+  /// waiting for it; with no result yet, this waits and shares that walk.
   pub async fn audit(
     &self,
     pool: &SqlitePool,
   ) -> AuditCheck {
-    let mut state = self.inner.lock().await;
-    match &state.audit {
-      Some(check) if check.ran.elapsed() < AUDIT_CHECK_INTERVAL => check.clone(),
-      _ => {
-        let check = verify(pool).await;
-        state.audit = Some(check.clone());
-        check
-      }
+    let cached = self.inner.lock().await.audit.clone();
+    if let Some(check) = &cached
+      && check.ran.elapsed() < AUDIT_CHECK_INTERVAL
+    {
+      return check.clone();
     }
+    let _walk = match (self.walk.try_lock(), cached) {
+      (Ok(walk), _) => walk,
+      (Err(_), Some(stale)) => return stale,
+      (Err(_), None) => self.walk.lock().await,
+    };
+    // The walk that held the lock may have just stored a fresh result.
+    if let Some(check) = &self.inner.lock().await.audit
+      && check.ran.elapsed() < AUDIT_CHECK_INTERVAL
+    {
+      return check.clone();
+    }
+    self.store(verify(pool).await).await
   }
 
-  /// Verify the audit chain now and keep the result.
+  /// Verify the audit chain now and keep the result. Waits for a walk that
+  /// is already running, then walks again, so the answer reflects the log
+  /// as it is now.
   pub async fn refresh(
     &self,
     pool: &SqlitePool,
   ) -> AuditCheck {
-    let mut state = self.inner.lock().await;
-    let check = verify(pool).await;
-    state.audit = Some(check.clone());
+    let _walk = self.walk.lock().await;
+    self.store(verify(pool).await).await
+  }
+
+  async fn store(
+    &self,
+    check: AuditCheck,
+  ) -> AuditCheck {
+    self.inner.lock().await.audit = Some(check.clone());
     check
   }
 
