@@ -6,432 +6,140 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
-- Access per project and environment. Accounts now point to a row in the new
-  `roles` table instead of a fixed role name. A role holds capabilities, such
-  as `users.manage` or `audit.read`, and a ceiling on the access its grants
-  can give. Admin, Member, Auditor, and AI agent are built in. Root is a flag
-  on the account and holds every capability. Grants give a user or a group one
-  level (`metadata`, `read`, `write`, `manage`, or `project_manager`) on all
-  projects, one project, or one environment. A grant on an environment
-  overrides one on its project, and `none` on an environment cuts it out of a
-  project grant. `GET /api/v1/auth/session` reports `roleName`,
-  `capabilities`, and `maxLevel`, and backups include the new tables.
-- A project's **Access** page, opened from the shield next to it, lists who
-  reaches the project and lets its project managers give or remove access
-  for users and groups. The `PUT /api/v1/grants`,
-  `DELETE /api/v1/grants/{id}`, `GET /api/v1/projects/{ref}/access`, and
-  `GET /api/v1/users/{id}/access` endpoints back it, and the Users page shows
-  where each person's access comes from.
-- Groups. The new **Groups** page creates groups and adds or removes members,
-  and a grant to a group reaches everyone in it. Leaving a group takes its
-  access away on the next request.
-- Personal tokens (`dpp_`). A token acts as its account from a script or an
-  AI agent on another machine. It reaches at most what the account reaches
-  right now, within its own project or environment and level (`metadata`,
-  `read`, or `write`), and always expires within the role's limit. Create
-  them on the Account page, with `dopbase token personal create`, or through
-  `POST /api/v1/users/me/tokens`, and use them as `DOPBASE_TOKEN`.
-- Custom roles. Root creates them on the new **Roles** page or with
-  `POST /api/v1/roles`: pick capabilities, how deep into project data holders
-  reach, and what their personal tokens may do. A Viewer that reads values
-  but never changes them, or a token-only role for CI bots, needs no code.
-  Built-in roles never change. People are given a role by its id
-  (`roleId` on `POST` and `PATCH /api/v1/users`), and only roles within your
-  own can be given. User responses add `roleId` and `roleName`.
-- Audit tokens. The Auditor role's personal tokens read the audit log and no
-  project data, for a SIEM or another log collector. Create one on the
-  Account page or with `dopbase token personal create --audit`.
-- `dopbase access` shows what you, or the token in `DOPBASE_TOKEN`, can reach
-  and where it comes from. `dopbase access --project <ref>` lists who reaches
-  a project.
-- Protected environments. Turn protection on from the Access page or with
-  `PATCH /api/v1/environments/{id}` and `{"protected": true}`, and a project
-  grant below project manager stops reaching the environment. Only a grant
-  on the environment itself or a project manager gets in.
-
-- A **Compare** tab on the project page lines up the open environment's keys
-  with others in the project. The environment in the switcher is the base, so
-  switching to staging re-bases the comparison on staging. It starts with one
-  other environment; **Add environment** adds up to three and goes away at
-  three. Each cell says Same, Differs, Not set or Set, with the version, and
-  never shows a value. Clicking a Not set cell fills it: match another
-  environment's value, copied on the server, or type its own. A note above
-  the table says set values can't be seen or changed here, and links to
-  **Secrets**.
-- Environment IDs in the console. The project bar shows the open
-  environment's ID (`env_918204`) after the switchers. The Projects tree has
-  an **Environment ID** column on screens 1280px and wider, and the
-  environments table on a project's **Settings** tab has an **ID** column on
-  screens 768px and wider. Click an ID
-  to copy it, then use it in place of `project/environment`, as in
-  `dopbase run env_918204 -- npm start`. If the browser blocks the
-  clipboard, the ID is selected for a manual copy.
-- New endpoints behind Compare. `GET /api/v1/environments/{id}/compare`
-  takes `with`, up to three environment ids, and returns each key's version
-  per environment and whether its value matches the base. Values are compared
-  only where you have Read on both. Matching goes through
-  `POST /api/v1/environments/{id}/secrets/{key}/copy`, which copies another
-  environment's value on the server, needs Read on the source and Write on
-  the target, and records `secret.copied`.
-- `POST /api/v1/environments/{id}/copy-secrets` creates a list of keys from
-  another environment in the same project in one transaction, and records one
-  `secret.bulk_copied` event. Without `values` each key starts empty and Names
-  only on the source is enough; with `values: true` the values are copied on
-  the server, which needs Read on the source. Keys the target already has are
-  skipped. Environment responses now include `secretCount`.
-
-- An **AI agents** page lists token-only accounts for bots and CI, with each
-  agent's owner, how far it reaches, and whether its token is active, about to
-  expire, or missing. An agent's own page has **Access**, **Tokens**, and
-  **Danger zone** tabs, **Activity** for its audit events, and **Transfer
-  owner**. **New token** replaces the agent's live token in one step, and the
-  copy dialog shows a `dopbase run` line for where the new token reaches.
-  `POST /api/v1/users/{id}/tokens` takes `"replaceExisting": true` for this;
-  it is refused with `TOKEN_REPLACE_INVALID` for anyone but an AI agent.
-- Each person has their own page with **Overview**, **Access**, **Groups**,
-  **Tokens**, and **Danger zone** tabs. Access shows where every grant comes
-  from, direct or through a group, lists each environment whose own grant
-  overrides the project grant with both levels side by side (or **No access**
-  when it's blocked), and gives, changes, or removes access from there. The
-  same **Give access** flow is used for people, AI agents, and groups.
-- Disable an account without deleting it. Disabling signs the person out
-  everywhere and stops their tokens; **Turn account back on** restores the
-  access they had. `POST /api/v1/users/{id}/disable` and `/enable` back it,
-  audited as `user.disabled` and `user.enabled`. User responses add `status`,
-  `lastSignInAt`, and `groups`, and the Users table shows how each person
-  signs in and when they last did.
-- Each group has its own page with **Members**, **Access**, and **Danger
-  zone** tabs. **Add members** adds several people at once, and each member
-  shows who added them and when. `GET /api/v1/groups` now returns each group's
-  members and grants, groups carry `createdBy`, and members carry `addedBy`.
-- A role editor at **Roles › New role** groups capabilities under People,
-  Projects, Audit, Tokens, and Instance, and sets how far holders reach, what
-  their personal tokens can do, and how holders sign in. Built-in roles open
-  read only, and **Duplicate** starts a custom role from any role.
-
-- Setup asks root to save a recovery kit before the console opens. Right
-  after the root account is created, it shows the master key (hidden until
-  you choose to show it), downloads a text kit with the key, the server's
-  address and the restore steps, and keeps **Continue** off until you confirm
-  the kit is stored outside the server. Root can download the key again from
-  **Status**.
-- The CLI approval page says who is asking before you approve: the machine,
-  the client (for example `dopbase 0.2.0 on macOS`), the address, when it was
-  requested, and a countdown to expiry, beside a mirror of what the terminal
-  should show. **It doesn't match** denies it, and an expired request says how
-  to get a new code. `dopbase login --browser` now sends `client`, and
-  `POST /api/v1/auth/cli/inspect` returns `client` and `sessionDays`.
-- A wrong password now says how many tries are left before a 15-minute pause,
-  and the pause says how long to wait. The wording is the same for an unknown
-  email, so the sign-in page still doesn't reveal who has an account.
-- The audit log opens an event's details in a side panel: actor, credential,
-  where, resource, address, the event as JSON, and whether the hash chain
-  checks out up to that event. **Verify chain** checks the whole log.
-- **Forgot password?** on the sign-in page explains who can help: an admin
-  from Users, or root on the server with `dopbase admin reset-password`.
-- `GET /api/v1/users/identities` returns each account's `id` and `email` and
-  nothing else. The audit log's Actor filter uses it now, so it no longer
-  loads every account's groups, role, and sign-in details just to show
-  emails.
-- Health checks on `GET /api/v1/status`. Accounts with `instance.view` get a
-  list of checks, most severe first, each with a status (`crit`, `warn`,
-  `tip`, or `ok`), a reason, and a `fixPath`: database response time and
-  size, whether the master key file still matches the key in use, free disk
-  space, the audit hash chain, backup age and whether the latest backup was
-  downloaded, tokens expiring within 7 days, audit retention, the public URL,
-  HTTPS, API docs, and whether someone besides root can manage the instance.
-  The response also carries `summary`, the readings behind each card in
-  `health`, the last 24 hours of `activity` (secret reads, failed sign-ins,
-  rate-limited requests, live sessions), and `platform`. Nothing runs in the
-  background: the checks run when the status is read, the audit chain walk
-  is reused for up to 10 minutes, and `POST /api/v1/status/checks/run` walks
-  it again on demand.
+- Roles and grants. A role holds capabilities and caps the access its grants
+  can give; Admin, Member, Auditor and AI agent are built in. A grant gives a
+  user or group a level, from `metadata` to `project_manager`, on all
+  projects, one project or one environment. `GET /api/v1/auth/session` adds
+  `roleName`, `capabilities` and `maxLevel`.
+- **Access** tab on the project page lists who reaches the project, and
+  project managers give or remove access there. API: `PUT /api/v1/grants`,
+  `DELETE /api/v1/grants/{id}`, `GET /api/v1/projects/{ref}/access` and
+  `GET /api/v1/users/{id}/access`.
+- **Groups** page. A grant to a group reaches every member, and leaving the
+  group takes that access away on the next request.
+- Personal tokens (`dpp_`) act as their account from a script or an AI agent,
+  limited to a project or environment and a level. Create them on the Account
+  page or with `dopbase token personal create`, then use them as
+  `DOPBASE_TOKEN`.
+- Custom roles on the new **Roles** page or with `POST /api/v1/roles`. Give
+  one with `roleId` on `POST` and `PATCH /api/v1/users`.
+- Audit tokens: Auditor personal tokens that read the audit log and no project
+  data, for a SIEM. Create one with `dopbase token personal create --audit`.
+- `dopbase access` shows what you or `DOPBASE_TOKEN` can reach, and
+  `dopbase access --project <ref>` lists who reaches a project.
+- Protected environments, which a project grant below project manager doesn't
+  reach. Turn protection on from Access or with `{"protected": true}` on
+  `PATCH /api/v1/environments/{id}`.
+- **Compare** tab on the project page shows which keys match, differ or are
+  missing across up to four environments, and fills a missing key from
+  another environment without showing the value. API:
+  `GET /api/v1/environments/{id}/compare` and
+  `POST /api/v1/environments/{id}/secrets/{key}/copy`.
+- Environment IDs in the console. Click one to copy it, then use it in place
+  of `project/environment`, as in `dopbase run env_918204 -- npm start`.
+- **Activity** tab with the audit trail for an environment or its project,
+  linking to the full audit log with the same filters.
+- **Settings** tab where project managers rename the project and protect,
+  rename or delete its environments.
+- **AI agents** page for token-only accounts used by bots and CI, with an
+  owner, **Transfer owner** and **New token**, which replaces the agent's
+  token in one step (`"replaceExisting": true` on
+  `POST /api/v1/users/{id}/tokens`).
+- A page for each person and each group, with tabs for their access, groups
+  or members, and tokens. Access shows where every grant comes from.
+- Disable an account without deleting it: it is signed out and its tokens
+  stop. API: `POST /api/v1/users/{id}/disable` and `/enable`.
+- Setup has root save a recovery kit with the master key before the console
+  opens.
+- The CLI approval page shows the machine, client, address and expiry before
+  you approve, and **It doesn't match** denies the request.
+- A wrong password says how many tries are left before a 15-minute pause.
+- The audit log opens an event in a side panel that shows whether the hash
+  chain checks out up to it. **Verify chain** checks the whole log.
+- **Forgot password?** on the sign-in page says who can reset it.
+- `GET /api/v1/users/identities` returns only each account's `id` and
+  `email`.
+- Health checks on `GET /api/v1/status` for accounts with `instance.view`, and
+  `POST /api/v1/status/checks/run` to run them now.
 - `update_check` in `server.toml` (or `DOPBASE_UPDATE_CHECK=true`) lets the
-  server ask GitHub for the latest release when the Status page is open, at
-  most once a day, so the page can say when a newer Dopbase is out. It is off
-  by default, and the server makes no outbound calls while it is off. A
-  failed lookup keeps the last answer.
+  Status page say when a newer release is out. It is off by default.
 
 ### Changed
 
-- The Status page is rebuilt around the health checks. A banner sums up what
-  needs attention, or says everything looks good, and turns red when the
-  master key file no longer matches the key in use. Database, Master key,
-  Disk, and Audit log cards sit beside a **Last 24 hours** card. **Needs
-  attention** lists failing checks with a button that fixes each one, hidden
-  when you couldn't use it, and folds the passing checks behind **Show all**.
-  **Run checks** runs everything now, **Copy diagnostics** copies a
-  plain-text report, and the page refreshes every 30 seconds, keeping the
-  last results if a refresh fails. The factory reset steps start folded
-  behind **Show reset steps**. Root downloads the master key from Backups, or
-  from Status when the key file changed.
-- `GET /api/v1/status` no longer returns `databaseHealth` and
-  `keyAvailability`, which were always `healthy` and `available`. A failed
-  count now comes back as `null` instead of failing the whole response.
-  `GET /api/v1/instance` reports `keyAvailability` as `changed` or `missing`
-  when the master key file no longer matches the key in use.
+- **Breaking:** Refused admin requests say `Your role does not allow this
+  operation.` instead of `This operation requires an administrator.`
+- **Breaking:** `PATCH /api/v1/environments/{id}` returns
+  `ENVIRONMENT_UPDATED` instead of `ENVIRONMENT_RENAMED`.
+- **Breaking:** New runner token names must be lowercase letters, numbers and
+  single hyphens; others get `TOKEN_NAME_INVALID`. Existing tokens keep theirs.
+- Service accounts are now AI agent accounts. The upgrade makes each one an
+  agent owned by root with the same reach, and its `dpa_` tokens keep working.
+- Lists show only the projects and environments your grants reach, and the
+  rest return 404. The upgrade gives admins `project_manager` and members
+  `write` on all projects; new members start with no access.
+- Creating a project needs `projects.create`, and the creator becomes its
+  project manager.
+- Nobody can change an account above their own, give a role they don't hold,
+  or change their own grants.
+- The audit log shows each reader what their role allows. Auditor and root
+  see every event, and members see their own actions instead of a 403.
+- A personal token that reaches values can reveal, export and run without a
+  password prompt.
+- Password sign-in refuses disabled and token-only accounts.
+- `dopbase client status` shows the account's role and how the CLI signed in.
+  The JSON output adds `role`.
+- The Status page is rebuilt around the health checks, with a fix button for
+  each failing one, **Run checks** and **Copy diagnostics**.
+- `GET /api/v1/status` returns `null` for a count it couldn't read instead of
+  failing. `GET /api/v1/instance` can report `keyAvailability` as `changed`,
+  `missing` or `unreadable`.
+- **Give access** opens its own page from an Access tab, and several grants
+  can be removed at once.
+- Sign in, Setup and CLI approval share a new split layout. Sign in puts
+  single sign-on first and warns when Caps Lock is on.
+- After setup, root sees a **Finish setting up Dopbase** checklist on Projects
+  until the first project exists.
+- A project with no environments offers project managers a setup list that
+  creates development, staging and a protected production.
+- An empty environment offers to copy keys, or keys and values, from another
+  environment, or to import a `.env` file. API:
+  `POST /api/v1/environments/{id}/copy-secrets`; environments add
+  `secretCount`.
+- The Single sign-on page has a status card at the top, and **Test sign-in**
+  comes first until a test works.
+- **Backups** puts each backup's actions in a row menu, and deleting one asks
+  for its file name.
+- **Audit log** filters are chips kept in the address.
+- **Account** has tabs, and **New token** starts from an AI agent or script
+  preset.
+- **Users**, **Groups** and **Roles** are tables with row menus.
+- New Dopbase logo and icon set in the console, docs and README.
+- The sidebar groups pages under Workspace, People & access and Instance, and
+  a page your role can't open shows **No access**.
+- **Projects** is a tree: each project opens to list its environments.
+- Environment pages use names, as in `/projects/payments/prod/secrets`. Old
+  ID links redirect, and renaming an environment breaks links to its old name.
+- The project page has a context bar with project and environment switchers
+  (press E) and **Run**, which shows how to run an app with its values.
+- The **Secrets** table has a key filter, a .env view and a row menu. **Copy
+  value** copies without showing the value and is audited like a reveal.
+- New runner tokens pick a lifetime, and the token dialog shows the
+  `dopbase run` line to use it.
+- The project page works on phones.
 
-- The Single sign-on page has a cleaner layout with the same settings. A
-  status card at the top always shows the provider, an **On**, **Off**,
-  **Untested** or **Not set up** badge, how many people have linked their
-  account and the last test sign-in, next to **Test sign-in** and **Turn
-  on**. Before the first good test, **Test sign-in** is the main button. The
-  warning about accounts without a password stays in that card and links to
-  Users. The Provider card is split into Redirect URI, Connection and Sign-in
-  button, each explained beside its fields, and **Save** moved to the bottom
-  next to the note that a new issuer, client ID or secret turns single
-  sign-on off until the next test. **Remove provider** is a quieter row with a
-  small button and the same confirmation.
+### Removed
 
-- **Give access** on a person's, AI agent's, or group's Access tab now opens
-  its own page (`/users/{id}/access/new`, `/agents/{id}/access/new`,
-  `/groups/{id}/access/new`) instead of a dialog. The page is one column: pick
-  a project from a searchable dropdown that shows what they already hold
-  there, then the whole project or any number of its environments, then a
-  level. Review sits under the steps, above a single **Give access** button.
-  It lists each grant, shows the old and new level when one is replaced, and
-  names protected environments that a whole-project grant won't reach.
-  Changing the level of an existing grant still uses a dialog.
-- Rows on an Access tab show the **⋯** menu only when it has something in it,
-  so an all-projects grant no longer opens an empty menu.
-- Remove several grants at once on a person's, AI agent's, or group's Access
-  tab. Direct grants have a checkbox, and the header box selects every one the
-  filter shows. **Remove access** asks once for all of them. If one fails, the
-  dialog says how many were removed and keeps the rest to try again.
-- Sign in, Setup, and CLI approval share a new split layout. Sign in names
-  the server and its version, puts single sign-on above the form as
-  **Continue with …**, warns when Caps Lock is on, and, when passwords are
-  off, says so and offers only the provider, with a password link for root.
-  Beside the form, Sign in shows one of five artworks, each with its own
-  caption, and picks a different one on every visit. The footer of Sign in
-  and Setup says **Secure cloud** on a `*.dopbase.dev` workspace and
-  **Self-hosted** everywhere else.
-  Setup shows a checklist of the steps beside the form and rates the root
-  password as you type. Below 1024px the right side drops and the form sits
-  in the middle of the screen. Setup now follows the Figma frames: a large
-  Dopbase mark sits in the checklist's bottom-right corner, **Start fresh**
-  and **Restore a backup** sit above the heading, the form's button reads
-  **Continue**, and the footer shows the Dopbase version. When the setup link
-  fills in the token, the token field stays hidden unless the server rejects
-  it.
-- After setup, root lands on Projects and sees where setup stands instead of
-  a plain empty state. **Finish setting up Dopbase** marks root account,
-  recovery kit and sign-in as done, says whether single sign-on is on, and
-  leaves **Create your first project** as the last step, with **New project**
-  and the CLI commands. It goes away once the first project exists. Other
-  accounts still see the usual empty state.
-- AI agents and Groups show a small grey illustration when there are none
-  yet: an agent between its CI job and its token, or a person joining a group
-  that reaches a project.
-- A project with no environments used to open on a bare Access and Settings
-  tab bar with one small card. Project managers now get a setup list: the
-  project is done, and **Create environments** comes next, with development,
-  staging and production ticked and production protected. **Add another**
-  takes any other name, and **Create 3 environments** makes the ticked ones
-  and opens the first one's secrets. If one fails, the ones that worked stay
-  and the error shows on its row. The project bar reads **No environments**
-  instead of ending in a slash, its menu holds **New environment**, and
-  **Your access** shows your level on the project. Everyone else still sees
-  the plain empty state.
-- An empty environment shows what fits the project. In a new project, writers
-  see the setup timeline carried on from Projects, with **Choose a file**,
-  **Paste .env** and **Add secret** in one box and the `dopbase import`
-  command under it. When another environment already has secrets, writers
-  get **Copy from another environment** instead, which starts from the one
-  with the most secrets and copies **Keys only** unless you pick **Keys and
-  values**. **Review keys** lists the keys, all ticked, before anything is
-  copied. People who can't write are told why and get **See who has access**.
-- **Status** shows version, storage, master key and uptime as cards, the
-  counts under **What's stored**, and **Factory reset** as a card at the
-  bottom that stays off until you tick the box, type `FACTORY RESET`, and
-  enter the root password. People, AI agents, Runner tokens, and AI agent
-  tokens each have an info icon that explains what the count includes, so
-  AI agents (accounts) and AI agent tokens (their live tokens) no longer
-  read as the same thing.
-- **Backups** puts a master key reminder at the top and each backup's
-  Download, Restore, and Delete in a row menu. Deleting a backup asks for its
-  file name.
-- **Single sign-on** splits into provider, policy, and remove-provider cards,
-  and the summary says how many people have linked their account.
-- **Audit log** filters with Action, Actor, and Where chips that live in the
-  address.
-- **Account** has tabs with their own addresses: Profile & sign-in, and
-  Personal tokens or Audit tokens. **New token** starts from an AI agent or
-  script preset and sums up what the token can do, where, and until when.
-
-- **Users** is a table with filter chips for role and status, and a row menu
-  to edit, disable, or delete someone. AI agents moved to their own page, and
-  the sidebar lists **AI agents** under People & access.
-- **Groups** and **Roles** are tables. Groups shows members, where each group
-  reaches, and who created it; Roles shows each role's reach, capabilities,
-  sign-in, and holders. Their row menus hold the actions that used to sit in
-  dialogs.
-
-- `dopbase client status` shows the account's role, such as Member, Auditor,
-  or Root, on a new **Role** line in place of **Identity**. It used to say
-  `admin` for every saved login, whatever the role. The role comes from the
-  server, so it reads `unknown (server offline)` when the server can't be
-  reached. **Authentication** now says how the CLI signed in, for example
-  `dopbase login (saved session)` or `personal token (DOPBASE_TOKEN)`. The
-  JSON output adds `role` and keeps `authentication` and `identity` as they
-  were.
-- Service accounts are now accounts with the AI agent role. The upgrade turns
-  each one into an AI agent owned by root that still reads secret names on
-  every project, and its `dpa_` tokens keep working as personal tokens. New
-  agents are added on the AI agents page with a name and no password, start with
-  no access, and never reach more than the person who owns them. An owner
-  can't be deleted while they own agents; give the agents another owner
-  first. The `/api/v1/service-accounts` endpoints are gone: use
-  `POST /api/v1/users` with `"role": "ai_agent"` and
-  `/api/v1/users/{id}/tokens`.
-- A personal token that reaches values can reveal, export, and run without a
-  password prompt, and a `write` token can change secrets. A `metadata` token
-  is refused with `Your access to this environment does not allow this.`
-
-- Lists of projects and environments show only what your grants reach, and
-  anything else answers 404. Reading secret names needs `metadata`, values
-  need `read`, changes need `write`, and runner tokens, renaming, or deleting
-  an environment need `manage`. Renaming or deleting a project and adding
-  environments need `project_manager`. The Admin UI hides what your level
-  does not allow.
-- Creating a project needs the `projects.create` capability, which admins
-  have and members do not. The creator becomes the project's project manager.
-- New members start with no access until someone shares a project with them.
-  Admins that root creates start as project managers of every project, and
-  admins that other admins create start with none. Existing accounts keep
-  what they had: the upgrade gives every admin `project_manager` and every
-  member `write` on all projects.
-- Nobody can change, delete, or unlink an account whose role or access goes
-  beyond their own, give a role they do not hold, or change their own
-  grants.
-- The audit log shows each reader what their role allows. Roles with the
-  new `audit.read_all` capability, Auditor and root, read every event.
-  `audit.read` alone, which admins have, shows settings events and events on
-  the projects the reader reaches. Everyone else sees their own actions, so
-  the Audit page is open to all people and members no longer get a 403.
-- The built-in Auditor role gains `audit.read_all` and `tokens.personal`.
-- Factory reset deletes custom roles.
-- Signing in with a password refuses disabled accounts and accounts that use
-  tokens only, instead of issuing a session the server then rejects. Keeping
-  password sign-in while single sign-on is required now follows the
-  `password.breakglass` capability, and verifying a provider follows
-  `sso.manage`; both are root's alone.
-- `dopbase client status` reports a `dpp_` token as `personal_token`.
-- The documentation covers roles, grants, groups, protected environments,
-  personal tokens, AI agent accounts, and audit visibility, with new Project
-  access, Groups, and Roles pages. "Identity and tokens" is now "Identity and
-  access".
-- User management, the audit log, instance status, backups, single sign-on
-  settings, and factory reset now check a capability instead of a role. A
-  refused request says `Your role does not allow this operation.` where it
-  said `This operation requires an administrator.`
-- `PATCH /api/v1/environments/{id}` answers `ENVIRONMENT_UPDATED` instead of
-  `ENVIRONMENT_RENAMED`, and its `name` is optional.
-- The **Projects** and **Audit** pages no longer read the session store
-  themselves. Their controllers now decide who can create projects, manage a
-  project or environment, and how much of the audit log the viewer sees. The
-  frontend architecture guide spells out the rule: `ui` components hold no
-  business logic, every screen splits into a page and a controller, and a
-  component one page uses lives in that page's folder. Nothing changes for
-  people using the console.
-- New Dopbase logo: two stacked Ds in lavender, replacing the D in a ring. The
-  console shows it on its own in the sidebar, the sign-in and setup pages, and
-  the not-found page. The favicon is now the violet app icon, the docs site
-  switches between the lavender and violet mark with its theme, the README
-  shows the full logo with the wordmark, and the social preview image uses the
-  new banner. The icon set now matches the Figma file: it adds icons for
-  agents, filters, activity, menus, external links and the command key, and
-  drops 33 icons nothing used.
-- The console sidebar now groups its pages into **Workspace** (Projects, Audit
-  log), **People & access** (Users, Groups, Roles) and **Instance** (Status,
-  Backups, Single sign-on), and hides a group when your role can open none of
-  its pages. Your email and real role name sit at the bottom, replacing the
-  "admin console" and "member console" label, and open a menu with Account,
-  Personal tokens, Docs and Sign out. Instance is now **Status** at `/status`;
-  `/instance` redirects there. A link to a page your role can't open now
-  shows a **No access** screen that names the missing capability, instead of
-  sending you to Projects. The sidebar and the router read the same
-  capability map, so the nav never offers a page the router would refuse.
-- **Projects** is now a tree. Each project opens like a folder and lists its
-  environments with a protected chip, your level and the last change, six at
-  a time with **Show all**. The ID, level and date columns sit together on
-  the right, sized to their contents. The filter box searches projects and
-  environments together. Project and environment actions moved into a ⋯
-  menu, and the project rail is gone.
-- Environment pages are addressed by name, such as
-  `/projects/payments/prod/secrets` and `.../tokens`. Old
-  `/projects/p/.../e/env_...` links look the environment up and redirect.
-  Renaming an environment now breaks links to its old name, as renaming a
-  project already did.
-- The project page has a context bar: the `payments / prod` breadcrumb
-  switches project or environment (press E for the environment menu), a
-  protected environment gets an amber chip and an amber line across the top,
-  and your level sits on the right, next to **Run**, which opens the command
-  to run an app with this environment's values from the CLI, Docker or
-  GitHub Actions. Tabs below it show Secrets, Tokens (with Manage), Access
-  (project managers, or `access.report` to read), Activity, and Settings
-  (project managers).
-- The **Secrets** table has a key filter, a Table and .env switch, and one ⋯
-  menu per row with Reveal, Copy value, History, Edit value and Delete, in
-  that order. Clicking the masked value still reveals it. Copy value copies
-  without showing the value and is recorded like a reveal.
-- An empty environment shows a first-run checklist to anyone who can write
-  there: drop, choose or paste a `.env` file, and copy the `dopbase login`
-  and `dopbase run` commands for that environment.
-- The **Tokens** tab has a filter, a level meter for what each token can do,
-  and expiry in amber during a token's last week. New runner tokens pick
-  7 days, 30 days, 90 days, a year or a custom lifetime, and the dialog says
-  what the token will read and until when. The new token's dialog shows the
-  `export DOPBASE_TOKEN` and `dopbase run` lines to use it, with the
-  whole token so the lines can be pasted as they are; agent and personal
-  tokens get the same dialog. Both dialogs open wide, so the token, the
-  commands and the details fit without crowding.
-- Runner token names follow the same rule as project and environment
-  names: lowercase letters, numbers and single hyphens, starting with a
-  letter, at most 63 characters. The API refuses other names with
-  `TOKEN_NAME_INVALID`; tokens that already exist keep their names.
-- Read-only fields, such as the environment in **New runner token** and
-  the key in **Edit value**, are outlined instead of filled and show a
-  lock, at the same height as the fields you can edit.
-- **Access** moved inside the project page, at `/projects/<project>/access`.
-  Give access uses one card per level, and says what the grant will allow
-  and whether it replaces an existing one. Each grant's ⋯ menu changes its
-  level or removes it.
-- New **Activity** tab: the audit trail for this environment, widened to the
-  whole project or narrowed by action and actor, with a link to the full
-  audit log carrying the same filters. The audit log now reads those filters
-  from its address.
-- New **Settings** tab for project managers: rename the project, protect,
-  rename or delete each environment with its secret and runner token
-  counts, and a danger zone that says what deleting the project removes.
-- Corners are smaller across the console: cards and dialogs round at 6px,
-  and nothing rounds past that.
-- Every page now uses the same content column, centred beside the sidebar
-  and up to 1440px wide, so wide screens no longer stretch tables edge to
-  edge or leave a large gap, and the project tabs line up with each other
-  and with the other pages. The sidebar stays pinned to the left edge.
-- The project page fits a phone screen: the tabs scroll sideways, the
-  project tree shows a compact environment count, Access, Tokens and
-  Activity keep names and actors readable, and the Run command wraps. The
-  project and environment switchers open a sheet from the bottom of the
-  screen instead of a dropdown, and your level and **Run** share one
-  left-aligned row at the same height.
-- The environment switcher highlights the environment you're on, opens
-  with it focused, and ends with **New environment** for project
-  managers, so adding one no longer means a trip to Settings. Long project
-  and environment names are shortened in the context bar instead of
-  pushing **Run** off the row, and wrap in dialogs and on phones.
-- Switching environment clears the old table straight away instead of
-  showing its rows until the new ones load, and a filter change cancels
-  the activity page still loading. A runner token created while you switch
-  environment still shows its value once. A project manager can open
-  Access and Settings before the project has any environments.
+- **Breaking:** `/api/v1/service-accounts`. Use `POST /api/v1/users` with
+  `"role": "ai_agent"`, and `/api/v1/users/{id}/tokens`.
+- **Breaking:** `databaseHealth` and `keyAvailability` from
+  `GET /api/v1/status`. They were always `healthy` and `available`.
+- The project rail. Use the Projects tree instead.
+- The `/instance` page. It redirects to `/status`.
 
 ### Fixed
 
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
-pool` while loading `sqlx-macros`. The release profile now strips only the
-  final binary and leaves proc-macro libraries unstripped.
+  pool` while loading `sqlx-macros`.
 
 ## 0.1.10 - 2026-10-26
 
