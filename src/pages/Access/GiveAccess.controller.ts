@@ -345,8 +345,6 @@ export function useGiveAccessController() {
           saved += 1;
         }
       });
-      await router.push(backTo.value);
-      return true;
     } catch (cause) {
       const reason = errorMessage(cause, "Could not give that access.");
       error.value =
@@ -359,6 +357,14 @@ export function useGiveAccessController() {
     } finally {
       saving.value = false;
     }
+    try {
+      await router.push(backTo.value);
+    } catch {
+      // Every grant is in; only going back failed.
+      error.value =
+        "Access given, but this page couldn't go back. Open their Access tab to see it.";
+    }
+    return true;
   }
 
   function cancel(): void {

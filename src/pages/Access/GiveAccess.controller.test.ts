@@ -281,6 +281,18 @@ describe("useGiveAccessController", () => {
     );
   });
 
+  it("says so when every grant saved but the page couldn't go back", async () => {
+    push.mockRejectedValueOnce(new Error("guard"));
+    const page = await open();
+    page.chooseProject("prj_pay");
+    expect(await page.submit()).toBe(true);
+    expect(accessApi.setGrant).toHaveBeenCalledOnce();
+    expect(page.error.value).toBe(
+      "Access given, but this page couldn't go back. Open their Access tab to see it.",
+    );
+    expect(page.saving.value).toBe(false);
+  });
+
   it("gives a group access as a group, without a role cap", async () => {
     route.name = "group-access-give";
     route.params = { groupId: "grp_backend" };
