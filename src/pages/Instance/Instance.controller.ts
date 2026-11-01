@@ -501,14 +501,23 @@ export function useInstanceController() {
     return SEVERITY_TONES[status];
   }
 
+  // Every load and run takes a number. A response for an older number is
+  // dropped, so a poll that was already out when Run checks was pressed
+  // can't put its older results back over the fresh ones.
+  let latestRequest = 0;
+
   async function load(): Promise<void> {
+    const request = ++latestRequest;
     loading.value = true;
     loadError.value = null;
     try {
-      status.value = await fetchStatus();
+      const fresh = await fetchStatus();
+      if (request !== latestRequest) return;
+      status.value = fresh;
       staleSince.value = null;
       runError.value = null;
     } catch {
+      if (request !== latestRequest) return;
       if (status.value) {
         // Keep the last good results and say how old they are.
         staleSince.value = status.value.observedAt;
@@ -521,10 +530,13 @@ export function useInstanceController() {
   }
 
   async function runChecks(): Promise<void> {
+    const request = ++latestRequest;
     running.value = true;
     runError.value = null;
     try {
-      status.value = await runStatusChecks();
+      const fresh = await runStatusChecks();
+      if (request !== latestRequest) return;
+      status.value = fresh;
       staleSince.value = null;
     } catch (cause: unknown) {
       runError.value =

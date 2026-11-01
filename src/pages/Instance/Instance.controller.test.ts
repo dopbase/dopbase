@@ -483,6 +483,49 @@ describe("useInstanceController", () => {
       expect(c.staleSince.value).toBe(mockStatus.observedAt);
     });
 
+    it("drops a poll that was already out when Run checks was pressed", async () => {
+      signInAs(["instance.view"]);
+      const { controller: c } = mountController(useInstanceController);
+      await vi.advanceTimersByTimeAsync(0);
+      let answerPoll!: (status: instanceApi.StatusResponse) => void;
+      vi.mocked(instanceApi.fetchStatus).mockReturnValueOnce(
+        new Promise((resolve) => (answerPoll = resolve)),
+      );
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      expect(c.loading.value).toBe(true);
+
+      vi.mocked(instanceApi.runStatusChecks).mockResolvedValueOnce(allGood);
+      await c.runChecks();
+      answerPoll(mockStatus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(c.status.value).toEqual(allGood);
+      expect(c.loading.value).toBe(false);
+    });
+
+    it("keeps a run error when an older poll answers after it", async () => {
+      signInAs(["instance.view"]);
+      const { controller: c } = mountController(useInstanceController);
+      await vi.advanceTimersByTimeAsync(0);
+      let answerPoll!: (status: instanceApi.StatusResponse) => void;
+      vi.mocked(instanceApi.fetchStatus).mockReturnValueOnce(
+        new Promise((resolve) => (answerPoll = resolve)),
+      );
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+      vi.mocked(instanceApi.runStatusChecks).mockRejectedValueOnce(
+        new ApiError(429, {}, "Too many requests."),
+      );
+      await c.runChecks();
+      answerPoll(allGood);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(c.runError.value).toBe(
+        "Checks just ran. Wait a few seconds and try again.",
+      );
+      expect(c.status.value).toEqual(mockStatus);
+    });
+
     it("stops when the page closes", async () => {
       signInAs(["instance.view"]);
       const { unmount } = mountController(useInstanceController);
