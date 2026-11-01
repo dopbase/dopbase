@@ -258,12 +258,10 @@ fn master_key(
   now: DateTime<Utc>,
 ) -> (Check, MasterKeyHealth) {
   const RESTART: &str = "Download the key in use now and put it back in place before you restart.";
-  let file = match std::fs::read(&state.config.master_key.path) {
-    Ok(bytes) if bytes == state.crypto.master_key_bytes() => "matches",
-    Ok(_) => "changed",
-    Err(error) if error.kind() == std::io::ErrorKind::NotFound => "missing",
-    Err(_) => "unreadable",
-  };
+  let file = state
+    .crypto
+    .key_file_state(&state.config.master_key.path)
+    .as_str();
   let result = match file {
     "matches" => check(
       "master_key.file",

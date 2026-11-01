@@ -15,7 +15,8 @@ pub struct InstanceStatus {
   /// the database doesn't answer.
   pub database_health: &'static str,
   /// How the master key file compares with the key in use: `available` when
-  /// they match, `changed` or `missing` when the server would not start again.
+  /// they match, `changed`, `missing` or `unreadable` when the server would
+  /// not start again.
   pub key_availability: &'static str,
   /// Server configuration reload policy (`restartRequired`).
   pub configuration_reload: &'static str,

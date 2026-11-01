@@ -10,7 +10,7 @@ use crate::{
   },
   http::HttpError,
   models::AuthIdentity,
-  services::authx::Capability,
+  services::{authx::Capability, crypto::KeyFileState},
   state::AppState,
 };
 use axum::http::HeaderMap;
@@ -29,10 +29,9 @@ pub async fn status(
       "setupRequired"
     },
     database_health: "healthy",
-    key_availability: match std::fs::read(&state.config.master_key.path) {
-      Ok(bytes) if bytes == state.crypto.master_key_bytes() => "available",
-      Ok(_) => "changed",
-      Err(_) => "missing",
+    key_availability: match state.crypto.key_file_state(&state.config.master_key.path) {
+      KeyFileState::Matches => "available",
+      other => other.as_str(),
     },
     configuration_reload: "restartRequired",
   })

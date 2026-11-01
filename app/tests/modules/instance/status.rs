@@ -220,15 +220,36 @@ async fn master_key_check_compares_the_file_with_the_key_in_use() {
   assert_eq!(data["health"]["masterKey"]["file"], "changed");
   assert!(data["summary"]["critical"].as_u64().unwrap() >= 1);
 
+  assert_eq!(key_availability(&router, &root).await, "changed");
+
   std::fs::remove_file(&path).unwrap();
   let data = status(&router, &root).await;
   assert_eq!(data["health"]["masterKey"]["file"], "missing");
   assert_eq!(check(&data, "master_key.file")["fixPath"], "/backups");
+  assert_eq!(key_availability(&router, &root).await, "missing");
+
+  // A directory in its place can't be read as a file, but it isn't missing.
+  std::fs::create_dir(&path).unwrap();
+  let data = status(&router, &root).await;
+  assert_eq!(data["health"]["masterKey"]["file"], "unreadable");
+  assert_eq!(key_availability(&router, &root).await, "unreadable");
+  std::fs::remove_dir(&path).unwrap();
 
   std::fs::write(&path, original).unwrap();
   let data = status(&router, &root).await;
   assert_eq!(data["health"]["masterKey"]["file"], "matches");
+  assert_eq!(key_availability(&router, &root).await, "available");
   state.db.close().await;
+}
+
+/// What `GET /instance` says about the key file.
+async fn key_availability(
+  router: &Router,
+  who: &Person,
+) -> String {
+  let (status, body) = send(router, "GET", "/api/v1/instance", who.cli(), None).await;
+  assert_eq!(status, 200, "{body}");
+  body["data"]["keyAvailability"].as_str().unwrap().to_owned()
 }
 
 #[tokio::test]
