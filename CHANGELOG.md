@@ -58,6 +58,14 @@ All notable changes to Dopbase are documented in this file.
   environment's value, copied on the server, or type its own. A note above
   the table says set values can't be seen or changed here, and links to
   **Secrets**.
+- Environment IDs in the console. The project bar shows the open
+  environment's ID (`env_918204`) after the switchers. The Projects tree has
+  an **Environment ID** column on screens 1280px and wider, and the
+  environments table on a project's **Settings** tab has an **ID** column on
+  screens 768px and wider. Click an ID
+  to copy it, then use it in place of `project/environment`, as in
+  `dopbase run env_918204 -- npm start`. If the browser blocks the
+  clipboard, the ID is selected for a manual copy.
 - New endpoints behind Compare. `GET /api/v1/environments/{id}/compare`
   takes `with`, up to three environment ids, and returns each key's version
   per environment and whether its value matches the base. Values are compared
@@ -65,6 +73,12 @@ All notable changes to Dopbase are documented in this file.
   `POST /api/v1/environments/{id}/secrets/{key}/copy`, which copies another
   environment's value on the server, needs Read on the source and Write on
   the target, and records `secret.copied`.
+- `POST /api/v1/environments/{id}/copy-secrets` creates a list of keys from
+  another environment in the same project in one transaction, and records one
+  `secret.bulk_copied` event. Without `values` each key starts empty and Names
+  only on the source is enough; with `values: true` the values are copied on
+  the server, which needs Read on the source. Keys the target already has are
+  skipped. Environment responses now include `secretCount`.
 
 - An **AI agents** page lists token-only accounts for bots and CI, with each
   agent's owner, how far it reaches, and whether its token is active, about to
@@ -76,9 +90,10 @@ All notable changes to Dopbase are documented in this file.
   it is refused with `TOKEN_REPLACE_INVALID` for anyone but an AI agent.
 - Each person has their own page with **Overview**, **Access**, **Groups**,
   **Tokens**, and **Danger zone** tabs. Access shows where every grant comes
-  from, direct or through a group, notes when an environment grant overrides
-  its project grant, and gives, changes, or removes access from there. The
-  same **Give access** dialog is used for people, AI agents, and groups.
+  from, direct or through a group, lists each environment whose own grant
+  overrides the project grant with both levels side by side (or **No access**
+  when it's blocked), and gives, changes, or removes access from there. The
+  same **Give access** flow is used for people, AI agents, and groups.
 - Disable an account without deleting it. Disabling signs the person out
   everywhere and stops their tokens; **Turn account back on** restores the
   access they had. `POST /api/v1/users/{id}/disable` and `/enable` back it,
@@ -121,16 +136,68 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- **Give access** on a person's, AI agent's, or group's Access tab now opens
+  its own page (`/users/{id}/access/new`, `/agents/{id}/access/new`,
+  `/groups/{id}/access/new`) instead of a dialog. The page is one column: pick
+  a project from a searchable dropdown that shows what they already hold
+  there, then the whole project or any number of its environments, then a
+  level. Review sits under the steps, above a single **Give access** button.
+  It lists each grant, shows the old and new level when one is replaced, and
+  names protected environments that a whole-project grant won't reach.
+  Changing the level of an existing grant still uses a dialog.
+- Rows on an Access tab show the **⋯** menu only when it has something in it,
+  so an all-projects grant no longer opens an empty menu.
+- Remove several grants at once on a person's, AI agent's, or group's Access
+  tab. Direct grants have a checkbox, and the header box selects every one the
+  filter shows. **Remove access** asks once for all of them. If one fails, the
+  dialog says how many were removed and keeps the rest to try again.
 - Sign in, Setup, and CLI approval share a new split layout. Sign in names
   the server and its version, puts single sign-on above the form as
   **Continue with …**, warns when Caps Lock is on, and, when passwords are
   off, says so and offers only the provider, with a password link for root.
+  Beside the form, Sign in shows one of five artworks, each with its own
+  caption, and picks a different one on every visit. The footer of Sign in
+  and Setup says **Secure cloud** on a `*.dopbase.dev` workspace and
+  **Self-hosted** everywhere else.
   Setup shows a checklist of the steps beside the form and rates the root
-  password as you type.
+  password as you type. Below 1024px the right side drops and the form sits
+  in the middle of the screen. Setup now follows the Figma frames: a large
+  Dopbase mark sits in the checklist's bottom-right corner, **Start fresh**
+  and **Restore a backup** sit above the heading, the form's button reads
+  **Continue**, and the footer shows the Dopbase version. When the setup link
+  fills in the token, the token field stays hidden unless the server rejects
+  it.
+- After setup, root lands on Projects and sees where setup stands instead of
+  a plain empty state. **Finish setting up Dopbase** marks root account,
+  recovery kit and sign-in as done, says whether single sign-on is on, and
+  leaves **Create your first project** as the last step, with **New project**
+  and the CLI commands. It goes away once the first project exists. Other
+  accounts still see the usual empty state.
+- A project with no environments used to open on a bare Access and Settings
+  tab bar with one small card. Project managers now get a setup list: the
+  project is done, and **Create environments** comes next, with development,
+  staging and production ticked and production protected. **Add another**
+  takes any other name, and **Create 3 environments** makes the ticked ones
+  and opens the first one's secrets. If one fails, the ones that worked stay
+  and the error shows on its row. The project bar reads **No environments**
+  instead of ending in a slash, its menu holds **New environment**, and
+  **Your access** shows your level on the project. Everyone else still sees
+  the plain empty state.
+- An empty environment shows what fits the project. In a new project, writers
+  see the setup timeline carried on from Projects, with **Choose a file**,
+  **Paste .env** and **Add secret** in one box and the `dopbase import`
+  command under it. When another environment already has secrets, writers
+  get **Copy from another environment** instead, which starts from the one
+  with the most secrets and copies **Keys only** unless you pick **Keys and
+  values**. **Review keys** lists the keys, all ticked, before anything is
+  copied. People who can't write are told why and get **See who has access**.
 - **Status** shows version, storage, master key and uptime as cards, the
   counts under **What's stored**, and **Factory reset** as a card at the
   bottom that stays off until you tick the box, type `FACTORY RESET`, and
-  enter the root password.
+  enter the root password. People, AI agents, Runner tokens, and AI agent
+  tokens each have an info icon that explains what the count includes, so
+  AI agents (accounts) and AI agent tokens (their live tokens) no longer
+  read as the same thing.
 - **Backups** puts a master key reminder at the top and each backup's
   Download, Restore, and Delete in a row menu. Deleting a backup asks for its
   file name.
@@ -237,7 +304,8 @@ All notable changes to Dopbase are documented in this file.
   capability map, so the nav never offers a page the router would refuse.
 - **Projects** is now a tree. Each project opens like a folder and lists its
   environments with a protected chip, your level and the last change, six at
-  a time with **Show all**, and the filter box searches projects and
+  a time with **Show all**. The ID, level and date columns sit together on
+  the right, sized to their contents. The filter box searches projects and
   environments together. Project and environment actions moved into a ⋯
   menu, and the project rail is gone.
 - Environment pages are addressed by name, such as
