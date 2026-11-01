@@ -20,8 +20,9 @@ import { menuCloseKey } from "./menu";
  *
  * Arrow keys move between items, Escape closes and returns focus, and an
  * outside click, scroll or resize closes it. `DbMenuItem` closes it when
- * chosen. With a search field at the top of the list, it opens on the
- * field and the arrow keys move from it into the items. `matchWidth` sizes
+ * chosen. With a search field (`type="search"`, such as DbSearchField) at
+ * the top of the list, it opens on the field and the arrow keys move from
+ * it into the items. `matchWidth` sizes
  * the list to its trigger, for a picker. Presentation-only: items report
  * what was picked.
  */
@@ -151,7 +152,11 @@ watch(open, async (isOpen) => {
   place();
   await nextTick();
   place();
-  const field = panel.value?.querySelector<HTMLInputElement>("input");
+  // Only a search field, such as DbSearchField, takes focus. Other inputs,
+  // like the hidden one in DbCheckbox, leave it to the items.
+  const field = panel.value?.querySelector<HTMLInputElement>(
+    'input[type="search"]',
+  );
   if (field) {
     field.focus();
     return;
