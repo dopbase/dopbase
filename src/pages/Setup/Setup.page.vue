@@ -29,7 +29,9 @@ const {
   mode,
   step,
   host,
+  hosting,
   setupToken,
+  tokenFromLink,
   email,
   password,
   confirmPassword,
@@ -63,8 +65,8 @@ const {
 } = useSetupController();
 
 const MODES = [
-  { value: "setup", label: "New server" },
-  { value: "restore", label: "Restore from backup" },
+  { value: "setup", label: "Start fresh" },
+  { value: "restore", label: "Restore a backup" },
 ];
 const strengthBars: Record<PasswordStrength, number> = {
   empty: 0,
@@ -80,6 +82,14 @@ const strengthColor: Record<PasswordStrength, string> = {
   fair: "bg-warn",
   strong: "bg-ok",
 };
+const strengthText: Record<PasswordStrength, string> = {
+  empty: "text-ink-muted",
+  short: "text-crit",
+  weak: "text-crit",
+  fair: "text-warn",
+  strong: "text-ok",
+};
+const version = __APP_VERSION__;
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const keyFileInputRef = ref<HTMLInputElement | null>(null);
@@ -168,8 +178,8 @@ function clearKeyFile(): void {
           :disabled="!masterKey" />
       </div>
       <DbButton
+        variant="primary"
         class="mt-3 w-full"
-        :variant="canContinue ? 'primary' : 'secondary'"
         :disabled="!canContinue"
         data-testid="setup-continue"
         @click="finish">
@@ -189,6 +199,13 @@ function clearKeyFile(): void {
 
     <!-- Step 1: root account, or restore -->
     <div v-else>
+      <DbSegment
+        :model-value="mode"
+        :options="MODES"
+        label="Setup mode"
+        class="mb-8"
+        @update:model-value="mode = $event as 'setup' | 'restore'" />
+
       <h1 class="text-[28px] font-semibold leading-tight text-ink-strong">
         {{ mode === "setup" ? "Create the root account" : "Restore a backup" }}
       </h1>
@@ -200,20 +217,16 @@ function clearKeyFile(): void {
         }}
       </p>
 
-      <DbSegment
-        :model-value="mode"
-        :options="MODES"
-        label="Setup mode"
-        class="mt-6"
-        @update:model-value="mode = $event as 'setup' | 'restore'" />
-
       <form
         v-if="mode === 'setup'"
-        class="mt-5 flex flex-col gap-3"
+        class="mt-8 flex flex-col gap-3"
         novalidate
         data-testid="setup-form"
         @submit.prevent="submit">
+        <!-- The setup link fills the token; ask only without it or when the
+             server turned it down. -->
         <DbInput
+          v-if="!tokenFromLink || fieldErrors.setupToken"
           v-model="setupToken"
           label="Setup token"
           name="setupToken"
@@ -223,7 +236,7 @@ function clearKeyFile(): void {
           :error="fieldErrors.setupToken" />
         <DbInput
           v-model="email"
-          label="Email"
+          label="Root email"
           name="email"
           type="email"
           autocomplete="email"
@@ -241,20 +254,25 @@ function clearKeyFile(): void {
             v-if="strength !== 'empty'"
             class="flex flex-col gap-1"
             data-testid="password-strength">
-            <div class="flex gap-1" aria-hidden="true">
+            <div class="flex items-center gap-1">
               <span
                 v-for="bar in 4"
                 :key="bar"
                 class="h-1 flex-1 rounded-control"
+                aria-hidden="true"
                 :class="
                   bar <= strengthBars[strength]
                     ? strengthColor[strength]
                     : 'bg-line'
                 " />
+              <span
+                class="ml-1 text-[13px] font-medium"
+                :class="strengthText[strength]">
+                {{ strengthLabel }}
+              </span>
             </div>
-            <p class="text-[13px] text-ink-muted">
-              <span class="font-medium text-ink">{{ strengthLabel }}</span>
-              · {{ password.length }} characters. A long passphrase from your
+            <p class="text-[13px] leading-relaxed text-ink-muted">
+              {{ password.length }} characters. A long passphrase from your
               password manager is best.
             </p>
           </div>
@@ -274,17 +292,18 @@ function clearKeyFile(): void {
           type="submit"
           class="mt-1"
           :loading="submitting">
-          Create root account
+          Continue
         </DbButton>
       </form>
 
       <form
         v-else
-        class="mt-5 flex flex-col gap-3"
+        class="mt-8 flex flex-col gap-3"
         novalidate
         data-testid="restore-form"
         @submit.prevent="submitRestore">
         <DbInput
+          v-if="!tokenFromLink"
           v-model="setupToken"
           label="Setup token"
           name="setupToken"
@@ -375,8 +394,7 @@ function clearKeyFile(): void {
     </div>
 
     <template #footer>
-      <span>Self-hosted Dopbase</span>
-      <span class="font-mono">{{ host }}</span>
+      <span>{{ hosting }}, Dopbase {{ version }}</span>
     </template>
 
     <template #aside>

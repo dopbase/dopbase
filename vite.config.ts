@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import { assetFileNames } from "./config/asset-file-names.ts";
+
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,6 +15,9 @@ export default defineConfig({
   // assets must use absolute URLs — relative ones break on nested SPA routes.
   base: "/",
   plugins: [vue(), tailwindcss()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       "~": fileURLToPath(new URL("./src", import.meta.url)),

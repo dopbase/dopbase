@@ -4,6 +4,7 @@ import { fetchAuthMethods, ssoStartUrl } from "~/services/auth.api";
 import { fetchHealth } from "~/services/health.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
+import { formatHosting } from "~/utils/format";
 import { ssoErrorMessage } from "~/utils/sso";
 import { isSafeRedirect, isValidEmail } from "~/utils/validation";
 
@@ -34,6 +35,8 @@ export function useLoginController() {
   const ssoError = computed(() => ssoErrorMessage(route.query.sso_error));
   /** The server this page belongs to, so people know where they sign in. */
   const host = window.location.host;
+  /** `Secure cloud` or `Self-hosted`, for the footer. */
+  const hosting = formatHosting(window.location.hostname);
   /** The server's version for the footer; empty until it answers. */
   const version = ref("");
   /** Caps Lock is on while the password field has focus. */
@@ -145,6 +148,7 @@ export function useLoginController() {
     ssoError,
     loadMethods,
     host,
+    hosting,
     version,
     capsLock,
     trackCapsLock,

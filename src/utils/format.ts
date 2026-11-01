@@ -110,3 +110,13 @@ export function formatList(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
+
+/**
+ * Names how this server is run for auth page footers: `Secure cloud` on a
+ * `*.dopbase.dev` workspace, `Self-hosted` anywhere else.
+ */
+export function formatHosting(hostname: string): string {
+  return hostname.toLowerCase().endsWith(".dopbase.dev")
+    ? "Secure cloud"
+    : "Self-hosted";
+}

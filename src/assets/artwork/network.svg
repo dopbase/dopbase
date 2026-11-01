@@ -1,0 +1,32 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="880" height="900" viewBox="0 0 880 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Art" clip-path="url(#clip0_0_21)">
+<path id="Vector" d="M880 0H0V900H880V0Z" fill="url(#paint0_radial_0_21)"/>
+<path id="Vector_2" d="M440 400L501.6 150.1" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_3" d="M473.9 266C475.833 266 477.4 264.433 477.4 262.5C477.4 260.567 475.833 259 473.9 259C471.967 259 470.4 260.567 470.4 262.5C470.4 264.433 471.967 266 473.9 266Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_4" d="M440 400L698.4 259.1" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_5" d="M582.1 326C584.033 326 585.6 324.433 585.6 322.5C585.6 320.567 584.033 319 582.1 319C580.167 319 578.6 320.567 578.6 322.5C578.6 324.433 580.167 326 582.1 326Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_6" d="M440 400L743.8 450.7" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_7" d="M607.1 431.4C609.033 431.4 610.6 429.833 610.6 427.9C610.6 425.967 609.033 424.4 607.1 424.4C605.167 424.4 603.6 425.967 603.6 427.9C603.6 429.833 605.167 431.4 607.1 431.4Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_8" d="M440 400L611.3 612.5" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_9" d="M534.2 520.4C536.133 520.4 537.7 518.833 537.7 516.9C537.7 514.967 536.133 513.4 534.2 513.4C532.267 513.4 530.7 514.967 530.7 516.9C530.7 518.833 532.267 520.4 534.2 520.4Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_10" d="M440 400L378.4 649.9" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_11" d="M406.1 541C408.033 541 409.6 539.433 409.6 537.5C409.6 535.567 408.033 534 406.1 534C404.167 534 402.6 535.567 402.6 537.5C402.6 539.433 404.167 541 406.1 541Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_12" d="M440 400L181.6 540.9" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_13" d="M297.9 481C299.833 481 301.4 479.433 301.4 477.5C301.4 475.567 299.833 474 297.9 474C295.967 474 294.4 475.567 294.4 477.5C294.4 479.433 295.967 481 297.9 481Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_14" d="M440 400L136.2 349.3" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_15" d="M272.9 375.6C274.833 375.6 276.4 374.033 276.4 372.1C276.4 370.167 274.833 368.6 272.9 368.6C270.967 368.6 269.4 370.167 269.4 372.1C269.4 374.033 270.967 375.6 272.9 375.6Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_16" d="M440 400L268.7 187.5" stroke-width="1.2" stroke="#C4A3FC" stroke-opacity="0.28"/>
+<path id="Vector_17" d="M345.8 286.6C347.733 286.6 349.3 285.033 349.3 283.1C349.3 281.167 347.733 279.6 345.8 279.6C343.867 279.6 342.3 281.167 342.3 283.1C342.3 285.033 343.867 286.6 345.8 286.6Z" fill="#C4A3FC" fill-opacity="0.85"/>
+<path id="Vector_18" d="M580 400C580 477.32 517.32 540 440 540C362.68 540 300 477.32 300 400C300 322.68 362.68 260 440 260C517.32 260 580 322.68 580 400Z" stroke="#C4A3FC" stroke-opacity="0.12"/>
+<path id="Vector_19" d="M440 474C480.869 474 514 440.869 514 400C514 359.131 480.869 326 440 326C399.131 326 366 359.131 366 400C366 440.869 399.131 474 440 474Z" fill="#2A2433" stroke-width="1.5" stroke="#C4A3FC" stroke-opacity="0.5"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_0_21" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(440 400) scale(360 360)">
+<stop stop-color="#AA3BFF" stop-opacity="0.3"/>
+<stop offset="1" stop-color="#AA3BFF" stop-opacity="0"/>
+</radialGradient>
+<clipPath id="clip0_0_21">
+<rect width="880" height="900" fill="white"/>
+</clipPath>
+</defs>
+</svg>

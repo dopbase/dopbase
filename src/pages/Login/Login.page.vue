@@ -20,6 +20,7 @@ const {
   ssoError,
   loadMethods,
   host,
+  hosting,
   version,
   capsLock,
   trackCapsLock,
@@ -50,7 +51,7 @@ const ssoOnly = computed(
       Sign in
     </h1>
     <p class="mt-2 text-sm text-ink-muted">
-      to <span class="font-mono text-ink">{{ host }}</span>
+      <span class="font-mono text-ink">Admin Console</span>
     </p>
 
     <DbAlert v-if="notice" tone="info" class="mt-6">{{ notice }}</DbAlert>
@@ -168,7 +169,7 @@ const ssoOnly = computed(
         class="underline underline-offset-4 hover:text-ink">
         Trouble signing in?
       </RouterLink>
-      <span v-if="version">Self-hosted, Dopbase {{ version }}</span>
+      <span v-if="version">{{ hosting }}, Dopbase {{ version }}</span>
     </template>
   </AuthLayout>
 </template>

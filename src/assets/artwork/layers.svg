@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="880" height="900" viewBox="0 0 880 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Art" clip-path="url(#clip0_0_12)">
+<path id="Vector" d="M880 0H0V900H880V0Z" fill="url(#paint0_radial_0_12)"/>
+<path id="Vector_2" d="M602 440H198C182.536 440 170 452.536 170 468V672C170 687.464 182.536 700 198 700H602C617.464 700 630 687.464 630 672V468C630 452.536 617.464 440 602 440Z" fill="#262626" stroke="#3C3C3C"/>
+<path id="Vector_3" d="M657 355H253C237.536 355 225 367.536 225 383V587C225 602.464 237.536 615 253 615H657C672.464 615 685 602.464 685 587V383C685 367.536 672.464 355 657 355Z" fill="#2C2C2C" stroke="#474747"/>
+<path id="Vector_4" d="M712 270H308C292.536 270 280 282.536 280 298V502C280 517.464 292.536 530 308 530H712C727.464 530 740 517.464 740 502V298C740 282.536 727.464 270 712 270Z" fill="#2A2433" stroke-width="1.5" stroke="#C4A3FC" stroke-opacity="0.65"/>
+<path id="Vector_5" d="M566 350H318C314.686 350 312 352.686 312 356C312 359.314 314.686 362 318 362H566C569.314 362 572 359.314 572 356C572 352.686 569.314 350 566 350Z" fill="#C4A3FC" fill-opacity="0.35"/>
+<path id="Vector_6" d="M526 384H318C314.686 384 312 386.686 312 390C312 393.314 314.686 396 318 396H526C529.314 396 532 393.314 532 390C532 386.686 529.314 384 526 384Z" fill="#C4A3FC" fill-opacity="0.25"/>
+<path id="Vector_7" d="M546 418H318C314.686 418 312 420.686 312 424C312 427.314 314.686 430 318 430H546C549.314 430 552 427.314 552 424C552 420.686 549.314 418 546 418Z" fill="#C4A3FC" fill-opacity="0.25"/>
+<path id="Vector_8" d="M486 452H318C314.686 452 312 454.686 312 458C312 461.314 314.686 464 318 464H486C489.314 464 492 461.314 492 458C492 454.686 489.314 452 486 452Z" fill="#C4A3FC" fill-opacity="0.2"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_0_12" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(520 380) scale(380 380)">
+<stop stop-color="#AA3BFF" stop-opacity="0.28"/>
+<stop offset="1" stop-color="#AA3BFF" stop-opacity="0"/>
+</radialGradient>
+<clipPath id="clip0_0_12">
+<rect width="880" height="900" fill="white"/>
+</clipPath>
+</defs>
+</svg>
