@@ -64,7 +64,9 @@ describe("useInstanceController", () => {
     signInAs([]);
     const c = await mounted();
 
-    expect(c.counts.value).toEqual([
+    expect(
+      c.counts.value.map(({ label, value }) => ({ label, value })),
+    ).toEqual([
       { label: "Projects", value: 3 },
       { label: "Environments", value: 6 },
       { label: "Secrets", value: 12 },
@@ -74,6 +76,15 @@ describe("useInstanceController", () => {
       { label: "AI agent tokens", value: 1 },
       { label: "Backups", value: 4 },
     ]);
+  });
+
+  it("explains the account and token counts", async () => {
+    signInAs([]);
+    const c = await mounted();
+
+    expect(
+      c.counts.value.filter((item) => item.hint).map((item) => item.label),
+    ).toEqual(["People", "AI agents", "Runner tokens", "AI agent tokens"]);
   });
 
   it.each([

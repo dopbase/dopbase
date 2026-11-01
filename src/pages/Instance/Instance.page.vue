@@ -7,6 +7,7 @@ import {
   DbBadge,
   DbButton,
   DbCheckbox,
+  DbInfoTip,
   DbInput,
   DbSkeleton,
 } from "~/components/ui";
@@ -180,7 +181,13 @@ const {
               v-for="item in counts"
               :key="item.label"
               class="flex min-w-0 flex-col gap-0.5 rounded-control bg-editor px-3.5 py-2.5 text-sm">
-              <dt class="truncate text-ink-muted">{{ item.label }}</dt>
+              <dt class="flex min-w-0 items-center gap-1.5 text-ink-muted">
+                <span class="truncate">{{ item.label }}</span>
+                <DbInfoTip
+                  v-if="item.hint"
+                  :text="item.hint"
+                  :label="`About ${item.label}`" />
+              </dt>
               <dd class="font-mono font-semibold text-ink-strong">
                 {{ item.value }}
               </dd>

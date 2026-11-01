@@ -84,21 +84,43 @@ export function useInstanceController() {
     return formatRelativeTime(bootTime.value);
   });
 
-  /** The "What's stored" grid, in the order the status API counts them. */
-  const counts = computed(() => {
-    const current = status.value;
-    if (!current) return [];
-    return [
-      { label: "Projects", value: current.projects },
-      { label: "Environments", value: current.environments },
-      { label: "Secrets", value: current.secrets },
-      { label: "People", value: current.humanUsers },
-      { label: "AI agents", value: current.aiAgents },
-      { label: "Runner tokens", value: current.activeRunnerTokens },
-      { label: "AI agent tokens", value: current.activeAgentTokens },
-      { label: "Backups", value: current.backups },
-    ];
-  });
+  /**
+   * The "What's stored" grid, in the order the status API counts them.
+   * Accounts and tokens carry a hint, since "AI agents" and "AI agent
+   * tokens" read alike.
+   */
+  const counts = computed<{ label: string; value: number; hint?: string }[]>(
+    () => {
+      const current = status.value;
+      if (!current) return [];
+      return [
+        { label: "Projects", value: current.projects },
+        { label: "Environments", value: current.environments },
+        { label: "Secrets", value: current.secrets },
+        {
+          label: "People",
+          value: current.humanUsers,
+          hint: "Accounts that sign in to this instance, root included.",
+        },
+        {
+          label: "AI agents",
+          value: current.aiAgents,
+          hint: "Accounts for bots and CI. They never sign in and use a token to call the API.",
+        },
+        {
+          label: "Runner tokens",
+          value: current.activeRunnerTokens,
+          hint: "Live tokens that let a deployed app read one environment's values. You create them on an environment's Tokens tab.",
+        },
+        {
+          label: "AI agent tokens",
+          value: current.activeAgentTokens,
+          hint: "Live tokens held by AI agents. An agent has at most one, so this is lower than AI agents when some agents have no live token.",
+        },
+        { label: "Backups", value: current.backups },
+      ];
+    },
+  );
 
   async function load(): Promise<void> {
     loading.value = true;
