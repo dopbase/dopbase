@@ -133,8 +133,55 @@ All notable changes to Dopbase are documented in this file.
   nothing else. The audit log's Actor filter uses it now, so it no longer
   loads every account's groups, role, and sign-in details just to show
   emails.
+- Health checks on `GET /api/v1/status`. Accounts with `instance.view` get a
+  list of checks, most severe first, each with a status (`crit`, `warn`,
+  `tip`, or `ok`), a reason, and a `fixPath`: database response time and
+  size, whether the master key file still matches the key in use, free disk
+  space, the audit hash chain, backup age and whether the latest backup was
+  downloaded, tokens expiring within 7 days, audit retention, the public URL,
+  HTTPS, API docs, and whether someone besides root can manage the instance.
+  The response also carries `summary`, the readings behind each card in
+  `health`, the last 24 hours of `activity` (secret reads, failed sign-ins,
+  rate-limited requests, live sessions), and `platform`. Nothing runs in the
+  background: the checks run when the status is read, the audit chain walk
+  is reused for up to 10 minutes, and `POST /api/v1/status/checks/run` walks
+  it again on demand.
+- `update_check` in `server.toml` (or `DOPBASE_UPDATE_CHECK=true`) lets the
+  server ask GitHub for the latest release when the Status page is open, at
+  most once a day, so the page can say when a newer Dopbase is out. It is off
+  by default, and the server makes no outbound calls while it is off. A
+  failed lookup keeps the last answer.
 
 ### Changed
+
+- The Status page is rebuilt around the health checks. A banner sums up what
+  needs attention, or says everything looks good, and turns red when the
+  master key file no longer matches the key in use. Database, Master key,
+  Disk, and Audit log cards sit beside a **Last 24 hours** card. **Needs
+  attention** lists failing checks with a button that fixes each one, hidden
+  when you couldn't use it, and folds the passing checks behind **Show all**.
+  **Run checks** runs everything now, **Copy diagnostics** copies a
+  plain-text report, and the page refreshes every 30 seconds, keeping the
+  last results if a refresh fails. The factory reset steps start folded
+  behind **Show reset steps**. Root downloads the master key from Backups, or
+  from Status when the key file changed.
+- `GET /api/v1/status` no longer returns `databaseHealth` and
+  `keyAvailability`, which were always `healthy` and `available`. A failed
+  count now comes back as `null` instead of failing the whole response.
+  `GET /api/v1/instance` reports `keyAvailability` as `changed` or `missing`
+  when the master key file no longer matches the key in use.
+
+- The Single sign-on page has a cleaner layout with the same settings. A
+  status card at the top always shows the provider, an **On**, **Off**,
+  **Untested** or **Not set up** badge, how many people have linked their
+  account and the last test sign-in, next to **Test sign-in** and **Turn
+  on**. Before the first good test, **Test sign-in** is the main button. The
+  warning about accounts without a password stays in that card and links to
+  Users. The Provider card is split into Redirect URI, Connection and Sign-in
+  button, each explained beside its fields, and **Save** moved to the bottom
+  next to the note that a new issuer, client ID or secret turns single
+  sign-on off until the next test. **Remove provider** is a quieter row with a
+  small button and the same confirmation.
 
 - **Give access** on a person's, AI agent's, or group's Access tab now opens
   its own page (`/users/{id}/access/new`, `/agents/{id}/access/new`,
@@ -173,6 +220,9 @@ All notable changes to Dopbase are documented in this file.
   leaves **Create your first project** as the last step, with **New project**
   and the CLI commands. It goes away once the first project exists. Other
   accounts still see the usual empty state.
+- AI agents and Groups show a small grey illustration when there are none
+  yet: an agent between its CI job and its token, or a person joining a group
+  that reaches a project.
 - A project with no environments used to open on a bare Access and Settings
   tab bar with one small card. Project managers now get a setup list: the
   project is done, and **Create environments** comes next, with development,
