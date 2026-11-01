@@ -104,3 +104,9 @@ const LEVEL_LABELS: Record<Level, string> = {
 export function formatLevel(level: Level): string {
   return LEVEL_LABELS[level];
 }
+
+/** "staging", "staging and prod", "staging, prod and qa". */
+export function formatList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}

@@ -12,7 +12,7 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
 import { formatDate } from "~/utils/format";
-import type { GrantPrincipal } from "~/components/app/GiveAccessDialog.controller";
+import type { GrantPrincipal } from "~/utils/level";
 import type { MembersTarget } from "./components/AddMembersDialog.controller";
 import { memberLabel } from "./Groups.controller";
 

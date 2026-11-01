@@ -94,6 +94,10 @@ const usage = computed(() =>
           v-if="activeTab === 'access' && access"
           :principal="principal"
           :grants="access.grants"
+          :give-to="{
+            name: 'agent-access-give',
+            params: { agentId: principal.id },
+          }"
           :summary="accessSummary"
           @changed="controller.reloadAccess" />
 

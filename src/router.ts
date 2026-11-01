@@ -184,6 +184,12 @@ export const router = createRouter({
       meta: { page: "users" },
     })),
     {
+      path: "/users/:userId/access/new",
+      name: "user-access-give",
+      component: () => import("~/pages/Access/GiveAccess.page.vue"),
+      meta: { page: "users" },
+    },
+    {
       path: "/agents",
       name: "agents",
       component: () => import("~/pages/Agents/Agents.page.vue"),
@@ -200,6 +206,12 @@ export const router = createRouter({
       component: () => import("~/pages/Agents/Agent.page.vue"),
       meta: { page: "agents" },
     })),
+    {
+      path: "/agents/:agentId/access/new",
+      name: "agent-access-give",
+      component: () => import("~/pages/Access/GiveAccess.page.vue"),
+      meta: { page: "agents" },
+    },
     {
       path: "/roles",
       name: "roles",
@@ -234,6 +246,12 @@ export const router = createRouter({
       component: () => import("~/pages/Groups/Group.page.vue"),
       meta: { page: "groups" },
     })),
+    {
+      path: "/groups/:groupId/access/new",
+      name: "group-access-give",
+      component: () => import("~/pages/Access/GiveAccess.page.vue"),
+      meta: { page: "groups" },
+    },
     {
       path: "/cli/approve",
       name: "cli-approve",

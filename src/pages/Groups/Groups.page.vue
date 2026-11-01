@@ -4,7 +4,6 @@ import GroupDialog from "./components/GroupDialog.vue";
 import AddMembersDialog from "./components/AddMembersDialog.vue";
 import { DashboardLayout } from "~/layouts";
 import PageHeader from "~/components/app/PageHeader.vue";
-import GiveAccessDialog from "~/components/app/GiveAccessDialog.vue";
 import {
   DbAlert,
   DbAvatar,
@@ -38,8 +37,6 @@ const {
   dialogOpen,
   editing,
   membersTarget,
-  accessFor,
-  accessPrincipal,
   deleting,
   deleteBusy,
   deleteError,
@@ -171,7 +168,7 @@ const {
                       <template #icon><UsersIcon class="h-4 w-4" /></template>
                       Add members
                     </DbMenuItem>
-                    <DbMenuItem @select="accessFor = row.group">
+                    <DbMenuItem @select="controller.giveAccess(row.group)">
                       <template #icon><FolderIcon class="h-4 w-4" /></template>
                       Give access
                     </DbMenuItem>
@@ -233,14 +230,6 @@ const {
       :people="people"
       @close="membersTarget = null"
       @saved="controller.membersAdded" />
-
-    <GiveAccessDialog
-      v-if="accessPrincipal"
-      :open="accessFor !== null"
-      :principal="accessPrincipal"
-      :existing="accessFor?.grants ?? []"
-      @close="accessFor = null"
-      @saved="controller.accessGiven" />
 
     <DbConfirmDialog
       :open="deleting !== null"

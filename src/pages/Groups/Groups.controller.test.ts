@@ -186,18 +186,14 @@ describe("useGroupsController", () => {
     expect(controller.membersTarget.value).toBeNull();
   });
 
-  it("gives access to the group as a group", async () => {
+  it("opens the Give access page for the group", () => {
     signInAs(["groups.manage"]);
     const { controller } = mountController(useGroupsController);
-    controller.accessFor.value = backend;
-    expect(controller.accessPrincipal.value).toEqual({
-      type: "group",
-      id: "grp_backend",
-      label: "Backend",
+    controller.giveAccess(backend);
+    expect(router.push).toHaveBeenCalledWith({
+      name: "group-access-give",
+      params: { groupId: "grp_backend" },
     });
-    await controller.accessGiven();
-    expect(controller.accessFor.value).toBeNull();
-    expect(controller.accessPrincipal.value).toBeNull();
   });
 
   it("deletes a group after the typed confirmation", async () => {

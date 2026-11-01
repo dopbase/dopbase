@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatRelativeTime,
   formatLevel,
+  formatList,
   formatRole,
 } from "./format";
 
@@ -92,5 +93,14 @@ describe("formatLevel", () => {
     expect(formatLevel("metadata")).toBe("Names only");
     expect(formatLevel("project_manager")).toBe("Project manager");
     expect(formatLevel("none")).toBe("No access");
+  });
+});
+
+describe("formatList", () => {
+  it("joins names the way a sentence would", () => {
+    expect(formatList([])).toBe("");
+    expect(formatList(["staging"])).toBe("staging");
+    expect(formatList(["staging", "prod"])).toBe("staging and prod");
+    expect(formatList(["staging", "prod", "qa"])).toBe("staging, prod and qa");
   });
 });
