@@ -59,9 +59,46 @@ vi.mock("./ImportSecretsDialog.controller", async () => {
     }),
   };
 });
+const routerPush = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
   useRoute: () => ({ name: "environment", query: {}, params: {} }),
+  useRouter: () => ({ push: routerPush }),
 }));
+const empty = await vi.hoisted(async () => {
+  const { ref } = await import("vue");
+  return {
+    view: ref<"loading" | "first-run" | "start">("first-run"),
+    sources: ref<unknown[] | null>([]),
+  };
+});
+vi.mock("./EmptyEnvironment.controller", () => ({
+  useEmptyEnvironmentController: () => empty,
+}));
+const copyDialog = vi.hoisted(() => ({
+  open: false,
+  source: null as { name: string } | null,
+  withValues: false,
+}));
+vi.mock("./CopySecretsDialog.vue", async () => {
+  const { defineComponent: define } = await import("vue");
+  return {
+    default: define({
+      props: {
+        open: Boolean,
+        source: { type: Object, default: null },
+        withValues: Boolean,
+      },
+      setup(props) {
+        return () => {
+          copyDialog.open = props.open;
+          copyDialog.source = props.source as { name: string } | null;
+          copyDialog.withValues = props.withValues;
+          return null;
+        };
+      },
+    }),
+  };
+});
 vi.mock("./EnvFileEditor.vue", () => ({
   default: defineComponent({ render: () => null }),
 }));
@@ -117,7 +154,7 @@ function button(text: string): HTMLButtonElement | undefined {
 /** Mounts an empty environment and opens Add secret from the checklist. */
 function mountPanel() {
   render();
-  button("Or add secrets one at a time")?.click();
+  button("Add secret")?.click();
   return nextTick();
 }
 
@@ -154,6 +191,9 @@ afterEach(() => {
   controller.copyValue.mockClear();
   controller.secrets.value = [];
   controller.filter.value = "";
+  empty.view.value = "first-run";
+  empty.sources.value = [];
+  routerPush.mockClear();
 });
 
 describe("SecretsPanel create dialog", () => {
@@ -311,27 +351,114 @@ describe("SecretsPanel empty environment", () => {
     await nextTick();
 
     const checklist = document.querySelector('[data-testid="first-run"]');
-    expect(checklist?.textContent).toContain(
-      "Get payments running with Dopbase",
-    );
+    expect(checklist?.textContent).toContain("Get payments running");
     expect(checklist?.textContent).toContain(
       "payments, with dev and production.",
+    );
+    expect(
+      checklist?.querySelector('[aria-current="step"]')?.textContent,
+    ).toContain("Add secrets to");
+    expect(checklist?.textContent).toContain(
+      "dopbase import payments/production .env",
     );
     expect(checklist?.textContent).toContain(
       "dopbase run payments/production -- npm run dev",
     );
+    const dropZone = checklist?.querySelector('[data-testid="env-drop-zone"]');
+    expect(dropZone?.textContent).toContain("Choose a file");
+    expect(dropZone?.textContent).toContain("Paste .env");
+    expect(dropZone?.textContent).toContain("Add secret");
     expect(
       document.querySelector('[data-testid="secrets-toolbar"]'),
     ).toBeNull();
   });
 
-  it("tells a reader nobody has stored a secret yet", async () => {
+  it("waits for the project's environments before picking a start", async () => {
+    empty.view.value = "loading";
+    render();
+    await nextTick();
+
+    expect(
+      document.querySelector('[data-testid="empty-skeleton"]'),
+    ).not.toBeNull();
+    expect(document.querySelector('[data-testid="first-run"]')).toBeNull();
+  });
+
+  it("starts from another environment's keys, values left empty by default", async () => {
+    empty.view.value = "start";
+    empty.sources.value = [
+      { id: "env_dev", name: "dev", secretCount: 14, canCopyValues: true },
+      { id: "env_qa", name: "qa", secretCount: 2, canCopyValues: true },
+    ];
+    render();
+    await nextTick();
+
+    const start = document.querySelector('[data-testid="empty-start"]');
+    expect(start?.textContent).toContain("production has no secrets yet");
+    expect(start?.textContent).toContain("dev already has 14.");
+    expect(start?.textContent).toContain("Values start empty");
+    expect(
+      start?.querySelector('[data-testid="env-drop-zone"]'),
+    ).not.toBeNull();
+    expect(start?.textContent).toContain(
+      "dopbase import payments/production .env",
+    );
+    expect(document.querySelector('[data-testid="first-run"]')).toBeNull();
+
+    button("Review 14 keys")?.click();
+    await nextTick();
+    expect(copyDialog).toMatchObject({
+      open: true,
+      source: { name: "dev" },
+      withValues: false,
+    });
+  });
+
+  it("asks for values only when chosen and readable", async () => {
+    empty.view.value = "start";
+    empty.sources.value = [
+      { id: "env_dev", name: "dev", secretCount: 14, canCopyValues: true },
+    ];
+    render();
+    await nextTick();
+
+    button("Keys and values")?.click();
+    await nextTick();
+    button("Review 14 keys")?.click();
+    await nextTick();
+
+    expect(copyDialog.withValues).toBe(true);
+  });
+
+  it("copies only keys from an environment you can't read", async () => {
+    empty.view.value = "start";
+    empty.sources.value = [
+      { id: "env_prod", name: "prod", secretCount: 1, canCopyValues: false },
+    ];
+    render();
+    await nextTick();
+
+    expect(button("Keys and values")).toBeUndefined();
+    expect(document.body.textContent).toContain("but not its values");
+    expect(button("Review 1 key")).toBeDefined();
+  });
+
+  it("tells a reader why they can't add secrets and where to ask", async () => {
     render("read");
     await nextTick();
 
     expect(document.querySelector('[data-testid="first-run"]')).toBeNull();
-    expect(document.body.textContent).toContain(
-      "Nobody has stored a secret here yet.",
+    const state = document.querySelector(
+      '[data-testid="secrets-read-only-empty"]',
     );
+    expect(state?.textContent).toContain("production has no secrets yet");
+    expect(state?.textContent).toContain("adding secrets needs write access");
+    expect(state?.textContent).toContain("dopbase run payments/production");
+
+    button("See who has access")?.click();
+    expect(routerPush).toHaveBeenCalledWith({
+      name: "project-access",
+      params: { projectRef: "payments" },
+    });
   });
 });

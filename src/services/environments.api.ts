@@ -9,6 +9,8 @@ export interface Environment {
   name: string;
   /** Reached only by a grant on the environment itself or a project manager. */
   protected?: boolean;
+  /** How many secrets it holds. Older servers leave it out. */
+  secretCount?: number;
   /** What you can do here. */
   level?: Level;
   createdAt: string;

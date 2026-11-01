@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useSecretsPanelController } from "./SecretsPanel.controller";
 import { useImportSecretsDialogController } from "./ImportSecretsDialog.controller";
 import EnvFileEditor from "./EnvFileEditor.vue";
 import FirstRunChecklist from "./FirstRunChecklist.vue";
+import EmptyEnvironmentStart from "./EmptyEnvironmentStart.vue";
+import CopySecretsDialog from "./CopySecretsDialog.vue";
+import {
+  useEmptyEnvironmentController,
+  type CopySource,
+} from "./EmptyEnvironment.controller";
 import ImportSecretsDialog from "./ImportSecretsDialog.vue";
 import ExportSecretsDialog from "./ExportSecretsDialog.vue";
 import SecretHistoryDialog from "./SecretHistoryDialog.vue";
@@ -15,7 +21,6 @@ import {
   DbCheckbox,
   DbConfirmDialog,
   DbCopyButton,
-  DbEmptyState,
   DbInput,
   DbMenu,
   DbMenuItem,
@@ -35,6 +40,7 @@ import {
   LockIcon,
   PencilIcon,
   PlusIcon,
+  ShieldIcon,
   TrashIcon,
   UploadIcon,
 } from "~/assets/icons";
@@ -80,6 +86,7 @@ const dropImport = useImportSecretsDialogController(
   ref(false),
 );
 const route = useRoute();
+const router = useRouter();
 // Returning from the full-page import sets an `imported` timestamp in the
 // query. Refetch so the table reflects what was just applied.
 watch(
@@ -163,7 +170,11 @@ const viewOptions = computed(() =>
     : [{ value: "table", label: "Table" }],
 );
 
-/** An empty environment walks writers through their first secrets. */
+/**
+ * An empty environment walks writers through their first secrets: the
+ * first-run checklist in a new project, or the start panel when another
+ * environment already has secrets to copy.
+ */
 const showChecklist = computed(
   () =>
     view.value === "table" &&
@@ -172,6 +183,26 @@ const showChecklist = computed(
     secrets.value.length === 0 &&
     !loading.value,
 );
+const { sources: copySources, view: emptyView } = useEmptyEnvironmentController(
+  environmentIdRef,
+  toRef(props, "projectName"),
+  showChecklist,
+);
+
+/** The source and choice the Copy dialog opened with. */
+const copyRequest = ref<{ source: CopySource; values: boolean } | null>(null);
+
+function onCopied(): void {
+  copyRequest.value = null;
+  void controller.reload();
+}
+
+function openProjectAccess(): void {
+  void router.push({
+    name: "project-access",
+    params: { projectRef: props.projectName },
+  });
+}
 
 /** Pending view switch while an unsaved-editor discard is confirmed. */
 const discardTarget = ref<PanelView | null>(null);
@@ -384,25 +415,66 @@ async function confirmDelete(): Promise<void> {
         {{ loadError }}
       </DbAlert>
 
-      <FirstRunChecklist
-        v-else-if="showChecklist"
-        :project-name="projectName"
-        :environment-name="environmentName"
-        :environment-names="environmentNames"
-        :importing="dropImport.parsing.value"
-        @choose-file="showImport = true"
-        @drop-file="dropImport.processFile"
-        @paste-env="switchView('editor')"
-        @add-one="openCreate" />
+      <template v-else-if="showChecklist">
+        <DbSkeleton
+          v-if="emptyView === 'loading'"
+          class="h-48 w-full max-w-[720px] rounded-card"
+          data-testid="empty-skeleton" />
+        <FirstRunChecklist
+          v-else-if="emptyView === 'first-run'"
+          :project-name="projectName"
+          :environment-name="environmentName"
+          :environment-names="environmentNames"
+          :importing="dropImport.parsing.value"
+          @choose-file="showImport = true"
+          @drop-file="dropImport.processFile"
+          @paste-env="switchView('editor')"
+          @add-one="openCreate" />
+        <EmptyEnvironmentStart
+          v-else-if="copySources"
+          :project-name="projectName"
+          :environment-name="environmentName"
+          :sources="copySources"
+          :importing="dropImport.parsing.value"
+          @review="(source, values) => (copyRequest = { source, values })"
+          @choose-file="showImport = true"
+          @drop-file="dropImport.processFile"
+          @paste-env="switchView('editor')"
+          @add-one="openCreate" />
+      </template>
 
-      <DbEmptyState
+      <!-- Someone who can't write: say why, and where to ask. -->
+      <div
         v-else-if="secrets && secrets.length === 0"
-        title="No secrets in this environment"
-        description="Nobody has stored a secret here yet.">
-        <template #icon>
+        class="mx-auto mt-6 flex w-full max-w-[600px] flex-col items-center gap-3 rounded-card border border-dashed border-line bg-panel/50 px-8 py-12 text-center"
+        data-testid="secrets-read-only-empty">
+        <div
+          class="flex h-11 w-11 items-center justify-center rounded-control border border-line bg-raised text-ink-muted">
           <KeyIcon class="h-5 w-5" />
-        </template>
-      </DbEmptyState>
+        </div>
+        <h3 class="text-base font-semibold text-ink-strong">
+          <span class="font-mono">{{ environmentName }}</span> has no secrets
+          yet
+        </h3>
+        <p class="max-w-md text-sm text-ink-muted">
+          {{ canRead ? "You can read" : "You can see the keys in" }}
+          <span class="font-mono">{{ environmentName }}</span
+          >, but adding secrets needs write access. A project manager of
+          <span class="font-mono">{{ projectName }}</span> can add them or
+          change your access.
+        </p>
+        <DbButton class="mt-1" @click="openProjectAccess">
+          <ShieldIcon class="h-4 w-4" />
+          See who has access
+        </DbButton>
+        <p v-if="canRead" class="max-w-md text-sm text-ink-faint">
+          Once secrets are here,
+          <span class="font-mono"
+            >dopbase run {{ projectName }}/{{ environmentName }}</span
+          >
+          works for you too.
+        </p>
+      </div>
 
       <div
         v-else-if="secrets && visibleSecrets"
@@ -782,6 +854,14 @@ async function confirmDelete(): Promise<void> {
       :environment-id="environmentId"
       :environment-name="environmentName"
       @close="showImport = false" />
+    <CopySecretsDialog
+      :open="copyRequest !== null"
+      :environment-id="environmentId"
+      :environment-name="environmentName"
+      :source="copyRequest?.source ?? null"
+      :with-values="copyRequest?.values ?? false"
+      @close="copyRequest = null"
+      @copied="onCopied" />
     <ExportSecretsDialog
       :open="showExport"
       :environment-name="environmentName"

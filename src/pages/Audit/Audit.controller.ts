@@ -29,6 +29,7 @@ export const AUDIT_ACTIONS: readonly string[] = [
   "secret.exported",
   "secret.runtime_accessed",
   "secret.copied",
+  "secret.bulk_copied",
   "project.created",
   "project.renamed",
   "project.deleted",
