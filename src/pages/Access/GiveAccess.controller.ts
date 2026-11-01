@@ -3,6 +3,7 @@ import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import {
+  LEVELS,
   fetchGroup,
   fetchUserAccess,
   reaches,
@@ -230,6 +231,24 @@ export function useGiveAccessController() {
   const levels = computed(() =>
     levelChoices(where.value, principal.value?.maxLevel),
   );
+
+  // Start from a level their role allows. Once their cap is known, or the
+  // scope changes, a level above it drops to the highest one allowed.
+  watch(levels, (choices) => {
+    if (!choices.find((choice) => choice.level === level.value)?.disabled)
+      return;
+    const allowed = choices
+      .filter((choice) => !choice.disabled && choice.level !== "none")
+      .map((choice) => choice.level);
+    const highest = allowed.reduce<Level | null>(
+      (best, candidate) =>
+        best === null || LEVELS.indexOf(candidate) > LEVELS.indexOf(best)
+          ? candidate
+          : best,
+      null,
+    );
+    if (highest) level.value = highest;
+  });
 
   /** What saving would write, one entry per grant. */
   const planned = computed<PlannedGrant[]>(() => {

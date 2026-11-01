@@ -262,6 +262,25 @@ describe("useGiveAccessController", () => {
     });
   });
 
+  it("starts from a level the role allows, and keeps to it across scopes", async () => {
+    vi.mocked(accessApi.fetchUserAccess).mockResolvedValueOnce(
+      accessFixture({ maxLevel: "metadata", grants: [] }),
+    );
+    const page = await open();
+    expect(page.level.value).toBe("metadata");
+    page.chooseProject("prj_pay");
+    page.where.value = "environment";
+    await settle();
+    expect(page.level.value).toBe("metadata");
+    page.where.value = "project";
+    await settle();
+    expect(page.level.value).toBe("metadata");
+    expect(await page.submit()).toBe(true);
+    expect(accessApi.setGrant).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "metadata" }),
+    );
+  });
+
   it("gives a group access as a group, without a role cap", async () => {
     route.name = "group-access-give";
     route.params = { groupId: "grp_backend" };
