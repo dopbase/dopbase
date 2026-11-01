@@ -36,6 +36,7 @@ const {
   newNameError,
   creating,
   created,
+  stopped,
   firstName,
   submitLabel,
   canCreate,
@@ -55,13 +56,6 @@ const runCommands = computed(() => [
   "dopbase login",
   `dopbase run ${props.projectName}/${firstName.value} -- npm run dev`,
 ]);
-/** Some made it and one failed: offer to go on with what exists. */
-const stopped = computed(
-  () =>
-    !creating.value &&
-    created.value.length > 0 &&
-    rows.value.some((row) => row.status === "failed"),
-);
 </script>
 
 <template>

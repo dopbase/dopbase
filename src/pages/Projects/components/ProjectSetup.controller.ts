@@ -16,7 +16,14 @@ export interface SetupRow {
   status: "idle" | "creating" | "created" | "failed";
   /** Why it failed, or what went wrong after it was created. */
   error: string | null;
+  /** Set once created. */
+  environmentId: string | null;
+  /** Created and meant to be protected, but turning protection on failed. */
+  unprotected: boolean;
 }
+
+const UNPROTECTED =
+  "Created, but not protected yet. Try again, or turn it on in Settings.";
 
 /** The server's rule for environment names. */
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -35,6 +42,8 @@ function presets(): SetupRow[] {
     custom: false,
     status: "idle",
     error: null,
+    environmentId: null,
+    unprotected: false,
   });
   return [
     row("development", "Laptops and feature branches."),
@@ -55,8 +64,10 @@ function presets(): SetupRow[] {
  *
  * Create makes the ticked ones in list order, one request each, then
  * protects the ones marked. A failure keeps what worked, marks the failed
- * row and stops there, so a retry only sends what's left. When everything
- * is in, `onDone` opens the first one created.
+ * row and stops there, so a retry only sends what's left. One that was
+ * created but couldn't be protected also stops it, and the retry turns
+ * protection on again. When everything is in, `onDone` opens the first one
+ * created.
  */
 export function useProjectSetupController(
   projectName: Ref<string>,
@@ -74,6 +85,18 @@ export function useProjectSetupController(
   const created = computed(() =>
     rows.value.filter((row) => row.status === "created"),
   );
+  /** Created, but protection still has to be turned on. */
+  const unprotected = computed(() =>
+    rows.value.filter((row) => row.unprotected),
+  );
+  /** Something failed: stay here so the error can be read and retried. */
+  const stopped = computed(
+    () =>
+      !creating.value &&
+      created.value.length > 0 &&
+      (unprotected.value.length > 0 ||
+        rows.value.some((row) => row.status === "failed")),
+  );
   /** The environment the run commands point at. */
   const firstName = computed(
     () =>
@@ -84,12 +107,17 @@ export function useProjectSetupController(
 
   const submitLabel = computed(() => {
     const count = pending.value.length;
+    if (count === 0 && unprotected.value.length > 0) return "Try again";
     if (count === 0) return "Create environments";
     return count === 1
       ? "Create 1 environment"
       : `Create ${count} environments`;
   });
-  const canCreate = computed(() => !creating.value && pending.value.length > 0);
+  const canCreate = computed(
+    () =>
+      !creating.value &&
+      (pending.value.length > 0 || unprotected.value.length > 0),
+  );
 
   function nameProblem(name: string): string | null {
     if (!name) return "Type a name first.";
@@ -114,6 +142,8 @@ export function useProjectSetupController(
       custom: true,
       status: "idle",
       error: null,
+      environmentId: null,
+      unprotected: false,
     });
     newName.value = "";
     return true;
@@ -131,11 +161,29 @@ export function useProjectSetupController(
     newNameError.value = null;
   }
 
+  /** Turns protection on for a created row. False when that failed. */
+  async function protect(row: SetupRow): Promise<boolean> {
+    try {
+      await environmentsApi.setEnvironmentProtected(row.environmentId!, true);
+      row.unprotected = false;
+      row.error = null;
+      return true;
+    } catch {
+      // It exists, so carry on; say where to finish the job.
+      row.unprotected = true;
+      row.error = UNPROTECTED;
+      return false;
+    }
+  }
+
   async function create(): Promise<void> {
     if (!canCreate.value) return;
     creating.value = true;
     let failed = false;
-    for (const row of pending.value) {
+    for (const row of unprotected.value) {
+      if (!(await protect(row))) failed = true;
+    }
+    for (const row of failed ? [] : pending.value) {
       row.status = "creating";
       row.error = null;
       let environment: Environment;
@@ -151,13 +199,10 @@ export function useProjectSetupController(
         break;
       }
       row.status = "created";
-      if (row.protected) {
-        try {
-          await environmentsApi.setEnvironmentProtected(environment.id, true);
-        } catch {
-          // It exists, so carry on; say where to finish the job.
-          row.error = "Created, but not protected yet. Turn it on in Settings.";
-        }
+      row.environmentId = environment.id;
+      if (row.protected && !(await protect(row))) {
+        failed = true;
+        break;
       }
     }
     creating.value = false;
@@ -177,6 +222,8 @@ export function useProjectSetupController(
     creating,
     pending,
     created,
+    unprotected,
+    stopped,
     firstName,
     submitLabel,
     canCreate,

@@ -45,8 +45,8 @@ Project managers get a setup list where the secrets would be, with
 development, staging and production ticked and production protected. Untick
 any of them, flip **Protected**, or type another name under **Add another**.
 **Create** makes the ticked ones in order and opens the first one's secrets.
-If one fails, the others stay and its row says why, so you can try again,
-untick it, or open the ones already created. The project bar reads **No
+If one fails, or can't be made protected, the others stay and its row says
+why, so you can try again, untick it, or open the ones already created. The project bar reads **No
 environments**, and its menu has **New environment**. Anyone else is told
 that nobody has created an environment they can reach yet.
 
