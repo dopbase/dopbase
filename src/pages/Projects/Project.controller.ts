@@ -190,7 +190,14 @@ export function useProjectController() {
     void router.replace(environmentLocation(list[0].name, "secrets"));
   });
 
-  const level = computed(() => environment.value?.level);
+  // With no environment open, show the project's own level instead.
+  const level = computed(() =>
+    environment.value
+      ? environment.value.level
+      : environments.value?.length === 0
+        ? project.value?.level
+        : undefined,
+  );
   const meter = computed(() => (level.value ? levelMeter(level.value) : null));
   // Responses without a level come from servers that predate grants.
   const managesEnvironment = computed(
@@ -322,10 +329,15 @@ export function useProjectController() {
       projectName.value,
       name,
     );
+    await openEnvironment(created.name);
+  }
+
+  /** Opens the Secrets of an environment that was just created. */
+  async function openEnvironment(name: string): Promise<void> {
     // Refresh in place first, so the new environment is in the list when
     // its page opens and the panels don't drop back to a skeleton.
     await refresh();
-    await router.push(environmentLocation(created.name, "secrets"));
+    await router.push(environmentLocation(name, "secrets"));
   }
 
   return {
@@ -352,6 +364,7 @@ export function useProjectController() {
     switchEnvironment,
     openActivity,
     createEnvironment,
+    openEnvironment,
   };
 }
 

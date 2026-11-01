@@ -11,6 +11,7 @@ import ActivityPanel from "./components/ActivityPanel.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import RunDialog from "./components/RunDialog.vue";
 import NameDialog from "./components/NameDialog.vue";
+import ProjectSetup from "./components/ProjectSetup.vue";
 import { DashboardLayout } from "~/layouts";
 import { DbAlert, DbButton, DbEmptyState, DbSkeleton } from "~/components/ui";
 import { LayersIcon, PlusIcon } from "~/assets/icons";
@@ -63,6 +64,11 @@ const environmentNames = computed(
   () => environments.value?.map((candidate) => candidate.name) ?? [],
 );
 
+/** Where a project tab lives, when you can open it. */
+function tabTo(key: "access" | "settings") {
+  return tabs.value.find((tab) => tab.key === key)?.to ?? null;
+}
+
 useSingleKeyShortcut("e", () => contextBar.value?.openEnvironmentMenu());
 </script>
 
@@ -112,6 +118,31 @@ useSingleKeyShortcut("e", () => contextBar.value?.openEnvironmentMenu());
         </div>
 
         <!-- Access and Settings work without environments; the rest don't. -->
+        <ProjectSetup
+          v-else-if="
+            environments.length === 0 &&
+            !projectLevel &&
+            project !== null &&
+            managesProject
+          "
+          :project-name="projectName"
+          :access-to="tabTo('access')"
+          :settings-to="tabTo('settings')"
+          @created="controller.openEnvironment" />
+
+        <div
+          v-else-if="
+            environments.length === 0 &&
+            !projectLevel &&
+            projects === null &&
+            !projectsError
+          "
+          class="flex flex-col gap-3"
+          data-testid="project-skeleton">
+          <DbSkeleton class="h-9 w-full max-w-md rounded-control" />
+          <DbSkeleton class="h-64 w-full rounded-card" />
+        </div>
+
         <DbEmptyState
           v-else-if="
             environments.length === 0 &&
