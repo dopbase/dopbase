@@ -250,3 +250,69 @@ async fn copy_many_needs_names_only_for_keys_and_read_for_values() {
   }
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn copy_many_copies_the_source_as_it_is_when_it_writes() {
+  let (_dir, state, router) = test_app().await;
+  let (root, env) = instance(&state, &router).await;
+  let dev = &env["payments/dev"];
+  put(&router, &root, dev, "DB_PASSWORD", "old").await;
+  put(&router, &root, dev, "DB_PASSWORD", "rotated").await;
+  put(&router, &root, dev, "GONE", "soon").await;
+  let staging = add_environment(&router, &root, "staging").await;
+
+  // A key deleted from the source is not found, and nothing is copied.
+  let (status, _) = send(
+    &router,
+    "DELETE",
+    &format!("/api/v1/environments/{dev}/secrets/GONE"),
+    root.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200);
+  let (status, body) = copy_many(
+    &router,
+    root.browser(),
+    &staging,
+    json!({ "from": dev, "keys": ["DB_PASSWORD", "GONE"], "values": true }),
+  )
+  .await;
+  assert_eq!(status, 404, "{body}");
+  let (_, list) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/environments/{staging}/secrets"),
+    root.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(list["data"], json!([]));
+
+  // The copy and its audit event carry the source's current version.
+  let (status, body) = copy_many(
+    &router,
+    root.browser(),
+    &staging,
+    json!({ "from": dev, "keys": ["DB_PASSWORD"], "values": true }),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(
+    reveal(&router, &root, &staging, "DB_PASSWORD").await,
+    "rotated"
+  );
+  let (_, events) = send(
+    &router,
+    "GET",
+    "/api/v1/audit-events?action=secret.bulk_copied",
+    root.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(
+    events["data"]["items"][0]["metadata"]["copied"],
+    json!({ "DB_PASSWORD": 2 })
+  );
+  state.db.close().await;
+}

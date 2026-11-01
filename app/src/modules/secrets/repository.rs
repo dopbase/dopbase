@@ -41,11 +41,11 @@ pub async fn list(
   .fetch_all(pool)
   .await
 }
-pub async fn rows(
-  pool: &SqlitePool,
+pub async fn rows<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
   environment_id: &str,
 ) -> Result<Vec<SecretRow>, sqlx::Error> {
-  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(pool).await
+  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(executor).await
 }
 pub async fn find(
   pool: &SqlitePool,

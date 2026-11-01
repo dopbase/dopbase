@@ -288,17 +288,17 @@ pub async fn copy_many(
       "Copy from an environment in the same project.",
     ));
   }
-  let source_rows: HashMap<String, repository::SecretRow> =
-    repository::rows(state.db.pool(), &source.id)
-      .await?
-      .into_iter()
-      .map(|row| (row.key.clone(), row))
-      .collect();
+  // The source is read in the write transaction, so what is copied and the
+  // versions the audit event records are the source as it is at the write.
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let source_rows: HashMap<String, repository::SecretRow> = repository::rows(&mut *tx, &source.id)
+    .await?
+    .into_iter()
+    .map(|row| (row.key.clone(), row))
+    .collect();
   if keys.iter().any(|key| !source_rows.contains_key(key)) {
     return Err(secret_not_found());
   }
-
-  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let existing: HashSet<String> =
     sqlx::query_scalar("SELECT key FROM secrets WHERE environment_id=?")
       .bind(id)
