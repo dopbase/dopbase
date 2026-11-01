@@ -1435,6 +1435,8 @@ mod personal_tokens_tokens;
 mod roles_custom;
 #[path = "modules/secrets/compare.rs"]
 mod secrets_compare;
+#[path = "modules/secrets/copy.rs"]
+mod secrets_copy;
 #[path = "modules/secrets/import.rs"]
 mod secrets_import;
 #[path = "modules/secrets/versions.rs"]

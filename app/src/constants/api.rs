@@ -144,6 +144,8 @@ pub mod secrets {
   pub const COPY: &str = api_path!("/environments/{environment_id}/secrets/{key}/copy");
   /// Outside `/secrets/` so it never shadows a secret named `compare`.
   pub const COMPARE: &str = api_path!("/environments/{environment_id}/compare");
+  /// Outside `/secrets/` so it never shadows a secret named `copy`.
+  pub const COPY_MANY: &str = api_path!("/environments/{environment_id}/copy-secrets");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])

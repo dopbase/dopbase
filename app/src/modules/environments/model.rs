@@ -11,6 +11,8 @@ pub struct EnvironmentResponse {
   /// Reached only through a grant on the environment itself or a project
   /// manager grant.
   pub protected: bool,
+  /// How many secrets it holds.
+  pub secret_count: i64,
   /// What the caller can do here.
   #[sqlx(skip)]
   pub level: Level,

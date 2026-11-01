@@ -183,6 +183,26 @@ pub struct CopySecretRequest {
   #[serde(default)]
   pub expected_version: Option<i64>,
 }
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CopySecretsRequest {
+  /// The environment to copy from, in the same project.
+  pub from: String,
+  /// Keys to copy. Each must exist in the source.
+  pub keys: Vec<String>,
+  /// Copy the source's values too. Without it every key is created with an
+  /// empty value, and Names only on the source is enough.
+  #[serde(default)]
+  pub values: bool,
+}
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CopySecretsResponse {
+  /// Keys created here, A to Z.
+  pub copied_keys: Vec<String>,
+  /// Keys left alone because this environment already has them.
+  pub skipped_keys: Vec<String>,
+}
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RollbackSecretResponse {
