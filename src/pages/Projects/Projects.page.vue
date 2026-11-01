@@ -2,6 +2,7 @@
 import { useProjectsController } from "./Projects.controller";
 import ProjectTree from "./components/ProjectTree.vue";
 import NameDialog from "./components/NameDialog.vue";
+import SetupChecklist from "./components/SetupChecklist.vue";
 import { DashboardLayout } from "~/layouts";
 import {
   DbAlert,
@@ -26,6 +27,9 @@ const {
   filter,
   rows,
   canCreateProjects,
+  showSetupChecklist,
+  accountEmail,
+  signInMethods,
   nameDialog,
   nameDialogCopy,
   deleting,
@@ -87,6 +91,13 @@ const CREATE_COMMAND = "dopbase project create payments";
           </div>
         </div>
       </div>
+
+      <!-- Root finishing setup: carry on the setup steps -->
+      <SetupChecklist
+        v-else-if="showSetupChecklist"
+        :email="accountEmail"
+        :sign-in-methods="signInMethods"
+        @new-project="nameDialog = { kind: 'new-project' }" />
 
       <!-- No projects yet -->
       <div
