@@ -1,9 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { RESET_PHRASE, useInstanceController } from "./Instance.controller";
+import {
+  POLL_INTERVAL_MS,
+  RESET_PHRASE,
+  useInstanceController,
+} from "./Instance.controller";
 import * as instanceApi from "~/services/instance.api";
 import * as backupsApi from "~/services/backups.api";
 import { saveBlob } from "~/utils/download";
+import { copyText } from "~/utils/clipboard";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
 import { settle, signInAs } from "~/tests/people";
@@ -17,13 +22,38 @@ vi.mock("vue-router", () => ({
 vi.mock("~/services/instance.api");
 vi.mock("~/services/backups.api");
 vi.mock("~/utils/download");
+vi.mock("~/utils/clipboard");
 
+const check = (
+  id: string,
+  status: instanceApi.CheckStatus,
+  title: string,
+  extra: Partial<instanceApi.StatusCheck> = {},
+): instanceApi.StatusCheck => ({
+  id,
+  status,
+  title,
+  detail: `${title} detail`,
+  value: null,
+  fixPath: null,
+  lastRunAt: "2026-08-28T11:59:50Z",
+  ...extra,
+});
+
+const passingChecks = [
+  check("database.ping", "ok", "Database answers", { value: "3 ms" }),
+  check("master_key.file", "ok", "Master key matches the database"),
+  check("audit.chain", "ok", "Audit log chain is intact", {
+    value: "1,284 events",
+  }),
+];
+
+/** State A: one critical, two warnings and a tip. */
 const mockStatus: instanceApi.StatusResponse = {
   version: "0.1.0",
   uptimeSeconds: 8100, // 2h 15m
   initializationState: "ready",
-  databaseHealth: "healthy",
-  keyAvailability: "available",
+  platform: { os: "linux", arch: "x86_64" },
   projects: 3,
   environments: 6,
   secrets: 12,
@@ -32,7 +62,94 @@ const mockStatus: instanceApi.StatusResponse = {
   activeRunnerTokens: 2,
   activeAgentTokens: 1,
   backups: 4,
+  summary: {
+    critical: 1,
+    warnings: 2,
+    tips: 1,
+    passed: 3,
+    checkedAt: "2026-08-28T11:59:50Z",
+  },
+  checks: [
+    check("backup.age", "crit", "No backup in 12 days", {
+      fixPath: "/backups",
+    }),
+    check("tokens.expiring", "warn", "3 tokens expire this week", {
+      fixPath: "/projects/p/prj_1/e/env_1/tokens",
+    }),
+    check("backup.offsite", "warn", "The latest backup was never downloaded", {
+      fixPath: "/backups",
+    }),
+    check("audit.retention", "tip", "The audit log has no size limit", {
+      fixPath: "https://docs.dopbase.com/cli/serve#configuration-files",
+    }),
+    ...passingChecks,
+  ],
+  health: {
+    database: { status: "ok", pingMs: 3.2, sizeBytes: 50_331_648 },
+    masterKey: { status: "ok", file: "matches" },
+    disk: {
+      status: "ok",
+      freeBytes: 18 * 1024 ** 3,
+      totalBytes: 64 * 1024 ** 3,
+    },
+    auditLog: {
+      status: "ok",
+      events: 1284,
+      intact: true,
+      checkedAt: "2026-08-28T11:58:00Z",
+    },
+  },
+  activity: {
+    hours: [],
+    secretReads: {
+      total: 1204,
+      hourly: Array.from({ length: 24 }, (_, hour) => hour),
+      runnerTokens: 3,
+      people: 2,
+    },
+    failedSignIns: {
+      total: 3,
+      hourly: [],
+      accounts: ["root@example.com"],
+      addresses: ["203.0.113.7"],
+    },
+    rateLimited: { total: 0, hourly: [] },
+    activeSessions: { browser: 2, cli: 2 },
+  },
+  latestRelease: {
+    version: "v0.3.1",
+    updateAvailable: true,
+    url: "https://github.com/dopbase/dopbase/releases/tag/v0.3.1",
+    checkedAt: "2026-08-28T06:00:00Z",
+  },
   observedAt: "2026-08-28T12:00:00Z",
+};
+
+/** State B: every check passes. */
+const allGood: instanceApi.StatusResponse = {
+  ...mockStatus,
+  summary: { ...mockStatus.summary!, critical: 0, warnings: 0, tips: 0 },
+  checks: passingChecks,
+  latestRelease: { ...mockStatus.latestRelease!, updateAvailable: false },
+};
+
+/** State C: the key file on disk changed. */
+const keyChanged: instanceApi.StatusResponse = {
+  ...mockStatus,
+  summary: { ...mockStatus.summary!, critical: 1, warnings: 0, tips: 0 },
+  checks: [
+    check(
+      "master_key.file",
+      "crit",
+      "The key file no longer matches the key in use",
+      { fixPath: "/backups" },
+    ),
+    ...passingChecks.filter((item) => item.id !== "master_key.file"),
+  ],
+  health: {
+    ...mockStatus.health!,
+    masterKey: { status: "crit", file: "changed" },
+  },
 };
 
 async function mounted() {
@@ -58,6 +175,19 @@ describe("useInstanceController", () => {
     expect(c.formattedObservedAt.value).toMatch(/\d/);
     expect(c.relativeObservedAt.value).not.toBe("");
     expect(c.relativeBootTime.value).not.toBe("");
+  });
+
+  it("shows a dash for a count the server couldn't read", async () => {
+    signInAs([]);
+    vi.mocked(instanceApi.fetchStatus).mockResolvedValueOnce({
+      ...mockStatus,
+      activeAgentTokens: null,
+    });
+    const c = await mounted();
+
+    expect(
+      c.counts.value.find((item) => item.label === "AI agent tokens")?.value,
+    ).toBe("—");
   });
 
   it("lists only the counts the status API returns", async () => {
@@ -87,18 +217,310 @@ describe("useInstanceController", () => {
     ).toEqual(["People", "AI agents", "Runner tokens", "AI agent tokens"]);
   });
 
-  it.each([
-    ["healthy", "ok", "Healthy", "ok"],
-    ["available", "ok", "Available", "ok"],
-    ["unhealthy", "crit", "Unhealthy", "down"],
-    ["unavailable", "crit", "Unavailable", "down"],
-    ["unknown", "neutral", "Unknown", "unknown"],
-  ] as const)("shows %s as a %s stat", (value, tone, label, badge) => {
-    signInAs([]);
-    const { controller: c } = mountController(useInstanceController);
-    expect(c.healthTone(value)).toBe(tone);
-    expect(c.healthLabel(value)).toBe(label);
-    expect(c.healthBadge(value)).toBe(badge);
+  describe("banner", () => {
+    it("counts what needs attention and offers the new release", async () => {
+      signInAs(["instance.view"]);
+      const c = await mounted();
+
+      expect(c.banner.value).toMatchObject({
+        tone: "crit",
+        title: "4 things need attention",
+        keyProblem: false,
+      });
+      expect(c.banner.value?.detail).toMatch(
+        /^1 critical, 2 warnings and 1 tip\. 3 other checks passed\. Checked /,
+      );
+      expect(c.serverLine.value).toBe("Dopbase 0.1.0 · up 2h 15m");
+      expect(c.releaseBadge.value).toEqual({
+        tone: "accent",
+        text: "0.3.1 is out",
+      });
+    });
+
+    it("is calm when every check passes", async () => {
+      signInAs(["instance.view"]);
+      vi.mocked(instanceApi.fetchStatus).mockResolvedValue(allGood);
+      const c = await mounted();
+
+      expect(c.banner.value).toMatchObject({
+        tone: "ok",
+        title: "Everything looks good",
+      });
+      expect(c.banner.value?.detail).toMatch(/^All 3 checks passed\. /);
+      expect(c.releaseBadge.value).toEqual({
+        tone: "ok",
+        text: "latest version",
+      });
+    });
+
+    it("leads with the key file when it no longer matches", async () => {
+      signInAs(["instance.view"]);
+      vi.mocked(instanceApi.fetchStatus).mockResolvedValue(keyChanged);
+      const c = await mounted();
+
+      expect(c.banner.value).toMatchObject({
+        tone: "crit",
+        title: "The master key file changed on disk",
+        keyProblem: true,
+      });
+      expect(c.healthCards.value[1]).toMatchObject({
+        value: "File changed",
+        badge: { tone: "crit", text: "at risk" },
+        detail: "Key in use still works",
+      });
+    });
+
+    it("is left out for viewers without instance.view", async () => {
+      signInAs([]);
+      vi.mocked(instanceApi.fetchStatus).mockResolvedValue({
+        ...mockStatus,
+        summary: null,
+        checks: null,
+        health: null,
+        activity: null,
+        latestRelease: null,
+      });
+      const c = await mounted();
+
+      expect(c.banner.value).toBeNull();
+      expect(c.hasChecks.value).toBe(false);
+      expect(c.healthCards.value).toEqual([]);
+      expect(c.activityTiles.value).toEqual([]);
+    });
+  });
+
+  it("reads the four health cards", async () => {
+    signInAs(["instance.view"]);
+    const c = await mounted();
+
+    expect(
+      c.healthCards.value.map(({ label, value, badge, detail }) => ({
+        label,
+        value,
+        badge: badge.text,
+        detail,
+      })),
+    ).toEqual([
+      {
+        label: "Database",
+        value: "Healthy",
+        badge: "ok",
+        detail: "3 ms to answer · 48 MB",
+      },
+      {
+        label: "Master key",
+        value: "Verified",
+        badge: "ok",
+        detail: "Matches this database",
+      },
+      {
+        label: "Disk",
+        value: "18 GB free",
+        badge: "ok",
+        detail: "72% of the data disk used",
+      },
+      {
+        label: "Audit log",
+        value: "Intact",
+        badge: "ok",
+        detail: expect.stringMatching(/^Chain checked /),
+      },
+    ]);
+  });
+
+  it("sums up the last 24 hours", async () => {
+    signInAs(["instance.view"]);
+    const c = await mounted();
+
+    expect(
+      c.activityTiles.value.map(({ label, value, detail }) => ({
+        label,
+        value,
+        detail,
+      })),
+    ).toEqual([
+      {
+        label: "Secret reads",
+        value: "1,204",
+        detail: "By 3 runner tokens and 2 people",
+      },
+      {
+        label: "Failed sign-ins",
+        value: "3",
+        detail: "All for root@example.com, from 203.0.113.7",
+      },
+      {
+        label: "Rate limited",
+        value: "0",
+        detail: "No client was slowed down",
+      },
+      {
+        label: "Active sessions",
+        value: "4",
+        detail: "2 browser sessions, 2 CLI sessions",
+      },
+    ]);
+    expect(c.activityTiles.value[0].hourly).toHaveLength(24);
+  });
+
+  it("splits failing checks from passing ones and folds the passing", async () => {
+    signInAs(["instance.view"]);
+    const c = await mounted();
+
+    expect(c.attention.value.map((item) => item.id)).toEqual([
+      "backup.age",
+      "tokens.expiring",
+      "backup.offsite",
+      "audit.retention",
+    ]);
+    expect(c.passed.value).toHaveLength(3);
+    expect(c.showPassed.value).toBe(false);
+    expect(c.severityLabel("crit")).toBe("Critical");
+    expect(c.severityTone("tip")).toBe("neutral");
+  });
+
+  describe("fix actions", () => {
+    it("hide fixes the viewer can't use", async () => {
+      signInAs(["instance.view"]);
+      const c = await mounted();
+      const [backup, tokens, offsite, retention] = c.attention.value;
+
+      expect(c.fixAction(backup)).toBeNull();
+      expect(c.fixAction(offsite)).toBeNull();
+      expect(c.fixAction(tokens)).toMatchObject({
+        label: "Review tokens",
+        kind: "route",
+        to: "/projects/p/prj_1/e/env_1/tokens",
+      });
+      expect(c.fixAction(retention)).toMatchObject({
+        label: "How to set it",
+        kind: "external",
+      });
+    });
+
+    it("go to the page that fixes the check", async () => {
+      signInAs(["instance.view", "instance.backup"]);
+      const c = await mounted();
+      const [backup] = c.attention.value;
+
+      expect(c.fixAction(backup)).toMatchObject({
+        label: "Create backup",
+        to: "/backups",
+      });
+      await c.runFix(backup);
+      expect(routerPush).toHaveBeenCalledWith("/backups");
+    });
+
+    it("download the key in use for root only", async () => {
+      signInAs(["instance.view", "instance.backup"]);
+      vi.mocked(instanceApi.fetchStatus).mockResolvedValue(keyChanged);
+      const admin = await mounted();
+      expect(admin.fixAction(admin.attention.value[0])).toBeNull();
+
+      setActivePinia(createPinia());
+      signInAs([], { adminId: "usr_root", role: "root" });
+      const key = new Blob(["key"]);
+      vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(key);
+      const c = await mounted();
+      const [keyCheck] = c.attention.value;
+
+      expect(c.fixAction(keyCheck)).toMatchObject({
+        label: "Download key in use",
+        kind: "master-key",
+      });
+      await c.runFix(keyCheck);
+      expect(saveBlob).toHaveBeenCalledWith(key, "master.key");
+    });
+  });
+
+  describe("polling", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("asks again every 30 seconds", async () => {
+      signInAs(["instance.view"]);
+      mountController(useInstanceController);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(instanceApi.fetchStatus).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      expect(instanceApi.fetchStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the last results when a poll fails", async () => {
+      signInAs(["instance.view"]);
+      const { controller: c } = mountController(useInstanceController);
+      await vi.advanceTimersByTimeAsync(0);
+      vi.mocked(instanceApi.fetchStatus).mockRejectedValueOnce(
+        new Error("Network failed"),
+      );
+
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+      expect(c.status.value).toEqual(mockStatus);
+      expect(c.loadError.value).toBeNull();
+      expect(c.staleSince.value).toBe(mockStatus.observedAt);
+    });
+
+    it("stops when the page closes", async () => {
+      signInAs(["instance.view"]);
+      const { unmount } = mountController(useInstanceController);
+      await vi.advanceTimersByTimeAsync(0);
+      unmount();
+
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2);
+      expect(instanceApi.fetchStatus).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("run checks", () => {
+    it("shows the fresh results", async () => {
+      signInAs(["instance.view"]);
+      vi.mocked(instanceApi.runStatusChecks).mockResolvedValueOnce(allGood);
+      const c = await mounted();
+
+      await c.runChecks();
+
+      expect(c.status.value).toEqual(allGood);
+      expect(c.running.value).toBe(false);
+      expect(c.runError.value).toBeNull();
+    });
+
+    it("explains the wait when checks just ran", async () => {
+      signInAs(["instance.view"]);
+      vi.mocked(instanceApi.runStatusChecks).mockRejectedValueOnce(
+        new ApiError(429, {}, "Too many requests."),
+      );
+      const c = await mounted();
+
+      await c.runChecks();
+
+      expect(c.runError.value).toBe(
+        "Checks just ran. Wait a few seconds and try again.",
+      );
+      expect(c.status.value).toEqual(mockStatus);
+    });
+  });
+
+  it("copies a plain-text report of what the page shows", async () => {
+    signInAs(["instance.view"]);
+    vi.mocked(copyText).mockResolvedValueOnce(true);
+    const c = await mounted();
+
+    const report = c.diagnosticsText();
+    expect(report).toContain("Dopbase 0.1.0 on linux/x86_64, up 2h 15m");
+    expect(report).toContain(
+      "Checks: 1 critical, 2 warnings, 1 tips, 3 passed",
+    );
+    expect(report).toContain(
+      "[crit] No backup in 12 days: No backup in 12 days detail",
+    );
+    expect(report).toContain("[ok] Database answers (3 ms)");
+    expect(report).toContain("1204 secret reads, 3 failed sign-ins");
+
+    await c.copyDiagnostics();
+    expect(copyText).toHaveBeenCalledWith(report);
+    expect(c.diagnosticsCopied.value).toBe(true);
   });
 
   it("handles a load error", async () => {
@@ -155,6 +577,12 @@ describe("useInstanceController", () => {
   });
 
   describe("factory reset", () => {
+    it("starts folded", async () => {
+      signInAs([], { adminId: "usr_root", role: "root" });
+      const c = await mounted();
+      expect(c.resetOpen.value).toBe(false);
+    });
+
     it("stays off until the box is ticked, the phrase matches and a password is in", async () => {
       signInAs([], { adminId: "usr_root", role: "root" });
       const c = await mounted();
