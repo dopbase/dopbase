@@ -2,6 +2,7 @@
 import { useGroupsController } from "./Groups.controller";
 import GroupDialog from "./components/GroupDialog.vue";
 import AddMembersDialog from "./components/AddMembersDialog.vue";
+import GroupsEmptyArt from "./components/GroupsEmptyArt.vue";
 import { DashboardLayout } from "~/layouts";
 import PageHeader from "~/components/app/PageHeader.vue";
 import {
@@ -9,6 +10,7 @@ import {
   DbAvatar,
   DbButton,
   DbConfirmDialog,
+  DbEmptyState,
   DbMenu,
   DbMenuItem,
   DbSearchField,
@@ -74,14 +76,12 @@ const {
           class="h-12 w-full rounded-control" />
       </div>
 
-      <div
+      <DbEmptyState
         v-else-if="groups.length === 0"
-        class="rounded-card border border-dashed border-line px-6 py-10 text-center">
-        <p class="text-sm font-medium text-ink-strong">No groups yet</p>
-        <p class="mt-1 text-sm text-ink-muted">
-          Groups save you giving the same access to people one at a time.
-        </p>
-      </div>
+        title="No groups yet"
+        description="Groups save you giving the same access to people one at a time.">
+        <template #art><GroupsEmptyArt /></template>
+      </DbEmptyState>
 
       <template v-else>
         <!-- Table on wider screens -->
