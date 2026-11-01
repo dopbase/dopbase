@@ -266,17 +266,24 @@ export function useAccessGrantsPanel(
       removing.value = null;
       await changed();
     } catch (cause) {
-      if (cause instanceof DOMException && cause.name === "AbortError") return;
-      const reason = errorMessage(cause, "Could not remove that access.");
+      // Cancelling the sign-in prompt says nothing unless some went already.
+      const aborted =
+        cause instanceof DOMException && cause.name === "AbortError";
       if (done === 0) {
-        removeError.value = reason;
+        if (!aborted)
+          removeError.value = errorMessage(
+            cause,
+            "Could not remove that access.",
+          );
         return;
       }
       // Keep the rest in the dialog, so confirming again only tries those.
       const gone = todo.slice(0, done).map((row) => row.grant.id);
       selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
       removing.value = todo.slice(done);
-      removeError.value = `Removed ${done} of ${todo.length}. ${rowLabel(todo[done]!)} failed: ${reason}`;
+      removeError.value = aborted
+        ? `Removed ${done} of ${todo.length}. Confirm again to remove the rest.`
+        : `Removed ${done} of ${todo.length}. ${rowLabel(todo[done]!)} failed: ${errorMessage(cause, "Could not remove that access.")}`;
       await Promise.resolve(changed()).catch(() => undefined);
     } finally {
       removeBusy.value = false;

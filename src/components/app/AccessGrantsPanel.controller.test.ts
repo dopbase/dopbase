@@ -300,6 +300,41 @@ describe("useAccessGrantsPanel", () => {
     expect(changed).toHaveBeenCalledOnce();
   });
 
+  it("drops what went from the confirm when sign-in is cancelled partway", async () => {
+    vi.mocked(accessApi.removeGrant)
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new DOMException("Cancelled", "AbortError"));
+    const { panel: p, changed } = panel([direct, prodOverride]);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    await p.confirmRemove();
+    expect(p.removing.value?.map((row) => row.grant.id)).toEqual(["grt_prod"]);
+    expect(p.selectedRows.value.map((row) => row.grant.id)).toEqual([
+      "grt_prod",
+    ]);
+    expect(p.removeError.value).toBe(
+      "Removed 1 of 2. Confirm again to remove the rest.",
+    );
+    expect(changed).toHaveBeenCalledOnce();
+
+    // Confirming again only sends the one that's left.
+    vi.mocked(accessApi.removeGrant).mockClear().mockResolvedValue();
+    await p.confirmRemove();
+    expect(vi.mocked(accessApi.removeGrant).mock.calls).toEqual([["grt_prod"]]);
+  });
+
+  it("stays quiet when sign-in is cancelled before anything went", async () => {
+    vi.mocked(accessApi.removeGrant).mockRejectedValueOnce(
+      new DOMException("Cancelled", "AbortError"),
+    );
+    const { panel: p, changed } = panel([direct]);
+    p.askRemove(p.rows.value[0]!);
+    await p.confirmRemove();
+    expect(p.removeError.value).toBeNull();
+    expect(p.removing.value?.map((row) => row.grant.id)).toEqual(["grt_pay"]);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
   it("won't close the confirm while removing", async () => {
     let finish!: () => void;
     vi.mocked(accessApi.removeGrant).mockReturnValueOnce(
