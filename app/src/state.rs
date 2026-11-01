@@ -4,7 +4,9 @@ use tokio::sync::RwLock;
 
 use crate::{
   config::ServerConfig,
-  services::{cache::RateLimiter, crypto::CryptoService, db::DbClient, oidc::OidcCache},
+  services::{
+    cache::RateLimiter, crypto::CryptoService, db::DbClient, oidc::OidcCache, status::StatusMonitor,
+  },
 };
 
 #[derive(Clone)]
@@ -17,6 +19,8 @@ pub struct AppState {
   pub oidc: OidcCache,
   pub maintenance: Arc<std::sync::atomic::AtomicBool>,
   pub started_at: std::time::Instant,
+  /// Cached results of the slow Status page checks.
+  pub status: StatusMonitor,
 }
 
 #[derive(Default)]

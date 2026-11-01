@@ -1,5 +1,9 @@
 use crate::state::AppState;
-use axum::{Router, routing::get};
+use axum::{
+  Router,
+  routing::{get, post},
+};
+pub mod checks;
 pub mod controller;
 pub mod doc;
 pub mod error;
@@ -15,6 +19,10 @@ pub fn routes() -> Router<AppState> {
     .route(
       crate::constants::api::instance::PUBLIC_STATUS,
       get(controller::public_status),
+    )
+    .route(
+      crate::constants::api::instance::RUN_CHECKS,
+      post(controller::run_checks),
     )
     .route(
       crate::constants::api::instance::FACTORY_RESET,

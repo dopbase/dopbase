@@ -261,6 +261,7 @@ pub mod audit {
 pub mod instance {
   pub const ROOT: &str = api_path!("/instance");
   pub const PUBLIC_STATUS: &str = api_path!("/status");
+  pub const RUN_CHECKS: &str = api_path!("/status/checks/run");
   pub const FACTORY_RESET: &str = api_path!("/instance/factory-reset");
 }
 

@@ -732,6 +732,7 @@ async fn health_and_openapi_are_available() {
     "/api/v1/backups/{key}/restore",
     "/api/v1/instance",
     "/api/v1/status",
+    "/api/v1/status/checks/run",
     "/api/v1/instance/factory-reset",
     "/api/v1/users",
     "/api/v1/users/identities",
@@ -756,6 +757,9 @@ async fn health_and_openapi_are_available() {
     "AdminRole",
     "InstanceStatus",
     "StatusResponse",
+    "Check",
+    "HealthReport",
+    "Activity",
     "FactoryResetPreview",
     "FactoryResetRequest",
     "PersonalTokenResponse",
@@ -790,7 +794,7 @@ async fn health_and_openapi_are_available() {
   );
   assert_eq!(
     spec["paths"]["/api/v1/status"]["get"]["summary"],
-    "Show public instance status"
+    "Show instance status and health checks"
   );
   assert_eq!(
     spec["paths"]["/api/v1/instance/factory-reset"]["get"]["summary"],
@@ -1429,6 +1433,8 @@ mod auth_cli_device;
 mod grants_access;
 #[path = "modules/groups/members.rs"]
 mod groups_members;
+#[path = "modules/instance/status.rs"]
+mod instance_status;
 #[path = "modules/personal_tokens/tokens.rs"]
 mod personal_tokens_tokens;
 #[path = "modules/roles/custom.rs"]
