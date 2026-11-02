@@ -66,6 +66,12 @@ export const router = createRouter({
       component: () => import("~/pages/Projects/Project.page.vue"),
     },
     {
+      path: "/projects/:projectRef/access/new",
+      name: "project-access-give",
+      component: () => import("~/pages/Access/GiveAccess.page.vue"),
+      meta: { page: "projects" },
+    },
+    {
       path: "/projects/:projectRef/settings",
       name: "project-settings",
       component: () => import("~/pages/Projects/Project.page.vue"),

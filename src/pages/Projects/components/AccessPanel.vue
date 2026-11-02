@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import {
-  useAccessPanelController,
-  LEVEL_HINTS,
-} from "./AccessPanel.controller";
+import { ref } from "vue";
+import { useAccessPanelController } from "./AccessPanel.controller";
+import ChangeAccessDialog from "~/components/app/ChangeAccessDialog.vue";
 import {
   DbAlert,
   DbBadge,
@@ -13,10 +11,7 @@ import {
   DbLevelBadge,
   DbMenu,
   DbMenuItem,
-  DbModal,
-  DbRadioCard,
   DbSearchField,
-  DbSelect,
   DbSkeleton,
 } from "~/components/ui";
 import {
@@ -33,7 +28,8 @@ import type { Grant } from "~/services/access.api";
 /**
  * AccessPanel — the project's Access tab: who reaches the project and at
  * what level, on the whole project or one environment. Project managers
- * give, change and remove access; people with access.report only read.
+ * give access on the shared Give access page, and change or remove it
+ * here; people with access.report only read.
  */
 const controller = useAccessPanelController();
 const {
@@ -41,19 +37,12 @@ const {
   rows,
   filter,
   canManage,
+  giveTo,
+  changing,
+  changePrincipal,
   loading,
   loadError,
   actionError,
-  principals,
-  dialog,
-  principalKey,
-  where,
-  environmentId,
-  level,
-  levels,
-  saving,
-  dialogError,
-  dialogSummary,
 } = controller;
 
 const removeTarget = ref<Grant | null>(null);
@@ -66,33 +55,6 @@ async function confirmRemove(): Promise<void> {
   removing.value = false;
   removeTarget.value = null;
 }
-
-const principalOptions = computed(() =>
-  principals.value.map((principal) => ({
-    value: `${principal.type}:${principal.id}`,
-    label:
-      principal.type === "group"
-        ? `${principal.label} (group)`
-        : principal.label,
-  })),
-);
-const whereOptions = [
-  { value: "project", label: "Whole project" },
-  { value: "environment", label: "One environment" },
-];
-const environmentOptions = computed(() =>
-  (access.value?.environments ?? []).map((environment) => ({
-    value: environment.id,
-    label: environment.protected
-      ? `${environment.name} (protected)`
-      : environment.name,
-  })),
-);
-const dialogTitle = computed(() =>
-  dialog.value?.mode === "change"
-    ? `Change access for ${dialog.value.grant.principalLabel}`
-    : `Give access to ${access.value?.project.name ?? "this project"}`,
-);
 </script>
 
 <template>
@@ -107,7 +69,7 @@ const dialogTitle = computed(() =>
         class="ml-auto"
         variant="primary"
         data-testid="give-access"
-        @click="controller.openGive">
+        @click="$router.push(giveTo)">
         <PlusIcon class="h-4 w-4" />
         Give access
       </DbButton>
@@ -220,70 +182,12 @@ const dialogTitle = computed(() =>
       </p>
     </template>
 
-    <!-- Give access / change level -->
-    <DbModal
-      :open="dialog !== null"
-      :title="dialogTitle"
-      @close="!saving && (dialog = null)">
-      <form
-        id="access-dialog"
-        class="flex flex-col gap-4"
-        @submit.prevent="controller.submitDialog">
-        <template v-if="dialog?.mode === 'give'">
-          <DbSelect
-            v-if="principalOptions.length > 0"
-            v-model="principalKey"
-            label="User or group"
-            :options="principalOptions" />
-          <DbAlert v-else tone="info">
-            There's nobody you can list. Ask someone who can see users and
-            groups to give access.
-          </DbAlert>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <DbSelect v-model="where" label="Where" :options="whereOptions" />
-            <DbSelect
-              v-if="where === 'environment'"
-              v-model="environmentId"
-              label="Environment"
-              :options="environmentOptions" />
-          </div>
-        </template>
-
-        <fieldset class="flex flex-col gap-2">
-          <legend class="mb-1.5 text-sm text-ink-muted">Level</legend>
-          <DbRadioCard
-            v-for="candidate in levels"
-            :key="candidate"
-            name="access-level"
-            :value="candidate"
-            :checked="level === candidate"
-            :label="controller.formatLevel(candidate)"
-            :description="LEVEL_HINTS[candidate]"
-            @select="level = candidate" />
-        </fieldset>
-
-        <p
-          v-if="dialogSummary"
-          class="flex items-start gap-2.5 rounded-control bg-raised px-3.5 py-3 text-sm text-ink"
-          data-testid="access-summary">
-          <InfoIcon class="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
-          {{ dialogSummary }}
-        </p>
-        <DbAlert v-if="dialogError">{{ dialogError }}</DbAlert>
-      </form>
-      <template #footer>
-        <DbButton variant="ghost" :disabled="saving" @click="dialog = null">
-          Cancel
-        </DbButton>
-        <DbButton
-          variant="primary"
-          type="submit"
-          form="access-dialog"
-          :loading="saving">
-          {{ dialog?.mode === "change" ? "Save level" : "Give access" }}
-        </DbButton>
-      </template>
-    </DbModal>
+    <ChangeAccessDialog
+      v-if="changePrincipal"
+      :principal="changePrincipal"
+      :grant="changing"
+      @close="controller.closeChange"
+      @saved="controller.changed" />
 
     <DbConfirmDialog
       :open="removeTarget !== null"

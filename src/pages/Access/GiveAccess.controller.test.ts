@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { projectMeta, useGiveAccessController } from "./GiveAccess.controller";
+import {
+  principalMeta,
+  projectMeta,
+  useGiveAccessController,
+} from "./GiveAccess.controller";
 import * as accessApi from "~/services/access.api";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
+import * as usersApi from "~/services/users.api";
 import type { Environment, Project } from "~/services";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
@@ -11,7 +16,14 @@ import {
   accessFixture,
   grantFixture,
   groupDetailFixture,
+  groupSummaryFixture,
+  lead,
+  maya,
+  reader,
+  reviewBot,
+  root,
   settle,
+  signInAs,
 } from "~/tests/people";
 
 const { route, push } = await vi.hoisted(async () => {
@@ -33,10 +45,13 @@ vi.mock("~/services/access.api", async (original) => ({
   ...(await original<typeof accessApi>()),
   fetchUserAccess: vi.fn(),
   fetchGroup: vi.fn(),
+  fetchGroups: vi.fn(),
+  fetchProjectAccess: vi.fn(),
   setGrant: vi.fn(),
 }));
 vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
+vi.mock("~/services/users.api");
 
 const project = (overrides: Partial<Project>): Project => ({
   id: "prj_pay",
@@ -350,5 +365,151 @@ describe("useGiveAccessController", () => {
     );
     expect(page.saving.value).toBe(false);
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("useGiveAccessController from a project", () => {
+  beforeEach(() => {
+    route.name = "project-access-give";
+    route.params = { projectRef: "payments" };
+    signInAs(["users.view", "groups.manage"]);
+    vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue({
+      project: project({}),
+      environments: [
+        environment({}),
+        environment({ id: "env_prod", name: "prod", protected: true }),
+      ],
+      grants: [
+        grantFixture({ scopeId: "prj_pay", level: "write" }),
+        prodGrant,
+        grantFixture({
+          id: "grt_bot",
+          principalId: "usr_bot",
+          principalLabel: "review-bot",
+          scopeType: "environment",
+          scopeId: "env_staging",
+          scopeLabel: "payments/staging",
+          level: "metadata",
+        }),
+      ],
+    });
+    vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+      root,
+      lead,
+      reviewBot,
+      reader,
+      maya,
+    ]);
+    vi.mocked(accessApi.fetchGroups).mockResolvedValue([
+      groupSummaryFixture({ memberCount: 1 }),
+    ]);
+  });
+
+  it("lists groups, people, then AI agents with what they hold here, never root or you", async () => {
+    const page = await open();
+    expect(projectsApi.listProjects).not.toHaveBeenCalled();
+    expect(page.project.value?.name).toBe("payments");
+    expect(
+      page.principals.value.map((choice) => [
+        choice.label,
+        choice.group,
+        principalMeta(choice),
+      ]),
+    ).toEqual([
+      ["Backend", "groups", "1 member"],
+      ["maya@example.com", "people", "Member · has Write now"],
+      ["reader@example.com", "people", "Viewer"],
+      ["review-bot", "agents", "AI agent · has 1 environment"],
+    ]);
+    page.principalFilter.value = "REV";
+    expect(page.visiblePrincipals.value.map((c) => c.label)).toEqual([
+      "review-bot",
+    ]);
+  });
+
+  it("lists nobody without the capabilities to see users and groups", async () => {
+    signInAs([]);
+    const page = await open();
+    expect(usersApi.fetchUsers).not.toHaveBeenCalled();
+    expect(accessApi.fetchGroups).not.toHaveBeenCalled();
+    expect(page.principals.value).toEqual([]);
+  });
+
+  it("caps levels at the chosen person's role and goes back to the project", async () => {
+    vi.mocked(accessApi.fetchUserAccess).mockResolvedValueOnce(
+      accessFixture({ maxLevel: "manage" }),
+    );
+    const page = await open();
+    expect(await page.submit()).toBe(false);
+    expect(page.error.value).toBe("Choose who gets access.");
+
+    await page.choosePrincipal("user:usr_maya");
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_maya");
+    expect(page.principal.value?.maxLevel).toBe("manage");
+    expect(
+      page.levels.value.find((choice) => choice.level === "project_manager")
+        ?.disabled,
+    ).toBe(true);
+
+    page.where.value = "environment";
+    page.toggleEnvironment("env_prod", true);
+    page.level.value = "read";
+    expect(
+      page.planned.value.map((grant) => [grant.label, grant.replaces]),
+    ).toEqual([["payments / prod", "metadata"]]);
+    expect(await page.submit()).toBe(true);
+    expect(accessApi.setGrant).toHaveBeenCalledWith({
+      principalType: "user",
+      principalId: "usr_maya",
+      scopeType: "environment",
+      scope: "env_prod",
+      level: "read",
+    });
+    expect(push).toHaveBeenCalledWith({
+      name: "project-access",
+      params: { projectRef: "payments" },
+    });
+  });
+
+  it("keeps the last pick when an earlier role loads late", async () => {
+    let finishMaya: (value: accessApi.UserAccess) => void = () => {};
+    vi.mocked(accessApi.fetchUserAccess)
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishMaya = resolve)),
+      )
+      .mockResolvedValueOnce(
+        accessFixture({ userId: "usr_bot", maxLevel: "read" }),
+      );
+    const page = await open();
+    const first = page.choosePrincipal("user:usr_maya");
+    await page.choosePrincipal("user:usr_bot");
+    finishMaya(accessFixture({ maxLevel: "manage" }));
+    await first;
+    expect(page.principal.value).toEqual({
+      type: "user",
+      id: "usr_bot",
+      label: "review-bot",
+      maxLevel: "read",
+    });
+  });
+
+  it("gives a group access without loading a role", async () => {
+    const page = await open();
+    await page.choosePrincipal("group:grp_backend");
+    expect(accessApi.fetchUserAccess).not.toHaveBeenCalled();
+    page.level.value = "project_manager";
+    expect(page.summary.value).toBe(
+      "Everyone in Backend will be able to manage, and give others access to, all of payments.",
+    );
+  });
+
+  it("says when the project's access won't load", async () => {
+    vi.mocked(accessApi.fetchProjectAccess).mockRejectedValueOnce(
+      new Error(""),
+    );
+    const page = await open();
+    expect(page.loadError.value).toBe(
+      "Could not load who has access to this project.",
+    );
   });
 });

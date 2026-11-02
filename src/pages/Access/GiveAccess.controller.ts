@@ -5,14 +5,23 @@ import * as environmentsApi from "~/services/environments.api";
 import {
   LEVELS,
   fetchGroup,
+  fetchGroups,
+  fetchProjectAccess,
   fetchUserAccess,
   reaches,
   setGrant,
 } from "~/services/access.api";
-import type { Grant, Level, ScopeType } from "~/services/access.api";
+import type {
+  Grant,
+  Level,
+  PrincipalType,
+  ScopeType,
+} from "~/services/access.api";
 import type { Environment, Project } from "~/services";
+import { fetchUsers } from "~/services/users.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
+import { useAuthStore } from "~/stores/auth.store";
 import { formatLevel, formatList } from "~/utils/format";
 import {
   grantSentence,
@@ -20,13 +29,18 @@ import {
   type GrantPrincipal,
 } from "~/utils/level";
 
-export type GiveAccessKind = "user" | "agent" | "group";
+/**
+ * Who the page is for: a person, AI agent or group picked before it opened
+ * (they choose a project), or a project (you choose who).
+ */
+export type GiveAccessKind = "user" | "agent" | "group" | "project";
 export type GrantWhere = "project" | "environment";
 
 const KIND_FOR_ROUTE: Record<string, GiveAccessKind> = {
   "user-access-give": "user",
   "agent-access-give": "agent",
   "group-access-give": "group",
+  "project-access-give": "project",
 };
 
 export interface ProjectChoice {
@@ -52,6 +66,22 @@ export interface PlannedGrant {
   replaces: Level | null;
 }
 
+/** Someone you can give access to, on the page opened from a project. */
+export interface PrincipalChoice {
+  type: PrincipalType;
+  id: string;
+  /** An email, an agent's name, or a group's name. */
+  label: string;
+  /** Where the picker lists them. */
+  group: "groups" | "people" | "agents";
+  /** Their role, or how many people a group has. */
+  detail: string;
+  /** The level they hold on the whole project already, if any. */
+  current: Level | null;
+  /** How many of its environments they hold a grant on. */
+  environmentGrants: number;
+}
+
 /** "4 environments · has Write now" under a project's name. */
 export function projectMeta(choice: ProjectChoice): string {
   return [
@@ -62,11 +92,29 @@ export function projectMeta(choice: ProjectChoice): string {
     .join(" · ");
 }
 
+/** "Member · has Write now" under a person's, agent's or group's name. */
+export function principalMeta(choice: PrincipalChoice): string {
+  const held = choice.current
+    ? `has ${formatLevel(choice.current)} now`
+    : choice.environmentGrants > 0
+      ? `has ${choice.environmentGrants} ${choice.environmentGrants === 1 ? "environment" : "environments"}`
+      : "";
+  return [choice.detail, held].filter(Boolean).join(" · ");
+}
+
+export function principalKey(who: { type: PrincipalType; id: string }) {
+  return `${who.type}:${who.id}`;
+}
+
+function memberCount(count: number): string {
+  return `${count} ${count === 1 ? "member" : "members"}`;
+}
+
 /**
- * Give access page for a person, AI agent or group, reached from their
- * Access tab. Pick a project you manage, the whole project or some of its
- * environments, and one level. Each place becomes one grant; a grant they
- * already hold there is replaced.
+ * Give access page. From a person's, AI agent's or group's Access tab you
+ * pick a project you manage; from a project's Access tab you pick who.
+ * Then the whole project or some of its environments, and one level. Each
+ * place becomes one grant; a grant they already hold there is replaced.
  *
  * The server checks it all again: you need Project manager on the project,
  * and nobody can be given more than their role allows.
@@ -74,6 +122,7 @@ export function projectMeta(choice: ProjectChoice): string {
 export function useGiveAccessController() {
   const route = useRoute();
   const router = useRouter();
+  const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
 
   const kind = computed<GiveAccessKind>(
@@ -84,13 +133,24 @@ export function useGiveAccessController() {
       route.params.userId ?? route.params.agentId ?? route.params.groupId ?? "",
     ),
   );
+  const projectRef = computed(() => String(route.params.projectRef ?? ""));
 
   const principal = ref<GrantPrincipal | null>(null);
-  /** The grants the principal holds directly, not through a group. */
+  /**
+   * Grants held directly, not through a group: the principal's own, or,
+   * from a project, everyone's on it.
+   */
   const grants = ref<Grant[]>([]);
   const projects = ref<Project[] | null>(null);
   const environments = ref<Environment[]>([]);
   const loadError = ref<string | null>(null);
+
+  /** From a project: who you can pick, and who is picked. */
+  const candidates = ref<
+    Omit<PrincipalChoice, "current" | "environmentGrants">[]
+  >([]);
+  const chosenKey = ref("");
+  const principalFilter = ref("");
 
   const projectFilter = ref("");
   const environmentFilter = ref("");
@@ -123,11 +183,90 @@ export function useGiveAccessController() {
     );
   }
 
+  /** From a project: its environments and every grant on it. */
+  async function loadProject(): Promise<void> {
+    const access = await fetchProjectAccess(projectRef.value);
+    projects.value = [access.project];
+    environments.value = access.environments;
+    grants.value = access.grants;
+    projectId.value = access.project.id;
+  }
+
+  /**
+   * Groups, people and AI agents to pick from. Each list needs its own
+   * capability, so a project manager without them sees only what they may
+   * list. Root reaches every project already, and you can't give yourself
+   * access.
+   */
+  async function loadPrincipals(): Promise<void> {
+    const [users, groups] = await Promise.allSettled([
+      auth.can("users.view") ? fetchUsers() : Promise.resolve([]),
+      auth.can("users.view", "groups.manage")
+        ? fetchGroups()
+        : Promise.resolve([]),
+    ]);
+    const byName = (a: { label: string }, b: { label: string }) =>
+      a.label.localeCompare(b.label);
+    candidates.value = [
+      ...(groups.status === "fulfilled" ? groups.value : [])
+        .map((group) => ({
+          type: "group" as const,
+          id: group.id,
+          label: group.name,
+          group: "groups" as const,
+          detail: memberCount(group.memberCount),
+        }))
+        .sort(byName),
+      ...(users.status === "fulfilled" ? users.value : [])
+        .filter(
+          (user) => user.role !== "root" && user.id !== auth.session?.adminId,
+        )
+        .map((user) => ({
+          type: "user" as const,
+          id: user.id,
+          label: user.email,
+          group:
+            user.role === "ai_agent"
+              ? ("agents" as const)
+              : ("people" as const),
+          detail: user.roleName ?? "",
+        }))
+        .sort(
+          (a, b) =>
+            Number(a.group === "agents") - Number(b.group === "agents") ||
+            byName(a, b),
+        ),
+    ];
+  }
+
+  /** The candidates with what each holds on the project already. */
+  const principals = computed<PrincipalChoice[]>(() =>
+    candidates.value.map((candidate) => {
+      const theirs = grants.value.filter(
+        (grant) =>
+          grant.principalType === candidate.type &&
+          grant.principalId === candidate.id,
+      );
+      return {
+        ...candidate,
+        current:
+          theirs.find((grant) => grant.scopeType === "project")?.level ?? null,
+        environmentGrants: theirs.filter(
+          (grant) => grant.scopeType === "environment",
+        ).length,
+      };
+    }),
+  );
+
   async function load(): Promise<void> {
     loadError.value = null;
     principal.value = null;
     projects.value = null;
     try {
+      if (kind.value === "project") {
+        await Promise.all([loadProject(), loadPrincipals()]);
+        return;
+      }
       const [, projectList, environmentList] = await Promise.all([
         loadPrincipal(),
         projectsApi.listProjects(),
@@ -141,19 +280,70 @@ export function useGiveAccessController() {
     } catch (cause) {
       loadError.value = errorMessage(
         cause,
-        kind.value === "group"
-          ? "Could not load the group."
-          : "Could not load their access.",
+        kind.value === "project"
+          ? "Could not load who has access to this project."
+          : kind.value === "group"
+            ? "Could not load the group."
+            : "Could not load their access.",
       );
     }
   }
 
   onMounted(load);
 
+  const visiblePrincipals = computed(() => {
+    const needle = principalFilter.value.trim().toLowerCase();
+    return needle
+      ? principals.value.filter((choice) =>
+          choice.label.toLowerCase().includes(needle),
+        )
+      : principals.value;
+  });
+
+  /**
+   * From a project: picks who gets access. A person's or agent's role cap
+   * loads first, so the levels never offer what the server would refuse.
+   */
+  async function choosePrincipal(key: string): Promise<void> {
+    if (chosenKey.value === key) return;
+    chosenKey.value = key;
+    principalFilter.value = "";
+    principal.value = null;
+    error.value = null;
+    const choice = principals.value.find(
+      (candidate) => principalKey(candidate) === key,
+    );
+    if (!choice) return;
+    if (choice.type === "group") {
+      principal.value = { type: "group", id: choice.id, label: choice.label };
+      return;
+    }
+    try {
+      const access = await fetchUserAccess(choice.id);
+      // A later pick wins.
+      if (chosenKey.value !== key) return;
+      principal.value = {
+        type: "user",
+        id: choice.id,
+        label: choice.label,
+        maxLevel: access.maxLevel,
+      };
+    } catch (cause) {
+      if (chosenKey.value !== key) return;
+      error.value = errorMessage(cause, "Could not load their role.");
+    }
+  }
+
   function currentOn(scopeType: ScopeType, scopeId: string): Level | null {
+    const who = principal.value;
+    if (!who) return null;
     return (
       grants.value.find(
-        (grant) => grant.scopeType === scopeType && grant.scopeId === scopeId,
+        (grant) =>
+          grant.principalType === who.type &&
+          grant.principalId === who.id &&
+          grant.scopeType === scopeType &&
+          grant.scopeId === scopeId,
       )?.level ?? null
     );
   }
@@ -302,6 +492,11 @@ export function useGiveAccessController() {
 
   const backTo = computed<RouteLocationRaw>(() => {
     switch (kind.value) {
+      case "project":
+        return {
+          name: "project-access",
+          params: { projectRef: projectRef.value },
+        };
       case "agent":
         return { name: "agent", params: { agentId: principalId.value } };
       case "group":
@@ -314,7 +509,10 @@ export function useGiveAccessController() {
   async function submit(): Promise<boolean> {
     error.value = null;
     const who = principal.value;
-    if (!who) return false;
+    if (!who) {
+      error.value = "Choose who gets access.";
+      return false;
+    }
     if (!project.value) {
       error.value = "Choose a project.";
       return false;
@@ -352,7 +550,10 @@ export function useGiveAccessController() {
           ? `Saved ${saved} of ${todo.length}. ${todo[saved]!.label} failed: ${reason}`
           : reason;
       // Show what is held now, so a second try only redoes the rest.
-      if (saved > 0) await loadPrincipal().catch(() => undefined);
+      if (saved > 0)
+        await (
+          kind.value === "project" ? loadProject() : loadPrincipal()
+        ).catch(() => undefined);
       return false;
     } finally {
       saving.value = false;
@@ -362,10 +563,19 @@ export function useGiveAccessController() {
     } catch {
       // Every grant is in; only going back failed.
       error.value =
-        "Access given, but this page couldn't go back. Open their Access tab to see it.";
+        kind.value === "project"
+          ? "Access given, but this page couldn't go back. Open the project's Access tab to see it."
+          : "Access given, but this page couldn't go back. Open their Access tab to see it.";
     }
     return true;
   }
+
+  /** Whether the page has what it needs to show the form. */
+  const ready = computed(
+    () =>
+      projects.value !== null &&
+      (kind.value === "project" || principal.value !== null),
+  );
 
   function cancel(): void {
     void router.push(backTo.value);
@@ -374,7 +584,13 @@ export function useGiveAccessController() {
   return {
     kind,
     principal,
+    principals,
+    visiblePrincipals,
+    principalFilter,
+    chosenKey,
+    choosePrincipal,
     projects,
+    ready,
     loadError,
     load,
     projectFilter,

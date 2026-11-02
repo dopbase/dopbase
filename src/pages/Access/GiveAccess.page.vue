@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useGiveAccessController } from "./GiveAccess.controller";
+import PrincipalPicker from "./components/PrincipalPicker.vue";
 import ProjectPicker from "./components/ProjectPicker.vue";
 import { DashboardLayout } from "~/layouts";
 import PageHeader from "~/components/app/PageHeader.vue";
@@ -19,8 +20,13 @@ import { levelMeter } from "~/utils/level";
 
 const controller = useGiveAccessController();
 const {
+  kind,
   principal,
-  projects,
+  principals,
+  visiblePrincipals,
+  principalFilter,
+  chosenKey,
+  ready,
   loadError,
   projectFilter,
   manageable,
@@ -42,7 +48,18 @@ const {
   error,
 } = controller;
 
+const fromProject = computed(() => kind.value === "project");
+
+/** The page you came from: the project, or the person, agent or group. */
+const parentLabel = computed(() =>
+  fromProject.value
+    ? (controller.projects.value?.[0]?.name ?? "")
+    : (principal.value?.label ?? ""),
+);
+
 const subtitle = computed(() => {
+  if (fromProject.value)
+    return `Give a person, AI agent or group access to ${parentLabel.value}.`;
   const who = principal.value;
   if (!who) return "";
   if (who.type === "group")
@@ -76,9 +93,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
         <DbButton size="sm" @click="controller.load">Try again</DbButton>
       </div>
 
-      <div
-        v-else-if="!principal || projects === null"
-        class="flex max-w-3xl flex-col gap-3">
+      <div v-else-if="!ready" class="flex max-w-3xl flex-col gap-3">
         <DbSkeleton class="h-8 w-72 rounded-control" />
         <DbSkeleton class="h-64 w-full rounded-card" />
       </div>
@@ -87,14 +102,17 @@ const heading = "text-[15px] font-semibold text-ink-strong";
         <PageHeader
           title="Give access"
           :subtitle="subtitle"
-          :parent="{ label: principal.label, to: backTo }" />
+          :parent="{ label: parentLabel, to: backTo }" />
 
         <div
           v-if="manageable.length === 0"
           class="flex max-w-2xl flex-col items-start gap-3">
           <DbAlert tone="info">
-            You don't manage any project, so you can't give access here. Project
-            managers give access to their own projects.
+            {{
+              fromProject
+                ? "You don't manage this project, so you can't give access to it. Ask one of its project managers."
+                : "You don't manage any project, so you can't give access here. Project managers give access to their own projects."
+            }}
           </DbAlert>
           <DbButton size="sm" @click="controller.cancel">Back</DbButton>
         </div>
@@ -105,8 +123,35 @@ const heading = "text-[15px] font-semibold text-ink-strong";
           novalidate
           data-testid="give-access-page"
           @submit.prevent="controller.submit">
+          <!-- Who, when the project is fixed -->
+          <section
+            v-if="fromProject"
+            :class="card"
+            aria-labelledby="who-heading">
+            <div class="mb-4 flex items-center gap-3">
+              <span :class="step" aria-hidden="true">1</span>
+              <h2 id="who-heading" :class="heading">Who</h2>
+            </div>
+            <PrincipalPicker
+              v-if="principals.length > 0"
+              v-model:filter="principalFilter"
+              :model-value="chosenKey"
+              :choices="principals"
+              :visible="visiblePrincipals"
+              @update:model-value="controller.choosePrincipal" />
+            <DbAlert v-else tone="info">
+              There's nobody you can list. Ask someone who can see users and
+              groups to give access.
+            </DbAlert>
+            <p
+              v-if="principals.length > 0"
+              class="mt-2 text-[13px] text-ink-faint">
+              People, AI agents and groups. Root already reaches every project.
+            </p>
+          </section>
+
           <!-- Project -->
-          <section :class="card" aria-labelledby="project-heading">
+          <section v-else :class="card" aria-labelledby="project-heading">
             <div class="mb-4 flex items-center gap-3">
               <span :class="step" aria-hidden="true">1</span>
               <h2 id="project-heading" :class="heading">Project</h2>
@@ -227,7 +272,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
               <span :class="step" aria-hidden="true">3</span>
               <h2 id="level-heading" :class="heading">Level</h2>
               <span
-                v-if="principal.maxLevel"
+                v-if="principal?.maxLevel"
                 class="text-[13px] text-ink-faint sm:ml-auto">
                 Their role allows up to {{ formatLevel(principal.maxLevel) }}
               </span>
@@ -256,11 +301,15 @@ const heading = "text-[15px] font-semibold text-ink-strong";
             aria-labelledby="review-heading"
             data-testid="give-access-review">
             <h2 id="review-heading" :class="heading">Review</h2>
-            <p v-if="planned.length === 0" class="text-sm text-ink-muted">
+            <p
+              v-if="planned.length === 0 || !principal"
+              class="text-sm text-ink-muted">
               {{
-                project
-                  ? "Choose at least one environment."
-                  : "Choose a project to see what changes."
+                !principal
+                  ? "Choose who gets access to see what changes."
+                  : project
+                    ? "Choose at least one environment."
+                    : "Choose a project to see what changes."
               }}
             </p>
             <template v-else>
@@ -308,7 +357,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
                 variant="primary"
                 type="submit"
                 :loading="saving"
-                :disabled="planned.length === 0"
+                :disabled="planned.length === 0 || !principal"
                 data-testid="give-access-submit">
                 Give access
               </DbButton>
