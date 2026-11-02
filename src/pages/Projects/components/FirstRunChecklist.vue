@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { CheckIcon } from "~/assets/icons";
+import { formatList } from "~/utils/format";
 import CliCommands from "./CliCommands.vue";
 import EnvDropZone from "./EnvDropZone.vue";
 
@@ -31,7 +32,7 @@ const environmentsSentence = computed(() => {
   const names = props.environmentNames;
   if (names.length <= 1)
     return `${props.projectName}, with ${names[0] ?? props.environmentName}. Add more environments from Settings.`;
-  return `${props.projectName}, with ${names.slice(0, -1).join(", ")} and ${names.at(-1)}.`;
+  return `${props.projectName}, with ${formatList(names)}.`;
 });
 
 const importCommand = computed(() => [

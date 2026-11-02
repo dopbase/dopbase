@@ -8,6 +8,7 @@ import { fetchProjectAccess, reaches } from "~/services/access.api";
 import type { Grant } from "~/services/access.api";
 import type { Environment, Project } from "~/services";
 import { errorMessage } from "~/services/api-errors";
+import { formatList } from "~/utils/format";
 import { isActiveToken } from "./RunDialog.controller";
 
 export interface EnvironmentStats {
@@ -232,8 +233,7 @@ export function useSettingsPanelController(
       ),
       count(grants.value.length, "grant", "grants"),
     ].map((part) => `${part.count} ${part.label}`);
-    const list = `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
-    return `Deletes ${list}. Audit events stay.`;
+    return `Deletes ${formatList(parts)}. Audit events stay.`;
   });
 
   function startDelete(target: SettingsDelete): void {
