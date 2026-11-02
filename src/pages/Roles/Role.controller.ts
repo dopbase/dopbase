@@ -63,7 +63,14 @@ export function useRoleController() {
 
   const markStale = useInvalidate({ refetch: false });
   const roleList = useQuery(rolesQuery);
-  const roles = shownData<Role[]>(roleList);
+  // The form starts from a fresh read, never a cached copy someone may have
+  // changed since, so the page waits for that answer.
+  const answered = ref(false);
+  void roleList.refetch().then(() => {
+    answered.value = true;
+  });
+  const listed = shownData<Role[]>(roleList);
+  const roles = computed(() => (answered.value ? listed.value : null));
   const loadError = loadFailure(roleList, (cause) =>
     errorMessage(cause, "Could not load roles."),
   );

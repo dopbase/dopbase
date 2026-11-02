@@ -44,11 +44,19 @@ export function useSsoController() {
   const cache = useQueryCache();
   const invalidate = useInvalidate();
   const settingsQuery = useQuery(ssoSettingsQuery);
+  // The form starts from a fresh read, never a cached copy someone may have
+  // changed since.
+  const answered = ref(false);
+  void settingsQuery.refetch().then(() => {
+    answered.value = true;
+  });
   const settings = computed<SsoSettings | null>(
     () => settingsQuery.data.value ?? null,
   );
-  /** True until the first answer, good or bad. */
-  const loading = settingsQuery.isPending;
+  /** True until the first fresh answer, good or bad. */
+  const loading = computed(
+    () => !answered.value || settingsQuery.isPending.value,
+  );
   const loadError = loadFailure(
     settingsQuery,
     "Could not load the single sign-on settings.",
@@ -161,13 +169,13 @@ export function useSsoController() {
     void invalidate.signInChanged(ssoSettingsQuery.key);
   }
 
-  // The form fills once from the first answer, so a background refresh
-  // never overwrites what is being typed.
+  // The form fills once from the first fresh answer, so a background
+  // refresh never overwrites what is being typed.
   let formFilled = false;
   watch(
-    settingsQuery.data,
-    (next) => {
-      if (!next || formFilled) return;
+    [settingsQuery.data, answered],
+    ([next, ready]) => {
+      if (!next || !ready || formFilled) return;
       formFilled = true;
       fillForm(next);
     },
