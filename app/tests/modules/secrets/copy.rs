@@ -119,6 +119,16 @@ async fn copy_many_creates_keys_with_or_without_values_and_skips_existing() {
   assert_eq!(count("dev"), 3);
   assert_eq!(count("staging"), 3);
   assert_eq!(count("prod"), 0);
+  // A single environment counts too, by id or by name.
+  for path in [
+    format!("/api/v1/environments/{staging}"),
+    "/api/v1/environments/resolve?reference=payments/staging".to_owned(),
+    format!("/api/v1/environments/resolve?reference={staging}"),
+  ] {
+    let (status, body) = send(&router, "GET", &path, root.cli(), None).await;
+    assert_eq!(status, 200, "{path}: {body}");
+    assert_eq!(body["data"]["secretCount"], 3, "{path}");
+  }
 
   // With values: copied on the server, never returned.
   let qa = add_environment(&router, &root, "qa").await;

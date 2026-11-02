@@ -123,13 +123,7 @@ pub async fn show(
 ) -> Result<HttpResponse<EnvironmentResponse>, EnvironmentError> {
   crate::extractors::require_metadata_access(&identity)?;
   Ok(HttpResponse::ok(
-    service::authorize(
-      &state,
-      &identity,
-      &id,
-      crate::services::authx::Level::Metadata,
-    )
-    .await?,
+    service::detail(&state, &identity, &id).await?,
     "ENVIRONMENT_FETCHED",
   ))
 }

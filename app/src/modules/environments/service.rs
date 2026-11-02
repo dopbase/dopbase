@@ -105,6 +105,25 @@ pub async fn authorize(
   check(environment, &data_access(state, identity).await?, needed)
 }
 
+/// The environment for a response: checked like [`authorize`] at
+/// `Metadata`, with its secret count filled in.
+pub async fn detail(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+) -> Result<EnvironmentResponse, HttpError> {
+  let environment = authorize(state, identity, id, Level::Metadata).await?;
+  counted(state, environment).await
+}
+
+async fn counted(
+  state: &AppState,
+  mut environment: EnvironmentResponse,
+) -> Result<EnvironmentResponse, HttpError> {
+  environment.secret_count = repository::secret_count(state.db.pool(), &environment.id).await?;
+  Ok(environment)
+}
+
 pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
@@ -145,11 +164,12 @@ pub async fn resolve(
       "The runner token cannot access this environment.",
     ));
   }
-  check(
+  let environment = check(
     environment,
     &data_access(state, identity).await?,
     Level::Metadata,
-  )
+  )?;
+  counted(state, environment).await
 }
 pub async fn create(
   state: &AppState,
@@ -184,7 +204,7 @@ pub async fn create(
   )
   .await?;
   tx.commit().await?;
-  authorize(state, identity, &id, Level::Metadata).await
+  detail(state, identity, &id).await
 }
 pub async fn update(
   state: &AppState,
@@ -248,7 +268,7 @@ pub async fn update(
   tx.commit().await?;
   // Unprotecting can leave the caller with less than before, but never
   // with nothing they could not already see.
-  authorize(state, identity, id, Level::Metadata).await
+  detail(state, identity, id).await
 }
 pub async fn delete(
   state: &AppState,
