@@ -15,6 +15,7 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("~/services/bootstrap.api");
+vi.mock("~/services/auth.api");
 vi.mock("~/services/backups.api", () => ({
   downloadMasterKeyBlob: vi.fn(),
 }));
