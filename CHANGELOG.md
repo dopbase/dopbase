@@ -66,6 +66,11 @@ All notable changes to Dopbase are documented in this file.
   `POST /api/v1/status/checks/run` to run them now.
 - `update_check` in `server.toml` (or `DOPBASE_UPDATE_CHECK=true`) lets the
   Status page say when a newer release is out. It is off by default.
+- `GET /api/v1/runtime/secrets` gives a runner token the secrets of its own
+  environment, so an SDK needs only the server URL and the token. It returns
+  a `revision` and an `ETag`; a matching `If-None-Match` gets a `304` that
+  decrypts nothing and writes no audit event. `?reference=` checks the
+  environment first.
 
 ### Changed
 
@@ -132,6 +137,10 @@ All notable changes to Dopbase are documented in this file.
 - New runner tokens pick a lifetime, and the token dialog shows the
   `dopbase run` line to use it.
 - The project page works on phones.
+- `dopbase run` with a runner token runs the token's environment and needs no
+  reference. A reference or `DOPBASE_ENV` naming another environment stops the
+  run before the child starts, and the saved default is ignored.
+- A runner token's `last_used_at` is written at most once a minute.
 
 ### Removed
 
