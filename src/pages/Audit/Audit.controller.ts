@@ -8,7 +8,11 @@ import type { Environment, Project } from "~/services";
 import { errorMessage } from "~/services/api-errors";
 import { useAuthStore } from "~/stores/auth.store";
 import { auditEventsQuery, type AuditFilters } from "~/queries/audit";
-import { loadFailure, onlyWhen } from "~/queries/helpers";
+import {
+  keepFirstPageWhenLeft,
+  loadFailure,
+  onlyWhen,
+} from "~/queries/helpers";
 import { environmentsQuery, projectsQuery } from "~/queries/projects";
 import { userIdentitiesQuery } from "~/queries/users";
 import { formatDateTime, formatRelativeTime } from "~/utils/format";
@@ -158,6 +162,7 @@ export function useAuditController() {
     ...auditEventsQuery(feedFilters.value),
     placeholderData: (previous) => previous,
   }));
+  keepFirstPageWhenLeft(() => auditEventsQuery(feedFilters.value).key);
   const loadingMore = ref(false);
   const moreError = ref<string | null>(null);
   const feedFailure = loadFailure(feed, "Could not load audit events.", {

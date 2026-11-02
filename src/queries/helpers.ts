@@ -1,4 +1,10 @@
-import { computed, toValue, type ComputedRef } from "vue";
+import {
+  computed,
+  onScopeDispose,
+  toValue,
+  watch,
+  type ComputedRef,
+} from "vue";
 import {
   useQueryCache,
   type EntryKey,
@@ -119,6 +125,37 @@ export async function refreshWhere(
     }
   }
   await Promise.allSettled(now.map((entry) => cache.refresh(entry)));
+}
+
+/**
+ * Cuts a paged feed back to its first page once the screen stops showing
+ * it: when `key` moves to another feed, and when the screen goes away.
+ * Colada refetches every page an entry holds, one after another, so a feed
+ * left with many pages loaded would send that many requests the next time
+ * it shows. The entry keeps its age, so it still refreshes as usual.
+ */
+export function keepFirstPageWhenLeft(key: () => EntryKey): void {
+  const cache = useQueryCache();
+  function trim(left: EntryKey): void {
+    const entry = cache.get(left);
+    const data = entry?.state.value.data as
+      { pages: unknown[]; pageParams: unknown[] } | undefined;
+    if (!entry || !data || data.pages.length <= 1) return;
+    const when = entry.when;
+    cache.setEntryState(entry, {
+      ...entry.state.value,
+      data: {
+        pages: data.pages.slice(0, 1),
+        pageParams: data.pageParams.slice(0, 1),
+      },
+    });
+    entry.when = when;
+  }
+  watch(
+    () => JSON.stringify(key()),
+    (_, left) => trim(JSON.parse(left) as EntryKey),
+  );
+  onScopeDispose(() => trim(key()));
 }
 
 /** Revoked or deleted data should leave the screen, not linger. */

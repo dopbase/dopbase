@@ -6,7 +6,11 @@ import type { AuditEvent } from "~/services/audit.api";
 import type { Environment } from "~/services";
 import { errorMessage } from "~/services/api-errors";
 import { auditEventsQuery, type AuditFilters } from "~/queries/audit";
-import { loadFailure, onlyWhen } from "~/queries/helpers";
+import {
+  keepFirstPageWhenLeft,
+  loadFailure,
+  onlyWhen,
+} from "~/queries/helpers";
 import { formatRelativeTime } from "~/utils/format";
 
 export const ACTIVITY_PAGE_SIZE = 25;
@@ -80,6 +84,7 @@ export function useActivityPanelController(
   const pages = computed(() =>
     feedFailure.value ? [] : (feed.data.value?.pages ?? []),
   );
+  keepFirstPageWhenLeft(() => auditEventsQuery(filters.value).key);
   const items = computed<AuditEvent[]>(() =>
     pages.value.flatMap((page) => page?.items ?? []),
   );

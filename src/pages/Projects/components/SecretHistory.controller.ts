@@ -10,7 +10,11 @@ import { ApiError } from "~/services/http.client";
 import { isAbortError } from "~/services/api-errors";
 import { useReauthentication } from "~/composable";
 import { useAuthStore } from "~/stores/auth.store";
-import { loadFailure, onlyWhen } from "~/queries/helpers";
+import {
+  keepFirstPageWhenLeft,
+  loadFailure,
+  onlyWhen,
+} from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { secretVersionsQuery } from "~/queries/secrets";
 import { formatCountdown } from "~/utils/format";
@@ -67,6 +71,13 @@ export function useSecretHistoryController(
       }),
     ),
   );
+  const historyKey = () =>
+    secretVersionsQuery({
+      environmentId: environmentId.value,
+      key: secretKey.value ?? "",
+      limit: HISTORY_PAGE_SIZE,
+    }).key;
+  keepFirstPageWhenLeft(historyKey);
   const loadingMore = ref(false);
   /** What the last "older versions" read failed with; shown versions stay. */
   const moreCause = shallowRef<unknown>(null);
