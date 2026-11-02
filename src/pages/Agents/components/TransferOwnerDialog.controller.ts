@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from "vue";
 import { updateUser } from "~/services/users.api";
 import type { User } from "~/services/users.api";
+import type { Role } from "~/services/roles.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 
@@ -12,20 +13,32 @@ export function useTransferOwnerDialog(
   open: Ref<boolean>,
   agent: Ref<User | null>,
   people: Ref<User[]>,
+  roles: Ref<Role[]>,
 ) {
   const { runWithReauth } = useReauthentication();
   const ownerId = ref("");
   const saving = ref(false);
   const error = ref<string | null>(null);
 
-  /** Active people other than the current owner. */
+  /** Roles whose holders can see users, and so the agents they own. */
+  const seesUsers = computed(
+    () =>
+      new Set(
+        roles.value
+          .filter((role) => role.capabilities.includes("users.view"))
+          .map((role) => role.id),
+      ),
+  );
+
+  /** Active people other than the current owner who can see the agent. */
   const options = computed(() =>
     people.value
       .filter(
         (person) =>
           person.role !== "ai_agent" &&
           person.status !== "disabled" &&
-          person.id !== agent.value?.ownerId,
+          person.id !== agent.value?.ownerId &&
+          (person.role === "root" || seesUsers.value.has(person.roleId ?? "")),
       )
       .map((person) => ({ value: person.id, label: person.email })),
   );

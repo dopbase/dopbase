@@ -291,6 +291,7 @@ const tokenUsage = computed(() =>
       :open="transferring !== null"
       :agent="transferring"
       :people="people"
+      :roles="roles"
       @close="transferring = null"
       @saved="controller.transferred" />
 

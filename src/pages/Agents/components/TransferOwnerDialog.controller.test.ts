@@ -7,12 +7,17 @@ import type { User } from "~/services/users.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
 import {
+  adminRole,
+  agentRole,
   lead,
   maya,
+  memberRole,
   reader,
   reviewBot,
+  root,
   signInAs,
   userFixture,
+  viewerRole,
 } from "~/tests/people";
 
 vi.mock("~/services/users.api");
@@ -30,11 +35,12 @@ const otherBot = userFixture({
 
 async function openDialog(
   agent: User | null = reviewBot,
-  people: User[] = [maya, departed, otherBot, lead, reader],
+  people: User[] = [maya, departed, otherBot, lead, reader, root],
 ) {
   const open = ref(false);
+  const roles = [adminRole, memberRole, viewerRole, agentRole];
   const { controller } = mountController(() =>
-    useTransferOwnerDialog(open, ref(agent), ref(people)),
+    useTransferOwnerDialog(open, ref(agent), ref(people), ref(roles)),
   );
   open.value = true;
   await nextTick();
@@ -54,8 +60,14 @@ describe("useTransferOwnerDialog", () => {
 
     expect(dialog.options.value).toEqual([
       { value: "usr_lead", label: "lead@example.com" },
-      { value: "usr_reader", label: "reader@example.com" },
+      { value: "usr_root", label: "root@example.com" },
     ]);
+  });
+
+  it("leaves out people who can't view users, since they couldn't see the agent", async () => {
+    const { dialog } = await openDialog(reviewBot, [maya, reader]);
+
+    expect(dialog.options.value).toEqual([]);
   });
 
   it("preselects the first person it can move the agent to", async () => {
@@ -74,11 +86,11 @@ describe("useTransferOwnerDialog", () => {
 
   it("moves the agent to the chosen owner", async () => {
     const { dialog } = await openDialog();
-    dialog.ownerId.value = "usr_reader";
+    dialog.ownerId.value = "usr_root";
 
     expect(await dialog.submit()).toBe(true);
     expect(usersApi.updateUser).toHaveBeenCalledWith("usr_bot", {
-      ownerId: "usr_reader",
+      ownerId: "usr_root",
     });
     expect(dialog.saving.value).toBe(false);
   });

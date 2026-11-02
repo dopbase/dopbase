@@ -28,6 +28,7 @@ const {
   agent,
   access,
   role,
+  roles,
   people,
   loadError,
   canManage,
@@ -266,6 +267,7 @@ const usage = computed(() =>
       :open="transferOpen"
       :agent="agent"
       :people="people"
+      :roles="roles"
       @close="transferOpen = false"
       @saved="controller.transferred" />
 

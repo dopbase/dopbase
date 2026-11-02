@@ -219,13 +219,14 @@ pub async fn owned_count(
     .await
 }
 
-/// Whether `id` can own an AI agent: an active account that signs in.
+/// Whether `id` can own an AI agent: an active account that signs in and
+/// can see users, so the agent shows up for them.
 pub async fn can_own(
   conn: &mut SqliteConnection,
   id: &str,
 ) -> Result<bool, sqlx::Error> {
   let found: Option<i64> = sqlx::query_scalar(
-    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR r.sign_in = 'interactive')",
+    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'users.view')))",
   )
   .bind(id)
   .fetch_optional(conn)

@@ -63,8 +63,9 @@ or **Revoke token** in the list's **⋯** menu.
 
 ## Transfer, disable, or delete
 
-**Transfer owner** lists the people who can own it. The agent keeps its grants
-and token, but never reaches more than its new owner does.
+**Transfer owner** lists the people who can own it: root and anyone whose role
+has `users.view`, so the new owner can see the agent. The agent keeps its
+grants and token, but never reaches more than its new owner does.
 
 **Disable agent** stops its token; its access and history stay. **Delete
 agent** asks you to type its name, then removes it with its grants and tokens.
