@@ -55,7 +55,10 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
   const secrets = computed<SecretMetadata[] | null>(() =>
     loadError.value ? null : (secretList.data.value ?? null),
   );
-  const loading = secretList.isLoading;
+  // Only a first load shows the skeleton; a background refresh keeps the rows.
+  const loading = computed(
+    () => secretList.isLoading.value && secretList.data.value === undefined,
+  );
   const actionError = ref<string | null>(null);
   const { runWithReauth } = useReauthentication();
   const auth = useAuthStore();

@@ -1,4 +1,4 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, shallowRef, watch } from "vue";
 import type { Ref } from "vue";
 import { useInfiniteQuery } from "@pinia/colada";
 import * as secretsApi from "~/services/secrets.api";
@@ -68,10 +68,15 @@ export function useSecretHistoryController(
     ),
   );
   const loadingMore = ref(false);
-  const loadError = loadFailure(
+  /** What the last "older versions" read failed with; shown versions stay. */
+  const moreCause = shallowRef<unknown>(null);
+  const failure = loadFailure(
     history,
     (cause) => describeError(cause, "Could not load the history."),
     { withData: true },
+  );
+  const loadError = computed(() =>
+    history.error.value === moreCause.value ? null : failure.value,
   );
   const pages = computed(() =>
     loadError.value ? [] : (history.data.value?.pages ?? []),
@@ -140,6 +145,7 @@ export function useSecretHistoryController(
     try {
       await history.loadNextPage({ throwOnError: true });
     } catch (cause) {
+      moreCause.value = cause;
       if (signal.aborted || isAbortError(cause) || auth.sessionExpired) return;
       actionError.value = describeError(
         cause,

@@ -75,7 +75,10 @@ export function useTokensPanelController(environmentId: Ref<string>) {
   const tokens = computed<RunnerToken[] | null>(() =>
     loadError.value ? null : (tokenList.data.value ?? null),
   );
-  const loading = tokenList.isLoading;
+  // Only a first load shows the skeleton; a background refresh keeps the rows.
+  const loading = computed(
+    () => tokenList.isLoading.value && tokenList.data.value === undefined,
+  );
   const actionError = ref<string | null>(null);
   const creating = ref(false);
 

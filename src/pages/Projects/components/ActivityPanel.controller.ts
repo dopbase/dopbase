@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from "vue";
+import { computed, ref, shallowRef, watch, type Ref } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 import { useInfiniteQuery } from "@pinia/colada";
 import type * as auditApi from "~/services/audit.api";
@@ -65,10 +65,15 @@ export function useActivityPanelController(
   );
   const loadingMore = ref(false);
   const moreError = ref<string | null>(null);
-  const feedFailure = loadFailure(
+  /** What the last Load more failed with; the rows already shown stay up. */
+  const moreCause = shallowRef<unknown>(null);
+  const failure = loadFailure(
     feed,
     (cause) => errorMessage(cause, "Could not load the activity."),
     { withData: true },
+  );
+  const feedFailure = computed(() =>
+    feed.error.value === moreCause.value ? null : failure.value,
   );
   const loadError = computed(() => feedFailure.value ?? moreError.value);
   const loading = computed(() => feed.isLoading.value && !loadingMore.value);
@@ -112,6 +117,7 @@ export function useActivityPanelController(
     try {
       await feed.loadNextPage({ throwOnError: true });
     } catch (cause) {
+      moreCause.value = cause;
       // A filter change meanwhile started another feed; this page is moot.
       if (filters.value === shown)
         moreError.value =
