@@ -9,7 +9,10 @@ use chrono::{Duration, Utc};
 use crate::{
   constants::{
     errors::{AUTHENTICATION_INVALID, AUTHORIZATION_DENIED, CSRF_REQUIRED_MESSAGE},
-    limits::{BROWSER_SESSION_IDLE_HOURS, CLI_SESSION_IDLE_DAYS, RECENT_AUTHENTICATION_MINUTES},
+    limits::{
+      BROWSER_SESSION_IDLE_HOURS, CLI_SESSION_IDLE_DAYS, RECENT_AUTHENTICATION_MINUTES,
+      RUNNER_LAST_USED_SECONDS,
+    },
     tokens::CSRF_TOKEN_PREFIX,
   },
   http::HttpError,
@@ -202,9 +205,14 @@ impl FromRequestParts<AppState> for AuthIdentity {
     .await
     .map_err(HttpError::from)?;
     if let Some((token_id, environment_id)) = runner {
-      sqlx::query("UPDATE runner_tokens SET last_used_at = ? WHERE id = ?")
+      // A runner may poll every few seconds; one write a minute is enough
+      // for "last used".
+      sqlx::query(
+        "UPDATE runner_tokens SET last_used_at = ? WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)",
+      )
         .bind(now.to_rfc3339())
         .bind(&token_id)
+        .bind((now - Duration::seconds(RUNNER_LAST_USED_SECONDS)).to_rfc3339())
         .execute(state.db.pool())
         .await
         .map_err(HttpError::from)?;

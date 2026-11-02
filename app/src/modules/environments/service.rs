@@ -148,6 +148,17 @@ pub(crate) async fn show(
     .await?
     .ok_or_else(not_found)
 }
+/// The id a reference names, without any access check.
+pub(crate) async fn resolve_id(
+  state: &AppState,
+  reference: &str,
+) -> Result<Option<String>, HttpError> {
+  Ok(
+    repository::resolve(state.db.pool(), reference)
+      .await?
+      .map(|environment| environment.id),
+  )
+}
 pub async fn resolve(
   state: &AppState,
   identity: &AuthIdentity,

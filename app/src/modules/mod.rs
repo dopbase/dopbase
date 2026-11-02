@@ -16,6 +16,7 @@ pub mod instance;
 pub mod personal_tokens;
 pub mod projects;
 pub mod roles;
+pub mod runtime;
 pub mod secrets;
 pub mod sso;
 pub mod tokens;
@@ -29,6 +30,7 @@ pub fn routes() -> Router<AppState> {
     .merge(projects::routes())
     .merge(environments::routes())
     .merge(secrets::routes())
+    .merge(runtime::routes())
     .merge(tokens::routes())
     .merge(audit::routes())
     .merge(instance::routes())
@@ -48,6 +50,7 @@ pub fn openapi() -> OpenApi {
   doc.merge(projects::doc::build());
   doc.merge(environments::doc::build());
   doc.merge(secrets::doc::build());
+  doc.merge(runtime::doc::build());
   doc.merge(tokens::doc::build());
   doc.merge(audit::doc::build());
   doc.merge(instance::doc::build());

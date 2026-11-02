@@ -234,6 +234,19 @@ pub mod tokens {
   }
 }
 
+/// The runner-only gate. The token decides the environment.
+pub mod runtime {
+  pub const SECRETS: &str = api_path!("/runtime/secrets");
+
+  /// The gate, checking that the token's environment is `reference`.
+  pub fn secrets(reference: Option<&str>) -> String {
+    match reference {
+      Some(reference) => super::with_query(SECRETS, "reference", reference),
+      None => SECRETS.to_owned(),
+    }
+  }
+}
+
 pub mod audit {
   use super::with_params as with_query;
 

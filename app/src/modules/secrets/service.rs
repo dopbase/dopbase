@@ -1047,6 +1047,46 @@ fn collection_revision<'a>(
   }
   format!("{:x}", hash.finalize())
 }
+/// An environment's rows and `.env` layout, read together, and the
+/// revision they make. Nothing is decrypted yet.
+pub(crate) struct Snapshot {
+  pub revision: String,
+  pub rows: Vec<repository::SecretRow>,
+  pub env_layout: Option<String>,
+}
+pub(crate) async fn snapshot(
+  state: &AppState,
+  id: &str,
+) -> Result<Snapshot, HttpError> {
+  let mut tx = state.db.pool().begin().await?;
+  let rows = repository::rows(&mut *tx, id).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  tx.rollback().await?;
+  Ok(Snapshot {
+    revision: collection_revision(id, rows.iter(), env_layout.as_deref()),
+    rows,
+    env_layout,
+  })
+}
+pub(crate) fn decrypt_rows(
+  state: &AppState,
+  id: &str,
+  rows: &[repository::SecretRow],
+) -> Result<Vec<SecretInput>, HttpError> {
+  rows
+    .iter()
+    .map(|row| {
+      decrypt_row(state, id, row).map(|value| SecretInput {
+        key: row.key.clone(),
+        value,
+      })
+    })
+    .collect()
+}
 async fn decrypt_all(
   state: &AppState,
   id: &str,
@@ -1105,25 +1145,12 @@ pub async fn export(
     ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
-  let mut tx = state.db.pool().begin().await?;
-  let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
-    .bind(id).fetch_all(&mut *tx).await?;
-  let env_layout: Option<String> =
-    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
-      .bind(id)
-      .fetch_optional(&mut *tx)
-      .await?;
-  let revision = collection_revision(id, rows.iter(), env_layout.as_deref());
-  let entries = rows
-    .iter()
-    .map(|row| {
-      decrypt_row(state, id, row).map(|value| SecretInput {
-        key: row.key.clone(),
-        value,
-      })
-    })
-    .collect::<Result<Vec<_>, _>>()?;
-  tx.rollback().await?;
+  let Snapshot {
+    revision,
+    rows,
+    env_layout,
+  } = snapshot(state, id).await?;
+  let entries = decrypt_rows(state, id, &rows)?;
   common::audit_standalone(
     state.db.pool(),
     actor_type,

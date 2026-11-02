@@ -722,6 +722,7 @@ async fn health_and_openapi_are_available() {
     "/api/v1/environments/{environment_id}/secrets/layout",
     "/api/v1/environments/{environment_id}/secrets/export",
     "/api/v1/environments/{environment_id}/secrets/runtime",
+    "/api/v1/runtime/secrets",
     "/api/v1/environments/{environment_id}/tokens",
     "/api/v1/tokens/{token_id}/revoke",
     "/api/v1/audit-events",
@@ -1439,6 +1440,8 @@ mod instance_status;
 mod personal_tokens_tokens;
 #[path = "modules/roles/custom.rs"]
 mod roles_custom;
+#[path = "modules/runtime/secrets.rs"]
+mod runtime_secrets;
 #[path = "modules/secrets/compare.rs"]
 mod secrets_compare;
 #[path = "modules/secrets/copy.rs"]

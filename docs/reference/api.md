@@ -33,6 +33,7 @@ in your installed version.
 | Comparing environments, copying a value across     | `/api/v1/environments/{id}/compare`                  |
 | Copying keys from another environment              | `/api/v1/environments/{id}/copy-secrets`             |
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
+| Runtime secrets for a runner token                 | `/api/v1/runtime/secrets`                            |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
 | People and AI agents                               | `/api/v1/users`                                      |
@@ -271,6 +272,34 @@ Account and agent-token administration requires a root/admin browser session;
 CLI bearer sessions cannot administer accounts. AI bearer tokens may only read
 metadata and [instance status](/ui/audit-instance#instance-status). See
 [identity and tokens](/reference/identity) for the complete role matrix.
+
+## Runtime secrets for runner tokens
+
+`GET /api/v1/runtime/secrets` returns the secrets of the runner token's
+environment. The token decides the environment, so an SDK or script needs only
+the server URL and the token:
+
+```bash
+curl -H "Authorization: Bearer $DOPBASE_TOKEN" \
+  https://dopbase.example.com/api/v1/runtime/secrets
+```
+
+`data` holds `projectId`, `project`, `environment`, `environmentId`, `revision`,
+and `entries`. The `revision` changes when a secret or the `.env` layout
+changes, and it matches the `revision` from export. A session or personal
+token gets `403` `RUNNER_TOKEN_REQUIRED`.
+
+The `ETag` header is the quoted revision. Send it back as `If-None-Match` to
+check for changes: while nothing has changed, the server answers
+`304 Not Modified` with an empty body. A 304 decrypts nothing and writes no
+audit event, so a client can poll every few seconds. A `200` writes one
+`secret.runtime_accessed` event with the revision.
+
+Add `?reference=` with an environment ID or `PROJECT_REF/ENVIRONMENT_NAME` to
+make sure the token is for that environment. Any other reference gets `403`
+`TOKEN_SCOPE_INVALID`, and the server reads no value.
+
+A runner token's `lastUsedAt` is updated at most once a minute.
 
 ## Instance status and health checks
 
