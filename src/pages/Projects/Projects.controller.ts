@@ -4,6 +4,7 @@ import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
+import { fetchAuthMethods, type AuthMethods } from "~/services/auth.api";
 import type { AffectedCounts, Environment, Project } from "~/services";
 import { reaches } from "~/services/access.api";
 import { useAuthStore } from "~/stores/auth.store";
@@ -78,9 +79,32 @@ export function useProjectsController() {
       }
       projects.value = projectList;
       environments.value = environmentList;
+      if (projectList.length === 0 && auth.isRoot) void loadSignInMethods();
     } catch {
       if (current.signal.aborted) return;
       loadError.value = "Could not load projects.";
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Setup checklist
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Root on a server with no projects is finishing setup, so the empty
+   * state carries on the setup steps instead of a plain invitation.
+   */
+  const showSetupChecklist = computed(
+    () => auth.isRoot && projects.value?.length === 0,
+  );
+  const accountEmail = computed(() => auth.session?.email ?? "");
+  const signInMethods = ref<AuthMethods | null>(null);
+
+  async function loadSignInMethods(): Promise<void> {
+    try {
+      signInMethods.value = await fetchAuthMethods();
+    } catch {
+      // Best effort. The sign-in step falls back to generic copy.
     }
   }
 
@@ -320,6 +344,9 @@ export function useProjectsController() {
     openEnvironment,
     openProjectAccess,
     canCreateProjects,
+    showSetupChecklist,
+    accountEmail,
+    signInMethods,
     nameDialog,
     nameDialogCopy,
     submitName,

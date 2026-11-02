@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { ref } from "vue";
 import { useAccessGrantsPanel } from "./AccessGrantsPanel.controller";
-import type { GrantPrincipal } from "./GiveAccessDialog.controller";
+import type { GrantPrincipal } from "~/utils/level";
 import * as accessApi from "~/services/access.api";
 import { ApiError } from "~/services/http.client";
 import { grantFixture } from "~/tests/people";
@@ -60,9 +60,15 @@ function panel(
   grants: accessApi.Grant[],
   principal: GrantPrincipal = maya,
   changed = vi.fn(),
+  readOnly = false,
 ) {
   return {
-    panel: useAccessGrantsPanel(ref(principal), ref(grants), changed),
+    panel: useAccessGrantsPanel(
+      ref(principal),
+      ref(grants),
+      changed,
+      ref(readOnly),
+    ),
     changed,
   };
 }
@@ -124,21 +130,38 @@ describe("useAccessGrantsPanel", () => {
     expect(p.rows.value[0]?.viaGroup).toBeNull();
   });
 
-  it("explains an environment grant that overrides the project grant", () => {
+  it("lists an environment grant that overrides the project grant, with both levels", () => {
     const { panel: p } = panel([direct, prodOverride]);
     expect(p.overrides.value).toEqual([
-      "An environment grant overrides the project grant, so maya@example.com gets Names only in payments/prod.",
+      {
+        key: "grt_prod",
+        project: "payments",
+        environment: "prod",
+        from: expect.objectContaining({ label: "Write" }),
+        to: expect.objectContaining({ label: "Names only" }),
+      },
     ]);
   });
 
-  it("says can't reach for a None override, and stays quiet with no project grant", () => {
+  it("compares against the highest project grant, direct or through a group", () => {
+    const readViaGroup = grantFixture({
+      ...viaBackend,
+      id: "grt_pay_group",
+      scopeId: direct.scopeId,
+      scopeLabel: "payments",
+      projectId: direct.projectId,
+      level: "manage",
+    });
+    const { panel: p } = panel([direct, readViaGroup, prodOverride]);
+    expect(p.overrides.value[0]?.from.label).toBe("Manage");
+  });
+
+  it("marks a None override as blocked, and stays quiet with no project grant", () => {
     const blocked = grantFixture({
       ...prodOverride,
       level: "none",
     });
-    expect(panel([direct, blocked]).panel.overrides.value[0]).toContain(
-      "maya@example.com can't reach payments/prod",
-    );
+    expect(panel([direct, blocked]).panel.overrides.value[0]?.to).toBeNull();
     expect(panel([prodOverride, everywhere]).panel.overrides.value).toEqual([]);
   });
 
@@ -154,16 +177,34 @@ describe("useAccessGrantsPanel", () => {
     ]);
   });
 
-  it("opens the dialog to give new access or change a level", async () => {
+  it("opens the change dialog for a grant and closes it once saved", async () => {
     const { panel: p, changed } = panel([direct]);
-    p.openGive();
-    expect(p.dialogOpen.value).toBe(true);
-    expect(p.editing.value).toBeNull();
     p.openChange(direct);
     expect(p.editing.value).toStrictEqual(direct);
     await p.saved();
-    expect(p.dialogOpen.value).toBe(false);
+    expect(p.editing.value).toBeNull();
     expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it("gives a row a menu only when it has something in it", () => {
+    const { panel: p } = panel([everywhere, direct, viaBackend]);
+    expect(
+      p.rows.value.map((row) => [row.grant.id, row.editable, row.hasActions]),
+    ).toEqual([
+      ["grt_all", false, false],
+      ["grt_pay", true, true],
+      ["grt_search", false, true],
+    ]);
+  });
+
+  it("lets read-only viewers open projects but not change grants", () => {
+    const { panel: p } = panel([everywhere, direct], maya, vi.fn(), true);
+    expect(
+      p.rows.value.map((row) => [row.grant.id, row.editable, row.hasActions]),
+    ).toEqual([
+      ["grt_all", false, false],
+      ["grt_pay", false, true],
+    ]);
   });
 
   it("removes a direct grant and tells the page", async () => {
@@ -185,6 +226,126 @@ describe("useAccessGrantsPanel", () => {
     await p.confirmRemove();
     expect(p.removing.value).not.toBeNull();
     expect(p.removeError.value).toBe("You don't manage payments.");
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("selects only grants you can remove, and the header box follows the filter", () => {
+    const { panel: p } = panel([direct, prodOverride, viaBackend, everywhere]);
+    expect(p.canSelect.value).toBe(true);
+    const [, pay, prod, search] = p.rows.value;
+    p.toggleRow(search!, true); // through a group, so not selectable
+    expect(p.selectedRows.value).toEqual([]);
+
+    p.toggleRow(prod!, true);
+    expect(p.someVisibleSelected.value).toBe(true);
+    expect(p.allVisibleSelected.value).toBe(false);
+
+    p.filter.value = "prod";
+    expect(p.allVisibleSelected.value).toBe(true);
+    p.toggleAllVisible(false);
+    expect(p.selectedRows.value).toEqual([]);
+
+    p.filter.value = "";
+    p.toggleAllVisible(true);
+    expect(p.selectedRows.value.map((row) => row.grant.id)).toEqual([
+      pay!.grant.id,
+      prod!.grant.id,
+    ]);
+    p.clearSelection();
+    expect(p.selectedRows.value).toEqual([]);
+  });
+
+  it("shows no checkboxes to read-only viewers", () => {
+    const { panel: p } = panel([direct], maya, vi.fn(), true);
+    expect(p.canSelect.value).toBe(false);
+  });
+
+  it("removes every selected grant and clears the selection", async () => {
+    vi.mocked(accessApi.removeGrant).mockResolvedValue();
+    const { panel: p, changed } = panel([direct, prodOverride]);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    expect(p.removeTitle.value).toBe("Remove 2 grants?");
+    expect(p.removeDescription.value).toBe(
+      "maya@example.com loses access to payments and payments/prod on their next request. Other grants they hold stay.",
+    );
+    await p.confirmRemove();
+    expect(vi.mocked(accessApi.removeGrant).mock.calls).toEqual([
+      ["grt_pay"],
+      ["grt_prod"],
+    ]);
+    expect(p.removing.value).toBeNull();
+    expect(p.selectedRows.value).toEqual([]);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it("closes the confirm when every grant went but the reload fails", async () => {
+    vi.mocked(accessApi.removeGrant).mockResolvedValue();
+    const changed = vi.fn().mockRejectedValue(new Error("offline"));
+    const { panel: p } = panel([direct, prodOverride], maya, changed);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    await expect(p.confirmRemove()).resolves.toBeUndefined();
+    expect(p.removing.value).toBeNull();
+    expect(p.removeError.value).toBeNull();
+    expect(p.removeBusy.value).toBe(false);
+    expect(p.selectedRows.value).toEqual([]);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it("says how far it got and keeps the rest when one removal fails", async () => {
+    vi.mocked(accessApi.removeGrant)
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(
+        new ApiError(403, { ACCESS_DENIED: "You don't manage payments." }),
+      );
+    const { panel: p, changed } = panel([direct, prodOverride]);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    await p.confirmRemove();
+    expect(p.removeError.value).toBe(
+      "Removed 1 of 2. payments/prod failed: You don't manage payments.",
+    );
+    expect(p.removing.value?.map((row) => row.grant.id)).toEqual(["grt_prod"]);
+    expect(p.removeTitle.value).toBe("Remove access to payments/prod?");
+    expect(p.selectedRows.value.map((row) => row.grant.id)).toEqual([
+      "grt_prod",
+    ]);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it("drops what went from the confirm when sign-in is cancelled partway", async () => {
+    vi.mocked(accessApi.removeGrant)
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new DOMException("Cancelled", "AbortError"));
+    const { panel: p, changed } = panel([direct, prodOverride]);
+    p.toggleAllVisible(true);
+    p.askRemoveSelected();
+    await p.confirmRemove();
+    expect(p.removing.value?.map((row) => row.grant.id)).toEqual(["grt_prod"]);
+    expect(p.selectedRows.value.map((row) => row.grant.id)).toEqual([
+      "grt_prod",
+    ]);
+    expect(p.removeError.value).toBe(
+      "Removed 1 of 2. Confirm again to remove the rest.",
+    );
+    expect(changed).toHaveBeenCalledOnce();
+
+    // Confirming again only sends the one that's left.
+    vi.mocked(accessApi.removeGrant).mockClear().mockResolvedValue();
+    await p.confirmRemove();
+    expect(vi.mocked(accessApi.removeGrant).mock.calls).toEqual([["grt_prod"]]);
+  });
+
+  it("stays quiet when sign-in is cancelled before anything went", async () => {
+    vi.mocked(accessApi.removeGrant).mockRejectedValueOnce(
+      new DOMException("Cancelled", "AbortError"),
+    );
+    const { panel: p, changed } = panel([direct]);
+    p.askRemove(p.rows.value[0]!);
+    await p.confirmRemove();
+    expect(p.removeError.value).toBeNull();
+    expect(p.removing.value?.map((row) => row.grant.id)).toEqual(["grt_pay"]);
     expect(changed).not.toHaveBeenCalled();
   });
 

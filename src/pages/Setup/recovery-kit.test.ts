@@ -35,7 +35,7 @@ describe("recovery kit", () => {
     expect(text).toContain("Server: https://secrets.acme.dev");
     expect(text).toContain("Root account: root@acme.dev");
     expect(text).toContain("ab".repeat(32));
-    expect(text).toContain("Choose Restore from backup");
+    expect(text).toContain("Choose Restore a backup");
     expect(text).toContain("2026-10-31T09:00:00.000Z");
   });
 

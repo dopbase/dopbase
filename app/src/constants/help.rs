@@ -10,6 +10,7 @@ Environment variables:
   DOPBASE_PUBLIC_URL              Public URL
   DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
   DOPBASE_WEB_UI                  Enable or disable the web UI (default: true)
+  DOPBASE_UPDATE_CHECK            Check for a newer release on the Status page (default: false)
   DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
   DOPBASE_AUDIT_RETENTION_DAYS    Days to keep audit records (unset keeps the whole log)

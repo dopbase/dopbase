@@ -1,5 +1,5 @@
-import { LEVELS } from "~/services/access.api";
-import type { Level } from "~/services/access.api";
+import { LEVELS, reaches } from "~/services/access.api";
+import type { Level, PrincipalType } from "~/services/access.api";
 import { formatLevel } from "./format";
 
 /** What `DbLevelBadge` draws for an access level. */
@@ -70,4 +70,40 @@ export function grantSentence(
   return level === "none"
     ? `${subject} will no longer reach ${target}, even through a project grant.`
     : `${subject} will be able to ${LEVEL_VERBS[level]} ${target}.`;
+}
+
+/** Someone a grant can be given to: a person, an AI agent or a group. */
+export interface GrantPrincipal {
+  type: PrincipalType;
+  id: string;
+  /** An email, an agent's name, or a group's name. */
+  label: string;
+  /** The most their role allows; groups have no cap of their own. */
+  maxLevel?: Level;
+}
+
+export interface LevelChoice {
+  level: Level;
+  label: string;
+  hint: string;
+  /** Above what their role allows. */
+  disabled: boolean;
+}
+
+/**
+ * The levels a grant on a whole project or on environments can give, with
+ * the ones above `cap` shown but disabled.
+ */
+export function levelChoices(
+  scope: "project" | "environment",
+  cap: Level | undefined,
+): LevelChoice[] {
+  return (scope === "project" ? PROJECT_LEVELS : ENVIRONMENT_LEVELS).map(
+    (level) => ({
+      level,
+      label: formatLevel(level),
+      hint: LEVEL_HINTS[level],
+      disabled: cap !== undefined && !reaches(cap, level),
+    }),
+  );
 }

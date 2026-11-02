@@ -47,6 +47,9 @@ const { controller } = await vi.hoisted(async () => {
       openEnvironment: vi.fn(),
       openProjectAccess: vi.fn(),
       canCreateProjects: ref(true),
+      showSetupChecklist: ref(false),
+      accountEmail: ref("root@example.com"),
+      signInMethods: ref<unknown>(null),
       nameDialog: ref<unknown>(null),
       nameDialogCopy: ref({
         title: "New project",
@@ -119,6 +122,8 @@ afterEach(() => {
   controller.projects.value = initialProjects;
   controller.rows.value = initialRows;
   controller.canCreateProjects.value = true;
+  controller.showSetupChecklist.value = false;
+  controller.signInMethods.value = null;
   controller.filter.value = "";
   controller.nameDialog.value = null;
   vi.clearAllMocks();
@@ -135,6 +140,26 @@ describe("Projects page", () => {
     expect(tree?.textContent).toContain("protected");
     expect(tree?.textContent).toContain("Names only");
     expect(tree?.textContent).toContain("Show all 8 environments");
+    expect(tree?.textContent).toContain("Environment ID");
+    expect(
+      tree?.querySelector('[data-testid="environment-id"]')?.textContent,
+    ).toContain("env_1");
+  });
+
+  it("copies an environment's ID without opening it", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const host = mountPage();
+
+    host
+      .querySelector<HTMLButtonElement>('[data-testid="environment-id"]')!
+      .click();
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("env_1"));
+    expect(controller.openEnvironment).not.toHaveBeenCalled();
   });
 
   it("opens an environment from its row", () => {
@@ -191,6 +216,42 @@ describe("Projects page", () => {
     expect(host.textContent).toContain("Create your first project");
     expect(host.textContent).toContain("dopbase project create payments");
     expect(button("New project")).toBeDefined();
+  });
+
+  it("carries on the setup steps for root, with the first project left", async () => {
+    controller.projects.value = [];
+    controller.rows.value = [];
+    controller.showSetupChecklist.value = true;
+    const host = mountPage();
+
+    const checklist = host.querySelector('[data-testid="setup-checklist"]');
+    expect(checklist?.textContent).toContain("3 of 4 done");
+    expect(checklist?.textContent).toContain("root@example.com");
+    expect(checklist?.textContent).toContain("Add single sign-on");
+    expect(
+      checklist?.querySelector('[aria-current="step"]')?.textContent,
+    ).toContain("Create your first project");
+
+    button("New project")?.click();
+    await nextTick();
+    expect(controller.nameDialog.value).toEqual({ kind: "new-project" });
+  });
+
+  it("names the single sign-on provider once it's set up", () => {
+    controller.projects.value = [];
+    controller.rows.value = [];
+    controller.showSetupChecklist.value = true;
+    controller.signInMethods.value = {
+      password: true,
+      passwordForm: true,
+      sso: { name: "Google" },
+      cliBrowser: true,
+    };
+    const host = mountPage();
+
+    const signIn = host.querySelector('[data-testid="setup-sign-in"]');
+    expect(signIn?.textContent).toContain("Passwords and Google.");
+    expect(signIn?.textContent).not.toContain("Add single sign-on");
   });
 
   it("tells everyone else to ask for access", () => {

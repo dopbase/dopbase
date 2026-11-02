@@ -4,9 +4,13 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 .DS_Store
 *.DS_Store
+**/.DS_Store
 *.local
 *.codegraph
 package.dev.json
 target/
 .claude/
 .vscode/
+.playwright-mcp
+backlog/archive
+app/docs

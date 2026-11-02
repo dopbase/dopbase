@@ -4,8 +4,8 @@ import * as auditApi from "~/services/audit.api";
 import type { AuditEvent, ChainVerifyReport } from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
-import { fetchUsers } from "~/services/users.api";
-import type { User } from "~/services/users.api";
+import { fetchUserIdentities } from "~/services/users.api";
+import type { UserIdentity } from "~/services/users.api";
 import type { Environment, Project } from "~/services";
 import { errorMessage } from "~/services/api-errors";
 import { useAuthStore } from "~/stores/auth.store";
@@ -29,6 +29,7 @@ export const AUDIT_ACTIONS: readonly string[] = [
   "secret.exported",
   "secret.runtime_accessed",
   "secret.copied",
+  "secret.bulk_copied",
   "project.created",
   "project.renamed",
   "project.deleted",
@@ -139,7 +140,7 @@ export function useAuditController() {
 
   const projects = ref<Project[]>([]);
   const environments = ref<Environment[]>([]);
-  const people = ref<User[]>([]);
+  const people = ref<UserIdentity[]>([]);
   let requestVersion = 0;
 
   const projectName = (id: string | null): string =>
@@ -311,12 +312,16 @@ export function useAuditController() {
   }
 
   async function loadFilterOptions(): Promise<void> {
+    let identitiesFetcher = Promise.resolve([] as UserIdentity[]);
+    if (auth.can("users.view")) {
+      identitiesFetcher = fetchUserIdentities().catch(
+        () => [] as UserIdentity[],
+      );
+    }
     const [projectList, environmentList, accounts] = await Promise.all([
       projectsApi.listProjects().catch(() => [] as Project[]),
       environmentsApi.listEnvironments().catch(() => [] as Environment[]),
-      auth.can("users.view")
-        ? fetchUsers().catch(() => [] as User[])
-        : Promise.resolve([] as User[]),
+      identitiesFetcher,
     ]);
     projects.value = projectList;
     environments.value = environmentList;

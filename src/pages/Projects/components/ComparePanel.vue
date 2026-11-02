@@ -26,6 +26,7 @@ import {
   XIcon,
 } from "~/assets/icons";
 import type { Environment } from "~/services";
+import { formatList } from "~/utils/format";
 
 /**
  * ComparePanel — the project page's Compare tab. The environment open in
@@ -88,20 +89,14 @@ const gridMinWidth = computed(
     `${180 + (columns.value.length + 1) * 160 + 12 * (columns.value.length + 1) + 16}px`,
 );
 
-const comparedNames = computed(() => {
-  const names = columns.value.map((column) => column.name);
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-});
+const comparedNames = computed(() =>
+  formatList(columns.value.map((column) => column.name)),
+);
 
 const namesOnlyNote = computed(() => {
   const names = namesOnly.value.map((column) => column.name);
   if (names.length === 0) return "";
-  const list =
-    names.length === 1
-      ? names[0]
-      : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-  return `You see names only in ${list}, so ${names.length === 1 ? "its column shows" : "their columns show"} which keys exist there, not whether the values match ${base.value.name}.`;
+  return `You see names only in ${formatList(names)}, so ${names.length === 1 ? "its column shows" : "their columns show"} which keys exist there, not whether the values match ${base.value.name}.`;
 });
 
 function setChoice(choice: string): void {

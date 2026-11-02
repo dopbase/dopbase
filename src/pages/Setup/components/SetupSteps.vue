@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { CheckIcon } from "~/assets/icons";
+import { CheckIcon, DopbaseIcon } from "~/assets/icons";
 
 /**
  * SetupSteps — the setup checklist beside the form: which step this is and
- * what comes after. Steps three and four happen in the console, so they
- * say where. Presentation-only.
+ * what comes after, over a large brand mark cropped by the bottom-right
+ * corner. Presentation-only.
  */
 const props = defineProps<{
   host: string;
@@ -24,11 +24,11 @@ const steps = computed(() => [
   },
   {
     title: "Sign-in for your team",
-    body: "Passwords, single sign-on or both, from Single sign-on in the console.",
+    body: "Google, passwords or both. You can change this later.",
   },
   {
     title: "First project",
-    body: "Create a project, import a .env, and run your app with it.",
+    body: "Import a .env and run your app with it.",
   },
 ]);
 
@@ -40,10 +40,19 @@ function state(index: number): "done" | "current" | "next" {
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col justify-center px-16 py-12">
-    <p class="text-[13px] text-ink-muted">Setting up</p>
-    <p class="mt-1 font-mono text-[17px] text-ink-strong">{{ host }}</p>
-    <ol class="mt-8 flex max-w-[400px] flex-col" aria-label="Setup steps">
+  <div class="relative flex flex-1 flex-col px-20 pb-12 pt-24">
+    <!-- Sized and placed as in the Figma frame: 521px wide, hanging off the
+         bottom-right corner, which the aside's overflow-hidden crops. -->
+    <DopbaseIcon
+      class="pointer-events-none absolute -bottom-[259px] -right-[171px] w-[521px] opacity-90"
+      data-testid="setup-brand-mark" />
+    <p class="relative text-[13px] text-ink-muted">Setting up</p>
+    <p class="relative mt-1 font-mono text-[17px] text-ink-strong">
+      {{ host }}
+    </p>
+    <ol
+      class="relative mt-7 flex max-w-[420px] flex-col"
+      aria-label="Setup steps">
       <li
         v-for="(step, index) in steps"
         :key="step.title"
@@ -51,11 +60,11 @@ function state(index: number): "done" | "current" | "next" {
         :aria-current="state(index) === 'current' ? 'step' : undefined">
         <span
           v-if="index < steps.length - 1"
-          class="absolute left-[13px] top-7 h-[calc(100%-28px)] w-px"
+          class="absolute left-[13px] top-7 h-[calc(100%-28px)] w-[1.5px]"
           :class="state(index) === 'done' ? 'bg-ok' : 'bg-line'"
           aria-hidden="true" />
         <span
-          class="relative z-10 flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-control border text-xs font-medium"
+          class="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium"
           :class="{
             'border-ok/50 bg-ok/15 text-ok': state(index) === 'done',
             'border-ink-strong bg-ink-strong text-canvas':

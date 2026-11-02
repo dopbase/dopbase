@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, toRef } from "vue";
 import { useSettingsPanelController } from "./SettingsPanel.controller";
+import EnvironmentId from "./EnvironmentId.vue";
 import NameDialog from "./NameDialog.vue";
 import {
   DbAlert,
@@ -16,7 +17,8 @@ import type { Environment, Project } from "~/services";
 
 /**
  * SettingsPanel — the project's Settings tab, for project managers: its
- * name, its environments with protection and counts, and a danger zone.
+ * name, its environments with their IDs, protection and counts, and a
+ * danger zone.
  */
 const props = defineProps<{
   project: Project | null;
@@ -136,6 +138,10 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           <thead>
             <tr class="border-b border-line-soft">
               <th class="h-10 px-4 font-medium text-ink-muted">Environment</th>
+              <th
+                class="hidden h-10 px-4 font-medium text-ink-muted md:table-cell">
+                ID
+              </th>
               <th class="h-10 px-4 font-medium text-ink-muted">Protected</th>
               <th
                 class="hidden h-10 px-4 font-medium text-ink-muted sm:table-cell">
@@ -152,14 +158,14 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           </thead>
           <tbody>
             <tr v-if="environments.length === 0">
-              <td colspan="5" class="px-4 py-6 text-center text-ink-muted">
+              <td colspan="6" class="px-4 py-6 text-center text-ink-muted">
                 No environments yet.
               </td>
             </tr>
             <tr
               v-for="environment in environments"
               :key="environment.id"
-              class="border-b border-line-soft last:border-b-0"
+              class="group border-b border-line-soft last:border-b-0"
               data-testid="settings-environment">
               <td class="h-11 px-4">
                 <span
@@ -170,6 +176,9 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
                     class="h-3.5 w-3.5 text-warn"
                     aria-label="protected" />
                 </span>
+              </td>
+              <td class="hidden h-11 px-4 md:table-cell">
+                <EnvironmentId :id="environment.id" />
               </td>
               <td class="h-11 px-4">
                 <DbSwitch

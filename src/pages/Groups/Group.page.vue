@@ -155,6 +155,10 @@ const {
           v-else-if="activeTab === 'access'"
           :principal="principal"
           :grants="detail.grants"
+          :give-to="{
+            name: 'group-access-give',
+            params: { groupId: principal.id },
+          }"
           :summary="accessSummary"
           :read-only="!canManage"
           @changed="controller.reload" />

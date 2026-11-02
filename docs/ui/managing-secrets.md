@@ -15,10 +15,30 @@ level allows.
 
 ## An empty environment
 
-An environment without secrets shows a short checklist to anyone who can
-write there. Drop a `.env` file on it, choose one, or paste it into the
-`.env` view. The checklist also shows the `dopbase login` and `dopbase run`
-commands for this environment. It goes away once the first secret is saved.
+What an empty environment shows depends on the rest of the project and on
+your level. It goes away once the first secret is saved.
+
+In a new project, where no environment has secrets yet, anyone who can write
+sees the setup timeline from **Projects** carried on: the project is done,
+adding secrets is the current step, and running the app waits until there's a
+secret. One box takes a `.env` file you drop or pick, opens the `.env` view
+with **Paste .env**, or starts **Add secret**. Below it is the
+`dopbase import` command for this environment, and the last step shows
+`dopbase login` and `dopbase run`.
+
+When another environment in the project already has secrets, the page offers
+to start from it instead. **Copy from another environment** picks the one with
+the most secrets, which you can change. **Keys only** is the default: every
+key comes over with an empty value, so staging never ends up pointing at dev's
+database by accident. **Keys and values** copies the values on the server and
+shows only when you can read the source. **Review keys** lists the source's
+keys with their versions, all ticked. Untick what doesn't belong and choose
+**Copy**. Keys the environment already has are left alone. The same box for a
+`.env` file and the import command sit underneath.
+
+Someone who can see the environment but not write to it is told so and sent
+to a project manager. If they can open the project's **Access** tab, **See who
+has access** takes them there to find one.
 
 ## Set and delete
 

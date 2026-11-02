@@ -99,17 +99,19 @@ export function useSsoController() {
   /** One line under the provider's name saying where setup stands. */
   const providerSummary = computed(() => {
     const current = provider.value;
-    if (!current) return "";
+    if (!current) {
+      return "Fill in the provider below and save. Then run a test sign-in before you turn it on.";
+    }
     if (status.value === "enabled") {
       const linked = current.linkedAccounts;
       return linked === 1
-        ? "Provider is on. 1 person has linked their account."
-        : `Provider is on. ${linked} people have linked their account.`;
+        ? "1 person has linked their account."
+        : `${linked} people have linked their account.`;
     }
     if (status.value === "ready") {
-      return "Provider is off. The last test sign-in worked, so you can turn it on.";
+      return "The last test sign-in worked, so you can turn it on.";
     }
-    return "Run a test sign-in before you turn it on.";
+    return "Saved. Run a test sign-in as root before you turn it on. Nobody else sees a change yet.";
   });
 
   /** What removing the provider costs, for the danger card. */

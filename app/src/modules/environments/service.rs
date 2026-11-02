@@ -27,6 +27,7 @@ pub(crate) async fn insert_generated(
   tx: &mut Transaction<'_, Sqlite>,
   project_id: &str,
   name: &str,
+  protected: bool,
   now: &str,
 ) -> Result<String, HttpError> {
   const MAX_ATTEMPTS: usize = 5;
@@ -35,7 +36,7 @@ pub(crate) async fn insert_generated(
       tracing::error!(%error, "failed to generate environment id");
       HttpError::internal()
     })?;
-    if repository::insert(tx, &id, project_id, name, now)
+    if repository::insert(tx, &id, project_id, name, protected, now)
       .await
       .map_err(unique)?
     {
@@ -104,6 +105,25 @@ pub async fn authorize(
   check(environment, &data_access(state, identity).await?, needed)
 }
 
+/// The environment for a response: checked like [`authorize`] at
+/// `Metadata`, with its secret count filled in.
+pub async fn detail(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+) -> Result<EnvironmentResponse, HttpError> {
+  let environment = authorize(state, identity, id, Level::Metadata).await?;
+  counted(state, environment).await
+}
+
+async fn counted(
+  state: &AppState,
+  mut environment: EnvironmentResponse,
+) -> Result<EnvironmentResponse, HttpError> {
+  environment.secret_count = repository::secret_count(state.db.pool(), &environment.id).await?;
+  Ok(environment)
+}
+
 pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
@@ -144,11 +164,12 @@ pub async fn resolve(
       "The runner token cannot access this environment.",
     ));
   }
-  check(
+  let environment = check(
     environment,
     &data_access(state, identity).await?,
     Level::Metadata,
-  )
+  )?;
+  counted(state, environment).await
 }
 pub async fn create(
   state: &AppState,
@@ -167,7 +188,8 @@ pub async fn create(
   .await?;
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
-  let id = insert_generated(&mut tx, &project.id, &request.name, &now).await?;
+  // Protected from the first row, so no grant ever sees it unprotected.
+  let id = insert_generated(&mut tx, &project.id, &request.name, request.protected, &now).await?;
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
@@ -178,11 +200,11 @@ pub async fn create(
     Some(&id),
     Some("environment"),
     Some(&id),
-    serde_json::json!({"name":request.name}),
+    serde_json::json!({"name":request.name,"protected":request.protected}),
   )
   .await?;
   tx.commit().await?;
-  authorize(state, identity, &id, Level::Metadata).await
+  detail(state, identity, &id).await
 }
 pub async fn update(
   state: &AppState,
@@ -246,7 +268,7 @@ pub async fn update(
   tx.commit().await?;
   // Unprotecting can leave the caller with less than before, but never
   // with nothing they could not already see.
-  authorize(state, identity, id, Level::Metadata).await
+  detail(state, identity, id).await
 }
 pub async fn delete(
   state: &AppState,

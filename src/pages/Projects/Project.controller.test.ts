@@ -197,6 +197,8 @@ describe("useProjectController", () => {
     const c = await loaded();
 
     expect(c.tabs.value.map((tab) => tab.key)).toEqual(["access", "settings"]);
+    // With no environment to report a level, Your access shows the project's.
+    expect(c.meter.value?.label).toBe("Project manager");
   });
 
   it("says when the project's own details didn't load", async () => {

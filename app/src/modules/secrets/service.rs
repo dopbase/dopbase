@@ -249,6 +249,139 @@ pub async fn copy(
   tx.commit().await?;
   Ok(metadata)
 }
+/// Creates `keys` here from another environment in the same project, in
+/// one transaction with one audit event. Keys this environment already has
+/// are skipped, never overwritten. With `values` each key gets the source's
+/// current value, decrypted and re-encrypted on the server, which needs
+/// Read on the source; without it each key starts empty and Metadata is
+/// enough. Needs Write here.
+pub async fn copy_many(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  request: CopySecretsRequest,
+) -> Result<CopySecretsResponse, HttpError> {
+  require_metadata_access(identity)?;
+  let account = require_account(identity)?;
+  if request.from == id {
+    return Err(copy_source_invalid("Copy from a different environment."));
+  }
+  let keys: std::collections::BTreeSet<String> = request.keys.into_iter().collect();
+  if keys.is_empty() {
+    return Err(HttpError::validation(BTreeMap::from([(
+      "COPY_KEYS_REQUIRED".into(),
+      "Pick at least one key to copy.".into(),
+    )])));
+  }
+  if keys.len() > MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  let target = environment(state, identity, id, Level::Write).await?;
+  let needed = if request.values {
+    Level::Read
+  } else {
+    Level::Metadata
+  };
+  let source = environment(state, identity, &request.from, needed).await?;
+  if source.project_id != target.project_id {
+    return Err(copy_source_invalid(
+      "Copy from an environment in the same project.",
+    ));
+  }
+  // The source is read in the write transaction, so what is copied and the
+  // versions the audit event records are the source as it is at the write.
+  // Only the chosen keys are read, and ciphertext only when values are
+  // copied, since the write lock is held meanwhile.
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let chosen: Vec<&String> = keys.iter().collect();
+  let source_versions: HashMap<String, i64> =
+    repository::versions_of(&mut *tx, &source.id, &chosen)
+      .await?
+      .into_iter()
+      .collect();
+  if source_versions.len() != keys.len() {
+    return Err(secret_not_found());
+  }
+  let existing: HashSet<String> =
+    sqlx::query_scalar("SELECT key FROM secrets WHERE environment_id=?")
+      .bind(id)
+      .fetch_all(&mut *tx)
+      .await?
+      .into_iter()
+      .collect();
+  let (skipped, copied): (Vec<String>, Vec<String>) =
+    keys.into_iter().partition(|key| existing.contains(key));
+  if existing.len() + copied.len() > MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  let source_rows: HashMap<String, repository::SecretRow> = if request.values {
+    let wanted: Vec<&String> = copied.iter().collect();
+    repository::rows_of(&mut *tx, &source.id, &wanted)
+      .await?
+      .into_iter()
+      .map(|row| (row.key.clone(), row))
+      .collect()
+  } else {
+    HashMap::new()
+  };
+  let mut values = Vec::with_capacity(copied.len());
+  for key in &copied {
+    let value = if request.values {
+      let row = source_rows.get(key).ok_or_else(secret_not_found)?;
+      Zeroizing::new(decrypt_row(state, &source.id, row)?)
+    } else {
+      Zeroizing::new(String::new())
+    };
+    values.push((key, source_versions[key], value));
+  }
+  if values
+    .iter()
+    .map(|(_, _, value)| value.len())
+    .sum::<usize>()
+    > MAX_SECRET_COLLECTION_BYTES
+  {
+    return Err(HttpError::new(
+      axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+      SECRET_LIMIT_EXCEEDED,
+      SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
+    ));
+  }
+  let mut from_versions = serde_json::Map::new();
+  for (key, version, value) in &values {
+    write_value(state, &mut tx, identity, account, id, key, value, None).await?;
+    from_versions.insert((*key).clone(), (*version).into());
+  }
+  common::audit(
+    &mut tx,
+    identity.audit_actor_type(),
+    Some(account.0),
+    Some(account.1),
+    "secret.bulk_copied",
+    Some(&target.project_id),
+    Some(id),
+    Some("environment"),
+    Some(id),
+    serde_json::json!({
+      "fromEnvironmentId": source.id,
+      "values": request.values,
+      "copied": from_versions,
+      "skipped": skipped,
+    }),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(CopySecretsResponse {
+    copied_keys: copied,
+    skipped_keys: skipped,
+  })
+}
+fn secret_count_limit() -> HttpError {
+  HttpError::new(
+    axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+    SECRET_LIMIT_EXCEEDED,
+    SECRET_COUNT_LIMIT_MESSAGE,
+  )
+}
 fn copy_source_invalid(message: &str) -> HttpError {
   HttpError::validation(BTreeMap::from([(
     "COPY_SOURCE_INVALID".into(),

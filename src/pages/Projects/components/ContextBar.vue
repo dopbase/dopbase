@@ -20,16 +20,20 @@ import { NARROW_SCREEN, useMediaQuery } from "~/composable";
 import type { Environment, Project } from "~/services";
 import { formatLevel } from "~/utils/format";
 import type { LevelMeter } from "~/utils/level";
+import EnvironmentId from "./EnvironmentId.vue";
 import SwitcherSheet, { type SwitcherItem } from "./SwitcherSheet.vue";
 
 /**
  * ContextBar — where you are and what you can do there. The breadcrumb
  * segments are the project and environment switchers (E opens the second
- * one), a protected environment gets the amber chip, and your level sits on
- * the right so missing buttons make sense. Run opens how to run an app with
- * this environment's values. On phones the switchers open a bottom sheet
- * instead of a dropdown, and your level and Run sit on their own row.
- * Renders props, reports choices.
+ * one), a protected environment gets the amber chip, and the environment's
+ * ID follows as a chip that copies it. Your level sits on the right so
+ * missing buttons make sense. Run opens how to run an app with this
+ * environment's values. On phones the switchers open a bottom sheet instead
+ * of a dropdown, and the ID chip, your level and Run sit on their own row.
+ * A project with no environments reads "No environments" there, with New
+ * environment behind it for project managers. Renders props, reports
+ * choices.
  */
 const props = defineProps<{
   projectName: string;
@@ -231,25 +235,62 @@ defineExpose({ openEnvironmentMenu });
             </DbMenuItem>
           </template>
         </DbMenu>
+        <!-- A project with no environments says so instead of a bare slash.
+             On phones there's nothing to list, so it opens New environment. -->
+        <template v-else-if="environments?.length === 0">
+          <DbMenu v-if="canCreateEnvironment" align="start">
+            <template #trigger="{ toggle, attrs }">
+              <button
+                ref="environmentTrigger"
+                type="button"
+                class="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-control px-1.5 py-1 text-sm leading-[22px] text-ink-muted transition-colors hover:bg-raised hover:text-ink pointer-coarse:min-h-11"
+                v-bind="narrow ? {} : attrs"
+                aria-label="No environments. Create one"
+                data-testid="environment-switcher"
+                @click="narrow ? emit('new-environment') : toggle()">
+                No environments
+                <ChevronDownIcon class="h-4 w-4 shrink-0" />
+              </button>
+            </template>
+            <DbMenuItem
+              data-testid="new-environment"
+              @select="emit('new-environment')">
+              <template #icon><PlusIcon class="h-4 w-4" /></template>
+              New environment
+            </DbMenuItem>
+          </DbMenu>
+          <span
+            v-else
+            class="px-1.5 text-sm leading-[22px] text-ink-muted"
+            data-testid="no-environments">
+            No environments
+          </span>
+        </template>
         <span v-if="environment" class="hidden sm:inline-flex" title="Press E">
           <DbKbd>E</DbKbd>
+        </span>
+        <span v-if="environment" class="hidden pl-1.5 sm:inline-flex">
+          <EnvironmentId :id="environment.id" variant="chip" />
         </span>
       </nav>
 
       <!-- Its own left-aligned row on phones; the right end on wider screens. -->
       <div
-        class="flex w-full items-center gap-2 sm:ml-auto sm:w-auto"
+        class="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto"
         data-testid="context-actions">
+        <span v-if="environment" class="inline-flex sm:hidden">
+          <EnvironmentId :id="environment.id" variant="chip" />
+        </span>
         <template v-if="meter">
-          <span
-            class="hidden text-[13px] leading-[22px] text-ink-muted sm:inline">
+          <span class="hidden text-[13px] leading-5.5 text-ink-muted sm:inline">
             Your access
           </span>
           <!-- As tall as Run, so the pair lines up. -->
-          <DbLevelBadge v-bind="meter" class="h-10" data-testid="your-access" />
+          <DbLevelBadge v-bind="meter" class="h-8" data-testid="your-access" />
         </template>
         <DbButton
           v-if="showRun"
+          size="sm"
           class="sm:ml-2"
           data-testid="run-open"
           @click="emit('run')">

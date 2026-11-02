@@ -3,8 +3,10 @@ import {
   formatBytes,
   formatDateTime,
   formatDuration,
+  formatHosting,
   formatRelativeTime,
   formatLevel,
+  formatList,
   formatRole,
 } from "./format";
 
@@ -92,5 +94,29 @@ describe("formatLevel", () => {
     expect(formatLevel("metadata")).toBe("Names only");
     expect(formatLevel("project_manager")).toBe("Project manager");
     expect(formatLevel("none")).toBe("No access");
+  });
+});
+
+describe("formatList", () => {
+  it("joins names the way a sentence would", () => {
+    expect(formatList([])).toBe("");
+    expect(formatList(["staging"])).toBe("staging");
+    expect(formatList(["staging", "prod"])).toBe("staging and prod");
+    expect(formatList(["staging", "prod", "qa"])).toBe("staging, prod and qa");
+  });
+});
+
+describe("formatHosting", () => {
+  it("calls a dopbase.dev workspace Secure cloud", () => {
+    expect(formatHosting("acme.dopbase.dev")).toBe("Secure cloud");
+    expect(formatHosting("eu.acme.Dopbase.dev")).toBe("Secure cloud");
+  });
+
+  it("calls every other host Self-hosted", () => {
+    expect(formatHosting("localhost")).toBe("Self-hosted");
+    expect(formatHosting("dopbase.dev")).toBe("Self-hosted");
+    expect(formatHosting("vault.acme.com")).toBe("Self-hosted");
+    expect(formatHosting("dopbase.dev.evil.com")).toBe("Self-hosted");
+    expect(formatHosting("notdopbase.dev")).toBe("Self-hosted");
   });
 });

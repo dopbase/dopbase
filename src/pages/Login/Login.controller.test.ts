@@ -154,6 +154,7 @@ describe("useLoginController", () => {
     await c.loadMethods();
     await new Promise((resolve) => setTimeout(resolve));
     expect(c.host).toBe(window.location.host);
+    expect(c.hosting).toBe("Self-hosted");
     expect(c.version.value).toBe("0.2.0");
   });
 

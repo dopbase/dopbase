@@ -3,12 +3,14 @@ import { toRef } from "vue";
 import { useTransferOwnerDialog } from "./TransferOwnerDialog.controller";
 import { DbAlert, DbButton, DbModal, DbSelect } from "~/components/ui";
 import type { User } from "~/services/users.api";
+import type { Role } from "~/services/roles.api";
 
 /** TransferOwnerDialog — picks the person an AI agent answers to. */
 const props = defineProps<{
   open: boolean;
   agent: User | null;
   people: User[];
+  roles: Role[];
 }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
@@ -16,6 +18,7 @@ const dialog = useTransferOwnerDialog(
   toRef(props, "open"),
   toRef(props, "agent"),
   toRef(props, "people"),
+  toRef(props, "roles"),
 );
 const { ownerId, options, saving, error } = dialog;
 
@@ -41,8 +44,8 @@ async function save(): Promise<void> {
         :options="options"
         :disabled="options.length === 0" />
       <DbAlert tone="info">
-        The agent keeps its grants and token, but never reaches more than its
-        new owner does.
+        Only people who can view users can own an agent. It keeps its grants and
+        token, but never reaches more than its new owner does.
       </DbAlert>
       <DbAlert v-if="error">{{ error }}</DbAlert>
     </form>

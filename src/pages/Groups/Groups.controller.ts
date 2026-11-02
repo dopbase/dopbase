@@ -11,7 +11,6 @@ import type { User } from "~/services/users.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
-import type { GrantPrincipal } from "~/components/app/GiveAccessDialog.controller";
 import type { MembersTarget } from "./components/AddMembersDialog.controller";
 
 /** Avatars shown in the Members column before "+N". */
@@ -137,17 +136,12 @@ export function useGroupsController() {
     await load();
   }
 
-  // Give access
-  const accessFor = ref<GroupSummary | null>(null);
-  const accessPrincipal = computed<GrantPrincipal | null>(() =>
-    accessFor.value
-      ? { type: "group", id: accessFor.value.id, label: accessFor.value.name }
-      : null,
-  );
-
-  async function accessGiven(): Promise<void> {
-    accessFor.value = null;
-    await load();
+  // Give access happens on its own page.
+  function giveAccess(group: GroupSummary): void {
+    void router.push({
+      name: "group-access-give",
+      params: { groupId: group.id },
+    });
   }
 
   // Delete
@@ -198,9 +192,7 @@ export function useGroupsController() {
     membersTarget,
     openMembers,
     membersAdded,
-    accessFor,
-    accessPrincipal,
-    accessGiven,
+    giveAccess,
     deleting,
     deleteBusy,
     deleteError,

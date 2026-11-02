@@ -148,6 +148,44 @@ fn docs_precedence_is_config_then_environment_then_cli() {
 }
 
 #[test]
+fn update_check_is_off_unless_the_file_or_environment_turns_it_on() {
+  assert!(!ServerConfig::default().update_check);
+  let load = |file: Option<&str>, environment: Option<&str>| {
+    let directory = tempfile::TempDir::new().unwrap();
+    let data_dir = directory.path().join("data");
+    fs::create_dir_all(&data_dir).unwrap();
+    if let Some(contents) = file {
+      fs::write(data_dir.join(SERVER_CONFIG_FILENAME), contents).unwrap();
+    }
+    ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(data_dir),
+        ..Default::default()
+      },
+      EnvironmentOverrides {
+        update_check: environment.map(Into::into),
+        ..Default::default()
+      },
+    )
+  };
+  assert!(!load(None, None).unwrap().update_check);
+  assert!(
+    load(Some("update_check = true\n"), None)
+      .unwrap()
+      .update_check
+  );
+  assert!(load(None, Some("true")).unwrap().update_check);
+  assert!(
+    !load(Some("update_check = true\n"), Some("false"))
+      .unwrap()
+      .update_check
+  );
+  assert!(
+    format!("{:#}", load(None, Some("yes")).unwrap_err()).contains("invalid DOPBASE_UPDATE_CHECK")
+  );
+}
+
+#[test]
 fn port_override_derives_loopback_public_url() {
   let directory = tempfile::TempDir::new().unwrap();
   let data_dir = directory.path().join("data");

@@ -60,7 +60,7 @@ const toneClasses = computed(() => {
         :is="icon"
         class="mt-0.5 h-4 w-4 shrink-0"
         aria-hidden="true" />
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <p class="text-sm font-semibold leading-5 text-ink-strong">
           {{ title }}
         </p>

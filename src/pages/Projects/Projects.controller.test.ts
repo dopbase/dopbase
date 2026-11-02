@@ -7,6 +7,7 @@ import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import * as secretsApi from "~/services/secrets.api";
 import * as tokensApi from "~/services/tokens.api";
+import * as authApi from "~/services/auth.api";
 import type { Environment, Project } from "~/services";
 import { mountController } from "~/tests/mount-controller";
 
@@ -16,13 +17,18 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 
-const { capabilities } = vi.hoisted(() => ({
+const { capabilities, viewer } = vi.hoisted(() => ({
   capabilities: new Set<string>(),
+  viewer: { isRoot: false },
 }));
 
 vi.mock("~/stores/auth.store", () => ({
   useAuthStore: () => ({
     can: (...needed: string[]) => needed.some((cap) => capabilities.has(cap)),
+    get isRoot() {
+      return viewer.isRoot;
+    },
+    session: { email: "root@example.com" },
   }),
 }));
 
@@ -30,6 +36,7 @@ vi.mock("~/services/projects.api");
 vi.mock("~/services/environments.api");
 vi.mock("~/services/secrets.api");
 vi.mock("~/services/tokens.api");
+vi.mock("~/services/auth.api");
 
 function project(id: string, name: string, extra: Partial<Project> = {}) {
   return { id, name, createdAt: "", updatedAt: "", ...extra };
@@ -58,6 +65,7 @@ const search = project("prj_2", "search", { level: "read" });
 beforeEach(() => {
   vi.resetAllMocks();
   capabilities.clear();
+  viewer.isRoot = false;
   vi.mocked(projectsApi.listProjects).mockResolvedValue([payments, search]);
   vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
     environment("env_3", "staging", payments, { level: "write" }),
@@ -203,6 +211,35 @@ describe("useProjectsController", () => {
     expect((await loaded()).canCreateProjects.value).toBe(false);
     capabilities.add("projects.create");
     expect((await loaded()).canCreateProjects.value).toBe(true);
+  });
+
+  it("shows root the setup checklist, with sign-in methods, until a project exists", async () => {
+    viewer.isRoot = true;
+    vi.mocked(projectsApi.listProjects).mockResolvedValue([]);
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([]);
+    const methods = {
+      password: true,
+      passwordForm: true,
+      sso: null,
+      cliBrowser: true,
+    };
+    vi.mocked(authApi.fetchAuthMethods).mockResolvedValue(methods);
+
+    const c = await loaded();
+
+    expect(c.showSetupChecklist.value).toBe(true);
+    expect(c.accountEmail.value).toBe("root@example.com");
+    await vi.waitFor(() => expect(c.signInMethods.value).toEqual(methods));
+  });
+
+  it("keeps the setup checklist from everyone but root and from servers with projects", async () => {
+    vi.mocked(projectsApi.listProjects).mockResolvedValue([]);
+    expect((await loaded()).showSetupChecklist.value).toBe(false);
+
+    viewer.isRoot = true;
+    vi.mocked(projectsApi.listProjects).mockResolvedValue([payments]);
+    expect((await loaded()).showSetupChecklist.value).toBe(false);
+    expect(authApi.fetchAuthMethods).not.toHaveBeenCalled();
   });
 
   it("opens an environment by name", async () => {

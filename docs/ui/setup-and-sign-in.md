@@ -44,15 +44,17 @@ http://localhost:8840/setup?token=setup_<TOKEN>
 
 ### Claim a fresh instance
 
-1. Open the setup link, which fills the token field, or paste the printed token.
+1. Open the setup link, which fills in the token, or paste the printed token.
+   With the link, the token field stays hidden unless the server rejects it.
 2. Enter the root email.
 3. Enter a password of 12 to 128 characters. A meter under the field rates it;
    a long passphrase from a password manager rates best.
-4. Choose **Create root account**.
+4. Choose **Continue**.
 
 The token works once. A checklist beside the form shows where you are: root
 account, recovery kit, then sign-in for your team and a first project, which
-you do from the console.
+you do from the console. After setup, root lands on **Projects**, which shows
+the same steps until the first project exists.
 
 ### Save the recovery kit
 
@@ -75,8 +77,9 @@ The server keeps running until you stop it with Ctrl+C. Later starts use
 
 ### Restore from a backup
 
-1. Switch to **Restore from backup**.
-2. Paste the setup token and choose the encrypted `.dop` backup.
+1. Switch to **Restore a backup**.
+2. Paste the setup token, unless the setup link filled it in, and choose the
+   encrypted `.dop` backup.
 3. If the backup comes from another server, give its master key: the
    `master.key` file, or the 64-character key from its recovery kit.
 4. Choose **Restore backup**.

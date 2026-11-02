@@ -15,7 +15,13 @@ import {
   DbSkeleton,
   DbSwitch,
 } from "~/components/ui";
-import { AlertTriangleIcon } from "~/assets/icons";
+import {
+  AlertTriangleIcon,
+  InfoIcon,
+  KeyIcon,
+  RefreshIcon,
+  TrashIcon,
+} from "~/assets/icons";
 import { formatDateTime } from "~/utils/format";
 
 /**
@@ -69,11 +75,15 @@ const statusBadge: Record<
   SsoStatus,
   { label: string; tone: "ok" | "warn" | "neutral" }
 > = {
-  none: { label: "not set up", tone: "neutral" },
-  unverified: { label: "untested", tone: "warn" },
-  ready: { label: "off", tone: "neutral" },
-  enabled: { label: "on", tone: "ok" },
+  none: { label: "Not set up", tone: "neutral" },
+  unverified: { label: "Untested", tone: "warn" },
+  ready: { label: "Off", tone: "neutral" },
+  enabled: { label: "On", tone: "ok" },
 };
+
+/** Left column of each Provider row: a short label and what it's for. */
+const rowClass =
+  "grid grid-cols-1 gap-x-8 gap-y-3 border-t border-line-soft py-4 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]";
 </script>
 
 <template>
@@ -129,46 +139,56 @@ const statusBadge: Record<
           :class="blocked ? 'pointer-events-none opacity-50' : ''">
           <!-- Where setup stands, with the test and on/off buttons -->
           <section
-            v-if="provider"
-            class="flex flex-col gap-3 rounded-card border border-line bg-panel p-4 sm:p-5"
+            class="flex flex-col gap-3.5 rounded-card border border-line bg-panel p-4 sm:p-5"
             data-testid="sso-summary">
             <div
-              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-              <div class="flex min-w-0 flex-1 items-start gap-3">
-                <DbBadge
-                  class="mt-0.5 shrink-0"
-                  :tone="statusBadge[status].tone"
-                  data-testid="sso-status">
-                  {{ statusBadge[status].label }}
-                </DbBadge>
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3.5">
+              <div class="flex min-w-0 flex-1 items-center gap-3.5">
+                <div
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-raised text-[15px] font-semibold text-ink-strong"
+                  aria-hidden="true">
+                  <template v-if="provider">{{
+                    providerName.charAt(0).toUpperCase()
+                  }}</template>
+                  <KeyIcon v-else class="h-4 w-4 text-ink-muted" />
+                </div>
                 <div class="min-w-0">
-                  <h2
-                    class="text-[15px] font-semibold text-ink-strong [overflow-wrap:anywhere]">
-                    {{ providerName }}
-                  </h2>
-                  <p class="text-sm text-ink-muted">{{ providerSummary }}</p>
-                  <p v-if="provider.verifiedAt" class="text-xs text-ink-muted">
-                    Last test sign-in {{ formatDateTime(provider.verifiedAt) }}.
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <h2
+                      class="text-[15px] font-semibold text-ink-strong [overflow-wrap:anywhere]">
+                      {{ provider ? providerName : "No provider yet" }}
+                    </h2>
+                    <DbBadge
+                      :tone="statusBadge[status].tone"
+                      data-testid="sso-status">
+                      {{ statusBadge[status].label }}
+                    </DbBadge>
+                  </div>
+                  <p
+                    class="text-sm text-ink-muted"
+                    data-testid="sso-summary-line">
+                    {{ providerSummary }}
+                    <template v-if="provider?.verifiedAt">
+                      Last test sign-in
+                      {{ formatDateTime(provider.verifiedAt) }}.
+                    </template>
                   </p>
                 </div>
               </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
+              <div v-if="provider" class="flex shrink-0 flex-wrap gap-2">
                 <DbButton
+                  size="sm"
                   :variant="status === 'unverified' ? 'primary' : 'secondary'"
                   :loading="testing"
                   :disabled="blocked"
                   data-testid="sso-test"
                   @click="testSignIn">
+                  <RefreshIcon v-if="!testing" class="h-3.5 w-3.5" />
                   Test sign-in
                 </DbButton>
                 <DbButton
-                  :variant="
-                    status === 'ready'
-                      ? 'primary'
-                      : provider.enabled
-                        ? 'ghost'
-                        : 'secondary'
-                  "
+                  size="sm"
+                  :variant="status === 'ready' ? 'primary' : 'secondary'"
                   :disabled="status === 'unverified' || blocked"
                   :loading="toggling"
                   data-testid="sso-toggle"
@@ -178,132 +198,181 @@ const statusBadge: Record<
               </div>
             </div>
             <div
-              v-if="provider.passwordlessAccounts > 0"
-              class="flex gap-2.5 rounded-control border border-warn/30 bg-warn/10 px-3.5 py-3 text-sm text-ink"
+              v-if="provider && provider.passwordlessAccounts > 0"
+              class="flex flex-col gap-2 rounded-control bg-warn/10 py-2.5 pl-3.5 pr-2.5 text-sm text-ink sm:flex-row sm:items-center"
               data-testid="sso-passwordless-warning">
-              <AlertTriangleIcon class="mt-0.5 h-4 w-4 shrink-0 text-warn" />
-              <p>
-                {{ provider.passwordlessAccounts }}
-                {{
-                  provider.passwordlessAccounts === 1
-                    ? "account has"
-                    : "accounts have"
-                }}
-                no password. Turning single sign-on off or removing it locks
-                {{ provider.passwordlessAccounts === 1 ? "it" : "them" }} out
-                until an administrator sets a password on the Users page.
-              </p>
+              <div class="flex min-w-0 flex-1 gap-2.5">
+                <AlertTriangleIcon class="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+                <p>
+                  {{ provider.passwordlessAccounts }}
+                  {{
+                    provider.passwordlessAccounts === 1
+                      ? "account has"
+                      : "accounts have"
+                  }}
+                  no password. Turning single sign-on off or removing it locks
+                  {{ provider.passwordlessAccounts === 1 ? "it" : "them" }} out
+                  until you set one.
+                </p>
+              </div>
+              <RouterLink
+                to="/users"
+                class="inline-flex h-8 shrink-0 items-center self-start rounded-control px-3 text-xs font-semibold text-ink hover:bg-raised hover:text-ink-strong sm:self-auto">
+                Open Users
+              </RouterLink>
             </div>
           </section>
 
           <!-- Provider details -->
           <form
-            class="flex flex-col gap-4 rounded-card border border-line bg-panel p-4 sm:p-5"
+            class="flex flex-col rounded-card border border-line bg-panel p-4 sm:p-5"
             novalidate
             data-testid="sso-form"
             @submit.prevent="save">
-            <div class="flex items-center gap-3">
-              <h2 class="flex-1 text-[15px] font-semibold text-ink-strong">
+            <div class="pb-4">
+              <h2 class="text-[15px] font-semibold text-ink-strong">
                 Provider
               </h2>
-              <DbButton
-                variant="primary"
-                type="submit"
-                :loading="saving"
-                :disabled="blocked">
-                Save
-              </DbButton>
+              <p class="text-sm text-ink-muted">
+                The OpenID Connect app people sign in with.
+              </p>
             </div>
 
-            <div class="flex flex-col gap-1.5">
-              <p class="text-sm text-ink-muted">
-                At your provider, create a web app that uses the authorization
-                code flow and has a client secret, then add this redirect URI.
-              </p>
-              <div class="flex items-center gap-2">
-                <DbCode class="min-w-0 flex-1 truncate">{{
+            <div :class="rowClass">
+              <div class="flex flex-col gap-1 text-sm">
+                <h3 class="font-semibold text-ink-strong">Redirect URI</h3>
+                <p class="text-ink-muted">
+                  Add this to the web app you create at your provider. The app
+                  uses the authorization code flow and has a client secret.
+                </p>
+              </div>
+              <div class="flex min-w-0 items-center gap-2 self-start">
+                <DbCode class="min-w-0 flex-1 truncate h-8 pt-1.5">{{
                   settings.redirectUri
                 }}</DbCode>
                 <DbCopyButton :value="settings.redirectUri" />
               </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div class="flex flex-col gap-1.5">
-                <DbSelect
-                  :model-value="preset"
-                  label="Provider"
-                  :options="presetOptions"
+            <div :class="rowClass">
+              <div class="flex flex-col gap-1 text-sm">
+                <h3 class="font-semibold text-ink-strong">Connection</h3>
+                <p class="text-ink-muted">
+                  Dopbase checks the issuer when you save. A first sign-in
+                  matches an existing account by verified email, so you still
+                  create accounts on the Users page.
+                </p>
+              </div>
+              <div class="flex min-w-0 flex-col gap-3">
+                <div class="flex flex-col gap-1.5">
+                  <DbSelect
+                    :model-value="preset"
+                    label="Provider"
+                    :options="presetOptions"
+                    :disabled="blocked"
+                    @update:model-value="choosePreset" />
+                  <p
+                    class="text-xs text-ink-muted"
+                    data-testid="sso-preset-hint">
+                    {{ presetHint }}
+                  </p>
+                </div>
+                <DbInput
+                  v-model="issuer"
+                  label="Issuer URL"
+                  name="issuer"
+                  mono
+                  :placeholder="issuerPlaceholder"
                   :disabled="blocked"
-                  @update:model-value="choosePreset" />
-                <p class="text-xs text-ink-muted" data-testid="sso-preset-hint">
-                  {{ presetHint }}
+                  :error="fieldErrors.issuer" />
+                <DbInput
+                  v-model="clientId"
+                  label="Client ID"
+                  name="clientId"
+                  mono
+                  autocomplete="off"
+                  placeholder="OICD Client ID"
+                  :disabled="blocked"
+                  :error="fieldErrors.clientId" />
+                <DbInput
+                  v-model="clientSecret"
+                  label="Client secret"
+                  name="clientSecret"
+                  type="password"
+                  autocomplete="new-password"
+                  :hint="
+                    provider
+                      ? 'Stored encrypted. Leave empty to keep it.'
+                      : null
+                  "
+                  :disabled="blocked"
+                  :error="fieldErrors.clientSecret" />
+              </div>
+            </div>
+
+            <div :class="rowClass">
+              <div class="flex flex-col gap-1 text-sm">
+                <h3 class="font-semibold text-ink-strong">Sign-in button</h3>
+                <p class="text-ink-muted">
+                  Shown on the sign-in page, after “Sign in with”.
                 </p>
               </div>
               <DbInput
                 v-model="displayName"
                 label="Button label"
                 name="displayName"
-                hint="Shown on the sign-in page button, after Sign in with."
                 :disabled="blocked"
                 :error="fieldErrors.displayName" />
             </div>
-            <DbInput
-              v-model="issuer"
-              label="Issuer URL"
-              name="issuer"
-              mono
-              :placeholder="issuerPlaceholder"
-              :disabled="blocked"
-              :error="fieldErrors.issuer" />
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DbInput
-                v-model="clientId"
-                label="Client ID"
-                name="clientId"
-                mono
-                autocomplete="off"
-                :disabled="blocked"
-                :error="fieldErrors.clientId" />
-              <DbInput
-                v-model="clientSecret"
-                label="Client secret"
-                name="clientSecret"
-                type="password"
-                autocomplete="new-password"
-                :hint="
-                  provider ? 'Stored encrypted. Leave empty to keep it.' : null
-                "
-                :disabled="blocked"
-                :error="fieldErrors.clientSecret" />
+
+            <div
+              class="flex flex-col gap-3 border-t border-line-soft pt-4 sm:flex-row sm:items-center sm:gap-4">
+              <p
+                class="flex min-w-0 flex-1 gap-2 text-sm text-ink-muted"
+                data-testid="sso-save-note">
+                <InfoIcon class="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />
+                <span v-if="provider">
+                  A new issuer, client ID or secret turns single sign-on off
+                  until the next test sign-in. A new issuer also removes every
+                  linked identity, and people link again by verified email.
+                </span>
+                <span v-else>
+                  Saving checks the issuer. Run a test sign-in from the card
+                  above next.
+                </span>
+              </p>
+              <DbButton
+                variant="primary"
+                type="submit"
+                class="self-start sm:self-auto"
+                :loading="saving"
+                :disabled="blocked">
+                {{ provider ? "Save changes" : "Save" }}
+              </DbButton>
             </div>
-            <p class="text-xs text-ink-muted">
-              You still create accounts on the Users page. A first sign-in
-              matches an account by its verified email.
-              <template v-if="provider">
-                Changing the issuer, client ID or secret turns single sign-on
-                off until the next test sign-in. A new issuer also removes every
-                linked identity, and people link again by verified email when
-                they next sign in.
-              </template>
-            </p>
           </form>
 
           <!-- Policy, once single sign-on is on -->
           <section
             v-if="provider?.enabled"
-            class="flex flex-col gap-4 rounded-card border border-line bg-panel p-4 sm:p-5"
+            class="flex flex-col rounded-card border border-line bg-panel p-4 sm:p-5"
             data-testid="sso-options">
-            <h2 class="text-[15px] font-semibold text-ink-strong">Policy</h2>
-            <div class="flex items-start gap-3">
+            <div class="pb-4">
+              <h2 class="text-[15px] font-semibold text-ink-strong">Policy</h2>
+              <p class="text-sm text-ink-muted">
+                Applies while single sign-on is on.
+              </p>
+            </div>
+            <div
+              class="flex items-center gap-4 border-t border-line-soft py-3.5">
               <div class="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
                 <p class="font-semibold text-ink-strong">
                   Hide the password form
                 </p>
                 <p class="text-ink-muted">
                   The sign-in page shows only the
-                  {{ provider.displayName }} button. Passwords keep working in
-                  the CLI and the API, and root can still reach the form at
+                  {{ provider.displayName }} button. Passwords still work in the
+                  CLI and the API, and root can reach the form at
                   <span class="font-mono">/login?password</span>.
                 </p>
               </div>
@@ -322,15 +391,16 @@ const statusBadge: Record<
                 </span>
               </div>
             </div>
-            <div class="flex items-start gap-3">
+            <div
+              class="flex items-center gap-4 border-t border-line-soft pt-3.5">
               <div class="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
                 <p class="font-semibold text-ink-strong">
                   Require single sign-on
                 </p>
                 <p class="text-ink-muted">
-                  Everyone except root must use the provider, in the browser and
-                  the CLI. Their password sessions end. Root keeps its password
-                  in case the provider is down.
+                  Everyone except root must use {{ provider.displayName }}, in
+                  the browser and the CLI. Their password sessions end. Root
+                  keeps its password in case the provider is down.
                 </p>
               </div>
               <div class="flex shrink-0 items-center gap-2">
@@ -353,19 +423,16 @@ const statusBadge: Record<
           <!-- Danger zone -->
           <section
             v-if="provider"
-            class="flex flex-col gap-3 rounded-card border border-crit/60 bg-panel p-4 sm:flex-row sm:items-center sm:p-5"
+            class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-card border border-crit/60 bg-panel p-4 sm:p-5"
             data-testid="sso-remove">
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0 flex-1 basis-72">
               <h2 class="text-[15px] font-semibold text-crit">
                 Remove provider
               </h2>
               <p class="text-sm text-ink-muted">{{ removeSummary }}</p>
             </div>
-            <DbButton
-              variant="danger"
-              class="self-start sm:self-auto"
-              :disabled="blocked"
-              @click="promptRemove">
+            <DbButton size="sm" :disabled="blocked" @click="promptRemove">
+              <TrashIcon class="h-3.5 w-3.5" />
               Remove provider
             </DbButton>
           </section>

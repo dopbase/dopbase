@@ -5,6 +5,7 @@ import { bootstrapRestore } from "~/services/bootstrap.api";
 import { downloadMasterKeyBlob } from "~/services/backups.api";
 import { errorMessage } from "~/services/api-errors";
 import { copyText } from "~/utils/clipboard";
+import { formatHosting } from "~/utils/format";
 import { useAuthStore } from "~/stores/auth.store";
 import {
   isValidEmail,
@@ -42,6 +43,8 @@ export function useSetupController() {
   const mode = ref<SetupMode>("setup");
   const step = ref<SetupStep>("account");
   const host = window.location.host;
+  /** `Secure cloud` or `Self-hosted`, for the footer. */
+  const hosting = formatHosting(window.location.hostname);
 
   // Setup form state
   const setupToken = ref("");
@@ -80,7 +83,10 @@ export function useSetupController() {
   const tokenParam = route.query.token;
   const emailParam = route.query.email;
   let consumedQuery = false;
-  if (typeof tokenParam === "string" && tokenParam.trim() !== "") {
+  // The page hides the token field when the link already carried it.
+  const tokenFromLink =
+    typeof tokenParam === "string" && tokenParam.trim() !== "";
+  if (tokenFromLink) {
     setupToken.value = tokenParam.trim();
     delete query.token;
     consumedQuery = true;
@@ -310,6 +316,7 @@ export function useSetupController() {
     mode,
     step,
     host,
+    hosting,
     strength,
     strengthLabel,
     masterKey,
@@ -326,6 +333,7 @@ export function useSetupController() {
     downloadKit,
     finish,
     setupToken,
+    tokenFromLink,
     email,
     password,
     confirmPassword,

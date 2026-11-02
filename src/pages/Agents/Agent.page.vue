@@ -28,6 +28,7 @@ const {
   agent,
   access,
   role,
+  roles,
   people,
   loadError,
   canManage,
@@ -94,6 +95,10 @@ const usage = computed(() =>
           v-if="activeTab === 'access' && access"
           :principal="principal"
           :grants="access.grants"
+          :give-to="{
+            name: 'agent-access-give',
+            params: { agentId: principal.id },
+          }"
           :summary="accessSummary"
           @changed="controller.reloadAccess" />
 
@@ -262,6 +267,7 @@ const usage = computed(() =>
       :open="transferOpen"
       :agent="agent"
       :people="people"
+      :roles="roles"
       @close="transferOpen = false"
       @saved="controller.transferred" />
 

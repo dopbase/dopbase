@@ -31,6 +31,7 @@ in your installed version.
 | Environments                                       | `/api/v1/environments`                               |
 | Secrets, import, export, and runtime values        | `/api/v1/environments/{id}/secrets`                  |
 | Comparing environments, copying a value across     | `/api/v1/environments/{id}/compare`                  |
+| Copying keys from another environment              | `/api/v1/environments/{id}/copy-secrets`             |
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
@@ -40,7 +41,7 @@ in your installed version.
 | Roles                                              | `/api/v1/roles`                                      |
 | Grants                                             | `/api/v1/grants`, `/api/v1/projects/{ref}/access`    |
 | Groups                                             | `/api/v1/groups`                                     |
-| Instance summary                                   | `/api/v1/status`                                     |
+| Instance summary and health checks                 | `/api/v1/status`, `/api/v1/status/checks`            |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
 the responses supported by each operation.
@@ -93,6 +94,38 @@ Successful previews record `secret.import_previewed` with the actor,
 project/environment, mode, and submitted entry count. They do not change
 secrets, versions, or layout. If the audit event cannot be saved, the server
 returns an error without the comparison results.
+
+## Creating a protected environment
+
+`POST /api/v1/projects/{ref}/environments` with
+`{ "name": "production", "protected": true }` creates the environment already
+protected, in one request, so grants on the whole project below project
+manager never reach it. Without `protected`, or with `false`, it is created
+unprotected. The `environment.created` audit event records `protected`.
+
+## Copying keys between environments
+
+`POST /api/v1/environments/{id}/copy-secrets` with
+`{ "from": "env_918201", "keys": ["API_KEY", "DATABASE_URL"], "values": false }`
+creates those keys in this environment from another one in the same project,
+in one transaction. Without `values`, or with `false`, each key starts with an
+empty value and Names only on the source is enough. With `values: true` each
+key gets the source's current value, copied on the server and never returned,
+which needs Read on the source. Writing needs Write here. Keys this
+environment already has are skipped, never overwritten. The response lists
+`copiedKeys` and `skippedKeys`.
+
+It is refused, without writing anything, with:
+
+| Status | Code                    | Meaning                                                    |
+| ------ | ----------------------- | ---------------------------------------------------------- |
+| `404`  | `SECRET_NOT_FOUND`      | A key does not exist in the source                         |
+| `422`  | `COPY_KEYS_REQUIRED`    | `keys` is empty                                            |
+| `422`  | `COPY_SOURCE_INVALID`   | The source is this environment or in another project       |
+| `422`  | `SECRET_LIMIT_EXCEEDED` | The copy would pass the environment's secret or size limit |
+
+Environment responses include `secretCount`, the number of secrets the
+environment holds.
 
 ## Secret versions
 
@@ -172,7 +205,10 @@ streams the filtered list as JSON lines.
 
 User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
 last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
-`GET /api/v1/users/{id}` returns one account.
+`GET /api/v1/users/{id}` returns one account. `GET /api/v1/users/identities`
+returns only each account's `id` and `email`, ordered by email, for screens
+that just need to name people. It needs the same `users.view` capability and
+browser session as the full list.
 
 `POST /api/v1/users/{id}/disable` signs the account out everywhere and stops
 its tokens without deleting anything. `POST /api/v1/users/{id}/enable` lets it
@@ -235,6 +271,51 @@ Account and agent-token administration requires a root/admin browser session;
 CLI bearer sessions cannot administer accounts. AI bearer tokens may only read
 metadata and [instance status](/ui/audit-instance#instance-status). See
 [identity and tokens](/reference/identity) for the complete role matrix.
+
+## Instance status and health checks
+
+`GET /api/v1/status` returns the version, uptime, `platform` (`os` and
+`arch`), and resource counts to any signed-in account or personal token. A
+count is `null` when its query failed, so one broken query never fails the
+whole response.
+
+Accounts holding `instance.view` also get:
+
+- `checks`: every health check, most severe first. Each has an `id` such as
+  `backup.age`, a `status` of `crit`, `warn`, `tip`, or `ok`, a `title`, a
+  `detail`, an optional short `value`, a `fixPath` (an Admin UI path or a
+  documentation URL), and `lastRunAt`. A check that fails to run comes back
+  as a `warn` titled "Couldn't check ...", and the server log has the error.
+  The public URL and HTTPS checks pass while the public URL points at this
+  machine. On a network address, HTTP is `crit` and a missing public URL is
+  `warn`.
+- `summary`: how many checks are critical, warnings, tips, and passed.
+- `health`: the readings behind the Database, Master key, Disk, and Audit log
+  cards. `masterKey.file` compares the key file on disk with the key the
+  server loaded at startup (`matches`, `changed`, `missing`, or
+  `unreadable`). `disk` is `null` where free space can't be read.
+- `activity`: the last 24 hours in hourly buckets: secret reads (with how
+  many runner tokens, people and AI agents read), failed sign-ins, requests
+  refused by the sign-in rate limits, and live browser and CLI sessions. The
+  rate-limit count lives in memory and starts again when the server restarts.
+
+With the opt-in `update_check` setting on (`DOPBASE_UPDATE_CHECK=true`), the
+server asks GitHub for the latest release and adds a `version.latest` check
+and a `latestRelease` object (`version`, `updateAvailable`, `url`,
+`checkedAt`). Reading the status starts the lookup when none has run in the
+last day, without waiting for it, so the answer shows up on a later read. A
+failed lookup keeps the last answer and is retried an hour later. A server
+nobody reads the status of never calls GitHub.
+
+The emails and addresses behind failed sign-ins need `audit.read`. Names of
+expiring tokens need `tokens.revoke_others`. `fixPath` is always returned;
+the Admin UI hides fixes the viewer can't use.
+
+Walking the audit hash chain reads every record, so it runs every 10 minutes
+in the background and the response carries the last result.
+`POST /api/v1/status/checks/run` walks it again right away and returns the
+same body. It needs `instance.view` and, from the Admin UI, the CSRF header.
+It answers `429 RATE_LIMITED` when checks ran less than 10 seconds before.
 
 ## Browser CLI login
 

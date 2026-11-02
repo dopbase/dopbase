@@ -1,6 +1,6 @@
 ---
 title: "Admin UI: projects and environments"
-description: "Browse projects and environments in the Dopbase Admin UI, switch between them, run an app with an environment's values, and manage tokens, access, activity and settings."
+description: "Browse projects and environments in the Dopbase Admin UI, switch between them, run an app with their values, and manage tokens, access and settings."
 ---
 
 # Projects and environments
@@ -18,7 +18,11 @@ secrets list without **Reveal**, **Edit value**, or **Add secret**. See
 
 Open a project to list its environments. Each row shows whether the
 environment is protected, your level there, and when it last changed. Click a
-row to open its secrets. A project with more than six environments lists six
+row to open its secrets. On wide screens (1280px and up) each row also shows
+the environment's ID, such as `env_918204`. Click the ID to copy it; the row
+stays where it is. The CLI takes the ID anywhere it takes
+`payments/prod`, so `dopbase run env_918204 -- npm start` works without
+typing names. A project with more than six environments lists six
 and a **Show all** link. Type in the filter box to find a project or an
 environment by name; a match inside a project opens it.
 
@@ -35,6 +39,17 @@ environment by name; a match inside a project opens it.
 - Deleting shows what goes with it before you confirm: every environment and
   secret for a project, the secret and runner token counts for an
   environment. Deletion cannot be undone.
+
+A project with no environments has only the **Access** and **Settings** tabs.
+Project managers get a setup list where the secrets would be, with
+development, staging and production ticked and production protected. Untick
+any of them, flip **Protected**, or type another name under **Add another**.
+**Create** makes the ticked ones in order and opens the first one's secrets.
+A protected one is created already protected, so project grants never reach
+it, even for a moment. If one fails, the others stay and its row says why, so
+you can try again, untick it, or open the ones already created. The project bar reads **No
+environments**, and its menu has **New environment**. Anyone else is told
+that nobody has created an environment they can reach yet.
 
 Adding environments needs project manager on the project. Renaming, deleting,
 and runner tokens need manage on the environment. A lock and an amber
@@ -53,6 +68,10 @@ Opening an environment shows one bar across the top:
   one. On a phone both open as a sheet from the bottom of the screen, with
   rows big enough to tap and a filter when the list is long. Long names are
   shortened in the bar; hover one to read it in full.
+- **Environment ID.** The ID of the environment you're on sits after the
+  switchers. Click it to copy it. On a phone it sits on the row with your
+  access and Run. If the browser blocks the clipboard, the ID is selected so
+  you can copy it yourself.
 - **Protection.** A protected environment gets an amber chip and an amber
   line across the top of the page. Nothing else in the console uses amber,
   so production never looks like dev.
@@ -132,9 +151,9 @@ access. Remove the environment chip to see the whole project, or add an
 
 - **General** renames the project. CLI paths and links use the name, so
   renaming breaks scripts that use the old one.
-- **Environments** lists each one with a **Protected** switch, its secret
-  count, and its active runner tokens. Its **⋯** menu renames, protects or
-  deletes it. **New environment** adds one.
+- **Environments** lists each one with its ID, a **Protected** switch, its
+  secret count, and its active runner tokens. Click an ID to copy it. Its
+  **⋯** menu renames, protects or deletes it. **New environment** adds one.
 - **Danger zone** deletes the project, after saying how many environments,
   secrets, runner tokens and grants go with it. Audit events stay.
 

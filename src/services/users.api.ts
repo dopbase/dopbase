@@ -24,9 +24,18 @@ export interface User {
   /** The groups the account belongs to. */
   groups: { id: string; name: string }[];
 }
+/** Just enough of an account to name it. */
+export type UserIdentity = Pick<User, "id" | "email">;
+
 const BASE = "/api/v1/users";
 export async function fetchUsers(): Promise<User[]> {
   const { data } = await apiRequest<User[]>(BASE);
+  return data;
+}
+
+/** Every account's id and email, by email. Lighter than `fetchUsers`. */
+export async function fetchUserIdentities(): Promise<UserIdentity[]> {
+  const { data } = await apiRequest<UserIdentity[]>(`${BASE}/identities`);
   return data;
 }
 

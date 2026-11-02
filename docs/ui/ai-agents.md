@@ -32,9 +32,9 @@ The page header names the owner and the deepest level the agent can reach.
 **Activity** opens the audit log filtered to the agent, and **Transfer owner**
 gives it to someone else.
 
-- **Access** lists its grants, as on a person's page. Choose **Give access**
-  to give it a project or one environment. Levels above its role are shown
-  but can't be picked.
+- **Access** lists its grants, as on a person's page. **Give access** opens
+  the page described in [Users](./users.md#giving-access). Levels above its
+  role are shown but can't be picked.
 - **Tokens** lists its current token and the ones before it.
 - **Danger zone** disables or deletes the agent.
 
@@ -63,8 +63,9 @@ or **Revoke token** in the list's **⋯** menu.
 
 ## Transfer, disable, or delete
 
-**Transfer owner** lists the people who can own it. The agent keeps its grants
-and token, but never reaches more than its new owner does.
+**Transfer owner** lists the people who can own it: root and anyone whose role
+has `users.view`, so the new owner can see the agent. The agent keeps its
+grants and token, but never reaches more than its new owner does.
 
 **Disable agent** stops its token; its access and history stay. **Delete
 agent** asks you to type its name, then removes it with its grants and tokens.

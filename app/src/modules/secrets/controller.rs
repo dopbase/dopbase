@@ -453,3 +453,40 @@ pub async fn copy(
     "SECRET_COPIED",
   ))
 }
+
+/// Copy keys from another environment
+///
+/// Create the chosen keys here from another environment in the same
+/// project, in one transaction. Keys this environment already has are
+/// skipped. With `values`, each key gets the source's current value, copied
+/// on the server and never returned, which needs Read on the source.
+/// Without it each key starts empty and Names only is enough. Needs Write
+/// here, and is recorded in the audit log as `secret.bulk_copied`.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::secrets::COPY_MANY,
+  tag = "secrets",
+  security(("bearerAuth" = []), ("cookieAuth" = [])),
+  params(("environment_id" = String, Path, description = "The environment to copy into")),
+  request_body = CopySecretsRequest,
+  responses(
+    (status = 200, description = "Keys copied", body = inline(HttpResponseFormat<CopySecretsResponse>)),
+    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Access to the source or Write here is missing, or the CSRF token is invalid", body = crate::http::ErrorBody),
+    (status = 404, description = "A key or an environment was not found", body = crate::http::ErrorBody),
+    (status = 422, description = "No keys, the source is this environment or another project's, or the copy would pass the environment's limits", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn copy_many(
+  State(state): State<AppState>,
+  headers: HeaderMap,
+  identity: AuthIdentity,
+  Path(id): Path<String>,
+  axum::Json(request): axum::Json<CopySecretsRequest>,
+) -> Result<HttpResponse<CopySecretsResponse>, SecretError> {
+  require_mutation(&identity, &headers)?;
+  Ok(HttpResponse::ok(
+    service::copy_many(&state, &identity, &id, request).await?,
+    "SECRETS_COPIED",
+  ))
+}

@@ -380,6 +380,77 @@ async fn grants_decide_what_a_member_reaches() {
 }
 
 #[tokio::test]
+async fn an_environment_created_protected_is_never_open_to_project_grants() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, _) = grant(
+    &router,
+    &root,
+    ("user", &member.id),
+    ("project", Some("payments")),
+    "write",
+  )
+  .await;
+  assert_eq!(status, 200);
+
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/projects/payments/environments",
+    root.cli(),
+    Some(json!({"name":"live","protected":true})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  assert_eq!(body["data"]["protected"], true);
+  let live = body["data"]["id"].as_str().unwrap().to_owned();
+  assert_eq!(
+    names(&router, &member, "/api/v1/environments").await,
+    ["payments/dev", "payments/prod"]
+  );
+  let (status, _) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/environments/{live}/secrets"),
+    member.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 404);
+
+  // Left out, it is created unprotected as before.
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/projects/payments/environments",
+    root.cli(),
+    Some(json!({"name":"qa"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  assert_eq!(body["data"]["protected"], false);
+
+  let (status, body) = send(
+    &router,
+    "GET",
+    "/api/v1/audit-events?action=environment.created",
+    root.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let created = body["data"]["items"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .find(|event| event["environmentId"] == live.as_str())
+    .unwrap_or_else(|| panic!("{body}"));
+  assert_eq!(created["metadata"]["protected"], true, "{created}");
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn grant_requests_are_checked_before_they_change_anything() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;

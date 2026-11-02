@@ -102,6 +102,12 @@ describe("auth store", () => {
       email: "a@b.c",
       csrfToken: "csrf_1",
     });
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
+      ...browserSessionInfo(),
+      role: "root",
+      roleName: "Root",
+      hasPassword: true,
+    });
     const store = useAuthStore();
     await store.bootstrap({
       setupToken: "dbs_setup",
@@ -109,6 +115,28 @@ describe("auth store", () => {
       password: "longenoughpw1",
     });
     expect(store.session?.email).toBe("a@b.c");
+    expect(store.session?.roleName).toBe("Root");
+    expect(store.session?.hasPassword).toBe(true);
+    expect(store.bootstrapState).toBe("ready");
+    expect(store.csrfToken).toBe("csrf_1");
+  });
+
+  it("bootstrap keeps root signed in when the session fetch fails", async () => {
+    vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      csrfToken: "csrf_1",
+    });
+    vi.mocked(authApi.fetchSession).mockRejectedValueOnce(
+      new ApiError(0, { NETWORK_ERROR: "down" }),
+    );
+    const store = useAuthStore();
+    await store.bootstrap({
+      setupToken: "dbs_setup",
+      email: "a@b.c",
+      password: "longenoughpw1",
+    });
+    expect(store.session?.role).toBe("root");
     expect(store.bootstrapState).toBe("ready");
     expect(store.csrfToken).toBe("csrf_1");
   });

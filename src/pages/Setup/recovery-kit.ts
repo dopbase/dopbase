@@ -49,7 +49,7 @@ export function recoveryKitText(kit: RecoveryKitDetails): string {
     "",
     "To restore a backup on a new server:",
     "1. Start Dopbase there and open the setup link it prints.",
-    "2. Choose Restore from backup and pick the .dop file.",
+    "2. Choose Restore a backup and pick the .dop file.",
     "3. Paste the master key above.",
     "",
     "Root can download the key again from Status while this server runs.",

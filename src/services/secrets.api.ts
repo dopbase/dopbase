@@ -39,6 +39,13 @@ export interface ImportSecretsResponse {
   revision: string;
 }
 
+export interface CopySecretsResponse {
+  /** Keys created in the target, A to Z. */
+  copiedKeys: string[];
+  /** Keys left alone because the target already had them. */
+  skippedKeys: string[];
+}
+
 export interface ExportSecretsResponse {
   entries: SecretEntry[];
   revision: string;
@@ -225,6 +232,25 @@ export async function rollbackSecret(
   const { data } = await apiRequest<RollbackSecretResponse>(
     `${base(environmentId)}/${encodeURIComponent(key)}/rollback`,
     { method: "POST", body: { version, expectedVersion } },
+  );
+  return data;
+}
+
+/**
+ * Creates `keys` in `targetId` from another environment in the same
+ * project. With `values`, each key gets the source's current value, copied
+ * on the server and never sent here; without it each key starts empty.
+ * Keys the target already has are skipped.
+ */
+export async function copySecrets(
+  targetId: string,
+  from: string,
+  keys: string[],
+  values: boolean,
+): Promise<CopySecretsResponse> {
+  const { data } = await apiRequest<CopySecretsResponse>(
+    `/api/v1/environments/${encodeURIComponent(targetId)}/copy-secrets`,
+    { method: "POST", body: { from, keys, values } },
   );
   return data;
 }

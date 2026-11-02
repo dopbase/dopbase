@@ -15,6 +15,7 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("~/services/bootstrap.api");
+vi.mock("~/services/auth.api");
 vi.mock("~/services/backups.api", () => ({
   downloadMasterKeyBlob: vi.fn(),
 }));
@@ -50,6 +51,7 @@ describe("useSetupController", () => {
     routeQuery.other = "kept";
     const c = useSetupController();
     expect(c.setupToken.value).toBe("setup_first-run-token");
+    expect(c.tokenFromLink).toBe(true);
     expect(routerReplace).toHaveBeenCalledTimes(1);
     expect(routerReplace).toHaveBeenCalledWith({ query: { other: "kept" } });
   });
@@ -58,6 +60,7 @@ describe("useSetupController", () => {
     routeQuery.token = ["setup_array"];
     const c = useSetupController();
     expect(c.setupToken.value).toBe("");
+    expect(c.tokenFromLink).toBe(false);
     expect(routerReplace).not.toHaveBeenCalled();
   });
   it("prefills email and token, removing both in one replacement", () => {

@@ -15,6 +15,10 @@ pub fn routes() -> Router<AppState> {
       get(controller::list).post(controller::create),
     )
     .route(
+      crate::constants::api::users::IDENTITIES,
+      get(controller::identities),
+    )
+    .route(
       crate::constants::api::users::ITEM,
       get(controller::get)
         .patch(controller::update)

@@ -232,12 +232,12 @@ See [server and client](./docs/guide/server-client.md) for the full walkthrough.
 
 ## Repository layout
 
-| Path         | Purpose                                         | Current state                  |
-| ------------ | ----------------------------------------------- | ------------------------------ |
-| `app/`       | Rust service and command-line application       | v0.1.10 backend implementation |
-| `app/tests/` | Rust integration tests                          | Backend and CLI test suite     |
-| `src/`       | Vue administration interface and frontend tests | Embedded Admin UI              |
-| `docs/`      | VitePress product documentation                 | Active public specification    |
+| Path         | Purpose                                         | Current state                 |
+| ------------ | ----------------------------------------------- | ----------------------------- |
+| `app/`       | Rust service and command-line application       | v0.2.0 backend implementation |
+| `app/tests/` | Rust integration tests                          | Backend and CLI test suite    |
+| `src/`       | Vue administration interface and frontend tests | Embedded Admin UI             |
+| `docs/`      | VitePress product documentation                 | Active public specification   |
 
 ## Development
 

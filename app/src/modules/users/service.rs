@@ -225,6 +225,20 @@ pub async fn list(
     .collect()
 }
 
+pub async fn identities(
+  state: &AppState,
+  identity: &AuthIdentity,
+) -> Result<Vec<UserIdentity>, HttpError> {
+  require_capability_browser(identity, Capability::UsersView)?;
+  Ok(
+    repository::identities(state.db.pool())
+      .await?
+      .into_iter()
+      .map(|(id, email)| UserIdentity { id, email })
+      .collect(),
+  )
+}
+
 pub async fn get(
   state: &AppState,
   identity: &AuthIdentity,
@@ -452,7 +466,7 @@ pub async fn update(
     if !repository::can_own(&mut tx, owner_id).await? {
       return Err(HttpError::bad_request(
         "OWNER_INVALID",
-        "The owner must be an active person who signs in.",
+        "The owner must be an active person who can see users.",
       ));
     }
     repository::set_owner(&mut tx, id, owner_id).await?;

@@ -18,11 +18,14 @@ describe("project routes", () => {
     ["/status", "status"],
     ["/users/usr_1", "user"],
     ["/users/usr_1/access", "user-access"],
+    ["/users/usr_1/access/new", "user-access-give"],
     ["/users/usr_1/tokens", "user-tokens"],
     ["/agents", "agents"],
     ["/agents/usr_9/tokens", "agent-tokens"],
+    ["/agents/usr_9/access/new", "agent-access-give"],
     ["/groups/grp_1", "group"],
     ["/groups/grp_1/access", "group-access"],
+    ["/groups/grp_1/access/new", "group-access-give"],
     ["/roles/new", "role-new"],
     ["/roles/role_1", "role"],
     ["/account", "account"],
@@ -71,6 +74,13 @@ describe("renamed routes", () => {
     [
       "/projects/p/billing/access",
       { name: "project-access", params: { projectRef: "billing" } },
+    ],
+    [
+      "/projects/billing/prod",
+      {
+        name: "environment",
+        params: { projectRef: "billing", environmentName: "prod" },
+      },
     ],
   ])("sends %s to its new address", (path, expected) => {
     const resolved = router.resolve(path);

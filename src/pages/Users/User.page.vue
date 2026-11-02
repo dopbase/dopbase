@@ -162,6 +162,7 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           v-else-if="activeTab === 'access' && access"
           :principal="principal"
           :grants="access.grants"
+          :give-to="{ name: 'user-access-give', params: { userId: user.id } }"
           :summary="accessSummary"
           :read-only="isRoot"
           @changed="controller.reloadAccess" />

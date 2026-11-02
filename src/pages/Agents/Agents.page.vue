@@ -6,6 +6,7 @@ import {
   type AgentTokenStatus,
 } from "./Agents.controller";
 import AddAgentDialog from "./components/AddAgentDialog.vue";
+import AgentsEmptyArt from "./components/AgentsEmptyArt.vue";
 import AgentTokenDialog from "./components/AgentTokenDialog.vue";
 import TransferOwnerDialog from "./components/TransferOwnerDialog.vue";
 import { DashboardLayout } from "~/layouts";
@@ -15,6 +16,7 @@ import {
   DbAlert,
   DbButton,
   DbConfirmDialog,
+  DbEmptyState,
   DbFilterMenu,
   DbLevelBadge,
   DbMenu,
@@ -115,14 +117,12 @@ const tokenUsage = computed(() =>
       </div>
 
       <template v-else>
-        <div
+        <DbEmptyState
           v-if="agents.length === 0"
-          class="rounded-card border border-dashed border-line px-6 py-10 text-center">
-          <p class="text-sm font-medium text-ink-strong">No AI agents yet</p>
-          <p class="mt-1 text-sm text-ink-muted">
-            Add one for a bot or CI job that needs its own token and access.
-          </p>
-        </div>
+          title="No AI agents yet"
+          description="Add one for a bot or CI job that needs its own token and access.">
+          <template #art><AgentsEmptyArt /></template>
+        </DbEmptyState>
 
         <!-- Table on wider screens -->
         <div
@@ -291,6 +291,7 @@ const tokenUsage = computed(() =>
       :open="transferring !== null"
       :agent="transferring"
       :people="people"
+      :roles="roles"
       @close="transferring = null"
       @saved="controller.transferred" />
 

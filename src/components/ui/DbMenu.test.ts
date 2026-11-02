@@ -140,4 +140,34 @@ describe("DbMenu", () => {
     // It opens on the current choice.
     expect(document.activeElement).toBe(choices[1]);
   });
+
+  it("opens on its search field when it has one", async () => {
+    const host = mount("Project", () => [
+      h("input", { type: "search", "aria-label": "Search projects" }),
+      h(DbMenuItem, () => "payments"),
+    ]);
+    host.querySelector<HTMLButtonElement>("button")!.click();
+    await nextTick();
+    await nextTick();
+
+    expect(document.activeElement).toBe(
+      document.querySelector('input[type="search"]'),
+    );
+  });
+
+  it("leaves other inputs in the list alone when it opens", async () => {
+    const host = mount("Columns", () => [
+      h("input", { type: "checkbox", "aria-label": "Show all" }),
+      h(DbMenuItem, { selected: false }, () => "Key"),
+      h(DbMenuItem, { selected: true }, () => "Value"),
+    ]);
+    host.querySelector<HTMLButtonElement>("button")!.click();
+    await nextTick();
+    await nextTick();
+
+    const choices = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
+    );
+    expect(document.activeElement).toBe(choices[1]);
+  });
 });

@@ -732,8 +732,10 @@ async fn health_and_openapi_are_available() {
     "/api/v1/backups/{key}/restore",
     "/api/v1/instance",
     "/api/v1/status",
+    "/api/v1/status/checks/run",
     "/api/v1/instance/factory-reset",
     "/api/v1/users",
+    "/api/v1/users/identities",
     "/api/v1/users/{id}",
     "/api/v1/users/{id}/tokens",
     "/api/v1/users/{id}/tokens/{token_id}/revoke",
@@ -749,11 +751,15 @@ async fn health_and_openapi_are_available() {
   for schema in [
     "ErrorBody",
     "UserResponse",
+    "UserIdentity",
     "CreateUserRequest",
     "UpdateUserRequest",
     "AdminRole",
     "InstanceStatus",
     "StatusResponse",
+    "Check",
+    "HealthReport",
+    "Activity",
     "FactoryResetPreview",
     "FactoryResetRequest",
     "PersonalTokenResponse",
@@ -788,7 +794,7 @@ async fn health_and_openapi_are_available() {
   );
   assert_eq!(
     spec["paths"]["/api/v1/status"]["get"]["summary"],
-    "Show public instance status"
+    "Show instance status and health checks"
   );
   assert_eq!(
     spec["paths"]["/api/v1/instance/factory-reset"]["get"]["summary"],
@@ -1427,12 +1433,16 @@ mod auth_cli_device;
 mod grants_access;
 #[path = "modules/groups/members.rs"]
 mod groups_members;
+#[path = "modules/instance/status.rs"]
+mod instance_status;
 #[path = "modules/personal_tokens/tokens.rs"]
 mod personal_tokens_tokens;
 #[path = "modules/roles/custom.rs"]
 mod roles_custom;
 #[path = "modules/secrets/compare.rs"]
 mod secrets_compare;
+#[path = "modules/secrets/copy.rs"]
+mod secrets_copy;
 #[path = "modules/secrets/import.rs"]
 mod secrets_import;
 #[path = "modules/secrets/versions.rs"]

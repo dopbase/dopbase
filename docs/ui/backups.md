@@ -47,9 +47,9 @@ Every Dopbase instance generates a 32-byte master encryption key stored at
 `~/.dopbase/master.key`. This key encrypts all `.dop` backup containers and
 derives the keys that protect stored project secrets.
 
-Choose **Download master key** in the banner, or **Download** on the master
-key card on [Status](./audit-instance#instance-status), and confirm your
-password if asked. Your browser saves `master.key`. Store it in a password
+Choose **Download master key** in the banner and confirm your password if
+asked. When the key file on disk stops matching the key in use,
+[Status](./audit-instance#instance-status) offers **Download key in use** too. Your browser saves `master.key`. Store it in a password
 manager or vault, not on the server. The recovery kit saved during
 [setup](./setup-and-sign-in#save-the-recovery-kit) holds the same key in hex.
 
@@ -117,7 +117,7 @@ When initializing a brand-new Dopbase instance, start the existing web setup
 listener with `dopbase server setup --web`. It prints a setup link and token.
 
 1. Open the setup link in your browser.
-2. Switch to **Restore from backup**.
+2. Switch to **Restore a backup**.
 3. Enter the one-time setup token printed by the server.
 4. Choose your `.dop` backup file.
 5. If migrating from another server, give its master key: the `master.key`

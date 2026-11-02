@@ -1,20 +1,27 @@
 use super::model::EnvironmentResponse;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.protected,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
+/// One environment, with `secret_count` left at 0. Access checks load it on
+/// every secret request, so counting here would be wasted; single responses
+/// fill it in with [`secret_count`].
+const SELECT: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.protected,0 AS secret_count,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
+/// The same with the secret count, for lists.
+const SELECT_COUNTED: &str = "SELECT e.id,e.project_id,p.name AS project_name,e.name,e.protected,(SELECT COUNT(*) FROM secrets s WHERE s.environment_id=e.id) AS secret_count,e.created_at,e.updated_at FROM environments e JOIN projects p ON p.id=e.project_id";
 
 pub async fn insert(
   tx: &mut Transaction<'_, Sqlite>,
   id: &str,
   project_id: &str,
   name: &str,
+  protected: bool,
   now: &str,
 ) -> Result<bool, sqlx::Error> {
   let result = sqlx::query(
-    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+    "INSERT INTO environments(id,project_id,name,protected,created_at,updated_at)VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
   )
   .bind(id)
   .bind(project_id)
   .bind(name)
+  .bind(protected)
   .bind(now)
   .bind(now)
   .execute(&mut **tx)
@@ -29,6 +36,15 @@ pub async fn find_id(
   sqlx::query_as(&format!("{SELECT} WHERE e.id=?"))
     .bind(id)
     .fetch_optional(pool)
+    .await
+}
+pub async fn secret_count(
+  pool: &SqlitePool,
+  id: &str,
+) -> Result<i64, sqlx::Error> {
+  sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id=?")
+    .bind(id)
+    .fetch_one(pool)
     .await
 }
 pub async fn resolve(
@@ -55,7 +71,7 @@ pub async fn list(
   match project {
     Some(value) => {
       sqlx::query_as(&format!(
-        "{SELECT} WHERE p.id=? OR p.name=? ORDER BY p.name,e.name"
+        "{SELECT_COUNTED} WHERE p.id=? OR p.name=? ORDER BY p.name,e.name"
       ))
       .bind(value)
       .bind(value)
@@ -63,7 +79,7 @@ pub async fn list(
       .await
     }
     None => {
-      sqlx::query_as(&format!("{SELECT} ORDER BY p.name,e.name"))
+      sqlx::query_as(&format!("{SELECT_COUNTED} ORDER BY p.name,e.name"))
         .fetch_all(pool)
         .await
     }

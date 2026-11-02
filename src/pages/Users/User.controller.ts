@@ -20,7 +20,12 @@ import type { PersonalToken } from "~/services/personal-tokens.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
-import { formatDate, formatLevel, formatRelativeTime } from "~/utils/format";
+import {
+  formatDate,
+  formatLevel,
+  formatList,
+  formatRelativeTime,
+} from "~/utils/format";
 import {
   isAgent,
   roleOf,
@@ -172,7 +177,7 @@ export function useUserController() {
     const from =
       groups.length === 0
         ? "Access comes from direct grants."
-        : `Access comes from direct grants and from ${groups.length === 1 ? `the ${groups[0]} group` : `the ${groups.slice(0, -1).join(", ")} and ${groups.at(-1)} groups`}.`;
+        : `Access comes from direct grants and from the ${formatList(groups)} ${groups.length === 1 ? "group" : "groups"}.`;
     return `Their role allows up to ${formatLevel(data.maxLevel)}. ${from}`;
   });
 

@@ -144,6 +144,8 @@ pub mod secrets {
   pub const COPY: &str = api_path!("/environments/{environment_id}/secrets/{key}/copy");
   /// Outside `/secrets/` so it never shadows a secret named `compare`.
   pub const COMPARE: &str = api_path!("/environments/{environment_id}/compare");
+  /// Outside `/secrets/` so it never shadows a secret named `copy`.
+  pub const COPY_MANY: &str = api_path!("/environments/{environment_id}/copy-secrets");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
@@ -259,6 +261,7 @@ pub mod audit {
 pub mod instance {
   pub const ROOT: &str = api_path!("/instance");
   pub const PUBLIC_STATUS: &str = api_path!("/status");
+  pub const RUN_CHECKS: &str = api_path!("/status/checks/run");
   pub const FACTORY_RESET: &str = api_path!("/instance/factory-reset");
 }
 
@@ -278,6 +281,7 @@ pub mod sso {
 
 pub mod users {
   pub const COLLECTION: &str = api_path!("/users");
+  pub const IDENTITIES: &str = api_path!("/users/identities");
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
   pub const DISABLE: &str = api_path!("/users/{id}/disable");

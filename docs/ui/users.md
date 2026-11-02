@@ -56,11 +56,16 @@ Choose someone's email to open their page. It has five tabs:
 - **Overview**: email, role, the deepest level their role allows, how they
   sign in, and how many grants and groups they have.
 - **Access**: every grant that reaches them, and where it comes from: direct,
-  or **via** a group, which links to the group. A note under the table says
-  when a grant on one environment overrides the grant on its project. Choose
-  **Give access** to give them a project or one environment, or use a row's
-  **⋯** menu to change the level or remove a direct grant. Grants that come
-  through a group are changed on the group.
+  or **via** a group, which links to the group. When a grant on one environment
+  overrides the grant on its project, a box under the table lists that
+  environment with the project's level next to the one it gets instead, or
+  **No access** if the environment is blocked. Use a
+  row's **⋯** menu to change the level or remove a direct grant. To remove
+  several, tick their boxes, or the box in the header for every row the
+  filter shows, then choose **Remove access** and confirm. If one fails, the
+  ones before it stay removed and the dialog keeps the rest. Grants that come
+  through a group are changed on the group and have no box. Rows with nothing
+  to change, such as an all-projects grant, have no menu.
 - **Groups**: the groups they belong to. **Add to a group** and **Take out**
   need `groups.manage`.
 - **Tokens**: the personal tokens they made, with what each can do, where, and
@@ -71,6 +76,25 @@ Choose **Edit** at the top to change their email, role, or password. Leave the
 password empty to keep it. Changing someone signs them out everywhere, and
 changing their role drops their access to every project at once; their grants
 stay. Nobody changes root or their own account from here.
+
+## Giving access
+
+Choose **Give access** on the Access tab. It opens a page with three steps:
+
+1. **Project**: pick one from the list of projects you manage. Each shows how
+   many environments it has and the level they already hold on it, if any.
+   Type to search once you manage more than six.
+2. **Where**: the whole project, which covers environments added later, or
+   some environments. Tick as many as you like; each one becomes its own
+   grant. A filter box appears when the project has more than six.
+3. **Level**: how far they reach. Project manager only applies to a whole
+   project, and levels above their role are shown but can't be picked.
+
+**Review**, under the steps, lists every grant before you save. A grant that
+replaces one shows both levels, for example Names only → Read. A
+whole-project grant below Project manager doesn't reach protected
+environments, so Review names those and you can give them separately. AI
+agents and groups use the same page.
 
 ## Disable or turn back on
 

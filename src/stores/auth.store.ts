@@ -130,6 +130,9 @@ export const useAuthStore = defineStore("auth", () => {
     setCsrf(response.csrfToken);
     sessionExpired.value = false;
     bootstrapState.value = "ready";
+    // The setup response has no role name or capabilities; the session
+    // endpoint does.
+    await fetchSession().catch(() => undefined);
   }
 
   /** Signs in with email + password and stores the browser session. */

@@ -20,15 +20,21 @@ import { menuCloseKey } from "./menu";
  *
  * Arrow keys move between items, Escape closes and returns focus, and an
  * outside click, scroll or resize closes it. `DbMenuItem` closes it when
- * chosen. Presentation-only: items report what was picked.
+ * chosen. With a search field (`type="search"`, such as DbSearchField) at
+ * the top of the list, it opens on the field and the arrow keys move from
+ * it into the items. `matchWidth` sizes
+ * the list to its trigger, for a picker. Presentation-only: items report
+ * what was picked.
  */
 const props = withDefaults(
   defineProps<{
     /** Names the default ⋯ trigger. */
     label?: string;
     align?: "start" | "end";
+    /** Make the list as wide as the trigger. */
+    matchWidth?: boolean;
   }>(),
-  { label: "More actions", align: "end" },
+  { label: "More actions", align: "end", matchWidth: false },
 );
 
 const menuId = useId();
@@ -62,7 +68,11 @@ function place(): void {
     props.align === "end"
       ? Math.max(margin, rect.right - width)
       : Math.min(rect.left, window.innerWidth - width - margin);
-  position.value = { top: `${top}px`, left: `${Math.max(margin, left)}px` };
+  position.value = {
+    top: `${top}px`,
+    left: `${Math.max(margin, left)}px`,
+    ...(props.matchWidth ? { width: `${rect.width}px` } : {}),
+  };
 }
 
 function close(returnFocus = false): void {
@@ -142,6 +152,15 @@ watch(open, async (isOpen) => {
   place();
   await nextTick();
   place();
+  // Only a search field, such as DbSearchField, takes focus. Other inputs,
+  // like the hidden one in DbCheckbox, leave it to the items.
+  const field = panel.value?.querySelector<HTMLInputElement>(
+    'input[type="search"]',
+  );
+  if (field) {
+    field.focus();
+    return;
+  }
   // A pick-one menu opens on its current choice, like a native select.
   const list = items();
   (
@@ -155,7 +174,10 @@ provide(menuCloseKey, () => close(true));
 </script>
 
 <template>
-  <span ref="anchor" class="inline-flex min-w-0 max-w-full">
+  <span
+    ref="anchor"
+    class="min-w-0 max-w-full"
+    :class="matchWidth ? 'flex w-full' : 'inline-flex'">
     <slot
       name="trigger"
       :open="open"
@@ -184,7 +206,8 @@ provide(menuCloseKey, () => close(true));
       v-if="open"
       :id="menuId"
       ref="panel"
-      class="fixed z-40 flex max-h-[min(24rem,70vh)] min-w-48 max-w-[min(20rem,calc(100vw-1rem))] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-card border border-line bg-panel p-1 shadow-xl"
+      class="fixed z-40 flex max-h-[min(24rem,70vh)] min-w-48 flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-card border border-line bg-panel p-1 shadow-xl"
+      :class="matchWidth ? '' : 'max-w-[min(20rem,calc(100vw-1rem))]'"
       :style="position"
       role="menu"
       data-testid="menu">
