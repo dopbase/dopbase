@@ -109,7 +109,7 @@ export function useInvalidate({ refetch = true }: { refetch?: boolean } = {}) {
       refresh(
         ...environmentIds.flatMap((id) => [
           keys.secrets.of(id),
-          ["secret-versions", id],
+          keys.secretVersions.environment(id),
         ]),
         keys.environments.root,
         keys.environmentStats.root,

@@ -33,6 +33,11 @@ export const keys = {
   },
   secretVersions: {
     root: ["secret-versions"],
+    /** Every secret's history in one environment. */
+    environment: (environmentId: string): EntryKey => [
+      "secret-versions",
+      environmentId,
+    ],
     of: (environmentId: string, key: string): EntryKey => [
       "secret-versions",
       environmentId,
