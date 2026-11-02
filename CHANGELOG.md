@@ -95,6 +95,9 @@ All notable changes to Dopbase are documented in this file.
   `missing` or `unreadable`.
 - **Give access** opens its own page from an Access tab, and several grants
   can be removed at once.
+- The project Access tab gives access on that same page, so you can grant
+  several environments at once and levels stop at the person's role. Change
+  level uses the same dialog as on people and groups.
 - Sign in, Setup and CLI approval share a new split layout. Sign in puts
   single sign-on first and warns when Caps Lock is on.
 - After setup, root sees a **Finish setting up Dopbase** checklist on Projects
@@ -140,6 +143,8 @@ All notable changes to Dopbase are documented in this file.
 
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
   pool` while loading `sqlx-macros`.
+- Right after first-run setup, root's role name and session details now show
+  without a reload, and the Users page no longer says root never signed in.
 
 ## 0.1.10 - 2026-10-26
 
