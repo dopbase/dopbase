@@ -7,7 +7,7 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import {
   DEFAULT_SESSION_DAYS,
   displayCode,
@@ -47,7 +47,7 @@ function settle(): Promise<void> {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   query.value = {};
   // Signed in already, in another tab, before the CLI asked.

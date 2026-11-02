@@ -181,8 +181,9 @@ export async function apiRequest<T>(
       signal: options.signal,
     });
   } catch (error) {
-    // AbortSignal cancellations are rethrown so callers can ignore them.
-    if (options.signal?.aborted) throw error;
+    // AbortSignal cancellations are rethrown as the signal's reason so callers
+    // (and the query cache) can tell them from real failures.
+    if (options.signal?.aborted) throw options.signal.reason ?? error;
     throw new ApiError(
       0,
       { NETWORK_ERROR: "Cannot reach the Dopbase server." },
@@ -219,6 +220,8 @@ export async function apiRequest<T>(
   try {
     payload = await response.json();
   } catch (cause) {
+    // Cancelled while the body was still arriving: not a bad response.
+    if (options.signal?.aborted) throw options.signal.reason ?? cause;
     throw new ApiError(
       response.status,
       { INVALID_RESPONSE: "The server returned an unreadable response." },
