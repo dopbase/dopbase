@@ -29,7 +29,10 @@ All notable changes to Dopbase are documented in this file.
   `dopbase access --project <ref>` lists who reaches a project.
 - Protected environments, which a project grant below project manager doesn't
   reach. Turn protection on from Access or with `{"protected": true}` on
-  `PATCH /api/v1/environments/{id}`.
+  `PATCH /api/v1/environments/{id}`, or create one already protected with
+  `{"protected": true}` on `POST /api/v1/projects/{ref}/environments`.
+  Project setup creates production that way, so it is never open to project
+  grants, even for a moment.
 - **Compare** tab on the project page shows which keys match, differ or are
   missing across up to four environments, and fills a missing key from
   another environment without showing the value. API:
