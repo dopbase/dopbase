@@ -14,12 +14,13 @@ type QueryCache = ReturnType<typeof useQueryCache>;
  * until its own options change, so removing it would leave the screen
  * showing a detached copy. Emptied entries show the loading state and
  * refetch on next use. Pre-session reads a mounted screen shows (sign-in
- * methods on the login page) stay, since they belong to no account.
+ * methods on the login page) stay, request and all, since they belong to no
+ * account.
  */
 export function clearQueryCache(cache: QueryCache = useQueryCache()): void {
   for (const entry of cache.getEntries()) {
-    cache.cancel(entry);
     if (!entry.active) {
+      cache.cancel(entry);
       cache.remove(entry);
     } else if (entry.key[0] !== PUBLIC) {
       emptyEntry(cache, entry);
