@@ -148,6 +148,9 @@ All notable changes to Dopbase are documented in this file.
   pool` while loading `sqlx-macros`.
 - Right after first-run setup, root's role name and session details now show
   without a reload, and the Users page no longer says root never signed in.
+- **Transfer owner** no longer hands an AI agent to someone who can't see it.
+  The new owner must be root or have `users.view`; anyone else gets
+  `OWNER_INVALID`.
 
 ## 0.1.10 - 2026-10-26
 
