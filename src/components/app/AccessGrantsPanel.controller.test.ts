@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { ref } from "vue";
 import { useAccessGrantsPanel } from "./AccessGrantsPanel.controller";
 import type { GrantPrincipal } from "~/utils/level";
@@ -52,7 +52,7 @@ const auditOnly = grantFixture({
 });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
 });
 

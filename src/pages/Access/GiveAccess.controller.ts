@@ -1,16 +1,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import * as projectsApi from "~/services/projects.api";
-import * as environmentsApi from "~/services/environments.api";
-import {
-  LEVELS,
-  fetchGroup,
-  fetchGroups,
-  fetchProjectAccess,
-  fetchUserAccess,
-  reaches,
-  setGrant,
-} from "~/services/access.api";
+import { useQueryCache } from "@pinia/colada";
+import { LEVELS, reaches, setGrant } from "~/services/access.api";
 import type {
   Grant,
   Level,
@@ -18,10 +9,19 @@ import type {
   ScopeType,
 } from "~/services/access.api";
 import type { Environment, Project } from "~/services";
-import { fetchUsers } from "~/services/users.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import {
+  groupQuery,
+  groupsQuery,
+  projectAccessQuery,
+  userAccessQuery,
+} from "~/queries/access";
+import { readQuery } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { environmentsQuery, projectsQuery } from "~/queries/projects";
+import { usersQuery } from "~/queries/users";
 import { formatLevel, formatList } from "~/utils/format";
 import {
   grantSentence,
@@ -123,6 +123,8 @@ export function useGiveAccessController() {
   const route = useRoute();
   const router = useRouter();
   const auth = useAuthStore();
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
   const { runWithReauth } = useReauthentication();
 
   const kind = computed<GiveAccessKind>(
@@ -161,17 +163,17 @@ export function useGiveAccessController() {
   const saving = ref(false);
   const error = ref<string | null>(null);
 
-  async function loadPrincipal(): Promise<void> {
+  async function loadPrincipal(fresh = false): Promise<void> {
     const id = principalId.value;
     if (kind.value === "group") {
-      const detail = await fetchGroup(id);
+      const detail = await readQuery(cache, groupQuery(id), { fresh });
       principal.value = { type: "group", id, label: detail.group.name };
       grants.value = detail.grants.filter(
         (grant) => grant.principalType === "group" && grant.principalId === id,
       );
       return;
     }
-    const access = await fetchUserAccess(id);
+    const access = await readQuery(cache, userAccessQuery(id), { fresh });
     principal.value = {
       type: "user",
       id,
@@ -184,8 +186,12 @@ export function useGiveAccessController() {
   }
 
   /** From a project: its environments and every grant on it. */
-  async function loadProject(): Promise<void> {
-    const access = await fetchProjectAccess(projectRef.value);
+  async function loadProject(fresh = false): Promise<void> {
+    const access = await readQuery(
+      cache,
+      projectAccessQuery(projectRef.value),
+      { fresh },
+    );
     projects.value = [access.project];
     environments.value = access.environments;
     grants.value = access.grants;
@@ -200,9 +206,11 @@ export function useGiveAccessController() {
    */
   async function loadPrincipals(): Promise<void> {
     const [users, groups] = await Promise.allSettled([
-      auth.can("users.view") ? fetchUsers() : Promise.resolve([]),
+      auth.can("users.view")
+        ? readQuery(cache, usersQuery)
+        : Promise.resolve([]),
       auth.can("users.view", "groups.manage")
-        ? fetchGroups()
+        ? readQuery(cache, groupsQuery)
         : Promise.resolve([]),
     ]);
     const byName = (a: { label: string }, b: { label: string }) =>
@@ -267,10 +275,12 @@ export function useGiveAccessController() {
         await Promise.all([loadProject(), loadPrincipals()]);
         return;
       }
+      // The form is filled once from the shared lists; a visit soon after
+      // another screen loaded them needs no request.
       const [, projectList, environmentList] = await Promise.all([
         loadPrincipal(),
-        projectsApi.listProjects(),
-        environmentsApi.listEnvironments(),
+        readQuery(cache, projectsQuery),
+        readQuery(cache, environmentsQuery(null)),
       ]);
       projects.value = projectList;
       environments.value = environmentList;
@@ -319,7 +329,7 @@ export function useGiveAccessController() {
       return;
     }
     try {
-      const access = await fetchUserAccess(choice.id);
+      const access = await readQuery(cache, userAccessQuery(choice.id));
       // A later pick wins.
       if (chosenKey.value !== key) return;
       principal.value = {
@@ -549,15 +559,19 @@ export function useGiveAccessController() {
         saved > 0
           ? `Saved ${saved} of ${todo.length}. ${todo[saved]!.label} failed: ${reason}`
           : reason;
-      // Show what is held now, so a second try only redoes the rest.
-      if (saved > 0)
+      if (saved > 0) {
+        void invalidate.accessChanged();
+        // Show what is held now, so a second try only redoes the rest.
         await (
-          kind.value === "project" ? loadProject() : loadPrincipal()
+          kind.value === "project" ? loadProject(true) : loadPrincipal(true)
         ).catch(() => undefined);
+      }
       return false;
     } finally {
       saving.value = false;
     }
+    // Every screen showing access, and the lists it decides, refresh.
+    void invalidate.accessChanged();
     try {
       await router.push(backTo.value);
     } catch {

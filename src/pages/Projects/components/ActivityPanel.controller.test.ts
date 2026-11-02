@@ -122,14 +122,47 @@ describe("useActivityPanelController", () => {
   });
 
   it("cancels the older request when a filter changes", async () => {
+    vi.mocked(auditApi.listAuditEvents).mockReturnValueOnce(
+      new Promise(() => {}),
+    );
     const c = panel();
-    await vi.waitFor(() => expect(c.rows.value).toHaveLength(1));
+    await nextTick();
     const first = vi.mocked(auditApi.listAuditEvents).mock.calls[0]![1]!;
 
     c.wholeProject.value = true;
     await nextTick();
 
     expect(first.aborted).toBe(true);
+    await vi.waitFor(() => expect(c.rows.value).toHaveLength(1));
+  });
+
+  it("keeps Load more on the feed shown when a filter changes meanwhile", async () => {
+    let answerOldPage!: (page: auditApi.AuditPage) => void;
+    vi.mocked(auditApi.listAuditEvents)
+      .mockResolvedValueOnce({ items: [event({})], nextCursor: "c2" })
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (answerOldPage = resolve)),
+      )
+      .mockResolvedValueOnce({
+        items: [event({ id: "aud_wide", environmentId: null })],
+        nextCursor: null,
+      });
+    const c = panel();
+    await vi.waitFor(() => expect(c.rows.value).toHaveLength(1));
+
+    const more = c.loadMore();
+    c.wholeProject.value = true;
+    await vi.waitFor(() =>
+      expect(c.rows.value.map((row) => row.event.id)).toEqual(["aud_wide"]),
+    );
+    answerOldPage({
+      items: [event({ id: "aud_old_page" })],
+      nextCursor: null,
+    });
+    await more;
+
+    expect(c.rows.value.map((row) => row.event.id)).toEqual(["aud_wide"]);
+    expect(c.loadError.value).toBeNull();
   });
 
   it("explains a failed load", async () => {

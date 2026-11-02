@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQueryCache } from "@pinia/colada";
+import { keys } from "~/queries/keys";
+import { freshPinia } from "~/tests/pinia";
 import { useLoginController } from "./Login.controller";
+import { mountController } from "~/tests/mount-controller";
+import { settle } from "~/tests/people";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
@@ -27,16 +31,20 @@ vi.mock("~/services/health.api", () => ({
 }));
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   routerPush.mockReset();
   routeQuery.redirect = undefined;
   routeQuery.sso_error = undefined;
   routeQuery.password = undefined;
 });
 
+function login() {
+  return mountController(useLoginController).controller;
+}
+
 describe("useLoginController", () => {
   it("blocks empty submissions with field errors", async () => {
-    const c = useLoginController();
+    const c = login();
     await c.submit();
     expect(c.fieldErrors.value.email).toBeTruthy();
     expect(c.fieldErrors.value.password).toBeTruthy();
@@ -44,7 +52,7 @@ describe("useLoginController", () => {
   });
 
   it("rejects malformed emails locally", async () => {
-    const c = useLoginController();
+    const c = login();
     c.email.value = "not-an-email";
     c.password.value = "pw";
     await c.submit();
@@ -54,7 +62,7 @@ describe("useLoginController", () => {
 
   it("signs in and routes to projects", async () => {
     vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
-    const c = useLoginController();
+    const c = login();
     c.email.value = "A@B.C";
     c.password.value = "pw";
     await c.submit();
@@ -69,7 +77,7 @@ describe("useLoginController", () => {
     async (redirect) => {
       routeQuery.redirect = redirect;
       vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
-      const c = useLoginController();
+      const c = login();
       c.email.value = "a@b.c";
       c.password.value = "pw";
       await c.submit();
@@ -86,7 +94,7 @@ describe("useLoginController", () => {
     ]) {
       routerPush.mockReset();
       routeQuery.redirect = redirect;
-      const c = useLoginController();
+      const c = login();
       c.email.value = "a@b.c";
       c.password.value = "pw";
       await c.submit();
@@ -98,7 +106,7 @@ describe("useLoginController", () => {
     vi.mocked(authApi.login).mockRejectedValueOnce(
       new ApiError(422, { EMAIL_INVALID: "Please use proper email" }),
     );
-    const c = useLoginController();
+    const c = login();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
@@ -115,7 +123,7 @@ describe("useLoginController", () => {
           "Email or password is wrong. 2 more tries, then a 5-minute pause.",
       }),
     );
-    const c = useLoginController();
+    const c = login();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
@@ -127,7 +135,7 @@ describe("useLoginController", () => {
 
   it("falls back to a plain message when the server sends none", async () => {
     vi.mocked(authApi.login).mockRejectedValueOnce(new Error("offline"));
-    const c = useLoginController();
+    const c = login();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
@@ -140,7 +148,7 @@ describe("useLoginController", () => {
         RATE_LIMITED: "Too many tries. Wait 5 minutes, then try again.",
       }),
     );
-    const c = useLoginController();
+    const c = login();
     c.email.value = "a@b.c";
     c.password.value = "pw";
     await c.submit();
@@ -150,7 +158,7 @@ describe("useLoginController", () => {
   });
 
   it("names the server and its version for the page", async () => {
-    const c = useLoginController();
+    const c = login();
     await c.loadMethods();
     await new Promise((resolve) => setTimeout(resolve));
     expect(c.host).toBe(window.location.host);
@@ -158,8 +166,22 @@ describe("useLoginController", () => {
     expect(c.version.value).toBe("0.2.0");
   });
 
+  it("keeps nothing read before sign-in once the page closes", async () => {
+    const { unmount } = mountController(useLoginController);
+    // This test's own cache: a timer left by an earlier test can make
+    // another Pinia the active one meanwhile.
+    const cache = useQueryCache();
+    await settle();
+    expect(cache.getEntries({ key: keys.public.root })).toHaveLength(2);
+
+    unmount();
+    await settle();
+
+    expect(cache.getEntries({ key: keys.public.root })).toHaveLength(0);
+  });
+
   it("notices Caps Lock from key events in the password field", () => {
-    const c = useLoginController();
+    const c = login();
     const press = (on: boolean) =>
       ({
         getModifierState: (key: string) => key === "CapsLock" && on,
@@ -177,7 +199,7 @@ describe("useLoginController", () => {
       sso: { name: "Acme SSO" },
       cliBrowser: true,
     });
-    const c = useLoginController();
+    const c = login();
     expect(c.methodsLoaded.value).toBe(false);
     await c.loadMethods();
     expect(c.methodsLoaded.value).toBe(true);
@@ -186,7 +208,9 @@ describe("useLoginController", () => {
     vi.mocked(authApi.fetchAuthMethods).mockRejectedValueOnce(
       new ApiError(404, { NOT_FOUND: "missing" }),
     );
-    const offline = useLoginController();
+    // Another tab, on a server without the methods endpoint.
+    freshPinia();
+    const offline = login();
     await offline.loadMethods();
     expect(offline.methodsLoaded.value).toBe(true);
     expect(offline.ssoName.value).toBeNull();
@@ -195,29 +219,35 @@ describe("useLoginController", () => {
   it("starts single sign-on from the same safe redirect", () => {
     routeQuery.redirect = "/projects/p/api";
     vi.mocked(authApi.ssoStartUrl).mockReturnValue("/start");
-    expect(useLoginController().ssoHref.value).toBe("/start");
+    expect(login().ssoHref.value).toBe("/start");
     expect(authApi.ssoStartUrl).toHaveBeenLastCalledWith("/projects/p/api");
 
     routeQuery.redirect = "https://evil.example";
-    void useLoginController().ssoHref.value;
+    void login().ssoHref.value;
     expect(authApi.ssoStartUrl).toHaveBeenLastCalledWith(undefined);
   });
 
   it("explains why a single sign-on attempt failed", () => {
     routeQuery.sso_error = "account_not_found";
-    expect(useLoginController().ssoError.value).toContain(
+    expect(login().ssoError.value).toContain(
       "No Dopbase account uses that email",
     );
     routeQuery.sso_error = "something-new";
-    expect(useLoginController().ssoError.value).toContain("didn't work");
+    expect(login().ssoError.value).toContain("didn't work");
   });
 
   it("says when password sign-in is turned off", async () => {
     vi.mocked(authApi.login).mockRejectedValueOnce(
       new ApiError(403, { PASSWORD_LOGIN_DISABLED: "turned off" }),
     );
-    const c = useLoginController();
-    c.ssoName.value = "Keycloak";
+    vi.mocked(authApi.fetchAuthMethods).mockResolvedValueOnce({
+      password: true,
+      passwordForm: true,
+      sso: { name: "Keycloak" },
+      cliBrowser: true,
+    });
+    const c = login();
+    await settle();
     c.email.value = "dev@example.com";
     c.password.value = "correct-horse-789";
     await c.submit();
@@ -231,13 +261,13 @@ describe("useLoginController", () => {
       sso: { name: "Acme SSO" },
       cliBrowser: true,
     });
-    const c = useLoginController();
+    const c = login();
     expect(c.showPasswordForm.value).toBe(true);
     await c.loadMethods();
     expect(c.showPasswordForm.value).toBe(false);
 
     routeQuery.password = "";
-    const breakGlass = useLoginController();
+    const breakGlass = login();
     await breakGlass.loadMethods();
     expect(breakGlass.showPasswordForm.value).toBe(true);
   });

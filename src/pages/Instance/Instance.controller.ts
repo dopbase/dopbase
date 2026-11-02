@@ -1,12 +1,9 @@
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import { useAuthStore } from "~/stores/auth.store";
 import { useReauthentication } from "~/composable/reauthentication";
-import {
-  factoryReset,
-  fetchStatus,
-  runStatusChecks,
-} from "~/services/instance.api";
+import { factoryReset, runStatusChecks } from "~/services/instance.api";
 import type {
   CheckStatus,
   StatusCheck,
@@ -16,6 +13,8 @@ import type { Capability } from "~/services/access.api";
 import { downloadMasterKeyBlob } from "~/services/backups.api";
 import { ApiError } from "~/services/http.client";
 import { errorMessage, isAbortError } from "~/services/api-errors";
+import { loadFailure } from "~/queries/helpers";
+import { statusQuery } from "~/queries/instance";
 import { saveBlob } from "~/utils/download";
 import { copyText } from "~/utils/clipboard";
 import {
@@ -91,11 +90,20 @@ export function useInstanceController() {
   const router = useRouter();
   const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
-  const status = ref<StatusResponse | null>(null);
-  const loading = ref(false);
-  const loadError = ref<string | null>(null);
+  const cache = useQueryCache();
+  const statusList = useQuery(statusQuery);
+  const status = computed<StatusResponse | null>(
+    () => statusList.data.value ?? null,
+  );
+  const loading = statusList.isLoading;
+  const loadError = loadFailure(
+    statusList,
+    "Could not load the instance status.",
+  );
   /** Set when a poll fails while older results are still on screen. */
-  const staleSince = ref<string | null>(null);
+  const staleSince = computed(() =>
+    statusList.error.value && status.value ? status.value.observedAt : null,
+  );
   const running = ref(false);
   const runError = ref<string | null>(null);
   const showPassed = ref(false);
@@ -501,43 +509,29 @@ export function useInstanceController() {
     return SEVERITY_TONES[status];
   }
 
-  // Every load and run takes a number. A response for an older number is
-  // dropped, so a poll that was already out when Run checks was pressed
-  // can't put its older results back over the fresh ones.
-  let latestRequest = 0;
-
+  /** Asks for fresh results now. A failure keeps the last ones on screen. */
   async function load(): Promise<void> {
-    const request = ++latestRequest;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const fresh = await fetchStatus();
-      if (request !== latestRequest) return;
-      status.value = fresh;
-      staleSince.value = null;
-      runError.value = null;
-    } catch {
-      if (request !== latestRequest) return;
-      if (status.value) {
-        // Keep the last good results and say how old they are.
-        staleSince.value = status.value.observedAt;
-      } else {
-        loadError.value = "Could not load the instance status.";
-      }
-    } finally {
-      loading.value = false;
-    }
+    await statusList.refetch();
   }
 
+  // A newer reading replaces an older Run checks error.
+  watch(statusList.data, () => {
+    runError.value = null;
+  });
+
+  /**
+   * Runs every check now. A poll already out is cancelled first, and again
+   * once the run answers, so its older results can never land over the
+   * fresh ones; a cancelled request never writes to the cache.
+   */
   async function runChecks(): Promise<void> {
-    const request = ++latestRequest;
     running.value = true;
     runError.value = null;
+    cache.cancelQueries({ key: statusQuery.key, exact: true });
     try {
       const fresh = await runStatusChecks();
-      if (request !== latestRequest) return;
-      status.value = fresh;
-      staleSince.value = null;
+      cache.cancelQueries({ key: statusQuery.key, exact: true });
+      cache.setQueryData(statusQuery.key, fresh);
     } catch (cause: unknown) {
       runError.value =
         cause instanceof ApiError && cause.status === 429
@@ -590,9 +584,10 @@ export function useInstanceController() {
     }
   }
 
+  // The first reading comes with the query; the poll runs while the page is
+  // open and skips a tick when a request is already out.
   let timer: ReturnType<typeof setInterval> | null = null;
   onMounted(() => {
-    void load();
     timer = setInterval(() => {
       if (!loading.value && !running.value) void load();
     }, POLL_INTERVAL_MS);

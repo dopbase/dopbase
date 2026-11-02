@@ -130,9 +130,12 @@ export interface CliLoginRequest {
   sessionDays?: number;
 }
 
-export async function fetchAuthMethods(): Promise<AuthMethods> {
+export async function fetchAuthMethods(
+  signal?: AbortSignal,
+): Promise<AuthMethods> {
   const { data } = await apiRequest<AuthMethods>(`${BASE}/methods`, {
     anonymous: true,
+    signal,
   });
   return data;
 }
@@ -204,8 +207,12 @@ export async function startSsoLink(): Promise<string> {
   return data.authorizeUrl;
 }
 
-export async function fetchSsoIdentity(): Promise<SsoIdentity> {
-  const { data } = await apiRequest<SsoIdentity>(`${BASE}/sso/identity`);
+export async function fetchSsoIdentity(
+  signal?: AbortSignal,
+): Promise<SsoIdentity> {
+  const { data } = await apiRequest<SsoIdentity>(`${BASE}/sso/identity`, {
+    signal,
+  });
   return data;
 }
 

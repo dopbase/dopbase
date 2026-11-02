@@ -61,8 +61,10 @@ export interface SaveSsoProviderRequest {
 
 const BASE = "/api/v1/sso/provider";
 
-export async function fetchSsoSettings(): Promise<SsoSettings> {
-  const { data } = await apiRequest<SsoSettings>(BASE);
+export async function fetchSsoSettings(
+  signal?: AbortSignal,
+): Promise<SsoSettings> {
+  const { data } = await apiRequest<SsoSettings>(BASE, { signal });
   return data;
 }
 

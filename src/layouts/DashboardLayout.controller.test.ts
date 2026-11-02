@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { useDashboardLayoutController } from "./DashboardLayout.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
@@ -27,7 +27,7 @@ vi.mock("vue-router", () => ({
 vi.mock("~/services/auth.api");
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   routerPush.mockReset();
   routerReplace.mockReset();
   route.path = "/projects/p/billing/e/env_1";

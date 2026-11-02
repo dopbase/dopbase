@@ -3,6 +3,7 @@ import type { Ref } from "vue";
 import * as environmentsApi from "~/services/environments.api";
 import { errorMessage } from "~/services/api-errors";
 import type { Environment } from "~/services";
+import { useInvalidate } from "~/queries/invalidate";
 
 /** One environment on the setup list, ticked or not. */
 export interface SetupRow {
@@ -66,6 +67,7 @@ export function useProjectSetupController(
   projectName: Ref<string>,
   onDone: (environmentName: string) => void | Promise<void>,
 ) {
+  const invalidate = useInvalidate();
   const rows = ref<SetupRow[]>(presets());
   const newName = ref("");
   const newNameError = ref<string | null>(null);
@@ -100,9 +102,7 @@ export function useProjectSetupController(
       ? "Create 1 environment"
       : `Create ${count} environments`;
   });
-  const canCreate = computed(
-    () => !creating.value && pending.value.length > 0,
-  );
+  const canCreate = computed(() => !creating.value && pending.value.length > 0);
 
   function nameProblem(name: string): string | null {
     if (!name) return "Type a name first.";
@@ -170,6 +170,8 @@ export function useProjectSetupController(
     }
     creating.value = false;
     if (!failed) await openCreated();
+    // Those made before the failure exist now; every list should show them.
+    else if (created.value.length > 0) void invalidate.projectTreeChanged();
   }
 
   /** Opens the first environment created, skipping any still to retry. */

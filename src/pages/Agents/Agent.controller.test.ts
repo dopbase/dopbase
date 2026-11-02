@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { useAgentController } from "./Agent.controller";
 import * as accessApi from "~/services/access.api";
 import * as rolesApi from "~/services/roles.api";
@@ -64,7 +64,7 @@ async function mountAgent() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-31T00:00:00Z"));
@@ -86,9 +86,18 @@ describe("useAgentController", () => {
   it("loads the agent with its access, tokens, role and owner", async () => {
     const controller = await mountAgent();
 
-    expect(usersApi.fetchUser).toHaveBeenCalledWith("usr_bot");
-    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_bot");
-    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("usr_bot");
+    expect(usersApi.fetchUser).toHaveBeenCalledWith(
+      "usr_bot",
+      expect.any(AbortSignal),
+    );
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+      "usr_bot",
+      expect.any(AbortSignal),
+    );
+    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(
+      "usr_bot",
+      expect.any(AbortSignal),
+    );
     expect(controller.agent.value).toEqual(reviewBot);
     expect(controller.access.value).toEqual(botAccess);
     expect(controller.role.value?.id).toBe("rol_ai_agent");

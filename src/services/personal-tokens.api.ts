@@ -46,8 +46,9 @@ function base(userId: string): string {
 
 export async function listPersonalTokens(
   userId = "me",
+  signal?: AbortSignal,
 ): Promise<PersonalToken[]> {
-  const { data } = await apiRequest<PersonalToken[]>(base(userId));
+  const { data } = await apiRequest<PersonalToken[]>(base(userId), { signal });
   return data;
 }
 

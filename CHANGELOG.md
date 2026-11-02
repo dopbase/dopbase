@@ -132,6 +132,10 @@ All notable changes to Dopbase are documented in this file.
 - New runner tokens pick a lifetime, and the token dialog shows the
   `dopbase run` line to use it.
 - The project page works on phones.
+- The Admin UI keeps what it has read in a shared cache. Going back to a
+  screen shows its data at once and refreshes it in the background, and a
+  change shows up on every screen that lists it. Signing out, an expired
+  session or signing in as someone else empties the cache.
 
 ### Removed
 
@@ -151,6 +155,9 @@ All notable changes to Dopbase are documented in this file.
 - **Transfer owner** no longer hands an AI agent to someone who can't see it.
   The new owner must be root or have `users.view`; anyone else gets
   `OWNER_INVALID`.
+- Moving quickly between users, agents or environments no longer shows the
+  previous one's tokens, and **Load more** on **Activity** no longer adds
+  events from the filters you just left.
 
 ## 0.1.10 - 2026-10-26
 

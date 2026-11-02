@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { MIN_PASSWORD_LENGTH, useSetupController } from "./Setup.controller";
 import * as bootstrapApi from "~/services/bootstrap.api";
 import * as backupsApi from "~/services/backups.api";
@@ -38,7 +38,7 @@ function fill(c: ReturnType<typeof useSetupController>): void {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   routerPush.mockReset();
   routerReplace.mockReset();
   vi.mocked(bootstrapApi.bootstrapAdmin).mockReset();

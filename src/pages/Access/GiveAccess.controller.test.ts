@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQueryCache } from "@pinia/colada";
+import { freshPinia } from "~/tests/pinia";
+import { keys } from "~/queries/keys";
 import {
   principalMeta,
   projectMeta,
@@ -82,7 +84,7 @@ const prodGrant = grantFixture({
 });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   route.name = "user-access-give";
   route.params = { userId: "usr_maya" };
@@ -444,7 +446,10 @@ describe("useGiveAccessController from a project", () => {
     expect(page.error.value).toBe("Choose who gets access.");
 
     await page.choosePrincipal("user:usr_maya");
-    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_maya");
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+      "usr_maya",
+      expect.any(AbortSignal),
+    );
     expect(page.principal.value?.maxLevel).toBe("manage");
     expect(
       page.levels.value.find((choice) => choice.level === "project_manager")
@@ -469,6 +474,12 @@ describe("useGiveAccessController from a project", () => {
       name: "project-access",
       params: { projectRef: "payments" },
     });
+    // The Access tab it goes back to reads the project's access fresh.
+    expect(
+      useQueryCache()
+        .getEntries({ key: keys.access.project("payments") })
+        .every((entry) => entry.stale),
+    ).toBe(true);
   });
 
   it("keeps the last pick when an earlier role loads late", async () => {

@@ -126,8 +126,12 @@ export async function fetchInstanceStatus(): Promise<InstanceStatus> {
   const { data } = await apiRequest<InstanceStatus>(BASE);
   return data;
 }
-export async function fetchStatus(): Promise<StatusResponse> {
-  const { data } = await apiRequest<StatusResponse>("/api/v1/status");
+export async function fetchStatus(
+  signal?: AbortSignal,
+): Promise<StatusResponse> {
+  const { data } = await apiRequest<StatusResponse>("/api/v1/status", {
+    signal,
+  });
   return data;
 }
 

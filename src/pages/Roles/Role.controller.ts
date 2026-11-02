@@ -1,6 +1,7 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { createRole, fetchRoles, updateRole } from "~/services/roles.api";
+import { useQuery } from "@pinia/colada";
+import { createRole, updateRole } from "~/services/roles.api";
 import type {
   Role,
   RoleSettings,
@@ -10,6 +11,9 @@ import type {
 import type { Capability, Level } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
+import { loadFailure, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { rolesQuery } from "~/queries/users";
 import { formatLevel } from "~/utils/format";
 import { PROJECT_LEVELS } from "~/utils/level";
 import { ROLE_CAPABILITIES } from "./Roles.controller";
@@ -57,9 +61,19 @@ export function useRoleController() {
       : null,
   );
 
-  const roles = ref<Role[] | null>(null);
-  const loadError = ref<string | null>(null);
-  const notFound = ref(false);
+  const markStale = useInvalidate({ refetch: false });
+  const roleList = useQuery(rolesQuery);
+  // The form starts from a fresh read, never a cached copy someone may have
+  // changed since, so the page waits for that answer.
+  const answered = ref(false);
+  void roleList.refetch().then(() => {
+    answered.value = true;
+  });
+  const listed = shownData<Role[]>(roleList);
+  const roles = computed(() => (answered.value ? listed.value : null));
+  const loadError = loadFailure(roleList, (cause) =>
+    errorMessage(cause, "Could not load roles."),
+  );
 
   const name = ref("");
   const description = ref("");
@@ -74,7 +88,6 @@ export function useRoleController() {
   const saving = ref(false);
   const nameError = ref<string | null>(null);
   const saveError = ref<string | null>(null);
-  let version = 0;
 
   /** The role being edited or viewed; null for a new one. */
   const role = computed(() =>
@@ -90,6 +103,9 @@ export function useRoleController() {
       : null,
   );
   const isNew = computed(() => roleId.value === null);
+  const notFound = computed(
+    () => roleId.value !== null && roles.value !== null && role.value === null,
+  );
   const readOnly = computed(() => role.value?.builtin === true);
 
   function fill(from: Role | null, copy: boolean): void {
@@ -112,30 +128,25 @@ export function useRoleController() {
     saveError.value = null;
   }
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    const current = ++version;
-    loadError.value = null;
-    notFound.value = false;
-    try {
-      const list = await fetchRoles();
-      if (current !== version) return;
-      roles.value = list;
-      if (roleId.value) {
-        notFound.value = role.value === null;
-        fill(role.value, false);
-      } else {
-        fill(source.value, source.value !== null);
-      }
-    } catch (cause) {
-      if (current !== version) return;
-      loadError.value = errorMessage(cause, "Could not load roles.");
-    }
+    await roleList.refetch();
   }
 
-  watch([roleId, fromId], () => void load(), { immediate: true });
-  onUnmounted(() => {
-    version++;
-  });
+  // Fill the form once per role (or role to copy), so a background refresh
+  // of the list never overwrites what is being typed.
+  let filledFor: string | null = null;
+  watch(
+    [roles, roleId, fromId],
+    ([list, id, from]) => {
+      const target = `${id}|${from}`;
+      if (!list || filledFor === target) return;
+      filledFor = target;
+      if (id) fill(role.value, false);
+      else fill(source.value, source.value !== null);
+    },
+    { immediate: true },
+  );
 
   const title = computed(() => {
     if (isNew.value)
@@ -190,6 +201,7 @@ export function useRoleController() {
           : await createRole(settings.value);
       });
       if (!saved) return false;
+      void markStale.rolesChanged();
       await router.push({ name: "roles" });
       return true;
     } catch (cause) {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, reactive } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { useImportSecretsController } from "./ImportSecrets.controller";
 import { useImportStore } from "~/stores/import.store";
 import { useReauthentication } from "~/composable";
@@ -33,7 +33,7 @@ function challenge() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   useReauthentication().dismiss();
   vi.resetAllMocks();
   route = reactive({

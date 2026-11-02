@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
 import { useAgentTokenDialog } from "./AgentTokenDialog.controller";
 import * as tokensApi from "~/services/personal-tokens.api";
@@ -54,7 +54,7 @@ async function openDialog({
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   signInAs(["users.manage"]);
   vi.mocked(tokensApi.createPersonalToken).mockResolvedValue({

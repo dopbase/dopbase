@@ -1,11 +1,13 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { fetchUsers } from "~/services/users.api";
+import { useQuery } from "@pinia/colada";
 import type { User } from "~/services/users.api";
-import { fetchRoles } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
-import { fetchAuthMethods } from "~/services/auth.api";
 import { useAuthStore } from "~/stores/auth.store";
+import { authMethodsQuery } from "~/queries/auth";
+import { loadFailure, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { rolesQuery, usersQuery } from "~/queries/users";
 import { formatRelativeTime } from "~/utils/format";
 import { isAgent, roleOf, signInMethod, type SignInMethod } from "./people";
 import { useAccountActions, type AccountActionKind } from "./account-actions";
@@ -42,11 +44,25 @@ export const STATUS_FILTERS = [
 export function useUsersController() {
   const auth = useAuthStore();
   const router = useRouter();
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
 
-  const users = ref<User[] | null>(null);
-  const roles = ref<Role[]>([]);
-  const ssoEnabled = ref(false);
-  const loadError = ref<string | null>(null);
+  const accountList = useQuery(usersQuery);
+  // Roles and sign-in methods only add detail, so a failure leaves them out.
+  const roleList = useQuery(rolesQuery);
+  const methods = useQuery(authMethodsQuery);
+  const accounts = shownData<User[]>(accountList);
+  // Says so even above the old list, which may be out of date.
+  const loadError = loadFailure(accountList, "Could not load users.", {
+    withData: true,
+  });
+  const users = computed<User[] | null>(() => {
+    if (accounts.value)
+      return accounts.value.filter((account) => !isAgent(account));
+    return loadError.value ? [] : null;
+  });
+  const roles = computed<Role[]>(() => roleList.data.value ?? []);
+  const ssoEnabled = computed(() => methods.data.value?.sso != null);
 
   const filter = ref("");
   const roleFilter = ref<string | null>(null);
@@ -54,23 +70,14 @@ export function useUsersController() {
 
   const canManage = computed(() => auth.can("users.manage"));
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    loadError.value = null;
-    try {
-      const [accounts, available, methods] = await Promise.all([
-        fetchUsers(),
-        fetchRoles().catch(() => [] as Role[]),
-        fetchAuthMethods().catch(() => null),
-      ]);
-      roles.value = available;
-      ssoEnabled.value = methods?.sso != null;
-      users.value = accounts.filter((account) => !isAgent(account));
-    } catch {
-      users.value ??= [];
-      loadError.value = "Could not load users.";
-    }
+    await Promise.all([
+      accountList.refetch(),
+      roleList.refresh(),
+      methods.refresh(),
+    ]);
   }
-  onMounted(load);
 
   const rows = computed<UserRow[]>(() =>
     (users.value ?? []).map((user) => {
@@ -140,13 +147,14 @@ export function useUsersController() {
     const added = editing.value === null;
     dialogOpen.value = false;
     if (added) {
+      void markStale.usersChanged();
       await router.push({ name: "user-access", params: { userId: user.id } });
       return;
     }
-    await load();
+    await invalidate.usersChanged();
   }
 
-  const actions = useAccountActions(load);
+  const actions = useAccountActions(() => invalidate.usersChanged());
 
   return {
     users,

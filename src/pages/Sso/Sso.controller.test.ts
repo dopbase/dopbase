@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { forgetQueries, freshPinia } from "~/tests/pinia";
 import { useSsoController } from "./Sso.controller";
 import * as ssoApi from "~/services/sso.api";
 import { ApiError } from "~/services/http.client";
@@ -66,7 +66,9 @@ function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve));
 }
 
+/** Opens the page as if in a new tab, so it reads `settings` from the server. */
 async function mounted(settings: ssoApi.SsoSettings) {
+  forgetQueries();
   vi.mocked(ssoApi.fetchSsoSettings).mockResolvedValueOnce(settings);
   const { controller } = mountController(useSsoController);
   await settle();
@@ -74,7 +76,7 @@ async function mounted(settings: ssoApi.SsoSettings) {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   query.value = {};
 });

@@ -1,17 +1,23 @@
 import { computed, ref, watch } from "vue";
 import type { Ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import * as secretsApi from "~/services/secrets.api";
 import type {
   CopySecretsResponse,
   SecretMetadata,
 } from "~/services/secrets.api";
 import { ApiError } from "~/services/http.client";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
+import { secretsQuery } from "~/queries/secrets";
 import type { CopySource } from "./EmptyEnvironment.controller";
 
 /**
  * Copy secrets dialog controller: lists the source's keys when the dialog
  * opens, all ticked, and copies the ticked ones into the target in one
  * request. Values are copied only when asked for and only on the server.
+ *
+ * The keys come from the source's cached secret list, which its own
+ * Secrets tab reads too.
  */
 export function useCopySecretsDialogController(
   targetId: Ref<string>,
@@ -19,41 +25,53 @@ export function useCopySecretsDialogController(
   open: Ref<boolean>,
   initialValues: Ref<boolean>,
 ) {
-  const keys = ref<SecretMetadata[] | null>(null);
-  const loadError = ref<string | null>(null);
+  const sourceKeys = useQuery(() =>
+    onlyWhen(
+      open.value && source.value !== null,
+      secretsQuery(source.value?.id ?? ""),
+    ),
+  );
+  const keys = computed<SecretMetadata[] | null>(() => {
+    const list = sourceKeys.data.value;
+    return list ? [...list].sort((a, b) => a.key.localeCompare(b.key)) : null;
+  });
+  const loadError = loadFailure(
+    sourceKeys,
+    () => `Could not load the keys in ${source.value?.name ?? "it"}.`,
+  );
   const selected = ref(new Set<string>());
   const values = ref(false);
   const submitting = ref(false);
   const submitError = ref<string | null>(null);
-  let request = 0;
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    const from = source.value;
-    if (!from) return;
-    const current = ++request;
-    keys.value = null;
-    loadError.value = null;
-    try {
-      const list = await secretsApi.listSecrets(from.id);
-      if (current !== request) return;
-      keys.value = [...list].sort((a, b) => a.key.localeCompare(b.key));
-      selected.value = new Set(list.map((secret) => secret.key));
-    } catch {
-      if (current !== request) return;
-      loadError.value = `Could not load the keys in ${from.name}.`;
-    }
+    if (source.value) await sourceKeys.refetch();
   }
 
   watch(
     open,
     (isOpen) => {
-      if (!isOpen) {
-        request++;
-        return;
-      }
+      if (!isOpen) return;
       values.value = initialValues.value && !!source.value?.canCopyValues;
       submitError.value = null;
-      void load();
+    },
+    { immediate: true },
+  );
+
+  // Everything starts ticked, once per opening, so a background refresh
+  // never undoes what was unticked.
+  let tickedFor: string | null = null;
+  watch(
+    [keys, open, () => source.value?.id ?? null],
+    ([list, isOpen, sourceId]) => {
+      if (!isOpen) {
+        tickedFor = null;
+        return;
+      }
+      if (!list || tickedFor === sourceId) return;
+      tickedFor = sourceId;
+      selected.value = new Set(list.map((secret) => secret.key));
     },
     { immediate: true },
   );

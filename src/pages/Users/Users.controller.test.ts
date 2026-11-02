@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { STATUS_FILTERS, useUsersController } from "./Users.controller";
 import * as usersApi from "~/services/users.api";
 import * as rolesApi from "~/services/roles.api";
@@ -49,7 +49,7 @@ const methods = (sso: { name: string } | null): authApi.AuthMethods => ({
 });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([
     root,
@@ -179,6 +179,26 @@ describe("useUsersController", () => {
       const c = await mountAs();
       expect(c.users.value).toEqual([]);
       expect(c.loadError.value).toBe("Could not load users.");
+    });
+
+    it("shows the list at once when you come back to it", async () => {
+      const first = await mountAs();
+      expect(ids(first.rows.value)).toContain("usr_maya");
+
+      const { controller: again } = mountController(useUsersController);
+
+      expect(ids(again.rows.value)).toContain("usr_maya");
+      await settle();
+      expect(usersApi.fetchUsers).toHaveBeenCalledTimes(1);
+    });
+
+    it("shares one roles request with every screen showing them", async () => {
+      signInAs(["users.view", "users.manage"]);
+      mountController(useUsersController);
+      mountController(useUsersController);
+      await settle();
+      expect(rolesApi.fetchRoles).toHaveBeenCalledTimes(1);
+      expect(authApi.fetchAuthMethods).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the list on screen when a refresh fails", async () => {

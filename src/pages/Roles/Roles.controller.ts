@@ -1,10 +1,14 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import { deleteRole, fetchRoles } from "~/services/roles.api";
+import { useQuery } from "@pinia/colada";
+import { deleteRole } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
 import type { Capability } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
+import { loadFailure, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { rolesQuery } from "~/queries/users";
 import { levelMeter, type LevelMeter } from "~/utils/level";
 
 /** What each capability lets a role's holders do. */
@@ -87,19 +91,23 @@ export function useRolesController() {
   const router = useRouter();
   const { runWithReauth } = useReauthentication();
 
-  const roles = ref<Role[] | null>(null);
-  const error = ref<string | null>(null);
+  const invalidate = useInvalidate();
+  const roleList = useQuery(rolesQuery);
+  const roleData = shownData<Role[]>(roleList);
+  // Says so even above the old list, which may be out of date.
+  const error = loadFailure(
+    roleList,
+    (cause) => errorMessage(cause, "Could not load roles."),
+    { withData: true },
+  );
+  const roles = computed<Role[] | null>(
+    () => roleData.value ?? (error.value ? [] : null),
+  );
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    error.value = null;
-    try {
-      roles.value = await fetchRoles();
-    } catch (cause) {
-      roles.value ??= [];
-      error.value = errorMessage(cause, "Could not load roles.");
-    }
+    await roleList.refetch();
   }
-  onMounted(load);
 
   /** Built-ins first; the server already sorts each by rank, then name. */
   const rows = computed(() =>
@@ -134,7 +142,7 @@ export function useRolesController() {
     try {
       await runWithReauth(() => deleteRole(role.id));
       deleting.value = null;
-      await load();
+      await invalidate.rolesChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       deleteError.value = errorMessage(cause, "Could not delete the role.");

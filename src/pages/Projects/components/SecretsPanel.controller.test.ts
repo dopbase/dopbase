@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { cacheContents, freshPinia } from "~/tests/pinia";
 import {
   REVEAL_SECONDS,
   useSecretsPanelController,
@@ -16,7 +16,7 @@ vi.mock("~/services/secrets.api");
 vi.mock("~/services/auth.api");
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   useReauthentication().dismiss();
   vi.mocked(secretsApi.listSecrets).mockReset();
   vi.mocked(secretsApi.setSecret).mockReset();
@@ -103,6 +103,23 @@ describe("useSecretsPanelController", () => {
     expect(c.secrets.value?.[0]).not.toHaveProperty("value");
   });
 
+  it("shows an environment opened before at once, with no new request", async () => {
+    vi.mocked(secretsApi.listSecrets).mockResolvedValue([metadata]);
+    const first = mountController(() =>
+      useSecretsPanelController(ref("env_1")),
+    );
+    await vi.waitFor(() =>
+      expect(first.controller.secrets.value).toEqual([metadata]),
+    );
+    first.unmount();
+
+    const again = makeController();
+
+    expect(again.secrets.value).toEqual([metadata]);
+    await nextTick();
+    expect(secretsApi.listSecrets).toHaveBeenCalledTimes(1);
+  });
+
   it("surfaces listing failures", async () => {
     vi.mocked(secretsApi.listSecrets).mockRejectedValueOnce(new Error("down"));
     const c = makeController();
@@ -124,6 +141,8 @@ describe("useSecretsPanelController", () => {
       expect(c.revealedKey.value).toBe("DATABASE_URL");
       expect(c.revealedValue.value).toBe("postgres://secret");
       expect(c.revealedValue.value).not.toContain("undefined");
+      // The plaintext lives in this controller only, never in the cache.
+      expect(cacheContents()).not.toContain("postgres://secret");
 
       await vi.advanceTimersByTimeAsync((REVEAL_SECONDS - 1) * 1000);
       expect(c.revealedKey.value).toBe("DATABASE_URL");
@@ -279,6 +298,7 @@ describe("useSecretsPanelController — filter and copy", () => {
     expect(writeText).toHaveBeenCalledWith("postgres://secret");
     expect(c.copiedKey.value).toBe("DATABASE_URL");
     expect(c.revealedValue.value).toBeNull();
+    expect(cacheContents()).not.toContain("postgres://secret");
   });
 
   it("says so when the browser blocks the copy", async () => {
@@ -324,6 +344,8 @@ describe("useSecretsPanelController — .env editor", () => {
       "# app\nDATABASE_URL=postgres://secret\nAPI_KEY=k-123\n",
     );
     expect(c.editorDirty.value).toBe(false);
+    expect(cacheContents()).not.toContain("postgres://secret");
+    expect(cacheContents()).not.toContain("k-123");
   });
 
   it("openEditor generates a fresh layout when none is stored", async () => {

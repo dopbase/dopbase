@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
 import { useAddAgentDialog } from "./AddAgentDialog.controller";
 import * as usersApi from "~/services/users.api";
@@ -21,7 +21,7 @@ async function openDialog(role: Role | null = agentRole) {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   signInAs(["users.manage"]);
   vi.mocked(usersApi.createUser).mockResolvedValue(reviewBot);

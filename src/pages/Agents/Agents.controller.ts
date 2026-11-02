@@ -1,14 +1,9 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import { fetchUsers } from "~/services/users.api";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import type { User } from "~/services/users.api";
-import { fetchRoles } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
-import {
-  listPersonalTokens,
-  revokePersonalToken,
-} from "~/services/personal-tokens.api";
-import { fetchUserAccess } from "~/services/access.api";
+import { revokePersonalToken } from "~/services/personal-tokens.api";
 import type { Grant } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
@@ -17,6 +12,11 @@ import type {
   PersonalToken,
 } from "~/services/personal-tokens.api";
 import { useAuthStore } from "~/stores/auth.store";
+import { userAccessQuery } from "~/queries/access";
+import { loadFailure, onlyWhen, readQuery, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { agentTokensQuery } from "~/queries/personal-tokens";
+import { rolesQuery, usersQuery } from "~/queries/users";
 import { formatDate, formatRelativeTime } from "~/utils/format";
 import { levelMeter, type LevelMeter } from "~/utils/level";
 import { isAgent, tokenState } from "~/pages/Users/people";
@@ -82,43 +82,50 @@ export function useAgentsController() {
   const router = useRouter();
   const { runWithReauth } = useReauthentication();
 
-  const agents = ref<User[] | null>(null);
-  const people = ref<User[]>([]);
-  const roles = ref<Role[]>([]);
-  const tokens = ref<Record<string, PersonalToken[] | null>>({});
-  const loadError = ref<string | null>(null);
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
+
+  const accountList = useQuery(usersQuery);
+  // Roles only add detail, so a failure leaves them out.
+  const roleList = useQuery(rolesQuery);
+  const accounts = shownData<User[]>(accountList);
+  const agentIds = computed(() =>
+    (accounts.value ?? []).filter(isAgent).map((agent) => agent.id),
+  );
+  // Each agent's tokens through its own entry, which its page reads too. A
+  // list that fails shows as an unknown token state.
+  const tokenLists = useQuery(() =>
+    onlyWhen(
+      accounts.value !== null,
+      agentTokensQuery({ cache, agentIds: agentIds.value }),
+    ),
+  );
+  // Says so even above the old list, which may be out of date.
+  const loadError = loadFailure(accountList, "Could not load AI agents.", {
+    withData: true,
+  });
+  const tokens = computed<Record<string, PersonalToken[] | null>>(
+    () => tokenLists.data.value ?? {},
+  );
+  /** Null until the agents and their tokens have loaded. */
+  const agents = computed<User[] | null>(() => {
+    if (accounts.value && tokenLists.data.value)
+      return accounts.value.filter(isAgent);
+    return loadError.value ? [] : null;
+  });
+  const people = computed<User[]>(() =>
+    (accounts.value ?? []).filter((account) => !isAgent(account)),
+  );
+  const roles = computed<Role[]>(() => roleList.data.value ?? []);
   const filter = ref("");
   const ownerFilter = ref<string | null>(null);
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    loadError.value = null;
-    try {
-      const [accounts, available] = await Promise.all([
-        fetchUsers(),
-        fetchRoles().catch(() => [] as Role[]),
-      ]);
-      roles.value = available;
-      people.value = accounts.filter((account) => !isAgent(account));
-      const list = accounts.filter(isAgent);
-      const lists = await Promise.allSettled(
-        list.map((agent) => listPersonalTokens(agent.id)),
-      );
-      tokens.value = Object.fromEntries(
-        list.map((agent, index) => {
-          const result = lists[index];
-          return [
-            agent.id,
-            result?.status === "fulfilled" ? result.value : null,
-          ];
-        }),
-      );
-      agents.value = list;
-    } catch {
-      agents.value ??= [];
-      loadError.value = "Could not load AI agents.";
-    }
+    await Promise.all([accountList.refetch(), roleList.refresh()]);
+    await tokenLists.refresh();
   }
-  onMounted(load);
 
   /** The role new agents get: the token-only role you may give. */
   const agentRole = computed(
@@ -197,6 +204,7 @@ export function useAgentsController() {
 
   async function added(agent: User): Promise<void> {
     addOpen.value = false;
+    void markStale.usersChanged();
     await router.push({ name: "agent", params: { agentId: agent.id } });
   }
 
@@ -210,7 +218,10 @@ export function useAgentsController() {
     tokenGrants.value = [];
     tokenFor.value = row;
     try {
-      tokenGrants.value = (await fetchUserAccess(row.agent.id)).grants;
+      const access = await readQuery(cache, userAccessQuery(row.agent.id));
+      // A later pick wins.
+      if (tokenFor.value?.agent.id === row.agent.id)
+        tokenGrants.value = access.grants;
     } catch {
       // The token can still reach everything the agent reaches.
     }
@@ -218,8 +229,10 @@ export function useAgentsController() {
 
   function tokenCreated(created: CreatedPersonalToken): void {
     tokenFor.value = null;
+    // The plaintext stays here until it is acknowledged; the list refresh
+    // only carries the new token's metadata.
     createdToken.value = created;
-    void load();
+    void invalidate.personalTokensChanged();
   }
 
   // Transfer
@@ -227,7 +240,7 @@ export function useAgentsController() {
 
   async function transferred(): Promise<void> {
     transferring.value = null;
-    await load();
+    await invalidate.usersChanged();
   }
 
   // Revoke
@@ -254,7 +267,7 @@ export function useAgentsController() {
         await revokePersonalToken(row.agent.id, row.token!.id);
       });
       revoking.value = null;
-      await load();
+      await invalidate.personalTokensChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       revokeError.value = errorMessage(cause, "Could not revoke the token.");
@@ -263,7 +276,7 @@ export function useAgentsController() {
     }
   }
 
-  const actions = useAccountActions(load);
+  const actions = useAccountActions(() => invalidate.usersChanged());
 
   return {
     agents,
