@@ -89,6 +89,30 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     .unwrap()
     .to_string();
   let csrf = bootstrap["data"]["csrfToken"].as_str().unwrap().to_string();
+  // Setup signs root in like any other sign-in.
+  let (status, session, _) = call(
+    &router,
+    "GET",
+    "/api/v1/auth/session",
+    Some(&cookie),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{session}");
+  assert_eq!(session["data"]["roleName"], "Root");
+  let root_id = bootstrap["data"]["adminId"].as_str().unwrap();
+  let (status, root, _) = call(
+    &router,
+    "GET",
+    &format!("/api/v1/users/{root_id}"),
+    Some(&cookie),
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{root}");
+  assert!(root["data"]["lastSignInAt"].is_string(), "{root}");
   let (status, created, _) = call(
     &router,
     "POST",
