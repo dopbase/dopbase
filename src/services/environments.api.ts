@@ -35,13 +35,15 @@ export async function listEnvironments(
   return data;
 }
 
+/** Creates an environment, protected from the start when `isProtected`. */
 export async function createEnvironment(
   projectRef: string,
   name: string,
+  isProtected = false,
 ): Promise<Environment> {
   const { data } = await apiRequest<Environment>(
     `/api/v1/projects/${encodeURIComponent(projectRef)}/environments`,
-    { method: "POST", body: { name } },
+    { method: "POST", body: { name, protected: isProtected } },
   );
   return data;
 }

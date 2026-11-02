@@ -25,9 +25,6 @@ beforeEach(() => {
   vi.mocked(environmentsApi.createEnvironment).mockImplementation(
     async (_project, name) => environment(name),
   );
-  vi.mocked(environmentsApi.setEnvironmentProtected).mockImplementation(
-    async (id) => ({ ...environment(id.slice(4)), protected: true }),
-  );
 });
 
 function mount() {
@@ -98,21 +95,18 @@ describe("useProjectSetupController", () => {
     ]);
   });
 
-  it("creates the ticked ones in order, protects the marked, then opens the first", async () => {
+  it("creates the ticked ones in order, protected in the same request, then opens the first", async () => {
     const c = mount();
     row(c, "staging").selected = false;
 
     await c.create();
 
     expect(vi.mocked(environmentsApi.createEnvironment).mock.calls).toEqual([
-      ["payment-service", "development"],
-      ["payment-service", "production"],
+      ["payment-service", "development", false],
+      ["payment-service", "production", true],
     ]);
-    expect(environmentsApi.setEnvironmentProtected).toHaveBeenCalledOnce();
-    expect(environmentsApi.setEnvironmentProtected).toHaveBeenCalledWith(
-      "env_production",
-      true,
-    );
+    // No second request that could fail and leave production open.
+    expect(environmentsApi.setEnvironmentProtected).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalledWith("development");
   });
 
@@ -142,7 +136,7 @@ describe("useProjectSetupController", () => {
     await c.create();
 
     expect(vi.mocked(environmentsApi.createEnvironment).mock.calls).toEqual([
-      ["payment-service", "production"],
+      ["payment-service", "production", true],
     ]);
     expect(onDone).toHaveBeenCalledWith("development");
   });
@@ -159,58 +153,6 @@ describe("useProjectSetupController", () => {
 
     await c.openCreated();
 
-    expect(onDone).toHaveBeenCalledWith("development");
-  });
-
-  it("stays put when it couldn't protect one, and retries only the protection", async () => {
-    vi.mocked(environmentsApi.setEnvironmentProtected).mockRejectedValueOnce(
-      new Error("Forbidden"),
-    );
-    const c = mount();
-
-    await c.create();
-
-    expect(row(c, "production")).toMatchObject({
-      status: "created",
-      unprotected: true,
-      error:
-        "Created, but not protected yet. Try again, or turn it on in Settings.",
-    });
-    // Leaving now would hide the warning with production open to everyone.
-    expect(onDone).not.toHaveBeenCalled();
-    expect(c.stopped.value).toBe(true);
-    expect(c.submitLabel.value).toBe("Try again");
-
-    vi.mocked(environmentsApi.createEnvironment).mockClear();
-    await c.create();
-
-    expect(environmentsApi.createEnvironment).not.toHaveBeenCalled();
-    expect(environmentsApi.setEnvironmentProtected).toHaveBeenLastCalledWith(
-      "env_production",
-      true,
-    );
-    expect(row(c, "production")).toMatchObject({
-      unprotected: false,
-      error: null,
-    });
-    expect(onDone).toHaveBeenCalledWith("development");
-  });
-
-  it("stops creating the rest after a protect failure", async () => {
-    vi.mocked(environmentsApi.setEnvironmentProtected).mockRejectedValue(
-      new Error("Forbidden"),
-    );
-    const c = mount();
-    row(c, "staging").protected = true;
-
-    await c.create();
-
-    expect(row(c, "staging").unprotected).toBe(true);
-    expect(row(c, "production").status).toBe("idle");
-    expect(onDone).not.toHaveBeenCalled();
-
-    // Going on without protection is still up to them.
-    await c.openCreated();
     expect(onDone).toHaveBeenCalledWith("development");
   });
 });
