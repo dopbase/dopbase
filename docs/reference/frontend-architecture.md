@@ -58,7 +58,7 @@ operation messages. Never branch on English server messages.
 
 ## Reading data
 
-Screens read server data through [Pinia Colada](https://pinia-colada.esm.dev/)
+Screens read server data through **Pinia Colada** its a vue native data fetching
 queries defined in `src/queries`. A controller calls `useQuery()` with a factory
 from that folder and returns the result in the shape its page already binds:
 `null` while nothing has loaded, then the data. Services stay plain transport
@@ -209,8 +209,6 @@ page's components.
 
 ## Design source
 
-The console is designed in the Figma file
-[Dopbase admin console](https://www.figma.com/design/JkWa51Xg9VDnFvvdvFojmw/-POC--ADMIN-CONSOLE).
 Its Foundations page uses the same tokens as `src/style.css`, and its
 Components page holds the shared set every screen is built from. Each Figma
 component maps to one component in code:
