@@ -77,6 +77,11 @@ export const router = createRouter({
       component: () => import("~/pages/Projects/Project.page.vue"),
     },
     {
+      // An environment without a tab opens its secrets.
+      path: "/projects/:projectRef/:environmentName",
+      redirect: (to) => ({ name: "environment", params: to.params }),
+    },
+    {
       path: "/projects/:projectRef/:environmentName/secrets",
       name: "environment",
       component: () => import("~/pages/Projects/Project.page.vue"),

@@ -75,6 +75,13 @@ describe("renamed routes", () => {
       "/projects/p/billing/access",
       { name: "project-access", params: { projectRef: "billing" } },
     ],
+    [
+      "/projects/billing/prod",
+      {
+        name: "environment",
+        params: { projectRef: "billing", environmentName: "prod" },
+      },
+    ],
   ])("sends %s to its new address", (path, expected) => {
     const resolved = router.resolve(path);
     const redirect = resolved.matched[0]?.redirect;
