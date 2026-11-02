@@ -51,23 +51,33 @@ export function useInvalidate({ refetch = true }: { refetch?: boolean } = {}) {
 
   const refresh = (...prefixes: EntryKey[]) => refreshAll(prefixes);
 
-  // The project and environment lists also refresh when no screen shows
-  // them: they're small, and the next screen would otherwise flash an old
-  // name before its own refresh lands.
+  // The project list and the every-project environment list also refresh
+  // when no screen shows them: they're small, and the next screen would
+  // otherwise flash an old name before its own refresh lands. One project's
+  // environment list refreshes only on screen, so a change doesn't refetch
+  // one list per project visited lately.
+  const everyEnvironment = keys.environments.list(null);
   const projectTreeChanged = () =>
     Promise.all([
       refreshWhere(
         cache,
         (entry) =>
           hasPrefix(entry.key, keys.projects) ||
-          hasPrefix(entry.key, keys.environments.root),
+          hasPrefix(entry.key, everyEnvironment),
         { refetch, offScreenToo: refetch },
       ),
-      refresh(
-        keys.environmentStats.root,
-        keys.compare.root,
-        keys.access.root,
-        keys.audit.root,
+      refreshWhere(
+        cache,
+        (entry) =>
+          (hasPrefix(entry.key, keys.environments.root) &&
+            !hasPrefix(entry.key, everyEnvironment)) ||
+          [
+            keys.environmentStats.root,
+            keys.compare.root,
+            keys.access.root,
+            keys.audit.root,
+          ].some((prefix) => hasPrefix(entry.key, prefix)),
+        { refetch },
       ),
     ]).then(() => undefined);
 
