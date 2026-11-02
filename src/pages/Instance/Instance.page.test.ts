@@ -1,6 +1,6 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as instanceApi from "~/services/instance.api";
 import { settle, signInAs } from "~/tests/people";
@@ -152,7 +152,7 @@ function find(host: HTMLElement, id: string): HTMLElement | null {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
 });
 
 afterEach(() => {

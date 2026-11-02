@@ -1,9 +1,11 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { fetchAuthMethods, ssoStartUrl } from "~/services/auth.api";
-import { fetchHealth } from "~/services/health.api";
+import { useQuery } from "@pinia/colada";
+import { ssoStartUrl } from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { useAuthStore } from "~/stores/auth.store";
+import { publicAuthMethodsQuery } from "~/queries/auth";
+import { publicHealthQuery } from "~/queries/health";
 import { formatHosting } from "~/utils/format";
 import { ssoErrorMessage } from "~/utils/sso";
 import { isSafeRedirect, isValidEmail } from "~/utils/validation";
@@ -23,12 +25,17 @@ export function useLoginController() {
   const fieldErrors = ref<{ email?: string; password?: string }>({});
   const formError = ref<string | null>(null);
   const submitting = ref(false);
+  // Older servers have no methods endpoint; the password form still works.
+  const methods = useQuery(publicAuthMethodsQuery);
+  const health = useQuery(publicHealthQuery);
   /** Button label for single sign-on, when the server has it enabled. */
-  const ssoName = ref<string | null>(null);
+  const ssoName = computed(() => methods.data.value?.sso?.name ?? null);
   /** False until the server says which sign-in options it offers. */
-  const methodsLoaded = ref(false);
+  const methodsLoaded = computed(() => methods.status.value !== "pending");
   /** Root can hide the form; `/login?password` brings it back for root. */
-  const passwordFormAllowed = ref(true);
+  const passwordFormAllowed = computed(
+    () => methods.data.value?.passwordForm !== false,
+  );
   const showPasswordForm = computed(
     () => passwordFormAllowed.value || route.query.password !== undefined,
   );
@@ -38,7 +45,7 @@ export function useLoginController() {
   /** `Secure cloud` or `Self-hosted`, for the footer. */
   const hosting = formatHosting(window.location.hostname);
   /** The server's version for the footer; empty until it answers. */
-  const version = ref("");
+  const version = computed(() => health.data.value?.version ?? "");
   /** Caps Lock is on while the password field has focus. */
   const capsLock = ref(false);
 
@@ -57,22 +64,9 @@ export function useLoginController() {
   /** Full-page link that starts single sign-on and returns to the same place. */
   const ssoHref = computed(() => ssoStartUrl(safeRedirect() ?? undefined));
 
+  /** Asks again what the server offers, if the last answer is stale. */
   async function loadMethods(): Promise<void> {
-    void fetchHealth()
-      .then((health) => {
-        version.value = health.version;
-      })
-      .catch(() => undefined);
-    try {
-      const methods = await fetchAuthMethods();
-      ssoName.value = methods.sso?.name ?? null;
-      passwordFormAllowed.value = methods.passwordForm !== false;
-    } catch {
-      // Older servers have no methods endpoint; the password form still works.
-      ssoName.value = null;
-    } finally {
-      methodsLoaded.value = true;
-    }
+    await Promise.all([methods.refresh(), health.refresh()]);
   }
 
   function validate(): boolean {

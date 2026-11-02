@@ -1,14 +1,16 @@
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useInfiniteQuery, useQuery } from "@pinia/colada";
 import * as auditApi from "~/services/audit.api";
 import type { AuditEvent, ChainVerifyReport } from "~/services/audit.api";
-import * as projectsApi from "~/services/projects.api";
-import * as environmentsApi from "~/services/environments.api";
-import { fetchUserIdentities } from "~/services/users.api";
 import type { UserIdentity } from "~/services/users.api";
 import type { Environment, Project } from "~/services";
 import { errorMessage } from "~/services/api-errors";
 import { useAuthStore } from "~/stores/auth.store";
+import { auditEventsQuery, type AuditFilters } from "~/queries/audit";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
+import { environmentsQuery, projectsQuery } from "~/queries/projects";
+import { userIdentitiesQuery } from "~/queries/users";
 import { formatDateTime, formatRelativeTime } from "~/utils/format";
 
 export const AUDIT_PAGE_SIZE = 25;
@@ -120,13 +122,6 @@ export function useAuditController() {
   const route = useRoute();
   const router = useRouter();
 
-  const items = ref<AuditEvent[]>([]);
-  const nextCursor = ref<string | null>(null);
-  const loading = ref(false);
-  const loadingMore = ref(false);
-  const loadError = ref<string | null>(null);
-  const hasLoaded = ref(false);
-
   const fromQuery = (key: string): string => {
     const value = route.query[key];
     return typeof value === "string" ? value : "";
@@ -138,10 +133,49 @@ export function useAuditController() {
     actor: fromQuery("actor"),
   });
 
-  const projects = ref<Project[]>([]);
-  const environments = ref<Environment[]>([]);
-  const people = ref<UserIdentity[]>([]);
-  let requestVersion = 0;
+  // Filter options share the lists other screens read. Best effort: a list
+  // that fails leaves its filter showing ids instead of names.
+  const projectOptions = useQuery(projectsQuery);
+  const environmentOptions = useQuery(() => environmentsQuery(null));
+  const peopleOptions = useQuery(() =>
+    onlyWhen(auth.can("users.view"), userIdentitiesQuery),
+  );
+  const projects = computed<Project[]>(() => projectOptions.data.value ?? []);
+  const environments = computed<Environment[]>(
+    () => environmentOptions.data.value ?? [],
+  );
+  const people = computed<UserIdentity[]>(() => peopleOptions.data.value ?? []);
+  // The feed follows the filters: each set is its own cached feed. While a
+  // new one loads the last rows stay up, as before.
+  const feedFilters = computed<AuditFilters>(() => ({
+    limit: AUDIT_PAGE_SIZE,
+    projectId: filters.projectId || null,
+    environmentId: filters.environmentId || null,
+    action: filters.action || null,
+    actor: filters.actor || null,
+  }));
+  const feed = useInfiniteQuery(() => ({
+    ...auditEventsQuery(feedFilters.value),
+    placeholderData: (previous) => previous,
+  }));
+  const loadingMore = ref(false);
+  const moreError = ref<string | null>(null);
+  const feedFailure = loadFailure(feed, "Could not load audit events.", {
+    withData: true,
+  });
+  const loadError = computed(() => feedFailure.value ?? moreError.value);
+  const loading = computed(() => feed.isLoading.value && !loadingMore.value);
+  /** Whether a feed has answered once, so empty means empty. */
+  const hasLoaded = computed(() => feed.data.value !== undefined);
+  const items = computed<AuditEvent[]>(
+    () => feed.data.value?.pages.flatMap((page) => page?.items ?? []) ?? [],
+  );
+  /** Never offered for the rows still showing from the last filters. */
+  const nextCursor = computed(() =>
+    feed.isPlaceholderData.value
+      ? null
+      : (feed.data.value?.pages.at(-1)?.nextCursor ?? null),
+  );
 
   const projectName = (id: string | null): string =>
     projects.value.find((project) => project.id === id)?.name ?? id ?? "";
@@ -229,8 +263,8 @@ export function useAuditController() {
     for (const [key, value] of Object.entries(filters)) {
       if (value) query[key] = value;
     }
+    moreError.value = null;
     void router.replace({ query });
-    void load();
   }
 
   function setAction(value: string | null): void {
@@ -259,73 +293,34 @@ export function useAuditController() {
 
   // Loading
 
-  function currentQuery(): auditApi.AuditQuery {
-    return {
-      limit: AUDIT_PAGE_SIZE,
-      action: filters.action || undefined,
-      projectId: filters.projectId || undefined,
-      environmentId: filters.environmentId || undefined,
-      actor: filters.actor || undefined,
-    };
-  }
-
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    const version = ++requestVersion;
-    const query = currentQuery();
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const page = await auditApi.listAuditEvents(query);
-      if (version !== requestVersion) return;
-      items.value = page.items;
-      nextCursor.value = page.nextCursor;
-      hasLoaded.value = true;
-    } catch {
-      // A newer filter already replaced this request.
-      if (version === requestVersion)
-        loadError.value = "Could not load audit events.";
-    } finally {
-      if (version === requestVersion) loading.value = false;
-    }
+    moreError.value = null;
+    await feed.refetch();
   }
 
   async function loadMore(): Promise<void> {
     if (!nextCursor.value || loadingMore.value) return;
-    const version = requestVersion;
-    const cursor = nextCursor.value;
-    const query = currentQuery();
+    const shown = feedFilters.value;
     loadingMore.value = true;
+    moreError.value = null;
     try {
-      const page = await auditApi.listAuditEvents({
-        ...query,
-        cursor,
-      });
-      if (version !== requestVersion || nextCursor.value !== cursor) return;
-      items.value.push(...page.items);
-      nextCursor.value = page.nextCursor;
+      await feed.loadNextPage({ throwOnError: true });
     } catch {
-      if (version === requestVersion)
-        loadError.value = "Could not load more audit events.";
+      // A filter change meanwhile started another feed; this page is moot.
+      if (feedFilters.value === shown)
+        moreError.value = "Could not load more audit events.";
     } finally {
       loadingMore.value = false;
     }
   }
 
   async function loadFilterOptions(): Promise<void> {
-    let identitiesFetcher = Promise.resolve([] as UserIdentity[]);
-    if (auth.can("users.view")) {
-      identitiesFetcher = fetchUserIdentities().catch(
-        () => [] as UserIdentity[],
-      );
-    }
-    const [projectList, environmentList, accounts] = await Promise.all([
-      projectsApi.listProjects().catch(() => [] as Project[]),
-      environmentsApi.listEnvironments().catch(() => [] as Environment[]),
-      identitiesFetcher,
+    await Promise.all([
+      projectOptions.refresh(),
+      environmentOptions.refresh(),
+      peopleOptions.refresh(),
     ]);
-    projects.value = projectList;
-    environments.value = environmentList;
-    people.value = accounts;
   }
 
   /** What the viewer's audit capabilities let this screen show. */
@@ -455,11 +450,6 @@ export function useAuditController() {
       .filter(Boolean)
       .join(" · ");
   }
-
-  onMounted(() => {
-    void load();
-    void loadFilterOptions();
-  });
 
   return {
     items,
