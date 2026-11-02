@@ -47,6 +47,23 @@ pub async fn rows<'e>(
 ) -> Result<Vec<SecretRow>, sqlx::Error> {
   sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(executor).await
 }
+/// The version of each of `keys` the environment has. Keys it doesn't have
+/// are left out.
+pub async fn versions_of<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  keys: &[&String],
+) -> Result<Vec<(String, i64)>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version FROM secrets WHERE environment_id=? AND key IN (SELECT value FROM json_each(?))").bind(environment_id).bind(serde_json::json!(keys).to_string()).fetch_all(executor).await
+}
+/// Like [`rows`], for `keys` only.
+pub async fn rows_of<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  keys: &[&String],
+) -> Result<Vec<SecretRow>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key IN (SELECT value FROM json_each(?)) ORDER BY key").bind(environment_id).bind(serde_json::json!(keys).to_string()).fetch_all(executor).await
+}
 pub async fn find(
   pool: &SqlitePool,
   environment_id: &str,

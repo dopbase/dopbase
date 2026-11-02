@@ -290,13 +290,16 @@ pub async fn copy_many(
   }
   // The source is read in the write transaction, so what is copied and the
   // versions the audit event records are the source as it is at the write.
+  // Only the chosen keys are read, and ciphertext only when values are
+  // copied, since the write lock is held meanwhile.
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
-  let source_rows: HashMap<String, repository::SecretRow> = repository::rows(&mut *tx, &source.id)
-    .await?
-    .into_iter()
-    .map(|row| (row.key.clone(), row))
-    .collect();
-  if keys.iter().any(|key| !source_rows.contains_key(key)) {
+  let chosen: Vec<&String> = keys.iter().collect();
+  let source_versions: HashMap<String, i64> =
+    repository::versions_of(&mut *tx, &source.id, &chosen)
+      .await?
+      .into_iter()
+      .collect();
+  if source_versions.len() != keys.len() {
     return Err(secret_not_found());
   }
   let existing: HashSet<String> =
@@ -311,15 +314,25 @@ pub async fn copy_many(
   if existing.len() + copied.len() > MAX_SECRETS_PER_ENVIRONMENT {
     return Err(secret_count_limit());
   }
+  let source_rows: HashMap<String, repository::SecretRow> = if request.values {
+    let wanted: Vec<&String> = copied.iter().collect();
+    repository::rows_of(&mut *tx, &source.id, &wanted)
+      .await?
+      .into_iter()
+      .map(|row| (row.key.clone(), row))
+      .collect()
+  } else {
+    HashMap::new()
+  };
   let mut values = Vec::with_capacity(copied.len());
   for key in &copied {
-    let row = &source_rows[key];
     let value = if request.values {
+      let row = source_rows.get(key).ok_or_else(secret_not_found)?;
       Zeroizing::new(decrypt_row(state, &source.id, row)?)
     } else {
       Zeroizing::new(String::new())
     };
-    values.push((key, row.version, value));
+    values.push((key, source_versions[key], value));
   }
   if values
     .iter()
