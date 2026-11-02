@@ -5,6 +5,7 @@ import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import type { Environment } from "~/services";
 import { mountController } from "~/tests/mount-controller";
+import { forgetQueries } from "~/tests/pinia";
 
 const { route, push, replace } = await vi.hoisted(async () => {
   const { reactive } = await import("vue");
@@ -182,10 +183,48 @@ describe("useProjectController", () => {
       { ...prod, name: "production" },
     ]);
 
+    // Renamed elsewhere, then the project opens in a new tab.
+    forgetQueries();
     at("project-settings", { projectRef: "payments" });
     const c = await loaded();
 
     expect(c.environment.value?.name).toBe("production");
+  });
+
+  it("shows a project opened before at once, with no new request", async () => {
+    const first = mountController(useProjectController);
+    await vi.waitFor(() =>
+      expect(first.controller.environments.value).not.toBeNull(),
+    );
+    first.unmount();
+
+    const { controller: c } = mountController(useProjectController);
+
+    expect(c.environment.value?.id).toBe("env_1");
+    await nextTick();
+    expect(environmentsApi.listEnvironments).toHaveBeenCalledTimes(1);
+    expect(projectsApi.listProjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the previous project's list at once and ignores its late answer", async () => {
+    let answerPayments!: (list: Environment[]) => void;
+    const billingDev = environment("env_9", "dev", {
+      projectId: "prj_2",
+      projectName: "billing",
+    });
+    vi.mocked(environmentsApi.listEnvironments).mockImplementation((project) =>
+      project === "payments"
+        ? new Promise((resolve) => (answerPayments = resolve))
+        : Promise.resolve([billingDev]),
+    );
+    const { controller: c } = mountController(useProjectController);
+
+    at("environment", { projectRef: "billing", environmentName: "dev" });
+    await vi.waitFor(() => expect(c.environment.value?.id).toBe("env_9"));
+    answerPayments([dev, prod]);
+    await nextTick();
+
+    expect(c.environments.value).toEqual([billingDev]);
   });
 
   it("keeps Access and Settings before the project has environments", async () => {

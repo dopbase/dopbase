@@ -1,13 +1,18 @@
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
-import * as secretsApi from "~/services/secrets.api";
-import * as tokensApi from "~/services/tokens.api";
-import { fetchAuthMethods, type AuthMethods } from "~/services/auth.api";
+import type { AuthMethods } from "~/services/auth.api";
 import type { AffectedCounts, Environment, Project } from "~/services";
 import { reaches } from "~/services/access.api";
 import { useAuthStore } from "~/stores/auth.store";
+import { authMethodsQuery } from "~/queries/auth";
+import { loadFailure, onlyWhen, readQuery, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { environmentsQuery, projectsQuery } from "~/queries/projects";
+import { secretsQuery } from "~/queries/secrets";
+import { runnerTokensQuery } from "~/queries/tokens";
 import { formatRelativeTime } from "~/utils/format";
 import { levelMeter, type LevelMeter } from "~/utils/level";
 
@@ -53,38 +58,45 @@ export type DeleteState =
 export function useProjectsController() {
   const router = useRouter();
   const auth = useAuthStore();
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
 
-  const projects = ref<Project[] | null>(null);
-  const environments = ref<Environment[]>([]);
-  const loadError = ref<string | null>(null);
+  const projectList = useQuery(projectsQuery);
+  const environmentList = useQuery(() => environmentsQuery(null));
+  const projectData = shownData<Project[]>(projectList);
+  const environmentData = shownData<Environment[]>(environmentList);
+  /** Null until both lists have loaded, so the tree never shows half. */
+  const projects = computed(() =>
+    projectData.value && environmentData.value ? projectData.value : null,
+  );
+  const environments = computed(() => environmentData.value ?? []);
+  const projectsFailure = loadFailure(projectList, "Could not load projects.");
+  const environmentsFailure = loadFailure(
+    environmentList,
+    "Could not load projects.",
+  );
+  const loadError = computed(
+    () => projectsFailure.value ?? environmentsFailure.value,
+  );
   const filter = ref("");
   const expanded = ref(new Set<string>());
   const showingAll = ref(new Set<string>());
-  let request: AbortController | null = null;
 
   async function load(): Promise<void> {
-    request?.abort();
-    const current = new AbortController();
-    request = current;
-    loadError.value = null;
-    try {
-      const [projectList, environmentList] = await Promise.all([
-        projectsApi.listProjects(current.signal),
-        environmentsApi.listEnvironments(undefined, current.signal),
-      ]);
-      if (current.signal.aborted) return;
-      // Open the first project the first time the tree loads.
-      if (projects.value === null && projectList[0]) {
-        expanded.value = new Set([projectList[0].id]);
-      }
-      projects.value = projectList;
-      environments.value = environmentList;
-      if (projectList.length === 0 && auth.isRoot) void loadSignInMethods();
-    } catch {
-      if (current.signal.aborted) return;
-      loadError.value = "Could not load projects.";
-    }
+    await Promise.all([projectList.refetch(), environmentList.refetch()]);
   }
+
+  // Open the first project the first time the tree shows, cached or not.
+  let opened = false;
+  watch(
+    projects,
+    (list) => {
+      if (opened || list === null) return;
+      opened = true;
+      if (list[0]) expanded.value = new Set([list[0].id]);
+    },
+    { immediate: true },
+  );
 
   // ---------------------------------------------------------------------------
   // Setup checklist
@@ -98,18 +110,11 @@ export function useProjectsController() {
     () => auth.isRoot && projects.value?.length === 0,
   );
   const accountEmail = computed(() => auth.session?.email ?? "");
-  const signInMethods = ref<AuthMethods | null>(null);
-
-  async function loadSignInMethods(): Promise<void> {
-    try {
-      signInMethods.value = await fetchAuthMethods();
-    } catch {
-      // Best effort. The sign-in step falls back to generic copy.
-    }
-  }
-
-  onMounted(load);
-  onUnmounted(() => request?.abort());
+  // Best effort. The sign-in step falls back to generic copy without it.
+  const signInMethodsQuery = useQuery(() =>
+    onlyWhen(showSetupChecklist.value, authMethodsQuery),
+  );
+  const signInMethods = shownData<AuthMethods>(signInMethodsQuery);
 
   // The server checks every action; these only hide what it would refuse.
   // Responses without a level come from servers that predate grants.
@@ -271,7 +276,7 @@ export function useProjectsController() {
         await environmentsApi.renameEnvironment(dialog.environment.id, name);
         break;
     }
-    await load();
+    await invalidate.projectTreeChanged();
   }
 
   // -------------------------------------------------------------------------
@@ -290,10 +295,12 @@ export function useProjectsController() {
     deleteError.value = null;
     deleteCounts.value = [];
     if (target.kind !== "environment") return;
+    const id = target.environment.id;
     try {
+      // Counts for a destructive confirmation are read fresh.
       const [secrets, tokens] = await Promise.all([
-        secretsApi.listSecrets(target.environment.id),
-        tokensApi.listTokens(target.environment.id),
+        readQuery(cache, secretsQuery(id), { fresh: true }),
+        readQuery(cache, runnerTokensQuery(id), { fresh: true }),
       ]);
       if (current !== deleteRequest || deleting.value === null) return;
       deleteCounts.value = [
@@ -320,7 +327,9 @@ export function useProjectsController() {
           ? await projectsApi.deleteProject(target.project.id)
           : await environmentsApi.deleteEnvironment(target.environment.id);
       deleting.value = null;
-      await load();
+      await (target.kind === "project"
+        ? invalidate.projectDeleted(target.project.id)
+        : invalidate.environmentDeleted(target.environment.id));
       return affected;
     } catch {
       deleteError.value =

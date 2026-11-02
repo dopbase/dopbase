@@ -61,7 +61,10 @@ describe("useCopySecretsDialogController", () => {
     open.value = true;
     await vi.waitFor(() => expect(controller.keys.value).not.toBeNull());
 
-    expect(secretsApi.listSecrets).toHaveBeenCalledWith("env_dev");
+    expect(secretsApi.listSecrets).toHaveBeenCalledWith(
+      "env_dev",
+      expect.any(AbortSignal),
+    );
     expect(controller.keys.value?.map((row) => row.key)).toEqual([
       "API_KEY",
       "DATABASE_URL",

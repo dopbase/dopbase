@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import { useEmptyEnvironmentController } from "./EmptyEnvironment.controller";
 import * as environmentsApi from "~/services/environments.api";
 import type { Environment } from "~/services";
+import { FRESH_FOR } from "~/queries/options";
+import { environmentsQuery } from "~/queries/projects";
 import { mountController } from "~/tests/mount-controller";
+import { forgetQueries } from "~/tests/pinia";
 
 vi.mock("~/services/environments.api");
 
@@ -89,13 +93,14 @@ describe("useEmptyEnvironmentController", () => {
     vi.mocked(environmentsApi.listEnvironments).mockRejectedValue(
       new Error("offline"),
     );
+    forgetQueries();
     const second = mount();
     await vi.waitFor(() =>
       expect(second.controller.view.value).toBe("first-run"),
     );
   });
 
-  it("loads only while the environment is empty, and again each time it is", async () => {
+  it("loads only while the environment is empty, and again once the list is stale", async () => {
     vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([staging]);
     const { controller, active } = mount(false);
     await nextTick();
@@ -105,9 +110,27 @@ describe("useEmptyEnvironmentController", () => {
     await vi.waitFor(() => expect(controller.view.value).toBe("first-run"));
     active.value = false;
     await nextTick();
-    active.value = true;
-    await vi.waitFor(() =>
-      expect(environmentsApi.listEnvironments).toHaveBeenCalledTimes(2),
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + FRESH_FOR + 1);
+    try {
+      active.value = true;
+      await vi.waitFor(() =>
+        expect(environmentsApi.listEnvironments).toHaveBeenCalledTimes(2),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shares the project page's environment list instead of loading its own", async () => {
+    vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([staging]);
+    const page = mountController(() =>
+      useQuery(() => environmentsQuery("payments")),
     );
+    const { controller } = mount();
+
+    await vi.waitFor(() => expect(controller.view.value).toBe("first-run"));
+    expect(page.controller.data.value).toEqual([staging]);
+    expect(environmentsApi.listEnvironments).toHaveBeenCalledTimes(1);
   });
 });

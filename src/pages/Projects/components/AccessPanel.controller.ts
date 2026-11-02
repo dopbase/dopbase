@@ -1,13 +1,13 @@
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { useRoute, type RouteLocationRaw } from "vue-router";
-import {
-  fetchProjectAccess,
-  fetchUserAccess,
-  removeGrant,
-} from "~/services/access.api";
+import { useQuery, useQueryCache } from "@pinia/colada";
+import { removeGrant } from "~/services/access.api";
 import type { Grant, ProjectAccess } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
+import { projectAccessQuery, userAccessQuery } from "~/queries/access";
+import { loadFailure, onlyWhen, readQuery } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
 import {
   levelMeter,
   type GrantPrincipal,
@@ -33,16 +33,29 @@ export interface AccessRow {
 export function useAccessPanelController() {
   const route = useRoute();
   const { runWithReauth } = useReauthentication();
-
-  const access = ref<ProjectAccess | null>(null);
-  const loading = ref(false);
-  const loadError = ref<string | null>(null);
-  const actionError = ref<string | null>(null);
-  let request: AbortController | null = null;
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
 
   const projectRef = computed(() =>
     typeof route.params.projectRef === "string" ? route.params.projectRef : "",
   );
+
+  const accessQuery = useQuery(() =>
+    onlyWhen(projectRef.value !== "", projectAccessQuery(projectRef.value)),
+  );
+  // A failed reload clears the list: grants that may be out of date
+  // shouldn't stay up for someone to act on.
+  const loadError = loadFailure(
+    accessQuery,
+    (cause) =>
+      errorMessage(cause, "Could not load who has access to this project."),
+    { withData: true },
+  );
+  const access = computed<ProjectAccess | null>(() =>
+    loadError.value ? null : (accessQuery.data.value ?? null),
+  );
+  const loading = accessQuery.isLoading;
+  const actionError = ref<string | null>(null);
   /** Only project managers change access; access.report can only read it. */
   const canManage = computed(
     () => access.value?.project.level === "project_manager",
@@ -93,7 +106,7 @@ export function useAccessPanelController() {
   // ---------------------------------------------------------------------
 
   /** The grant the Change access dialog is open for. */
-  const changing = ref<Grant | null>(null);
+  const changing = shallowRef<Grant | null>(null);
   /** Who holds it, with their role's cap once it's known. */
   const changePrincipal = ref<GrantPrincipal | null>(null);
 
@@ -112,7 +125,7 @@ export function useAccessPanelController() {
     if (grant.principalType === "user") {
       try {
         principal.maxLevel = (
-          await fetchUserAccess(grant.principalId)
+          await readQuery(cache, userAccessQuery(grant.principalId))
         ).maxLevel;
       } catch {
         // Not allowed to see their role; the server enforces it on save.
@@ -128,43 +141,23 @@ export function useAccessPanelController() {
 
   async function changed(): Promise<void> {
     changing.value = null;
-    await load();
+    await invalidate.accessChanged();
   }
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    request?.abort();
-    const current = new AbortController();
-    request = current;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const result = await fetchProjectAccess(projectRef.value, current.signal);
-      if (!current.signal.aborted) access.value = result;
-    } catch (cause) {
-      if (current.signal.aborted) return;
-      access.value = null;
-      loadError.value = errorMessage(
-        cause,
-        "Could not load who has access to this project.",
-      );
-    } finally {
-      if (request === current) loading.value = false;
-    }
+    await accessQuery.refetch();
   }
 
   async function remove(grant: Grant): Promise<void> {
     actionError.value = null;
     try {
       await runWithReauth(() => removeGrant(grant.id));
-      await load();
+      await invalidate.accessChanged();
     } catch (cause) {
       actionError.value = errorMessage(cause, "Could not remove that access.");
     }
   }
-
-  watch(projectRef, load);
-  onMounted(load);
-  onUnmounted(() => request?.abort());
 
   return {
     access,

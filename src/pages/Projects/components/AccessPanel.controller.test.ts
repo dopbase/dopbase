@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQuery } from "@pinia/colada";
+import { freshPinia } from "~/tests/pinia";
+import { keys } from "~/queries/keys";
 import { useAccessPanelController } from "./AccessPanel.controller";
 import * as accessApi from "~/services/access.api";
 import { ApiError } from "~/services/http.client";
@@ -69,7 +71,7 @@ function settle(): Promise<void> {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue(access);
   vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(
@@ -122,7 +124,10 @@ describe("useAccessPanelController", () => {
     const projectGrant = controller.rows.value[0]!.grant;
 
     await controller.openChange(projectGrant);
-    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_member");
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+      "usr_member",
+      expect.any(AbortSignal),
+    );
     expect(controller.changePrincipal.value).toEqual({
       type: "user",
       id: "usr_member",
@@ -161,6 +166,22 @@ describe("useAccessPanelController", () => {
       id: "grp_backend",
       label: "Backend",
     });
+  });
+
+  it("refreshes the project lists on screen after removing a grant", async () => {
+    vi.mocked(accessApi.removeGrant).mockResolvedValueOnce();
+    const listProjects = vi.fn().mockResolvedValue([]);
+    mountController(() =>
+      useQuery({ key: keys.projects, query: listProjects }),
+    );
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+
+    await controller.remove(access.grants[1]!);
+
+    // What someone reaches, the viewer included, may have changed with it.
+    expect(listProjects).toHaveBeenCalledTimes(2);
+    expect(accessApi.fetchProjectAccess).toHaveBeenCalledTimes(2);
   });
 
   it("explains a removal the server refuses", async () => {

@@ -1,7 +1,9 @@
-import { computed, onUnmounted, ref, watch, type Ref } from "vue";
-import * as tokensApi from "~/services/tokens.api";
+import { computed, ref, type Ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import type { RunnerToken } from "~/services/tokens.api";
 import type { Environment } from "~/services";
+import { onlyWhen } from "~/queries/helpers";
+import { runnerTokensQuery } from "~/queries/tokens";
 import { formatDate, formatRelativeTime } from "~/utils/format";
 
 export type RunTarget = "cli" | "docker" | "github";
@@ -34,8 +36,18 @@ export function useRunDialogController(
   open: Ref<boolean>,
 ) {
   const target = ref<RunTarget>("cli");
-  const tokens = ref<RunnerToken[] | null>(null);
-  let request: AbortController | null = null;
+  // Only managers see the deploy token, and only while the dialog is open.
+  // The Tokens tab reads the same entry. Without it the dialog still shows
+  // the commands.
+  const tokenList = useQuery(() =>
+    onlyWhen(
+      open.value && canManage.value,
+      runnerTokensQuery(environment.value.id),
+    ),
+  );
+  const tokens = computed<RunnerToken[] | null>(
+    () => tokenList.data.value ?? null,
+  );
 
   const serverUrl = window.location.origin;
   const reference = computed(
@@ -83,28 +95,6 @@ export function useRunDialogController(
   const defaultCommand = computed(
     () => `dopbase env default ${reference.value}`,
   );
-
-  async function loadTokens(): Promise<void> {
-    request?.abort();
-    tokens.value = null;
-    if (!open.value || !canManage.value) return;
-    const current = new AbortController();
-    request = current;
-    const id = environment.value.id;
-    try {
-      const result = await tokensApi.listTokens(id, current.signal);
-      if (!current.signal.aborted && environment.value.id === id) {
-        tokens.value = result;
-      }
-    } catch {
-      // The dialog still shows the commands without the token summary.
-    }
-  }
-
-  watch([open, () => environment.value.id, canManage], loadTokens, {
-    immediate: true,
-  });
-  onUnmounted(() => request?.abort());
 
   /** The active token used most recently, to show as the deploy token. */
   const deployToken = computed(() => {

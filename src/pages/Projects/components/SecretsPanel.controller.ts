@@ -1,5 +1,6 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import type { Ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import * as secretsApi from "~/services/secrets.api";
 import type {
   ExportSecretsResponse,
@@ -9,6 +10,9 @@ import type {
 import { ApiError } from "~/services/http.client";
 import { useReauthentication } from "~/composable";
 import { useAuthStore } from "~/stores/auth.store";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { secretsQuery } from "~/queries/secrets";
 import {
   mergeLayoutValues,
   parseEnvFileLines,
@@ -27,7 +31,8 @@ export const REVEAL_SECONDS = 30;
  * recent-password reveal flow with its auto-hide countdown.
  *
  * Revealed plaintext lives only in this component's memory — never in
- * storage or global state — and is dropped on route change or unmount.
+ * storage, global state or the query cache — and is dropped on route change
+ * or unmount. The cached secret list holds keys and metadata only.
  * Copying does not extend the timer.
  *
  * The `.env` editor follows the same discipline: opening it reauthenticates
@@ -37,13 +42,23 @@ export const REVEAL_SECONDS = 30;
  * entries so comments and ordering survive reloads.
  */
 export function useSecretsPanelController(environmentId: Ref<string>) {
-  const secrets = ref<SecretMetadata[] | null>(null);
-  const loading = ref(false);
-  const loadError = ref<string | null>(null);
+  const invalidate = useInvalidate();
+  // Keyed by environment, so another one starts empty and a late answer for
+  // the previous one never lands here.
+  const secretList = useQuery(() =>
+    onlyWhen(environmentId.value !== "", secretsQuery(environmentId.value)),
+  );
+  // A failed reload clears the rows, so nothing acts on keys that may be gone.
+  const loadError = loadFailure(secretList, "Could not load secrets.", {
+    withData: true,
+  });
+  const secrets = computed<SecretMetadata[] | null>(() =>
+    loadError.value ? null : (secretList.data.value ?? null),
+  );
+  const loading = secretList.isLoading;
   const actionError = ref<string | null>(null);
   const { runWithReauth } = useReauthentication();
   const auth = useAuthStore();
-  let loadRequest: AbortController | null = null;
   let operationScope = new AbortController();
   let editorScope = new AbortController();
   let editorImportScope = new AbortController();
@@ -93,29 +108,15 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     }
   }
 
-  async function load(target = environmentId.value): Promise<void> {
-    loadRequest?.abort();
-    const request = new AbortController();
-    loadRequest = request;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const result = await secretsApi.listSecrets(target, request.signal);
-      if (!request.signal.aborted && environmentId.value === target) {
-        secrets.value = result;
-      }
-    } catch {
-      if (request.signal.aborted || environmentId.value !== target) return;
-      loadError.value = "Could not load secrets.";
-      secrets.value = null;
-    } finally {
-      if (loadRequest === request) loading.value = false;
-    }
+  /** Refreshes this environment's list and everything showing its secrets. */
+  async function reload(target = environmentId.value): Promise<void> {
+    await invalidate.secretsChanged(target);
   }
 
+  // Another environment: drop everything tied to the last one's keys.
   watch(
     environmentId,
-    (target) => {
+    () => {
       operationScope.abort();
       operationScope = new AbortController();
       editorImportScope.abort();
@@ -123,16 +124,12 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
       editorScope = new AbortController();
       hideRevealed();
       wipeEditor();
-      // Drop the old environment's rows so nothing acts on their keys here.
-      secrets.value = null;
       actionError.value = null;
-      void load(target);
     },
     { immediate: true },
   );
   onUnmounted(() => {
     if (copiedTimer) clearTimeout(copiedTimer);
-    loadRequest?.abort();
     operationScope.abort();
     editorScope.abort();
     editorImportScope.abort();
@@ -220,7 +217,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     actionError.value = null;
     try {
       await secretsApi.setSecret(target, key, value);
-      if (environmentId.value === target) await load(target);
+      await reload(target);
     } catch (cause) {
       reportActionError(cause, "Could not save the secret.");
       throw cause;
@@ -234,7 +231,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
       await secretsApi.deleteSecret(target, key);
       if (environmentId.value !== target) return;
       if (revealedKey.value === key) hideRevealed();
-      await load(target);
+      await reload(target);
     } catch (cause) {
       reportActionError(cause, "Could not delete the secret.");
       throw cause;
@@ -401,7 +398,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
           editorBaseline.value = content;
           editorDiff.value = null;
           hideRevealed();
-          await load(target);
+          await reload(target);
         }
       }, signal);
       return !signal.aborted && environmentId.value === target;
@@ -458,7 +455,7 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     loadError,
     actionError,
     /** Refetches the metadata listing (e.g. after a full-page import). */
-    reload: load,
+    reload,
     filter,
     visibleSecrets,
     copiedKey,

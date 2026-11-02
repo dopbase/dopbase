@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { ref } from "vue";
 import { useImportStore } from "~/stores/import.store";
 import { useImportSecretsDialogController } from "./ImportSecretsDialog.controller";
@@ -11,7 +11,7 @@ vi.mock("vue-router", () => ({
 }));
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   push.mockReset();
 });
 

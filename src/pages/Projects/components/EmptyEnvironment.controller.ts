@@ -1,7 +1,10 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed } from "vue";
 import type { Ref } from "vue";
-import * as environmentsApi from "~/services/environments.api";
+import { useQuery } from "@pinia/colada";
+import type { Environment } from "~/services";
 import { reaches } from "~/services/access.api";
+import { onlyWhen } from "~/queries/helpers";
+import { environmentsQuery } from "~/queries/projects";
 
 /** Another environment in the project that new secrets can start from. */
 export interface CopySource {
@@ -18,9 +21,11 @@ export interface CopySource {
  * project is new and the first-run checklist walks through it. Otherwise
  * the start panel offers to copy keys from the environment with the most.
  *
- * The project's environments are fetched fresh each time an environment
- * turns up empty, so counts changed elsewhere since the page loaded are
- * seen. Older servers send no counts; their environments read as empty,
+ * It reads the project's environment list only while an environment is
+ * empty, from the same cache entry as the project page. Any secret change in
+ * this tab refreshes that list, and a copy older than a few seconds is
+ * refreshed when an environment turns up empty, so counts changed elsewhere
+ * are seen. Older servers send no counts; their environments read as empty,
  * which falls back to the checklist.
  */
 export function useEmptyEnvironmentController(
@@ -28,55 +33,33 @@ export function useEmptyEnvironmentController(
   projectName: Ref<string>,
   active: Ref<boolean>,
 ) {
-  /** Null until loaded. */
-  const sources = ref<CopySource[] | null>(null);
-  let request: AbortController | null = null;
-
-  async function load(): Promise<void> {
-    request?.abort();
-    const current = new AbortController();
-    request = current;
-    sources.value = null;
-    const target = environmentId.value;
-    try {
-      const environments = await environmentsApi.listEnvironments(
-        projectName.value,
-        current.signal,
-      );
-      if (current.signal.aborted) return;
-      sources.value = environments
-        .filter(
-          (environment) =>
-            environment.id !== target && (environment.secretCount ?? 0) > 0,
-        )
-        .sort(
-          (a, b) =>
-            (b.secretCount ?? 0) - (a.secretCount ?? 0) ||
-            a.name.localeCompare(b.name),
-        )
-        .map((environment) => ({
-          id: environment.id,
-          name: environment.name,
-          secretCount: environment.secretCount ?? 0,
-          canCopyValues:
-            !environment.level || reaches(environment.level, "read"),
-        }));
-    } catch {
-      if (current.signal.aborted) return;
-      // Without the list, the checklist still gets someone started.
-      sources.value = [];
-    }
-  }
-
-  watch(
-    [active, environmentId],
-    ([isActive]) => {
-      if (isActive) void load();
-      else request?.abort();
-    },
-    { immediate: true },
+  const list = useQuery(() =>
+    onlyWhen(active.value, environmentsQuery(projectName.value)),
   );
-  onUnmounted(() => request?.abort());
+
+  /** Null until loaded. */
+  const sources = computed<CopySource[] | null>(() => {
+    const environments: Environment[] | undefined = list.data.value;
+    // Without the list, the checklist still gets someone started.
+    if (!environments) return list.error.value ? [] : null;
+    const target = environmentId.value;
+    return environments
+      .filter(
+        (environment) =>
+          environment.id !== target && (environment.secretCount ?? 0) > 0,
+      )
+      .sort(
+        (a, b) =>
+          (b.secretCount ?? 0) - (a.secretCount ?? 0) ||
+          a.name.localeCompare(b.name),
+      )
+      .map((environment) => ({
+        id: environment.id,
+        name: environment.name,
+        secretCount: environment.secretCount ?? 0,
+        canCopyValues: !environment.level || reaches(environment.level, "read"),
+      }));
+  });
 
   const view = computed<"loading" | "first-run" | "start">(() => {
     if (sources.value === null) return "loading";

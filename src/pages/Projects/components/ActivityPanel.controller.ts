@@ -1,9 +1,12 @@
-import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import type { RouteLocationRaw } from "vue-router";
-import * as auditApi from "~/services/audit.api";
+import { useInfiniteQuery } from "@pinia/colada";
+import type * as auditApi from "~/services/audit.api";
 import type { AuditEvent } from "~/services/audit.api";
 import type { Environment } from "~/services";
 import { errorMessage } from "~/services/api-errors";
+import { auditEventsQuery, type AuditFilters } from "~/queries/audit";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
 import { formatRelativeTime } from "~/utils/format";
 
 export const ACTIVITY_PAGE_SIZE = 25;
@@ -44,20 +47,42 @@ export function useActivityPanelController(
   const wholeProject = ref(false);
   const action = ref("");
   const actor = ref("");
-  const items = ref<AuditEvent[]>([]);
-  const nextCursor = ref<string | null>(null);
-  const loading = ref(false);
-  const loadingMore = ref(false);
-  const loadError = ref<string | null>(null);
-  let version = 0;
-  // One request at a time: a new filter cancels the page still loading.
-  let request: AbortController | null = null;
 
-  function nextRequest(): AbortController {
-    request?.abort();
-    request = new AbortController();
-    return request;
-  }
+  const filters = computed<AuditFilters>(() => {
+    const current = query();
+    return {
+      limit: ACTIVITY_PAGE_SIZE,
+      projectId: current.projectId ?? null,
+      environmentId: current.environmentId ?? null,
+      action: current.action ?? null,
+      actor: current.actor ?? null,
+    };
+  });
+  // Keyed by filters: a new filter is its own feed, so a page still loading
+  // for the old one is dropped and Load more always extends what's shown.
+  const feed = useInfiniteQuery(() =>
+    onlyWhen(projectId.value !== null, auditEventsQuery(filters.value)),
+  );
+  const loadingMore = ref(false);
+  const moreError = ref<string | null>(null);
+  const feedFailure = loadFailure(
+    feed,
+    (cause) => errorMessage(cause, "Could not load the activity."),
+    { withData: true },
+  );
+  const loadError = computed(() => feedFailure.value ?? moreError.value);
+  const loading = computed(() => feed.isLoading.value && !loadingMore.value);
+  const pages = computed(() =>
+    feedFailure.value ? [] : (feed.data.value?.pages ?? []),
+  );
+  const items = computed<AuditEvent[]>(() =>
+    pages.value.flatMap((page) => page?.items ?? []),
+  );
+  const nextCursor = computed(() => pages.value.at(-1)?.nextCursor ?? null);
+
+  watch(filters, () => {
+    moreError.value = null;
+  });
 
   function query(): auditApi.AuditQuery {
     return {
@@ -72,59 +97,29 @@ export function useActivityPanelController(
     };
   }
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
     if (!projectId.value) return;
-    const current = ++version;
-    const { signal } = nextRequest();
-    loading.value = true;
-    loadingMore.value = false;
-    loadError.value = null;
-    try {
-      const page = await auditApi.listAuditEvents(query(), signal);
-      if (current !== version) return;
-      items.value = page.items;
-      nextCursor.value = page.nextCursor;
-    } catch (cause) {
-      if (current !== version) return;
-      items.value = [];
-      nextCursor.value = null;
-      loadError.value = errorMessage(cause, "Could not load the activity.");
-    } finally {
-      if (current === version) loading.value = false;
-    }
+    moreError.value = null;
+    await feed.refetch();
   }
 
   async function loadMore(): Promise<void> {
-    const cursor = nextCursor.value;
-    if (!cursor || loadingMore.value) return;
-    const current = version;
-    const { signal } = nextRequest();
+    if (!nextCursor.value || loadingMore.value) return;
+    const shown = filters.value;
     loadingMore.value = true;
+    moreError.value = null;
     try {
-      const page = await auditApi.listAuditEvents(
-        { ...query(), cursor },
-        signal,
-      );
-      if (current !== version) return;
-      items.value = [...items.value, ...page.items];
-      nextCursor.value = page.nextCursor;
+      await feed.loadNextPage({ throwOnError: true });
     } catch (cause) {
-      if (current === version)
-        loadError.value = errorMessage(cause, "Could not load more activity.");
+      // A filter change meanwhile started another feed; this page is moot.
+      if (filters.value === shown)
+        moreError.value =
+          errorMessage(cause, "Could not load more activity.") || null;
     } finally {
-      if (current === version) loadingMore.value = false;
+      loadingMore.value = false;
     }
   }
-
-  watch(
-    [projectId, () => environment.value?.id, wholeProject, action, actor],
-    load,
-    { immediate: true },
-  );
-  onUnmounted(() => {
-    version++;
-    request?.abort();
-  });
 
   const rows = computed<ActivityRow[]>(() =>
     items.value.map((event) => {
