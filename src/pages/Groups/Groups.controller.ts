@@ -1,16 +1,20 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { deleteGroup, fetchGroups } from "~/services/access.api";
+import { useQuery } from "@pinia/colada";
+import { deleteGroup } from "~/services/access.api";
 import type {
   AccountRef,
   GroupDetail,
   GroupSummary,
 } from "~/services/access.api";
-import { fetchUsers } from "~/services/users.api";
 import type { User } from "~/services/users.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import { groupsQuery } from "~/queries/access";
+import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { usersQuery } from "~/queries/users";
 import type { MembersTarget } from "./components/AddMembersDialog.controller";
 
 /** Avatars shown in the Members column before "+N". */
@@ -60,26 +64,32 @@ export function useGroupsController() {
   const router = useRouter();
   const { runWithReauth } = useReauthentication();
 
-  const groups = ref<GroupSummary[] | null>(null);
-  const people = ref<User[]>([]);
-  const loadError = ref<string | null>(null);
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
+
+  const groupList = useQuery(groupsQuery);
+  // Picking members needs users.view; without it Add members has nobody.
+  const peopleList = useQuery(() =>
+    onlyWhen(auth.can("users.view"), usersQuery),
+  );
+  const groupData = shownData<GroupSummary[]>(groupList);
+  // Says so even above the old list, which may be out of date.
+  const loadError = loadFailure(
+    groupList,
+    (cause) => errorMessage(cause, "Could not load groups."),
+    { withData: true },
+  );
+  const groups = computed<GroupSummary[] | null>(
+    () => groupData.value ?? (loadError.value ? [] : null),
+  );
+  const people = computed<User[]>(() => peopleList.data.value ?? []);
   const filter = ref("");
   const canManage = computed(() => auth.can("groups.manage"));
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    loadError.value = null;
-    try {
-      groups.value = await fetchGroups();
-    } catch (cause) {
-      groups.value ??= [];
-      loadError.value = errorMessage(cause, "Could not load groups.");
-    }
-    // Picking members needs users.view; without it Add members has nobody.
-    if (auth.can("users.view")) {
-      people.value = await fetchUsers().catch(() => []);
-    }
+    await Promise.all([groupList.refetch(), peopleList.refresh()]);
   }
-  onMounted(load);
 
   const rows = computed(() => (groups.value ?? []).map(toGroupRow));
   const visibleRows = computed(() => {
@@ -111,13 +121,14 @@ export function useGroupsController() {
     dialogOpen.value = false;
     editing.value = null;
     if (created) {
+      void markStale.groupsChanged();
       await router.push({
         name: "group",
         params: { groupId: detail.group.id },
       });
       return;
     }
-    await load();
+    await invalidate.groupsChanged();
   }
 
   // Add members
@@ -133,7 +144,7 @@ export function useGroupsController() {
 
   async function membersAdded(): Promise<void> {
     membersTarget.value = null;
-    await load();
+    await invalidate.groupsChanged();
   }
 
   // Give access happens on its own page.
@@ -166,7 +177,7 @@ export function useGroupsController() {
     try {
       await runWithReauth(() => deleteGroup(group.id));
       deleting.value = null;
-      await load();
+      await invalidate.groupsChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       deleteError.value = errorMessage(cause, "Could not delete the group.");

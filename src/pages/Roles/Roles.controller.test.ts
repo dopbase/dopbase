@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import {
   CAPABILITY_GROUPS,
   CAPABILITY_LABELS,
@@ -29,7 +29,7 @@ vi.mock("~/services/roles.api", async (original) => ({
 }));
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   // The server sorts by rank; a custom role can rank above a built-in.
   vi.mocked(rolesApi.fetchRoles).mockResolvedValue([

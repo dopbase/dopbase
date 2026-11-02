@@ -1,16 +1,19 @@
-import { onMounted, ref } from "vue";
+import { computed, ref } from "vue";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import {
   createBackup,
   deleteBackup,
   downloadBackupUrl,
   downloadMasterKeyBlob,
-  fetchBackups,
   restoreBackup,
   uploadBackup,
   type BackupItem,
 } from "~/services/backups.api";
 import { useReauthentication } from "~/composable/reauthentication";
 import { errorMessage, isAbortError } from "~/services/api-errors";
+import { backupsQuery } from "~/queries/backups";
+import { loadFailure } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
 import { saveBlob } from "~/utils/download";
 
 /**
@@ -20,10 +23,27 @@ import { saveBlob } from "~/utils/download";
  */
 export function useBackupsController() {
   const { runWithReauth } = useReauthentication();
-  const backups = ref<BackupItem[]>([]);
-  const loading = ref(true);
-  const hasLoaded = ref(false);
-  const loadError = ref<string | null>(null);
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
+  const backupList = useQuery(backupsQuery);
+  const backups = computed<BackupItem[]>(() => backupList.data.value ?? []);
+  const loading = backupList.isLoading;
+  /** Whether the list has answered once, so empty means empty. */
+  const hasLoaded = computed(
+    () =>
+      backupList.data.value !== undefined || backupList.error.value !== null,
+  );
+  // Says so even above the old list, which may be out of date.
+  const loadError = loadFailure(
+    backupList,
+    "Could not load the list of backups.",
+    { withData: true },
+  );
+
+  /** Applies a change the server just confirmed, without asking again. */
+  function patch(update: (list: BackupItem[]) => BackupItem[]): void {
+    cache.setQueryData(backupsQuery.key, (list) => update(list ?? []));
+  }
   const actionMessage = ref<{ text: string; tone: "ok" | "crit" } | null>(null);
   const downloadingMasterKey = ref(false);
 
@@ -52,21 +72,10 @@ export function useBackupsController() {
   const deleting = ref(false);
   const deleteError = ref<string | null>(null);
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    loading.value = true;
-    loadError.value = null;
-    try {
-      backups.value = await fetchBackups();
-      hasLoaded.value = true;
-    } catch {
-      loadError.value = "Could not load the list of backups.";
-      hasLoaded.value = true;
-    } finally {
-      loading.value = false;
-    }
+    await backupList.refetch();
   }
-
-  onMounted(load);
 
   function openCreateModal(): void {
     createModalOpen.value = true;
@@ -84,11 +93,7 @@ export function useBackupsController() {
     createError.value = null;
     try {
       const created = await createBackup(customName.value);
-      backups.value = [
-        created,
-        ...backups.value.filter((b) => b.key !== created.key),
-      ];
-      hasLoaded.value = true;
+      patch((list) => [created, ...list.filter((b) => b.key !== created.key)]);
       createModalOpen.value = false;
       actionMessage.value = {
         text: `Backup "${created.key}" was created successfully.`,
@@ -142,11 +147,10 @@ export function useBackupsController() {
       const uploaded = keyInput
         ? await uploadBackup(selectedFile.value, keyInput)
         : await uploadBackup(selectedFile.value);
-      backups.value = [
+      patch((list) => [
         uploaded,
-        ...backups.value.filter((b) => b.key !== uploaded.key),
-      ];
-      hasLoaded.value = true;
+        ...list.filter((b) => b.key !== uploaded.key),
+      ]);
       uploadModalOpen.value = false;
       actionMessage.value = {
         text: `Backup "${uploaded.key}" was uploaded and verified.`,
@@ -225,7 +229,8 @@ export function useBackupsController() {
         text: `System restored successfully from "${restoredKey}".`,
         tone: "ok",
       };
-      await load();
+      // The whole database was replaced, so every screen reads it again.
+      await invalidate.everythingChanged();
     } catch (cause: unknown) {
       restoreError.value = errorMessage(
         cause,
@@ -253,7 +258,7 @@ export function useBackupsController() {
     try {
       const targetKey = deleteTarget.value.key;
       await deleteBackup(targetKey);
-      backups.value = backups.value.filter((b) => b.key !== targetKey);
+      patch((list) => list.filter((b) => b.key !== targetKey));
       deleteTarget.value = null;
       actionMessage.value = {
         text: `Backup "${targetKey}" was deleted.`,

@@ -1,10 +1,13 @@
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import * as projectsApi from "~/services/projects.api";
+import { useQuery } from "@pinia/colada";
 import * as environmentsApi from "~/services/environments.api";
 import type { Environment, Project } from "~/services";
 import { reaches } from "~/services/access.api";
 import { useAuthStore } from "~/stores/auth.store";
+import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { environmentsQuery, projectsQuery } from "~/queries/projects";
 import { levelMeter } from "~/utils/level";
 
 export type ProjectTab =
@@ -59,17 +62,32 @@ export function useProjectController() {
   const route = useRoute();
   const router = useRouter();
   const auth = useAuthStore();
-
-  const projects = ref<Project[] | null>(null);
-  const environments = ref<Environment[] | null>(null);
-  const loadError = ref<string | null>(null);
-  /** The project list failed, so the project's own level is unknown. */
-  const projectsError = ref<string | null>(null);
-  let projectsRequest: AbortController | null = null;
-  let environmentsRequest: AbortController | null = null;
+  const invalidate = useInvalidate();
 
   const projectRef = computed(() =>
     typeof route.params.projectRef === "string" ? route.params.projectRef : "",
+  );
+
+  const projectList = useQuery(projectsQuery);
+  // Keyed by project, so another project starts empty and a late answer
+  // for the previous one never lands here.
+  const environmentList = useQuery(() =>
+    onlyWhen(projectRef.value !== "", environmentsQuery(projectRef.value)),
+  );
+  const projects = shownData<Project[]>(projectList);
+  const environments = shownData<Environment[]>(environmentList);
+  const loadError = loadFailure(
+    environmentList,
+    "Could not load this project's environments.",
+  );
+  /**
+   * The project list failed, so the project's own level is unknown. The
+   * switcher falls back to the current project, but Access and Settings
+   * need its level, so say so instead of showing a blank tab.
+   */
+  const projectsError = loadFailure(
+    projectList,
+    "Could not load this project's details.",
   );
   const activeTab = computed<ProjectTab>(
     () => TAB_FOR_ROUTE[String(route.name)] ?? "secrets",
@@ -116,79 +134,41 @@ export function useProjectController() {
       environment.value === null,
   );
 
-  watch(environment, (current) => {
-    if (current) lastEnvironment.set(current.projectId, current.id);
-  });
+  // A cached list is there from the start, so these watchers run at once.
+  watch(
+    environment,
+    (current) => {
+      if (current) lastEnvironment.set(current.projectId, current.id);
+    },
+    { immediate: true },
+  );
 
-  async function loadProjects(): Promise<void> {
-    projectsRequest?.abort();
-    const request = new AbortController();
-    projectsRequest = request;
-    projectsError.value = null;
-    try {
-      const result = await projectsApi.listProjects(request.signal);
-      if (!request.signal.aborted) projects.value = result;
-    } catch {
-      if (request.signal.aborted) return;
-      // The switcher falls back to the current project, but Access and
-      // Settings need its level, so say so instead of showing a blank tab.
-      projectsError.value = "Could not load this project's details.";
-    }
+  async function reloadProjects(): Promise<void> {
+    await projectList.refetch();
   }
 
-  async function loadEnvironments(): Promise<void> {
-    environmentsRequest?.abort();
-    const reference = projectRef.value;
-    const request = new AbortController();
-    environmentsRequest = request;
-    loadError.value = null;
-    // Drop the previous project's list so nothing acts on it meanwhile.
-    environments.value = null;
-    try {
-      const result = await environmentsApi.listEnvironments(
-        reference,
-        request.signal,
-      );
-      if (!request.signal.aborted && projectRef.value === reference) {
-        environments.value = result;
-      }
-    } catch {
-      if (request.signal.aborted || projectRef.value !== reference) return;
-      loadError.value = "Could not load this project's environments.";
-    }
+  async function reload(): Promise<void> {
+    await environmentList.refetch();
   }
 
-  /** Reloads after a change elsewhere on the page, such as a rename. */
+  /**
+   * Refreshes after a change elsewhere on the page, such as a rename. The
+   * current lists stay on screen meanwhile, and a failed refresh keeps
+   * them: the change itself already succeeded.
+   */
   async function refresh(): Promise<void> {
-    environmentsRequest?.abort();
-    const reference = projectRef.value;
-    const request = new AbortController();
-    environmentsRequest = request;
-    try {
-      const result = await environmentsApi.listEnvironments(
-        reference,
-        request.signal,
-      );
-      if (!request.signal.aborted && projectRef.value === reference)
-        environments.value = result;
-    } catch {
-      // Keep the current list: the change itself already succeeded.
-    }
-    void loadProjects();
+    await invalidate.projectTreeChanged();
   }
-
-  watch(projectRef, loadEnvironments, { immediate: true });
-  onMounted(loadProjects);
-  onUnmounted(() => {
-    projectsRequest?.abort();
-    environmentsRequest?.abort();
-  });
 
   // /projects/:projectRef opens the first environment.
-  watch(environments, (list) => {
-    if (route.name !== "project" || !list?.[0]) return;
-    void router.replace(environmentLocation(list[0].name, "secrets"));
-  });
+  watch(
+    environments,
+    (list) => {
+      if (route.name !== "project" || !list?.[0]) return;
+      void router.replace(environmentLocation(list[0].name, "secrets"));
+    },
+    { immediate: true },
+  );
 
   // With no environment open, show the project's own level instead.
   const level = computed(() =>
@@ -234,6 +214,7 @@ export function useProjectController() {
       if (tab === "settings" && project.value === null) return;
       void router.replace(environmentLocation(current.name, "secrets"));
     },
+    { immediate: true },
   );
 
   function environmentLocation(
@@ -345,8 +326,8 @@ export function useProjectController() {
     environments,
     loadError,
     projectsError,
-    reloadProjects: loadProjects,
-    reload: loadEnvironments,
+    reloadProjects,
+    reload,
     refresh,
     projectRef,
     projectName,

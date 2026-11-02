@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { shortHash, useAuditController } from "./Audit.controller";
 import * as auditApi from "~/services/audit.api";
 import * as projectsApi from "~/services/projects.api";
@@ -59,7 +59,7 @@ async function mounted() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   route.query = {};
   signInAs(["audit.read"]);
@@ -112,13 +112,16 @@ describe("useAuditController", () => {
     });
     const c = await mounted();
 
-    expect(auditApi.listAuditEvents).toHaveBeenCalledWith({
-      limit: 25,
-      action: undefined,
-      projectId: undefined,
-      environmentId: undefined,
-      actor: undefined,
-    });
+    expect(auditApi.listAuditEvents).toHaveBeenCalledWith(
+      {
+        limit: 25,
+        action: undefined,
+        projectId: undefined,
+        environmentId: undefined,
+        actor: undefined,
+      },
+      expect.any(AbortSignal),
+    );
     expect(c.items.value).toEqual([event]);
     expect(c.nextCursor.value).toBe("cursor_2");
     expect(c.hasLoaded.value).toBe(true);
@@ -135,6 +138,7 @@ describe("useAuditController", () => {
     });
     expect(auditApi.listAuditEvents).toHaveBeenLastCalledWith(
       expect.objectContaining({ action: "secret.revealed" }),
+      expect.any(AbortSignal),
     );
   });
 
@@ -146,6 +150,7 @@ describe("useAuditController", () => {
     expect(c.whereValue.value).toBe("environment:env_1");
     expect(auditApi.listAuditEvents).toHaveBeenLastCalledWith(
       expect.objectContaining({ projectId: "prj_1", environmentId: "env_1" }),
+      expect.any(AbortSignal),
     );
     expect(router.replace).toHaveBeenLastCalledWith({
       query: { projectId: "prj_1", environmentId: "env_1" },
@@ -176,6 +181,7 @@ describe("useAuditController", () => {
 
     expect(auditApi.listAuditEvents).toHaveBeenCalledWith(
       expect.objectContaining({ actor: "usr_bot" }),
+      expect.any(AbortSignal),
     );
     expect(c.actorOptions.value).toContainEqual({
       value: "usr_bot",
@@ -214,6 +220,7 @@ describe("useAuditController", () => {
 
     expect(auditApi.listAuditEvents).toHaveBeenLastCalledWith(
       expect.objectContaining({ cursor: "cursor_2" }),
+      expect.any(AbortSignal),
     );
     expect(c.items.value.map((item) => item.id)).toEqual(["aud_1", "aud_2"]);
     expect(c.nextCursor.value).toBeNull();

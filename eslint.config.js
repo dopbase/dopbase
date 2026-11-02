@@ -69,7 +69,10 @@ export default [
                 "~/services/*",
                 "~/pages",
                 "~/pages/*",
+                "~/queries",
+                "~/queries/*",
                 "~/router",
+                "@pinia/colada",
               ],
               message:
                 "UI components must be presentation-only and cannot import business logic.",

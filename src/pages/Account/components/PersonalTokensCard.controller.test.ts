@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { usePersonalTokensCardController } from "./PersonalTokensCard.controller";
 import * as tokensApi from "~/services/personal-tokens.api";
 import * as projectsApi from "~/services/projects.api";
@@ -45,7 +45,7 @@ async function mounted() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(tokensApi.listPersonalTokens).mockResolvedValue([
     tokenFixture({

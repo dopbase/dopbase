@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { useAccountActions } from "./account-actions";
 import * as usersApi from "~/services/users.api";
 import { ApiError } from "~/services/http.client";
@@ -14,7 +14,7 @@ const challenge = () =>
   });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(usersApi.disableUser).mockResolvedValue(
     userFixture({ status: "disabled" }),

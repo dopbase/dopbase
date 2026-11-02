@@ -1,8 +1,12 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import type { Ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import * as tokensApi from "~/services/tokens.api";
 import type { CreatedTokenResponse, RunnerToken } from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { runnerTokensQuery } from "~/queries/tokens";
 import { formatDate, formatRelativeTime } from "~/utils/format";
 import { copyText } from "~/utils/clipboard";
 
@@ -55,12 +59,28 @@ export function describeExpiry(
  * tone inside the last week. A minute timer keeps those current.
  */
 export function useTokensPanelController(environmentId: Ref<string>) {
-  const tokens = ref<RunnerToken[] | null>(null);
-  const loading = ref(false);
-  const loadError = ref<string | null>(null);
+  const invalidate = useInvalidate();
+  // Keyed by environment, so another one starts empty and a late answer for
+  // the previous one never lands here. The Run dialog reads the same entry.
+  const tokenList = useQuery(() =>
+    onlyWhen(
+      environmentId.value !== "",
+      runnerTokensQuery(environmentId.value),
+    ),
+  );
+  // A failed reload clears the rows, so nothing acts on tokens that may be gone.
+  const loadError = loadFailure(tokenList, "Could not load runner tokens.", {
+    withData: true,
+  });
+  const tokens = computed<RunnerToken[] | null>(() =>
+    loadError.value ? null : (tokenList.data.value ?? null),
+  );
+  // Only a first load shows the skeleton; a background refresh keeps the rows.
+  const loading = computed(
+    () => tokenList.isLoading.value && tokenList.data.value === undefined,
+  );
   const actionError = ref<string | null>(null);
   const creating = ref(false);
-  let loadRequest: AbortController | null = null;
 
   /** Shown exactly once inside the creation dialog. */
   const created = ref<CreatedTokenResponse | null>(null);
@@ -93,41 +113,13 @@ export function useTokensPanelController(environmentId: Ref<string>) {
     }, 2000);
   }
 
-  async function load(target = environmentId.value): Promise<void> {
-    loadRequest?.abort();
-    const request = new AbortController();
-    loadRequest = request;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const result = await tokensApi.listTokens(target, request.signal);
-      if (!request.signal.aborted && environmentId.value === target) {
-        tokens.value = result;
-      }
-    } catch {
-      if (request.signal.aborted || environmentId.value !== target) return;
-      loadError.value = "Could not load runner tokens.";
-      tokens.value = null;
-    } finally {
-      if (loadRequest === request) loading.value = false;
-    }
-  }
-
-  // A new environment starts clean: no rows, error or busy state from the
-  // last one.
-  watch(
-    environmentId,
-    (target) => {
-      tokens.value = null;
-      actionError.value = null;
-      creating.value = false;
-      void load(target);
-    },
-    { immediate: true },
-  );
+  // A new environment starts clean: no error or busy state from the last one.
+  watch(environmentId, () => {
+    actionError.value = null;
+    creating.value = false;
+  });
   onUnmounted(() => {
     clearInterval(clock);
-    loadRequest?.abort();
     // Closing the panel discards the plaintext permanently.
     created.value = null;
   });
@@ -145,7 +137,7 @@ export function useTokensPanelController(environmentId: Ref<string>) {
       // Show the plaintext even if the environment changed meanwhile: the
       // token exists, and this is the only time it can be seen.
       created.value = result;
-      if (environmentId.value === target) await load(target);
+      await invalidate.runnerTokensChanged(target);
     } catch (cause) {
       if (environmentId.value !== target) return;
       if (cause instanceof ApiError && cause.status === 409) {
@@ -168,7 +160,7 @@ export function useTokensPanelController(environmentId: Ref<string>) {
     actionError.value = null;
     try {
       await tokensApi.revokeToken(token.id);
-      if (environmentId.value === target) await load(target);
+      await invalidate.runnerTokensChanged(target);
     } catch {
       if (environmentId.value !== target) return;
       actionError.value = "Could not revoke the token.";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import {
   POLL_INTERVAL_MS,
   RESET_PHRASE,
@@ -160,7 +160,7 @@ async function mounted() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(instanceApi.fetchStatus).mockResolvedValue(mockStatus);
 });
@@ -176,6 +176,20 @@ describe("useInstanceController", () => {
     expect(c.formattedObservedAt.value).toMatch(/\d/);
     expect(c.relativeObservedAt.value).not.toBe("");
     expect(c.relativeBootTime.value).not.toBe("");
+  });
+
+  it("shows the last results at once when you come back to Status", async () => {
+    signInAs([]);
+    const first = mountController(useInstanceController);
+    await settle();
+    first.unmount();
+
+    const { controller: again } = mountController(useInstanceController);
+
+    expect(again.status.value).toEqual(mockStatus);
+    expect(again.loading.value).toBe(false);
+    await settle();
+    expect(instanceApi.fetchStatus).toHaveBeenCalledTimes(1);
   });
 
   it("shows a dash for a count the server couldn't read", async () => {
@@ -438,7 +452,7 @@ describe("useInstanceController", () => {
       const admin = await mounted();
       expect(admin.fixAction(admin.attention.value[0])).toBeNull();
 
-      setActivePinia(createPinia());
+      freshPinia();
       signInAs([], { adminId: "usr_root", role: "root" });
       const key = new Blob(["key"]);
       vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(key);

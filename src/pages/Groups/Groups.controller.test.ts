@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import {
   memberLabel,
   toGroupRow,
@@ -51,7 +51,7 @@ const contractors = groupSummaryFixture({
 });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(accessApi.fetchGroups).mockResolvedValue([backend, contractors]);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([root, lead, maya, reader]);

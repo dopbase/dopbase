@@ -1,5 +1,6 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, shallowRef, watch } from "vue";
 import type { Ref } from "vue";
+import { useInfiniteQuery } from "@pinia/colada";
 import * as secretsApi from "~/services/secrets.api";
 import type {
   RollbackSecretResponse,
@@ -9,6 +10,13 @@ import { ApiError } from "~/services/http.client";
 import { isAbortError } from "~/services/api-errors";
 import { useReauthentication } from "~/composable";
 import { useAuthStore } from "~/stores/auth.store";
+import {
+  keepFirstPageWhenLeft,
+  loadFailure,
+  onlyWhen,
+} from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { secretVersionsQuery } from "~/queries/secrets";
 import { formatCountdown } from "~/utils/format";
 import { REVEAL_SECONDS } from "./SecretsPanel.controller";
 
@@ -37,25 +45,65 @@ export function changeLabel(version: SecretVersion): string {
  * one earlier value with the same 30-second auto-hide as the table, and
  * rollback.
  *
- * A revealed value lives only in this controller and is dropped when the
- * key or environment changes, when the dialog closes, and on unmount.
+ * A revealed value lives only in this controller, never in the query cache,
+ * and is dropped when the key or environment changes, when the dialog
+ * closes, and on unmount. The cached history holds metadata only.
  */
 export function useSecretHistoryController(
   environmentId: Ref<string>,
   secretKey: Ref<string | null>,
 ) {
-  const versions = ref<SecretVersion[] | null>(null);
-  const retainedVersions = ref<number | null>(null);
-  const nextBefore = ref<number | null>(null);
-  const loading = ref(false);
-  const loadingMore = ref(false);
-  const loadError = ref<string | null>(null);
-  const actionError = ref<string | null>(null);
-  const notice = ref<string | null>(null);
   const { runWithReauth } = useReauthentication();
   const auth = useAuthStore();
+  const invalidate = useInvalidate();
+  /** Reveals and rollbacks for the key on screen; reset when it changes. */
   let scope = new AbortController();
-  let requestVersion = 0;
+
+  // Keyed by environment and secret, so another one starts empty and a page
+  // still loading for the previous one never lands here.
+  const history = useInfiniteQuery(() =>
+    onlyWhen(
+      secretKey.value !== null,
+      secretVersionsQuery({
+        environmentId: environmentId.value,
+        key: secretKey.value ?? "",
+        limit: HISTORY_PAGE_SIZE,
+      }),
+    ),
+  );
+  const historyKey = () =>
+    secretVersionsQuery({
+      environmentId: environmentId.value,
+      key: secretKey.value ?? "",
+      limit: HISTORY_PAGE_SIZE,
+    }).key;
+  keepFirstPageWhenLeft(historyKey);
+  const loadingMore = ref(false);
+  /** What the last "older versions" read failed with; shown versions stay. */
+  const moreCause = shallowRef<unknown>(null);
+  const failure = loadFailure(
+    history,
+    (cause) => describeError(cause, "Could not load the history."),
+    { withData: true },
+  );
+  const loadError = computed(() =>
+    history.error.value === moreCause.value ? null : failure.value,
+  );
+  const pages = computed(() =>
+    loadError.value ? [] : (history.data.value?.pages ?? []),
+  );
+  const versions = computed<SecretVersion[] | null>(() =>
+    history.data.value && !loadError.value
+      ? pages.value.flatMap((page) => page?.items ?? [])
+      : null,
+  );
+  const retainedVersions = computed(
+    () => pages.value[0]?.retainedVersions ?? null,
+  );
+  const nextBefore = computed(() => pages.value.at(-1)?.nextBefore ?? null);
+  const loading = computed(() => history.isLoading.value && !loadingMore.value);
+  const actionError = ref<string | null>(null);
+  const notice = ref<string | null>(null);
 
   const revealedVersion = ref<number | null>(null);
   const revealedValue = ref<string | null>(null);
@@ -86,83 +134,41 @@ export function useSecretHistoryController(
   function reset(): void {
     scope.abort();
     scope = new AbortController();
-    requestVersion += 1;
     hideRevealed();
-    versions.value = null;
-    retainedVersions.value = null;
-    nextBefore.value = null;
-    loading.value = false;
     loadingMore.value = false;
-    loadError.value = null;
     actionError.value = null;
     notice.value = null;
     rollbackTarget.value = null;
     rollbackError.value = null;
   }
 
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    const key = secretKey.value;
-    if (!key) return;
-    const target = environmentId.value;
-    const request = ++requestVersion;
-    const signal = scope.signal;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const page = await secretsApi.listSecretVersions(target, key, {
-        limit: HISTORY_PAGE_SIZE,
-        signal,
-      });
-      if (request !== requestVersion) return;
-      versions.value = page.items;
-      nextBefore.value = page.nextBefore;
-      retainedVersions.value = page.retainedVersions;
-    } catch (cause) {
-      if (request !== requestVersion || signal.aborted) return;
-      loadError.value = describeError(cause, "Could not load the history.");
-      versions.value = null;
-    } finally {
-      if (request === requestVersion) loading.value = false;
-    }
+    if (!secretKey.value) return;
+    await history.refetch();
   }
 
   async function loadMore(): Promise<void> {
-    const key = secretKey.value;
-    const before = nextBefore.value;
-    if (!key || before === null || loadingMore.value) return;
-    const target = environmentId.value;
-    const request = requestVersion;
+    if (!secretKey.value || nextBefore.value === null || loadingMore.value)
+      return;
     const signal = scope.signal;
     loadingMore.value = true;
     try {
-      const page = await secretsApi.listSecretVersions(target, key, {
-        before,
-        limit: HISTORY_PAGE_SIZE,
-        signal,
-      });
-      if (request !== requestVersion) return;
-      versions.value = [...(versions.value ?? []), ...page.items];
-      nextBefore.value = page.nextBefore;
+      await history.loadNextPage({ throwOnError: true });
     } catch (cause) {
-      if (request !== requestVersion || signal.aborted || auth.sessionExpired)
-        return;
+      moreCause.value = cause;
+      if (signal.aborted || isAbortError(cause) || auth.sessionExpired) return;
       actionError.value = describeError(
         cause,
         "Could not load older versions.",
       );
     } finally {
-      if (request === requestVersion) loadingMore.value = false;
+      if (!signal.aborted) loadingMore.value = false;
     }
   }
 
-  watch(
-    [environmentId, secretKey],
-    () => {
-      reset();
-      void load();
-    },
-    { immediate: true },
-  );
+  // Another key or environment: drop what was revealed or chosen for the last.
+  watch([environmentId, secretKey], reset, { immediate: true });
   onUnmounted(() => {
     scope.abort();
     hideRevealed();
@@ -253,7 +259,7 @@ export function useSecretHistoryController(
       rollbackTarget.value = null;
       hideRevealed();
       notice.value = `Rolled back to v${result.sourceVersion}. Now at v${result.version}.`;
-      await load();
+      await invalidate.secretsChanged(target);
       return result;
     } catch (cause) {
       if (signal.aborted || isAbortError(cause) || auth.sessionExpired)
@@ -262,7 +268,8 @@ export function useSecretHistoryController(
         cause instanceof ApiError &&
         cause.firstCode === "SECRET_VERSION_CONFLICT";
       rollbackError.value = describeError(cause, "Could not roll back.");
-      if (conflict) await load();
+      // It changed elsewhere: show the latest before another try.
+      if (conflict) await invalidate.secretsChanged(target);
       return null;
     } finally {
       rollingBack.value = false;

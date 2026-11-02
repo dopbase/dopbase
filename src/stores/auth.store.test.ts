@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import { useAuthStore } from "./auth.store";
 import * as authApi from "~/services/auth.api";
 import * as bootstrapApi from "~/services/bootstrap.api";
 import { ApiError, apiRequest } from "~/services/http.client";
+import { keys } from "~/queries/keys";
 import { browserSession, browserSessionInfo } from "~/tests/browser-session";
+import { mountController } from "~/tests/mount-controller";
+import { settle } from "~/tests/people";
 
 vi.mock("~/services/auth.api");
 vi.mock("~/services/bootstrap.api");
 
 beforeEach(() => {
-  setActivePinia(createPinia());
   sessionStorage.clear();
 });
 
@@ -207,5 +209,228 @@ describe("auth store", () => {
     expect(store.session).toBeNull();
     expect(store.csrfToken).toBeNull();
     expect(store.isAuthenticated).toBe(false);
+  });
+});
+
+describe("auth store and the query cache", () => {
+  function errorResponse(status: number, error: Record<string, string>) {
+    return new Response(JSON.stringify({ success: false, error }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  async function signedIn() {
+    vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
+    const store = useAuthStore();
+    await store.login("a@b.c", "pw");
+    return store;
+  }
+
+  /** Puts reads no screen is showing into the cache. */
+  function seed(): void {
+    const cache = useQueryCache();
+    cache.setQueryData(keys.projects, [{ id: "prj_1" }]);
+    cache.setQueryData(keys.users.list, [{ id: "usr_1" }]);
+  }
+
+  const cached = () =>
+    useQueryCache()
+      .getEntries()
+      .map((entry) => entry.key);
+
+  it.each([
+    [
+      "logout",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(authApi.logout).mockResolvedValueOnce();
+        await store.logout();
+      },
+    ],
+    [
+      "a logout the server rejects",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(authApi.logout).mockRejectedValueOnce(
+          new ApiError(0, { NETWORK_ERROR: "down" }),
+        );
+        await store.logout().catch(() => undefined);
+      },
+    ],
+    [
+      "an expired session",
+      async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi
+            .fn()
+            .mockResolvedValueOnce(
+              errorResponse(401, { UNAUTHORIZED: "Sign in again." }),
+            ),
+        );
+        await apiRequest("/api/v1/projects").catch(() => undefined);
+      },
+    ],
+    [
+      "a rejected CSRF token",
+      async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValueOnce(
+            errorResponse(403, {
+              AUTHORIZATION_DENIED: "A valid CSRF token is required.",
+            }),
+          ),
+        );
+        await apiRequest("/api/v1/projects", { method: "POST" }).catch(
+          () => undefined,
+        );
+      },
+    ],
+    [
+      "a password change",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(authApi.changePassword).mockResolvedValueOnce();
+        await store.changePassword("pw", "newlongpassword");
+      },
+    ],
+    [
+      "clearing the local session",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        store.clearLocalSession();
+      },
+    ],
+  ])("empties the cache after %s", async (_, end) => {
+    const store = await signedIn();
+    seed();
+    expect(cached()).toHaveLength(2);
+    await end(store);
+    expect(store.session).toBeNull();
+    expect(cached()).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    [
+      "signing in",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(authApi.login).mockResolvedValueOnce(browserSession());
+        await store.login("a@b.c", "pw");
+      },
+    ],
+    [
+      "single sign-on",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(authApi.exchangeSso).mockResolvedValueOnce({
+          session: browserSession(),
+          redirectTo: null,
+        });
+        await store.completeSso("ssoh_code");
+      },
+    ],
+    [
+      "first-run setup",
+      async (store: ReturnType<typeof useAuthStore>) => {
+        vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+          adminId: "usr_1",
+          email: "a@b.c",
+          csrfToken: "csrf_1",
+        });
+        await store.bootstrap({
+          setupToken: "dbs_setup",
+          email: "a@b.c",
+          password: "longenoughpw1",
+        });
+      },
+    ],
+  ])("starts %s from an empty cache", async (_, start) => {
+    const store = useAuthStore();
+    seed();
+    await start(store);
+    expect(store.isAuthenticated).toBe(true);
+    expect(cached()).toEqual([]);
+  });
+
+  it("keeps the cache when the session check returns the same account", async () => {
+    const store = await signedIn();
+    seed();
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce(browserSessionInfo());
+    await store.fetchSession();
+    expect(cached()).toHaveLength(2);
+  });
+
+  it("starts over when the session check returns another account", async () => {
+    const store = await signedIn();
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce(["first account's projects"])
+      .mockResolvedValueOnce(["second account's projects"]);
+    const { controller } = mountController(() =>
+      useQuery({ key: keys.projects, query }),
+    );
+    await vi.waitFor(() =>
+      expect(controller.data.value).toEqual(["first account's projects"]),
+    );
+    useQueryCache().setQueryData(keys.users.list, [{ id: "usr_1" }]);
+
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
+      ...browserSessionInfo(),
+      adminId: "usr_2",
+      email: "b@b.c",
+    });
+    await store.fetchSession();
+
+    expect(store.session?.adminId).toBe("usr_2");
+    expect(useQueryCache().getQueryData(keys.users.list)).toBeUndefined();
+    await vi.waitFor(() =>
+      expect(controller.data.value).toEqual(["second account's projects"]),
+    );
+  });
+
+  it("empties a read a mounted screen shows, and drops its late response", async () => {
+    const store = await signedIn();
+    let answerLate!: (value: string[]) => void;
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce(["root's projects"])
+      .mockImplementationOnce(
+        () => new Promise<string[]>((resolve) => (answerLate = resolve)),
+      )
+      .mockResolvedValueOnce(["next account's projects"]);
+    const { controller } = mountController(() =>
+      useQuery({ key: keys.projects, query }),
+    );
+    await vi.waitFor(() =>
+      expect(controller.data.value).toEqual(["root's projects"]),
+    );
+    void controller.refetch();
+
+    vi.mocked(authApi.logout).mockResolvedValueOnce();
+    await store.logout();
+    expect(controller.data.value).toBeUndefined();
+    expect(controller.status.value).toBe("pending");
+
+    answerLate(["root's projects, late"]);
+    await settle();
+    expect(controller.data.value).toBeUndefined();
+
+    // The screen still owns a live entry: the next refresh reaches it.
+    await useQueryCache().invalidateQueries({ key: keys.projects });
+    expect(controller.data.value).toEqual(["next account's projects"]);
+  });
+
+  it("keeps a pre-session read the login screen still shows", async () => {
+    const store = await signedIn();
+    const { controller } = mountController(() =>
+      useQuery({
+        key: keys.public.authMethods,
+        query: async () => ({ password: true }),
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(controller.data.value).toEqual({ password: true }),
+    );
+    vi.mocked(authApi.logout).mockResolvedValueOnce();
+    await store.logout();
+    expect(controller.data.value).toEqual({ password: true });
   });
 });

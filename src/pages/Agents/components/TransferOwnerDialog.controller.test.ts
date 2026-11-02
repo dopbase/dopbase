@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
 import { useTransferOwnerDialog } from "./TransferOwnerDialog.controller";
 import * as usersApi from "~/services/users.api";
@@ -48,7 +48,7 @@ async function openDialog(
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   signInAs(["users.manage"]);
   vi.mocked(usersApi.updateUser).mockResolvedValue(reviewBot);

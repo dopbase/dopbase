@@ -10,6 +10,7 @@ import * as tokensApi from "~/services/tokens.api";
 import * as authApi from "~/services/auth.api";
 import type { Environment, Project } from "~/services";
 import { mountController } from "~/tests/mount-controller";
+import { forgetQueries } from "~/tests/pinia";
 
 const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
 
@@ -238,8 +239,39 @@ describe("useProjectsController", () => {
 
     viewer.isRoot = true;
     vi.mocked(projectsApi.listProjects).mockResolvedValue([payments]);
+    forgetQueries();
     expect((await loaded()).showSetupChecklist.value).toBe(false);
     expect(authApi.fetchAuthMethods).not.toHaveBeenCalled();
+  });
+
+  it("shows the tree at once when you come back, and refreshes it once stale", async () => {
+    const first = mountController(useProjectsController);
+    await vi.waitFor(() =>
+      expect(first.controller.projects.value).not.toBeNull(),
+    );
+    first.unmount();
+
+    // Back within a few seconds: the cached tree, no request.
+    const again = mountController(useProjectsController);
+    expect(again.controller.rows.value.map((row) => row.project.id)).toEqual([
+      "prj_1",
+      "prj_2",
+    ]);
+    again.unmount();
+    expect(projectsApi.listProjects).toHaveBeenCalledTimes(1);
+
+    // Back later: still shown at once, then refreshed in the background.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 60_000);
+    try {
+      const later = mountController(useProjectsController);
+      expect(later.controller.projects.value).not.toBeNull();
+      await vi.waitFor(() =>
+        expect(projectsApi.listProjects).toHaveBeenCalledTimes(2),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens an environment by name", async () => {

@@ -75,7 +75,7 @@ All notable changes to Dopbase are documented in this file.
 ### Changed
 
 - **Breaking:** Refused admin requests say `Your role does not allow this
-  operation.` instead of `This operation requires an administrator.`
+operation.` instead of `This operation requires an administrator.`
 - **Breaking:** `PATCH /api/v1/environments/{id}` returns
   `ENVIRONMENT_UPDATED` instead of `ENVIRONMENT_RENAMED`.
 - **Breaking:** New runner token names must be lowercase letters, numbers and
@@ -141,6 +141,10 @@ All notable changes to Dopbase are documented in this file.
   reference. A reference or `DOPBASE_ENV` naming another environment stops the
   run before the child starts, and the saved default is ignored.
 - A runner token's `last_used_at` is written at most once a minute.
+- The Admin UI keeps what it has read in a shared cache. Going back to a
+  screen shows its data at once and refreshes it in the background, and a
+  change shows up on every screen that lists it. Signing out, an expired
+  session or signing in as someone else empties the cache.
 
 ### Removed
 
@@ -154,12 +158,15 @@ All notable changes to Dopbase are documented in this file.
 ### Fixed
 
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
-  pool` while loading `sqlx-macros`.
+pool` while loading `sqlx-macros`.
 - Right after first-run setup, root's role name and session details now show
   without a reload, and the Users page no longer says root never signed in.
 - **Transfer owner** no longer hands an AI agent to someone who can't see it.
   The new owner must be root or have `users.view`; anyone else gets
   `OWNER_INVALID`.
+- Moving quickly between users, agents or environments no longer shows the
+  previous one's tokens, and **Load more** on **Activity** no longer adds
+  events from the filters you just left.
 
 ## 0.1.10 - 2026-10-26
 

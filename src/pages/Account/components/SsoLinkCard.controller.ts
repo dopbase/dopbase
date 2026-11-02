@@ -1,10 +1,13 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { fetchSsoIdentity, startSsoLink, unlinkSso } from "~/services/auth.api";
+import { useQuery } from "@pinia/colada";
+import { startSsoLink, unlinkSso } from "~/services/auth.api";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
 import type { SsoIdentity } from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
+import { useInvalidate } from "~/queries/invalidate";
+import { ssoIdentityQuery } from "~/queries/sso";
 import { ssoErrorMessage } from "~/utils/sso";
 
 /**
@@ -17,7 +20,12 @@ export function useSsoLinkCardController() {
   const router = useRouter();
   const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
-  const identity = ref<SsoIdentity | null>(null);
+  const invalidate = useInvalidate();
+  const identityQuery = useQuery(ssoIdentityQuery);
+  /** Null until loaded, or when it can't be read; the card then hides. */
+  const identity = computed<SsoIdentity | null>(
+    () => identityQuery.data.value ?? null,
+  );
   const linking = ref(false);
   const unlinking = ref(false);
   /** Unlinking needs a password to fall back on. */
@@ -45,12 +53,9 @@ export function useSsoLinkCardController() {
     }
   }
 
+  /** Reads the link again. */
   async function load(): Promise<void> {
-    try {
-      identity.value = await fetchSsoIdentity();
-    } catch {
-      identity.value = null;
-    }
+    await identityQuery.refetch();
   }
 
   async function link(): Promise<void> {
@@ -74,7 +79,7 @@ export function useSsoLinkCardController() {
     try {
       await runWithReauth(unlinkSso);
       notice.value = "Single sign-on is unlinked. Sign in with your password.";
-      await load();
+      await invalidate.signInChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       error.value =
@@ -86,10 +91,7 @@ export function useSsoLinkCardController() {
     }
   }
 
-  onMounted(() => {
-    readCallback();
-    void load();
-  });
+  onMounted(readCallback);
 
   return {
     identity,

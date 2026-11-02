@@ -28,14 +28,18 @@ export interface User {
 export type UserIdentity = Pick<User, "id" | "email">;
 
 const BASE = "/api/v1/users";
-export async function fetchUsers(): Promise<User[]> {
-  const { data } = await apiRequest<User[]>(BASE);
+export async function fetchUsers(signal?: AbortSignal): Promise<User[]> {
+  const { data } = await apiRequest<User[]>(BASE, { signal });
   return data;
 }
 
 /** Every account's id and email, by email. Lighter than `fetchUsers`. */
-export async function fetchUserIdentities(): Promise<UserIdentity[]> {
-  const { data } = await apiRequest<UserIdentity[]>(`${BASE}/identities`);
+export async function fetchUserIdentities(
+  signal?: AbortSignal,
+): Promise<UserIdentity[]> {
+  const { data } = await apiRequest<UserIdentity[]>(`${BASE}/identities`, {
+    signal,
+  });
   return data;
 }
 
@@ -86,8 +90,13 @@ export async function unlinkUserSso(id: string): Promise<User> {
   return data;
 }
 
-export async function fetchUser(id: string): Promise<User> {
-  const { data } = await apiRequest<User>(`${BASE}/${encodeURIComponent(id)}`);
+export async function fetchUser(
+  id: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const { data } = await apiRequest<User>(`${BASE}/${encodeURIComponent(id)}`, {
+    signal,
+  });
   return data;
 }
 

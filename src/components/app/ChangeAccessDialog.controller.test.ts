@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
 import { useChangeAccessDialog } from "./ChangeAccessDialog.controller";
 import * as accessApi from "~/services/access.api";
@@ -33,7 +33,7 @@ const prod = grantFixture({
 });
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(accessApi.setGrant).mockResolvedValue(grantFixture());
 });

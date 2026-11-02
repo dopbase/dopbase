@@ -1,4 +1,5 @@
-import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
+import { useQuery } from "@pinia/colada";
 import * as compareApi from "~/services/compare.api";
 import type { CompareEnvironment, CompareResult } from "~/services/compare.api";
 import * as secretsApi from "~/services/secrets.api";
@@ -6,6 +7,9 @@ import { reaches } from "~/services/access.api";
 import { ApiError } from "~/services/http.client";
 import { errorMessage } from "~/services/api-errors";
 import type { Environment } from "~/services";
+import { compareQuery } from "~/queries/compare";
+import { loadFailure } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
 
 export const MAX_COMPARE = compareApi.MAX_COMPARE_ENVIRONMENTS;
 
@@ -177,50 +181,41 @@ export function useComparePanelController(
   // Loading
   // ---------------------------------------------------------------------
 
+  const invalidate = useInvalidate();
   /** "FEATURE_FLAGS set in prod.", shown after a fill. */
   const filled = ref<string | null>(null);
-  const result = ref<CompareResult | null>(null);
-  const loading = ref(false);
-  const loadError = ref<string | null>(null);
-  let request: AbortController | null = null;
+  const comparison = useQuery(() => ({
+    ...compareQuery({
+      baseId: base.value.id,
+      withIds: selected.value.map((candidate) => candidate.id),
+    }),
+    // Changing columns keeps the old table up until the new one arrives.
+    // Another base starts empty: the old table reads against the wrong one.
+    placeholderData: (previous, previousEntry) =>
+      previousEntry?.key[1] === base.value.id ? previous : undefined,
+  }));
+  const result = computed<CompareResult | null>(
+    () => comparison.data.value ?? null,
+  );
+  const loading = comparison.isLoading;
+  const loadError = loadFailure(
+    comparison,
+    (cause) =>
+      errorMessage(cause, "Could not compare these environments.") || "",
+    { withData: true },
+  );
 
   async function load(): Promise<void> {
-    request?.abort();
-    const current = new AbortController();
-    request = current;
-    loading.value = true;
-    loadError.value = null;
-    try {
-      const next = await compareApi.compareEnvironments(
-        base.value.id,
-        selected.value.map((candidate) => candidate.id),
-        current.signal,
-      );
-      if (!current.signal.aborted) result.value = next;
-    } catch (cause) {
-      if (current.signal.aborted) return;
-      loadError.value =
-        errorMessage(cause, "Could not compare these environments.") || null;
-    } finally {
-      if (request === current) loading.value = false;
-    }
+    await comparison.refetch();
   }
 
+  // The last fill's note belongs to the old base.
   watch(
     () => base.value.id,
     () => {
-      // Another base: the old table would read against the wrong one, and
-      // the last fill's note belongs to it.
-      result.value = null;
       filled.value = null;
     },
   );
-  watch(
-    () => [base.value.id, selectedIds.value.join(",")],
-    () => void load(),
-    { immediate: true },
-  );
-  onUnmounted(() => request?.abort());
 
   // ---------------------------------------------------------------------
   // Rows
@@ -351,7 +346,7 @@ export function useComparePanelController(
       }
       fillDialog.value = null;
       filled.value = `${dialog.key} set in ${dialog.target.column.name}.`;
-      void load();
+      void invalidate.secretsChanged(dialog.target.column.id);
     } catch (cause) {
       fillError.value =
         cause instanceof ApiError && cause.status === 409

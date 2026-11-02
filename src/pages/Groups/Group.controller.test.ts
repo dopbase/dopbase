@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { addedLabel, useGroupController } from "./Group.controller";
 import * as accessApi from "~/services/access.api";
 import * as usersApi from "~/services/users.api";
@@ -57,7 +57,7 @@ const detail = groupDetailFixture({
 });
 
 beforeEach(async () => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   const current = await liveRoute();
   current.name = "group";
@@ -81,7 +81,10 @@ describe("useGroupController", () => {
     signInAs(["users.view", "groups.manage"]);
     const { controller } = mountController(useGroupController);
     await settle();
-    expect(accessApi.fetchGroup).toHaveBeenCalledWith("grp_backend");
+    expect(accessApi.fetchGroup).toHaveBeenCalledWith(
+      "grp_backend",
+      expect.any(AbortSignal),
+    );
     expect(controller.group.value?.name).toBe("Backend");
     expect(controller.subtitle.value).toBe("Payments service team · 2 members");
     expect(
@@ -180,7 +183,10 @@ describe("useGroupController", () => {
     vi.mocked(accessApi.fetchGroup).mockResolvedValueOnce(other);
     (await liveRoute()).params = { groupId: "grp_data" };
     await settle();
-    expect(accessApi.fetchGroup).toHaveBeenLastCalledWith("grp_data");
+    expect(accessApi.fetchGroup).toHaveBeenLastCalledWith(
+      "grp_data",
+      expect.any(AbortSignal),
+    );
     expect(controller.group.value?.name).toBe("Data");
   });
 

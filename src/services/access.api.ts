@@ -154,23 +154,33 @@ export async function fetchProjectAccess(
   return data;
 }
 
-export async function fetchUserAccess(id: string): Promise<UserAccess> {
+export async function fetchUserAccess(
+  id: string,
+  signal?: AbortSignal,
+): Promise<UserAccess> {
   const { data } = await apiRequest<UserAccess>(
     `/api/v1/users/${encodeURIComponent(id)}/access`,
+    { signal },
   );
   return data;
 }
 
 const GROUPS = "/api/v1/groups";
 
-export async function fetchGroups(): Promise<GroupSummary[]> {
-  const { data } = await apiRequest<GroupSummary[]>(GROUPS);
+export async function fetchGroups(
+  signal?: AbortSignal,
+): Promise<GroupSummary[]> {
+  const { data } = await apiRequest<GroupSummary[]>(GROUPS, { signal });
   return data;
 }
 
-export async function fetchGroup(id: string): Promise<GroupDetail> {
+export async function fetchGroup(
+  id: string,
+  signal?: AbortSignal,
+): Promise<GroupDetail> {
   const { data } = await apiRequest<GroupDetail>(
     `${GROUPS}/${encodeURIComponent(id)}`,
+    { signal },
   );
   return data;
 }

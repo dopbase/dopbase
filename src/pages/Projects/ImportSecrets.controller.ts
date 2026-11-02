@@ -6,10 +6,13 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable";
 import { ApiError } from "~/services/http.client";
 import { useImportStore } from "~/stores/import.store";
+import { useInvalidate } from "~/queries/invalidate";
 
 /** Owns the review and confirmation flow for an in-memory .env import. */
 export function useImportSecretsController() {
   const route = useRoute();
+  // The environment page reads the new secrets when it opens.
+  const markStale = useInvalidate({ refetch: false });
   const router = useRouter();
   const importStore = useImportStore();
   const { runWithReauth } = useReauthentication();
@@ -144,6 +147,7 @@ export function useImportSecretsController() {
         await importSecrets(target, request, signal);
       }, signal);
       if (signal.aborted) return;
+      void markStale.secretsChanged(target);
       void router.push({
         name: "environment",
         params,

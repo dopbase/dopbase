@@ -7,6 +7,9 @@ import {
 import * as tokensApi from "~/services/tokens.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
+import { cacheContents } from "~/tests/pinia";
+import { useRunDialogController } from "./RunDialog.controller";
+import type { Environment } from "~/services";
 
 vi.mock("~/services/tokens.api");
 
@@ -61,6 +64,7 @@ describe("useTokensPanelController", () => {
       expiresIn: "never",
     });
     expect(c.created.value?.plaintextToken).toBe("dbs_secret");
+    expect(cacheContents()).not.toContain("dbs_secret");
     c.acknowledgeCreated();
     expect(c.created.value).toBeNull();
   });
@@ -142,6 +146,28 @@ describe("useTokensPanelController", () => {
     await c.revoke(token);
     expect(tokensApi.revokeToken).toHaveBeenCalledWith("tok_1");
     await vi.waitFor(() => expect(c.tokens.value).toEqual([]));
+  });
+
+  it("still refreshes after a revoke once the Run dialog that shared its list closed", async () => {
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([token]);
+    vi.mocked(tokensApi.revokeToken).mockResolvedValueOnce({
+      ...token,
+      revokedAt: "2026-08-28T01:00:00Z",
+    });
+    const c = makeController();
+    const open = ref(true);
+    const environment = ref({ id: "env_1", name: "prod" } as Environment);
+    mountController(() =>
+      useRunDialogController(ref("payments"), environment, ref(true), open),
+    );
+    await vi.waitFor(() => expect(c.tokens.value).toEqual([token]));
+    open.value = false;
+    await nextTick();
+    vi.mocked(tokensApi.listTokens).mockResolvedValue([]);
+
+    await c.revoke(token);
+
+    expect(c.tokens.value).toEqual([]);
   });
 });
 

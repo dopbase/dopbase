@@ -1,6 +1,6 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ssoApi from "~/services/sso.api";
 
@@ -108,7 +108,7 @@ function button(host: HTMLElement, label: string): HTMLButtonElement | null {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
 });
 
 afterEach(() => {

@@ -1,25 +1,21 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import { fetchUser } from "~/services/users.api";
+import { useQuery } from "@pinia/colada";
 import type { User } from "~/services/users.api";
-import { fetchRoles } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
-import {
-  addGroupMember,
-  fetchGroups,
-  fetchUserAccess,
-  removeGroupMember,
-} from "~/services/access.api";
+import { addGroupMember, removeGroupMember } from "~/services/access.api";
 import type { GroupSummary, UserAccess } from "~/services/access.api";
-import { fetchAuthMethods } from "~/services/auth.api";
-import {
-  listPersonalTokens,
-  revokePersonalToken,
-} from "~/services/personal-tokens.api";
+import { revokePersonalToken } from "~/services/personal-tokens.api";
 import type { PersonalToken } from "~/services/personal-tokens.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import { groupsQuery, userAccessQuery } from "~/queries/access";
+import { authMethodsQuery } from "~/queries/auth";
+import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { personalTokensQuery } from "~/queries/personal-tokens";
+import { rolesQuery, userQuery } from "~/queries/users";
 import {
   formatDate,
   formatLevel,
@@ -71,63 +67,71 @@ export function useUserController() {
   const router = useRouter();
   const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
 
   const userId = computed(() => String(route.params.userId ?? ""));
   const activeTab = computed<UserTab>(
     () => TAB_FOR_ROUTE[String(route.name)] ?? "overview",
   );
 
-  const user = ref<User | null>(null);
-  const access = ref<UserAccess | null>(null);
-  const roles = ref<Role[]>([]);
-  const ssoEnabled = ref(false);
-  const loadError = ref<string | null>(null);
-  const tokens = ref<PersonalToken[] | null>(null);
-  let version = 0;
+  // Keyed by account, so another account starts empty and a late answer
+  // for the previous one never lands here.
+  const account = useQuery(() =>
+    onlyWhen(userId.value !== "", userQuery(userId.value)),
+  );
+  const accountAccess = useQuery(() =>
+    onlyWhen(userId.value !== "", userAccessQuery(userId.value)),
+  );
+  // Roles and sign-in methods only add detail, so a failure leaves them out.
+  const roleList = useQuery(rolesQuery);
+  const methods = useQuery(authMethodsQuery);
+  const accountData = shownData<User>(account);
+  const accessData = shownData<UserAccess>(accountAccess);
+  const failed = (cause: unknown) =>
+    errorMessage(cause, "Could not load this account.");
+  const accountFailure = loadFailure(account, failed);
+  const accessFailure = loadFailure(accountAccess, failed);
+  /** Their access changed but the new grants didn't load. */
+  const reloadError = ref<string | null>(null);
+  const loadError = computed(
+    () => accountFailure.value ?? accessFailure.value ?? reloadError.value,
+  );
 
-  async function load(): Promise<void> {
-    const current = ++version;
-    const id = userId.value;
-    loadError.value = null;
-    try {
-      const [account, grants, available, methods] = await Promise.all([
-        fetchUser(id),
-        fetchUserAccess(id),
-        fetchRoles().catch(() => [] as Role[]),
-        fetchAuthMethods().catch(() => null),
-      ]);
-      if (current !== version) return;
-      if (isAgent(account)) {
-        // Agents have their own page, with their tokens.
-        await router.replace({
-          name: activeTab.value === "tokens" ? "agent-tokens" : "agent",
-          params: { agentId: account.id },
-        });
-        return;
-      }
-      user.value = account;
-      access.value = grants;
-      roles.value = available;
-      ssoEnabled.value = methods?.sso != null;
-    } catch (cause) {
-      if (current !== version) return;
-      loadError.value = errorMessage(cause, "Could not load this account.");
-    }
-  }
+  /** The account, once it and its access have loaded. Agents never show. */
+  const user = computed<User | null>(() =>
+    accountData.value && accessData.value && !isAgent(accountData.value)
+      ? accountData.value
+      : null,
+  );
+  const access = computed<UserAccess | null>(() =>
+    user.value ? accessData.value : null,
+  );
+  const roles = computed<Role[]>(() => roleList.data.value ?? []);
+  const ssoEnabled = computed(() => methods.data.value?.sso != null);
 
+  // Agents have their own page, with their tokens.
   watch(
-    userId,
-    () => {
-      user.value = null;
-      access.value = null;
-      tokens.value = null;
-      void load();
+    accountData,
+    (current) => {
+      if (!current || !isAgent(current)) return;
+      void router.replace({
+        name: activeTab.value === "tokens" ? "agent-tokens" : "agent",
+        params: { agentId: current.id },
+      });
     },
     { immediate: true },
   );
-  onUnmounted(() => {
-    version++;
-  });
+
+  /** Tries again after a failed load. */
+  async function load(): Promise<void> {
+    await Promise.all([
+      account.refetch(),
+      accountAccess.refetch(),
+      roleList.refresh(),
+      methods.refresh(),
+    ]);
+  }
 
   const role = computed(() =>
     user.value ? roleOf(user.value, roles.value) : null,
@@ -188,34 +192,34 @@ export function useUserController() {
     maxLevel: access.value?.maxLevel,
   }));
 
+  /**
+   * After a grant changes: every access view and what it decides refresh.
+   * Says so when theirs didn't, since the grants shown are then out of date.
+   */
   async function reloadAccess(): Promise<void> {
-    try {
-      access.value = await fetchUserAccess(userId.value);
-    } catch (cause) {
-      loadError.value = errorMessage(cause, "Could not reload their access.");
-    }
+    await invalidate.accessChanged();
+    reloadError.value = accountAccess.error.value
+      ? "Could not reload their access."
+      : null;
   }
 
   // Groups
-  const allGroups = ref<GroupSummary[] | null>(null);
   const groupsError = ref<string | null>(null);
   const canManageGroups = computed(
     () => auth.can("groups.manage") && !isRoot.value,
   );
+  const groupList = useQuery(() =>
+    onlyWhen(
+      activeTab.value === "groups" && canManageGroups.value && !!user.value,
+      groupsQuery,
+    ),
+  );
+  const allGroups = computed<GroupSummary[]>(() => groupList.data.value ?? []);
   const joinable = computed(() =>
-    (allGroups.value ?? []).filter(
+    allGroups.value.filter(
       (group) => !access.value?.groups.some((own) => own.id === group.id),
     ),
   );
-
-  async function loadGroups(): Promise<void> {
-    if (!canManageGroups.value || allGroups.value) return;
-    try {
-      allGroups.value = await fetchGroups();
-    } catch {
-      allGroups.value = [];
-    }
-  }
 
   async function joinGroup(groupId: string): Promise<void> {
     groupsError.value = null;
@@ -223,7 +227,7 @@ export function useUserController() {
       await runWithReauth(async () => {
         await addGroupMember(groupId, userId.value);
       });
-      await reloadAccess();
+      await invalidate.groupsChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       groupsError.value = errorMessage(
@@ -239,7 +243,7 @@ export function useUserController() {
       await runWithReauth(async () => {
         await removeGroupMember(groupId, userId.value);
       });
-      await reloadAccess();
+      await invalidate.groupsChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       groupsError.value = errorMessage(
@@ -249,19 +253,22 @@ export function useUserController() {
     }
   }
 
-  // Tokens
-  const tokensError = ref<string | null>(null);
+  // Tokens, read while their tab is open and keyed by account.
+  const tokenList = useQuery(() =>
+    onlyWhen(
+      activeTab.value === "tokens" && !!user.value,
+      personalTokensQuery(userId.value),
+    ),
+  );
+  const tokensFailure = loadFailure(tokenList, (cause) =>
+    errorMessage(cause, "Could not load their tokens."),
+  );
+  const revokeError = ref<string | null>(null);
+  const tokensError = computed(() => revokeError.value ?? tokensFailure.value);
+  const tokens = computed<PersonalToken[] | null>(
+    () => tokenList.data.value ?? (tokensFailure.value ? [] : null),
+  );
   const canRevokeTokens = computed(() => auth.can("tokens.revoke_others"));
-
-  async function loadTokens(): Promise<void> {
-    tokensError.value = null;
-    try {
-      tokens.value = await listPersonalTokens(userId.value);
-    } catch (cause) {
-      tokens.value = [];
-      tokensError.value = errorMessage(cause, "Could not load their tokens.");
-    }
-  }
 
   const tokenRows = computed<TokenRow[]>(() =>
     (tokens.value ?? []).map((token) => ({
@@ -276,42 +283,33 @@ export function useUserController() {
   );
 
   async function revokeToken(token: PersonalToken): Promise<void> {
-    tokensError.value = null;
+    revokeError.value = null;
     try {
       await runWithReauth(async () => {
         await revokePersonalToken(userId.value, token.id);
       });
-      await loadTokens();
+      await invalidate.personalTokensChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
-      tokensError.value = errorMessage(cause, "Could not revoke that token.");
+      revokeError.value = errorMessage(cause, "Could not revoke that token.");
     }
   }
-
-  watch(
-    [activeTab, user],
-    ([tab, account]) => {
-      if (!account) return;
-      if (tab === "tokens" && tokens.value === null) void loadTokens();
-      if (tab === "groups") void loadGroups();
-    },
-    { immediate: true },
-  );
 
   // Edit and account actions
   const editOpen = ref(false);
 
   async function edited(): Promise<void> {
     editOpen.value = false;
-    await load();
+    await invalidate.usersChanged();
   }
 
   const actions = useAccountActions(async (action) => {
     if (action.kind === "delete") {
+      void markStale.usersChanged();
       await router.push({ name: "users" });
       return;
     }
-    await load();
+    await invalidate.usersChanged();
   });
 
   const created = computed(() =>

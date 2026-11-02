@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
 import { useUserDialog } from "./UserDialog.controller";
 import * as usersApi from "~/services/users.api";
@@ -21,7 +21,7 @@ vi.mock("~/services/users.api");
 const PASSWORD = "correct horse battery";
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.mocked(usersApi.createUser).mockImplementation(async (email) =>
     userFixture({ id: "usr_new", email }),

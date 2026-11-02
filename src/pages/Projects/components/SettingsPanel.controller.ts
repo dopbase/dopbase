@@ -1,13 +1,16 @@
-import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import { useRouter } from "vue-router";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
-import * as secretsApi from "~/services/secrets.api";
-import * as tokensApi from "~/services/tokens.api";
-import { fetchProjectAccess, reaches } from "~/services/access.api";
+import { reaches } from "~/services/access.api";
 import type { Grant } from "~/services/access.api";
 import type { Environment, Project } from "~/services";
 import { errorMessage } from "~/services/api-errors";
+import { projectAccessQuery } from "~/queries/access";
+import { onlyWhen } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { environmentContentsQuery } from "~/queries/projects";
 import { formatList } from "~/utils/format";
 import { isActiveToken } from "./RunDialog.controller";
 
@@ -38,15 +41,45 @@ export function useSettingsPanelController(
   changed: () => Promise<void> | void,
 ) {
   const router = useRouter();
+  const cache = useQueryCache();
+  // Deleting the project leaves the page, so nothing on it refetches.
+  const markStale = useInvalidate({ refetch: false });
 
   const name = ref("");
   const savingName = ref(false);
   const nameError = ref<string | null>(null);
   const actionError = ref<string | null>(null);
-  const stats = ref<Record<string, EnvironmentStats>>({});
-  const grants = ref<Grant[]>([]);
-  let statsVersion = 0;
-  let statsRequest: AbortController | null = null;
+
+  // Counts come from the same cached lists the Secrets and Tokens tabs use.
+  const environmentIds = computed(() =>
+    environments.value.map((environment) => environment.id),
+  );
+  const contents = useQuery(() =>
+    onlyWhen(
+      environmentIds.value.length > 0,
+      environmentContentsQuery({ cache, environmentIds: environmentIds.value }),
+    ),
+  );
+  /** Secret and active token counts per environment. */
+  const stats = computed<Record<string, EnvironmentStats>>(() =>
+    Object.fromEntries(
+      Object.entries(contents.data.value ?? {}).map(([id, own]) => [
+        id,
+        {
+          secrets: own.secrets?.length ?? null,
+          tokens:
+            own.tokens?.filter((token) => isActiveToken(token)).length ?? null,
+        },
+      ]),
+    ),
+  );
+  const access = useQuery(() =>
+    onlyWhen(
+      project.value !== null,
+      projectAccessQuery(project.value?.name ?? ""),
+    ),
+  );
+  const grants = computed<Grant[]>(() => access.data.value?.grants ?? []);
 
   watch(
     () => project.value?.name,
@@ -81,54 +114,6 @@ export function useSettingsPanelController(
       savingName.value = false;
     }
   }
-
-  /** Secret and active token counts per environment, and the grants. */
-  async function loadStats(): Promise<void> {
-    const current = ++statsVersion;
-    statsRequest?.abort();
-    const request = new AbortController();
-    statsRequest = request;
-    const { signal } = request;
-    const list = environments.value;
-    const results = await Promise.all(
-      list.map(async (environment) => {
-        const [secrets, tokens] = await Promise.allSettled([
-          secretsApi.listSecrets(environment.id, signal),
-          tokensApi.listTokens(environment.id, signal),
-        ]);
-        return [
-          environment.id,
-          {
-            secrets:
-              secrets.status === "fulfilled" ? secrets.value.length : null,
-            tokens:
-              tokens.status === "fulfilled"
-                ? tokens.value.filter((token) => isActiveToken(token)).length
-                : null,
-          },
-        ] as const;
-      }),
-    );
-    if (current !== statsVersion) return;
-    stats.value = Object.fromEntries(results);
-    if (!project.value) return;
-    try {
-      const access = await fetchProjectAccess(project.value.name, signal);
-      if (current === statsVersion) grants.value = access.grants;
-    } catch {
-      if (current === statsVersion) grants.value = [];
-    }
-  }
-
-  watch(
-    () => environments.value.map((environment) => environment.id).join(","),
-    loadStats,
-    { immediate: true },
-  );
-  onUnmounted(() => {
-    statsVersion++;
-    statsRequest?.abort();
-  });
 
   const canManage = (environment: Environment): boolean =>
     reaches(environment.level ?? "manage", "manage");
@@ -254,6 +239,7 @@ export function useSettingsPanelController(
       if (target.kind === "project") {
         await projectsApi.deleteProject(project.value.id);
         deleting.value = null;
+        void markStale.projectDeleted(project.value.id);
         await router.push({ name: "projects" });
         return;
       }

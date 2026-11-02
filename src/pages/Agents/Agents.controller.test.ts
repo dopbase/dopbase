@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import {
   agentTokenUsage,
   liveToken,
@@ -79,7 +79,7 @@ function rowOf(
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -144,8 +144,14 @@ describe("useAgentsController", () => {
       "usr_maya",
       "usr_lead",
     ]);
-    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("usr_bot");
-    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("usr_deploy");
+    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(
+      "usr_bot",
+      expect.any(AbortSignal),
+    );
+    expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(
+      "usr_deploy",
+      expect.any(AbortSignal),
+    );
   });
 
   it("says it could not load the agents when the users list fails", async () => {
@@ -384,7 +390,10 @@ describe("useAgentsController", () => {
 
     await controller.openToken(row);
 
-    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_bot");
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+      "usr_bot",
+      expect.any(AbortSignal),
+    );
     expect(controller.tokenFor.value).toEqual(row);
     expect(controller.tokenGrants.value).toEqual(grants);
   });
@@ -409,19 +418,23 @@ describe("useAgentsController", () => {
       token: tokenFixture({ id: "pat_2" }),
       plaintextToken: "dop_pat_x",
     };
+    const listed = vi.mocked(tokensApi.listPersonalTokens).mock.calls.length;
 
     controller.tokenCreated(created);
     await settle();
 
     expect(controller.tokenFor.value).toBeNull();
     expect(controller.createdToken.value).toEqual(created);
-    expect(usersApi.fetchUsers).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(tokensApi.listPersonalTokens).mock.calls.length,
+    ).toBeGreaterThan(listed);
   });
 
   it("lets an owner without users.manage revoke their agent's token", async () => {
     signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
     const controller = await mountAgents();
     controller.askRevoke(rowOf(controller, "usr_bot"));
+    const listed = vi.mocked(tokensApi.listPersonalTokens).mock.calls.length;
 
     await controller.confirmRevoke();
 
@@ -431,7 +444,9 @@ describe("useAgentsController", () => {
     );
     expect(controller.revoking.value).toBeNull();
     expect(controller.revokeError.value).toBeNull();
-    expect(usersApi.fetchUsers).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(tokensApi.listPersonalTokens).mock.calls.length,
+    ).toBeGreaterThan(listed);
   });
 
   it("keeps the confirmation open with the server's reason when revoking fails", async () => {

@@ -1,4 +1,5 @@
 import { beforeEach } from "vitest";
+import { freshPinia } from "./pinia";
 
 /**
  * Installs a working, in-memory `localStorage` on the test global.
@@ -53,7 +54,9 @@ for (const target of [
   });
 }
 
-// Reset storage between tests so state never leaks across cases.
+// Reset storage, stores and the query cache between tests so state never
+// leaks across cases.
 beforeEach(() => {
   localStorageMock.clear();
+  freshPinia();
 });

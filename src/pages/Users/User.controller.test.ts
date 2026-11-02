@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick } from "vue";
 import { useUserController } from "./User.controller";
 import * as usersApi from "~/services/users.api";
@@ -64,7 +64,7 @@ const MANAGER: accessApi.Capability[] = [
 ];
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   route.name = "user";
   route.params = { userId: "usr_maya" };
@@ -113,8 +113,14 @@ describe("useUserController", () => {
       });
       const c = await open();
 
-      expect(usersApi.fetchUser).toHaveBeenCalledWith("usr_maya");
-      expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("usr_maya");
+      expect(usersApi.fetchUser).toHaveBeenCalledWith(
+        "usr_maya",
+        expect.any(AbortSignal),
+      );
+      expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+        "usr_maya",
+        expect.any(AbortSignal),
+      );
       expect(c.user.value).toStrictEqual(maya);
       expect(c.role.value).toStrictEqual(memberRole);
       expect(c.ssoEnabled.value).toBe(true);
@@ -162,7 +168,10 @@ describe("useUserController", () => {
       expect(c.user.value).toBeNull();
       await settle();
 
-      expect(usersApi.fetchUser).toHaveBeenLastCalledWith("usr_sam");
+      expect(usersApi.fetchUser).toHaveBeenLastCalledWith(
+        "usr_sam",
+        expect.any(AbortSignal),
+      );
       expect(c.user.value?.id).toBe("usr_sam");
     });
 
@@ -432,7 +441,30 @@ describe("useUserController", () => {
 
       route.name = "user-tokens";
       await settle();
-      expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith("usr_maya");
+      expect(tokensApi.listPersonalTokens).toHaveBeenCalledWith(
+        "usr_maya",
+        expect.any(AbortSignal),
+      );
+    });
+
+    it("never shows the previous account's tokens", async () => {
+      route.name = "user-tokens";
+      let answerMaya!: (tokens: tokensApi.PersonalToken[]) => void;
+      vi.mocked(tokensApi.listPersonalTokens).mockImplementation((id) =>
+        id === "usr_maya"
+          ? new Promise((resolve) => (answerMaya = resolve))
+          : Promise.resolve([tokenFixture({ id: "pat_sam", userId: id })]),
+      );
+      const c = await open();
+
+      route.params = { userId: "usr_sam" };
+      await vi.waitFor(() =>
+        expect(c.tokens.value?.map((token) => token.id)).toEqual(["pat_sam"]),
+      );
+      answerMaya([tokenFixture({ id: "pat_maya", userId: "usr_maya" })]);
+      await settle();
+
+      expect(c.tokens.value?.map((token) => token.id)).toEqual(["pat_sam"]);
     });
 
     it("describes each token's scope, state, expiry and last use", async () => {
@@ -491,7 +523,7 @@ describe("useUserController", () => {
       const without = await open();
       expect(without.canRevokeTokens.value).toBe(false);
 
-      setActivePinia(createPinia());
+      freshPinia();
       const holder = await open([...MANAGER, "tokens.revoke_others"]);
       expect(holder.canRevokeTokens.value).toBe(true);
     });
