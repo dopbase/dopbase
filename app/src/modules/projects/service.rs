@@ -282,6 +282,7 @@ pub async fn init(
     &mut tx,
     &project_id,
     &request.environment_name,
+    false,
     &now,
   )
   .await?;

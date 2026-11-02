@@ -95,6 +95,14 @@ project/environment, mode, and submitted entry count. They do not change
 secrets, versions, or layout. If the audit event cannot be saved, the server
 returns an error without the comparison results.
 
+## Creating a protected environment
+
+`POST /api/v1/projects/{ref}/environments` with
+`{ "name": "production", "protected": true }` creates the environment already
+protected, in one request, so grants on the whole project below project
+manager never reach it. Without `protected`, or with `false`, it is created
+unprotected. The `environment.created` audit event records `protected`.
+
 ## Copying keys between environments
 
 `POST /api/v1/environments/{id}/copy-secrets` with

@@ -7,14 +7,16 @@ pub async fn insert(
   id: &str,
   project_id: &str,
   name: &str,
+  protected: bool,
   now: &str,
 ) -> Result<bool, sqlx::Error> {
   let result = sqlx::query(
-    "INSERT INTO environments(id,project_id,name,created_at,updated_at)VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+    "INSERT INTO environments(id,project_id,name,protected,created_at,updated_at)VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
   )
   .bind(id)
   .bind(project_id)
   .bind(name)
+  .bind(protected)
   .bind(now)
   .bind(now)
   .execute(&mut **tx)
