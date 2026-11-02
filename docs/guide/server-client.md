@@ -85,9 +85,10 @@ target an environment explicitly with an immutable ID or a readable
 dopbase run payment-service/development -- npm start
 ```
 
-Application servers can avoid saved client state by providing `DOPBASE_URL`, an
-environment-scoped `DOPBASE_TOKEN`, and the immutable environment ID in their
-deployment configuration.
+Application servers can avoid saved client state by providing `DOPBASE_URL` and
+a runner token as `DOPBASE_TOKEN` in their deployment configuration. The runner
+token belongs to one environment, so `dopbase run -- npm start` needs no
+reference.
 
 ## Self-hosted and Cloud
 

@@ -39,3 +39,6 @@ Run 'dopbase help <command>' for details on any command.
 
 pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
 PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production.";
+pub(crate) const RUN_ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
+PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production. \
+With a runner token, leave it out: the token's own environment is used, and a reference only checks it.";

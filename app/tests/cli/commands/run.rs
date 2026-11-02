@@ -3,7 +3,13 @@ use app::cli::{
   local_config::{ClientConfig, ResolvedServer, ServerSource},
   runtime_cache::{self, RuntimeSource},
 };
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{
+  Json, Router,
+  extract::{Query, State},
+  http::StatusCode,
+  response::IntoResponse,
+  routing::get,
+};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::sync::{
@@ -105,9 +111,57 @@ async fn runtime_handler(State(mode): State<Arc<AtomicU8>>) -> impl IntoResponse
   )
 }
 
+/// Mode 1 is an outage, mode 10 an older server without the route. Like
+/// the server, it refuses a reference to another environment.
+async fn runner_handler(
+  State(mode): State<Arc<AtomicU8>>,
+  Query(query): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+  if let Some(reference) = query.get("reference")
+    && mode.load(Ordering::SeqCst) == 0
+    && ![
+      "env_01CACHE",
+      "payment-service/development",
+      "prj_01CACHE/development",
+    ]
+    .contains(&reference.as_str())
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(json!({"error":{"TOKEN_SCOPE_INVALID":format!(
+        "This runner token is for payment-service/development, not {reference}."
+      )}})),
+    );
+  }
+  match mode.load(Ordering::SeqCst) {
+    1 => (
+      StatusCode::SERVICE_UNAVAILABLE,
+      Json(json!({"error":{"SERVER_UNAVAILABLE":"try later"}})),
+    ),
+    10 => (
+      StatusCode::NOT_FOUND,
+      Json(json!({"error":{"REQUEST_INVALID":"The requested API route was not found."}})),
+    ),
+    _ => (
+      StatusCode::OK,
+      Json(json!({
+        "data": {
+          "projectId": "prj_01CACHE",
+          "project": "payment-service",
+          "environment": "development",
+          "environmentId": "env_01CACHE",
+          "revision": "rev-1",
+          "entries": [{"key":"API_TOKEN","value":SECRET}]
+        }
+      })),
+    ),
+  }
+}
+
 async fn start_server() -> (Arc<AtomicU8>, String, tokio::task::JoinHandle<()>) {
   let mode = Arc::new(AtomicU8::new(0));
   let router = Router::new()
+    .route("/api/v1/runtime/secrets", get(runner_handler))
     .route("/api/v1/environments/resolve", get(resolve_handler))
     .route(
       "/api/v1/environments/{id}/secrets/runtime",
@@ -307,6 +361,88 @@ async fn unavailable_server_without_cache_does_not_provide_runtime_values() {
   assert!(error.contains("child was not started"));
 }
 
+#[tokio::test]
+async fn a_runner_token_loads_its_own_environment_and_a_reference_only_checks_it() {
+  let (_mode, url, task) = start_server().await;
+  let directory = TempDir::new().unwrap();
+  let server = make_server(&directory, &url);
+  let api = ApiClient::new(&server, Some(TOKEN.into())).unwrap();
+
+  let loaded = runtime_cache::load_runner(&server, &api, None)
+    .await
+    .unwrap();
+  assert_eq!(loaded.source.as_str(), "live");
+  assert_eq!(
+    (loaded.project.as_str(), loaded.environment.as_str()),
+    ("payment-service", "development")
+  );
+  assert_eq!(loaded.entries[0].value, SECRET);
+  for reference in [
+    "env_01CACHE",
+    "payment-service/development",
+    "prj_01CACHE/development",
+  ] {
+    runtime_cache::load_runner(&server, &api, Some(reference))
+      .await
+      .unwrap_or_else(|error| panic!("{reference}: {error}"));
+  }
+  let error = runtime_cache::load_runner(&server, &api, Some("payment-service/local"))
+    .await
+    .unwrap_err()
+    .to_string();
+  assert!(
+    error
+      .contains("This runner token is for payment-service/development, not payment-service/local"),
+    "{error}"
+  );
+  task.abort();
+}
+
+#[tokio::test]
+async fn a_runner_token_falls_back_to_its_cache_and_to_the_old_routes() {
+  let (mode, url, task) = start_server().await;
+  let directory = TempDir::new().unwrap();
+  let server = make_server(&directory, &url);
+  let api = ApiClient::new(&server, Some(TOKEN.into())).unwrap();
+  runtime_cache::load_runner(&server, &api, None)
+    .await
+    .unwrap();
+
+  // Offline: the cached entry is found without a reference and still
+  // checks one.
+  mode.store(1, Ordering::SeqCst);
+  let cached = runtime_cache::load_runner(&server, &api, None)
+    .await
+    .unwrap();
+  assert_eq!(cached.source.as_str(), "cache");
+  assert_eq!(cached.entries[0].value, SECRET);
+  let named = runtime_cache::load_runner(&server, &api, Some("prj_01CACHE/development"))
+    .await
+    .unwrap();
+  assert_eq!(named.source.as_str(), "cache");
+  let error = runtime_cache::load_runner(&server, &api, Some("payment-service/local"))
+    .await
+    .unwrap_err()
+    .to_string();
+  assert!(error.contains("This runner token is for"), "{error}");
+
+  // An older server: a reference takes the resolve + runtime routes.
+  mode.store(10, Ordering::SeqCst);
+  let legacy = runtime_cache::load_runner(&server, &api, Some("env_01CACHE"))
+    .await
+    .unwrap();
+  assert_eq!(legacy.source.as_str(), "live");
+  let error = runtime_cache::load_runner(&server, &api, None)
+    .await
+    .unwrap_err()
+    .to_string();
+  assert!(
+    error.contains("Pass ENVIRONMENT_REF or upgrade the server"),
+    "{error}"
+  );
+  task.abort();
+}
+
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interactive_child_reads_from_the_terminal_and_returns_its_exit_status() {
@@ -393,6 +529,23 @@ fn run_environment_rejects_a_non_unicode_variable() {
   );
 }
 
+#[test]
+fn a_runner_reference_is_optional_and_comes_from_the_argument_or_variable() {
+  use app::cli::commands::runner_environment;
+  assert_eq!(
+    runner_environment(None, Err(VarError::NotPresent)).unwrap(),
+    None
+  );
+  assert_eq!(
+    runner_environment(Some("env_explicit".into()), Ok("env_variable".into())).unwrap(),
+    Some("env_explicit".into())
+  );
+  assert_eq!(
+    runner_environment(None, Ok("env_variable".into())).unwrap(),
+    Some("env_variable".into())
+  );
+}
+
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_revoked_token() {
@@ -410,7 +563,10 @@ async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_re
     .json(&["token", "create", &id, "--name", "runner"])
     .await;
   let token = created["plaintextToken"].as_str().unwrap();
-  fixture.json(&["env", "default", &id]).await;
+  // The saved default belongs to people; a runner token runs its own
+  // environment without a reference.
+  fixture.json(&["env", "create", "fixture/staging"]).await;
+  fixture.json(&["env", "default", "fixture/staging"]).await;
   let mut command = fixture.command();
   command
     .env("API_KEY", "incorrect-parent-value")
@@ -443,6 +599,54 @@ async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_re
     !marker.exists(),
     "run started its child after authentication failed"
   );
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn run_with_a_runner_token_refuses_another_environment_before_the_child_starts() {
+  use super::support::{Fixture, failure, output};
+  let fixture = Fixture::new().await;
+  let id = fixture.environment().await;
+  fixture.json(&["env", "create", "fixture/staging"]).await;
+  let created = fixture
+    .json(&["token", "create", &id, "--name", "runner"])
+    .await;
+  let token = created["plaintextToken"].as_str().unwrap();
+  let marker = fixture.directory.path().join("child-was-started");
+  for (argument, variable) in [
+    (Some("fixture/staging"), None),
+    (None, Some("fixture/staging")),
+  ] {
+    let mut command = fixture.command();
+    command
+      .env("DOPBASE_TOKEN", token)
+      .env("DOPBASE_CHILD_MARKER", &marker)
+      .arg("run");
+    if let Some(variable) = variable {
+      command.env("DOPBASE_ENV", variable);
+    }
+    command.args(argument).args([
+      "--",
+      "sh",
+      "-c",
+      r#"printf started > "$DOPBASE_CHILD_MARKER""#,
+    ]);
+    let result = output(command, None).await;
+    failure(
+      &result,
+      "This runner token is for fixture/local, not fixture/staging",
+    );
+    assert!(
+      !marker.exists(),
+      "run started its child for another environment"
+    );
+  }
+
+  let mut command = fixture.command();
+  command
+    .env("DOPBASE_TOKEN", token)
+    .args(["run", "fixture/local", "--", "true"]);
+  assert!(output(command, None).await.status.success());
 }
 
 use app::cli::commands::{SelectionOptions, select};

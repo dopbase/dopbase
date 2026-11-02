@@ -242,6 +242,10 @@ The environment used by `dopbase run` is resolved in this order:
 2. A non-empty `DOPBASE_ENV`
 3. The saved default when its server URL matches the effective server
 
+A runner token skips this order. It always runs its own environment, ignores the
+saved default, and treats a positional reference or `DOPBASE_ENV` as a check: one
+that names another environment stops the run.
+
 Set or clear the default with `dopbase env default <ENVIRONMENT_REF>` and
 `dopbase env default --clear`. A server override never reuses a default saved
 for another endpoint.

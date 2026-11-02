@@ -26,13 +26,13 @@ so no active project selection is needed.
 
 ## Deployment configuration
 
-Application servers should use an immutable environment ID and a runner token
-scoped to that environment:
+Application servers should use a runner token. A runner token belongs to one
+environment, so `dopbase run` uses that environment and needs no reference:
 
 ```bash
 export DOPBASE_URL=https://dopbase.example.com
 printf '%s' "$RUNNER_TOKEN" | dopbase login --token
-dopbase run env_482731 -- ./payment-service
+dopbase run -- ./payment-service
 ```
 
 This stores one encrypted credential for the selected server. Saving another
@@ -41,12 +41,24 @@ instead:
 
 ```bash
 # The pipeline injects DOPBASE_TOKEN from its secret store.
-dopbase run env_482731 -- ./payment-service
+dopbase run -- ./payment-service
 ```
 
 Credential priority is `DOPBASE_TOKEN`, then the saved credential. A saved
 runner token works for a persistent server; an injected token works for a CI
 job without writing local credentials.
+
+You can still name the environment, as in `dopbase run env_482731 -- ./payment-service`.
+With a runner token the reference only checks the token. If it names another
+environment, `run` stops before the application starts and before the server
+reads any value:
+
+```text
+Error: This runner token is for payment-service/production, not payment-service/staging. Drop the environment reference, or use a token made for payment-service/staging.
+```
+
+`DOPBASE_ENV` works the same way. A runner token ignores the saved default from
+`dopbase env default`, which is for people signed in with their own account.
 
 If a deployment command needs a file, use the same runner credential with
 `dopbase export env_482731 --output .env`. Export requires a live server and
@@ -58,7 +70,8 @@ stops and asks you to run `dopbase login` or set `DOPBASE_TOKEN`. Invalid,
 expired, and revoked credentials also stop the command before the application
 starts.
 
-The environment can instead come from deployment-time configuration:
+With a personal login or personal token, the environment can instead come from
+deployment-time configuration:
 
 ```bash
 export DOPBASE_ENV=env_482731

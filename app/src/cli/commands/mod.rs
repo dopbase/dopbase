@@ -32,7 +32,9 @@ pub use admin::{
   factory_reset_quarantine_path, validate_factory_reset_target,
 };
 pub use client::{insecure_transport_warning, server_switch_confirmed, status_document};
-pub use run::{RunEnvironment, Selection, SelectionOptions, run_environment, select};
+pub use run::{
+  RunEnvironment, Selection, SelectionOptions, run_environment, runner_environment, select,
+};
 
 use super::{args::*, local_config};
 use anyhow::{Result, bail};
