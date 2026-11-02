@@ -42,7 +42,8 @@ export function useSettingsPanelController(
 ) {
   const router = useRouter();
   const cache = useQueryCache();
-  const invalidate = useInvalidate();
+  // Deleting the project leaves the page, so nothing on it refetches.
+  const markStale = useInvalidate({ refetch: false });
 
   const name = ref("");
   const savingName = ref(false);
@@ -238,7 +239,7 @@ export function useSettingsPanelController(
       if (target.kind === "project") {
         await projectsApi.deleteProject(project.value.id);
         deleting.value = null;
-        void invalidate.projectDeleted(project.value.id);
+        void markStale.projectDeleted(project.value.id);
         await router.push({ name: "projects" });
         return;
       }

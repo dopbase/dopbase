@@ -232,8 +232,9 @@ export function useSecretsPanelController(environmentId: Ref<string>) {
     actionError.value = null;
     try {
       await secretsApi.deleteSecret(target, key);
-      if (environmentId.value !== target) return;
-      if (revealedKey.value === key) hideRevealed();
+      if (environmentId.value === target && revealedKey.value === key)
+        hideRevealed();
+      // Even after a switch: the cached list for `target` still has the key.
       await reload(target);
     } catch (cause) {
       reportActionError(cause, "Could not delete the secret.");
