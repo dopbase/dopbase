@@ -1,10 +1,12 @@
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
+import { useQuery } from "@pinia/colada";
 import { ApiError } from "~/services/http.client";
-import { fetchUserAccess } from "~/services/access.api";
 import type { GroupRef } from "~/services/access.api";
 import { useAuthStore } from "~/stores/auth.store";
 import { useReauthentication } from "~/composable/reauthentication";
+import { userAccessQuery } from "~/queries/access";
+import { shownData } from "~/queries/helpers";
 import { formatDateTime, formatRelativeTime, formatRole } from "~/utils/format";
 import {
   MAX_PASSWORD_LENGTH,
@@ -122,20 +124,18 @@ export function useAccountController() {
 
   // Profile
 
+  const ownAccess = useQuery(() => userAccessQuery("me"));
+  const ownAccessData = shownData(ownAccess);
   /** Null until loaded, or when your access can't be read. */
-  const groups = ref<GroupRef[] | null>(null);
+  const groups = computed<GroupRef[] | null>(
+    () => ownAccessData.value?.groups ?? null,
+  );
   /** Group pages open for people who can see groups. */
   const canOpenGroups = computed(() => auth.can("users.view", "groups.manage"));
 
   async function loadGroups(): Promise<void> {
-    try {
-      groups.value = (await fetchUserAccess("me")).groups;
-    } catch {
-      groups.value = null;
-    }
+    await ownAccess.refetch();
   }
-
-  onMounted(loadGroups);
 
   // Password
 

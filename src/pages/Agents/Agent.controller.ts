@@ -1,15 +1,10 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import { fetchUser, fetchUsers } from "~/services/users.api";
+import { useQuery } from "@pinia/colada";
 import type { User } from "~/services/users.api";
-import { fetchRoles } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
-import { fetchUserAccess } from "~/services/access.api";
 import type { UserAccess } from "~/services/access.api";
-import {
-  listPersonalTokens,
-  revokePersonalToken,
-} from "~/services/personal-tokens.api";
+import { revokePersonalToken } from "~/services/personal-tokens.api";
 import type {
   CreatedPersonalToken,
   PersonalToken,
@@ -17,6 +12,11 @@ import type {
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import { userAccessQuery } from "~/queries/access";
+import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { personalTokensQuery } from "~/queries/personal-tokens";
+import { rolesQuery, userQuery, usersQuery } from "~/queries/users";
 import { formatDate, formatLevel, formatRelativeTime } from "~/utils/format";
 import { isAgent, tokenState, type TokenState } from "~/pages/Users/people";
 import { useAccountActions } from "~/pages/Users/account-actions";
@@ -58,54 +58,83 @@ export function useAgentController() {
     () => TAB_FOR_ROUTE[String(route.name)] ?? "access",
   );
 
-  const agent = ref<User | null>(null);
-  const access = ref<UserAccess | null>(null);
-  const tokens = ref<PersonalToken[] | null>(null);
-  const roles = ref<Role[]>([]);
-  const people = ref<User[]>([]);
-  const loadError = ref<string | null>(null);
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
+
+  // Keyed by agent, so another agent starts empty and a late answer for the
+  // previous one never lands here.
+  const known = computed(() => agentId.value !== "");
+  const account = useQuery(() =>
+    onlyWhen(known.value, userQuery(agentId.value)),
+  );
+  const accountAccess = useQuery(() =>
+    onlyWhen(known.value, userAccessQuery(agentId.value)),
+  );
+  const tokenList = useQuery(() =>
+    onlyWhen(known.value, personalTokensQuery(agentId.value)),
+  );
+  // Roles and owners only add detail, so a failure leaves them out.
+  const roleList = useQuery(rolesQuery);
+  const peopleList = useQuery(usersQuery);
+  const accountData = shownData<User>(account);
+  const accessData = shownData<UserAccess>(accountAccess);
+  const tokenData = shownData<PersonalToken[]>(tokenList);
+  const failed = (cause: unknown) =>
+    errorMessage(cause, "Could not load this agent.");
+  const accountFailure = loadFailure(account, failed);
+  const accessFailure = loadFailure(accountAccess, failed);
+  const tokensFailure = loadFailure(tokenList, failed);
+  /** Its access changed but the new grants didn't load. */
+  const reloadError = ref<string | null>(null);
+  const loadError = computed(
+    () =>
+      accountFailure.value ??
+      accessFailure.value ??
+      tokensFailure.value ??
+      reloadError.value,
+  );
   const tokensError = ref<string | null>(null);
-  let version = 0;
 
-  async function load(): Promise<void> {
-    const current = ++version;
-    const id = agentId.value;
-    loadError.value = null;
-    try {
-      const [account, grants, list, available, accounts] = await Promise.all([
-        fetchUser(id),
-        fetchUserAccess(id),
-        listPersonalTokens(id),
-        fetchRoles().catch(() => [] as Role[]),
-        fetchUsers().catch(() => [] as User[]),
-      ]);
-      if (current !== version) return;
-      if (!isAgent(account)) {
-        await router.replace({ name: "user", params: { userId: account.id } });
-        return;
-      }
-      agent.value = account;
-      access.value = grants;
-      tokens.value = list;
-      roles.value = available;
-      people.value = accounts.filter((candidate) => !isAgent(candidate));
-    } catch (cause) {
-      if (current !== version) return;
-      loadError.value = errorMessage(cause, "Could not load this agent.");
-    }
-  }
+  /** The agent, once it, its access and its tokens have loaded. */
+  const agent = computed<User | null>(() =>
+    accountData.value &&
+    accessData.value &&
+    tokenData.value &&
+    isAgent(accountData.value)
+      ? accountData.value
+      : null,
+  );
+  const access = computed<UserAccess | null>(() =>
+    agent.value ? accessData.value : null,
+  );
+  const tokens = computed<PersonalToken[] | null>(() =>
+    agent.value ? tokenData.value : null,
+  );
+  const roles = computed<Role[]>(() => roleList.data.value ?? []);
+  const people = computed<User[]>(() =>
+    (peopleList.data.value ?? []).filter((candidate) => !isAgent(candidate)),
+  );
 
+  // People have their own page.
   watch(
-    agentId,
-    () => {
-      agent.value = null;
-      void load();
+    accountData,
+    (current) => {
+      if (current && !isAgent(current))
+        void router.replace({ name: "user", params: { userId: current.id } });
     },
     { immediate: true },
   );
-  onUnmounted(() => {
-    version++;
-  });
+
+  /** Tries again after a failed load. */
+  async function load(): Promise<void> {
+    await Promise.all([
+      account.refetch(),
+      accountAccess.refetch(),
+      tokenList.refetch(),
+      roleList.refresh(),
+      peopleList.refresh(),
+    ]);
+  }
 
   const role = computed(
     () =>
@@ -164,12 +193,15 @@ export function useAgentController() {
     return `${agent.value.email} reaches at most ${formatLevel(access.value.maxLevel)}, and never more than ${ownerName} does.`;
   });
 
+  /**
+   * After a grant changes: every access view and what it decides refresh.
+   * Says so when its own didn't, since the grants shown are then out of date.
+   */
   async function reloadAccess(): Promise<void> {
-    try {
-      access.value = await fetchUserAccess(agentId.value);
-    } catch (cause) {
-      loadError.value = errorMessage(cause, "Could not reload its access.");
-    }
+    await invalidate.accessChanged();
+    reloadError.value = accountAccess.error.value
+      ? "Could not reload its access."
+      : null;
   }
 
   // Tokens
@@ -190,12 +222,10 @@ export function useAgentController() {
   );
 
   async function reloadTokens(): Promise<void> {
-    tokensError.value = null;
-    try {
-      tokens.value = await listPersonalTokens(agentId.value);
-    } catch (cause) {
-      tokensError.value = errorMessage(cause, "Could not load its tokens.");
-    }
+    await invalidate.personalTokensChanged();
+    tokensError.value = tokenList.error.value
+      ? errorMessage(tokenList.error.value, "Could not load its tokens.")
+      : null;
   }
 
   const tokenOpen = ref(false);
@@ -225,15 +255,16 @@ export function useAgentController() {
 
   async function transferred(): Promise<void> {
     transferOpen.value = false;
-    await load();
+    await invalidate.usersChanged();
   }
 
   const actions = useAccountActions(async (action) => {
     if (action.kind === "delete") {
+      void markStale.usersChanged();
       await router.push({ name: "agents" });
       return;
     }
-    await load();
+    await invalidate.usersChanged();
   });
 
   const activity = computed<RouteLocationRaw>(() => ({

@@ -1,16 +1,16 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import {
-  deleteGroup,
-  fetchGroup,
-  removeGroupMember,
-} from "~/services/access.api";
+import { useQuery, useQueryCache } from "@pinia/colada";
+import { deleteGroup, removeGroupMember } from "~/services/access.api";
 import type { GroupDetail, GroupMember } from "~/services/access.api";
-import { fetchUsers } from "~/services/users.api";
 import type { User } from "~/services/users.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import { groupQuery } from "~/queries/access";
+import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { usersQuery } from "~/queries/users";
 import { formatDate } from "~/utils/format";
 import type { GrantPrincipal } from "~/utils/level";
 import type { MembersTarget } from "./components/AddMembersDialog.controller";
@@ -65,43 +65,39 @@ export function useGroupController() {
   );
   const canManage = computed(() => auth.can("groups.manage"));
 
-  const detail = ref<GroupDetail | null>(null);
-  const people = ref<User[]>([]);
-  const loadError = ref<string | null>(null);
-  const membersError = ref<string | null>(null);
-  let version = 0;
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
+  const markStale = useInvalidate({ refetch: false });
 
+  // Keyed by group, so another group starts empty.
+  const groupDetail = useQuery(() =>
+    onlyWhen(groupId.value !== "", groupQuery(groupId.value)),
+  );
+  // Member roles need users.view; without it the column stays empty.
+  const peopleList = useQuery(() =>
+    onlyWhen(auth.can("users.view"), usersQuery),
+  );
+  const detail = shownData<GroupDetail>(groupDetail);
+  const people = computed<User[]>(() => peopleList.data.value ?? []);
+  const groupFailure = loadFailure(groupDetail, (cause) =>
+    errorMessage(cause, "Could not load this group."),
+  );
+  /** The group changed but the new state didn't load. */
+  const reloadError = ref<string | null>(null);
+  const loadError = computed(() => groupFailure.value ?? reloadError.value);
+  const membersError = ref<string | null>(null);
+
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
-    const current = ++version;
-    const id = groupId.value;
-    loadError.value = null;
-    try {
-      const [group, accounts] = await Promise.all([
-        fetchGroup(id),
-        auth.can("users.view")
-          ? fetchUsers().catch(() => [] as User[])
-          : Promise.resolve([] as User[]),
-      ]);
-      if (current !== version) return;
-      detail.value = group;
-      people.value = accounts;
-    } catch (cause) {
-      if (current !== version) return;
-      loadError.value = errorMessage(cause, "Could not load this group.");
-    }
+    await Promise.all([groupDetail.refetch(), peopleList.refresh()]);
   }
 
-  watch(
-    groupId,
-    () => {
-      detail.value = null;
-      void load();
-    },
-    { immediate: true },
-  );
-  onUnmounted(() => {
-    version++;
-  });
+  /** Shows a group the server just returned, then refreshes what it affects. */
+  function show(saved: GroupDetail): void {
+    const key = groupQuery(saved.group.id).key;
+    cache.setQueryData(key, saved);
+    void invalidate.groupsChanged(key);
+  }
 
   const group = computed(() => detail.value?.group ?? null);
 
@@ -154,12 +150,15 @@ export function useGroupController() {
       : "",
   );
 
+  /**
+   * After its members or grants change: the group and everything it
+   * affects refresh. Says so when the group didn't, since it's out of date.
+   */
   async function reload(): Promise<void> {
-    try {
-      detail.value = await fetchGroup(groupId.value);
-    } catch (cause) {
-      loadError.value = errorMessage(cause, "Could not reload the group.");
-    }
+    await invalidate.groupsChanged();
+    reloadError.value = groupDetail.error.value
+      ? "Could not reload the group."
+      : null;
   }
 
   // Members
@@ -183,7 +182,7 @@ export function useGroupController() {
     membersError.value = null;
     try {
       await runWithReauth(async () => {
-        detail.value = await removeGroupMember(groupId.value, member.id);
+        show(await removeGroupMember(groupId.value, member.id));
       });
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -199,7 +198,7 @@ export function useGroupController() {
 
   async function renamed(saved: GroupDetail): Promise<void> {
     renameOpen.value = false;
-    detail.value = saved;
+    show(saved);
   }
 
   // Delete
@@ -222,6 +221,7 @@ export function useGroupController() {
     try {
       await runWithReauth(() => deleteGroup(groupId.value));
       deleteOpen.value = false;
+      void markStale.groupsChanged();
       await router.push({ name: "groups" });
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;

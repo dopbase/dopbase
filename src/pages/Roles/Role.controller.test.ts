@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQueryCache } from "@pinia/colada";
+import { freshPinia } from "~/tests/pinia";
+import { keys } from "~/queries/keys";
 import { useRoleController } from "./Role.controller";
 import * as rolesApi from "~/services/roles.api";
 import { ApiError } from "~/services/http.client";
@@ -43,7 +45,7 @@ async function at(name: string, params = {}, query = {}): Promise<void> {
 }
 
 beforeEach(async () => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   await at("role-new");
   vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
@@ -93,6 +95,20 @@ describe("useRoleController", () => {
       }),
     );
     expect(router.push).toHaveBeenCalledWith({ name: "roles" });
+  });
+
+  it("keeps what you typed when the role list refreshes in the background", async () => {
+    await at("role", { roleId: viewerRole.id });
+    const { controller } = mountController(useRoleController);
+    await settle();
+    expect(controller.name.value).toBe(viewerRole.name);
+
+    controller.name.value = "Read only";
+    await useQueryCache().invalidateQueries({ key: keys.roles });
+    await settle();
+
+    expect(rolesApi.fetchRoles).toHaveBeenCalledTimes(2);
+    expect(controller.name.value).toBe("Read only");
   });
 
   it("asks for a name first", async () => {

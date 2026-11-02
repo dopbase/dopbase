@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { nextTick } from "vue";
 import { useAccountController } from "./Account.controller";
 import * as authApi from "~/services/auth.api";
@@ -36,7 +36,7 @@ function signIn(store: ReturnType<typeof useAuthStore>): Promise<void> {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   route.name = "account";
 });
@@ -200,7 +200,10 @@ describe("useAccountController", () => {
     const { controller } = mountController(useAccountController);
     await settle();
 
-    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith("me");
+    expect(accessApi.fetchUserAccess).toHaveBeenCalledWith(
+      "me",
+      expect.any(AbortSignal),
+    );
     expect(controller.groups.value).toEqual([
       { id: "grp_backend", name: "Backend" },
     ]);

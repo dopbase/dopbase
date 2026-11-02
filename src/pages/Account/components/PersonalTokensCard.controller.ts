@@ -1,23 +1,23 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import type { RouteLocationRaw } from "vue-router";
-import {
-  listPersonalTokens,
-  revokePersonalToken,
-} from "~/services/personal-tokens.api";
+import { useQuery } from "@pinia/colada";
+import { revokePersonalToken } from "~/services/personal-tokens.api";
 import type {
   CreatedPersonalToken,
   PersonalToken,
 } from "~/services/personal-tokens.api";
-import { listProjects } from "~/services/projects.api";
 import type { Project } from "~/services/projects.api";
-import { listEnvironments } from "~/services/environments.api";
 import type { Environment } from "~/services/environments.api";
-import { fetchRoles } from "~/services/roles.api";
 import type { Role } from "~/services/roles.api";
 import { LEVELS, type Level } from "~/services/access.api";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { useAuthStore } from "~/stores/auth.store";
+import { loadFailure, onlyWhen } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { personalTokensQuery } from "~/queries/personal-tokens";
+import { environmentsQuery, projectsQuery } from "~/queries/projects";
+import { rolesQuery } from "~/queries/users";
 import { formatDate, formatRelativeTime } from "~/utils/format";
 import { levelMeter, type LevelMeter } from "~/utils/level";
 import { copyText } from "~/utils/clipboard";
@@ -49,17 +49,67 @@ function lower(a: Level, b: Level): Level {
 export function usePersonalTokensCardController() {
   const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
+  const invalidate = useInvalidate();
 
-  const tokens = ref<PersonalToken[] | null>(null);
-  const projects = ref<Project[]>([]);
-  const environments = ref<Environment[]>([]);
-  const role = ref<Role | null>(null);
-  const error = ref<string | null>(null);
   const created = ref<CreatedPersonalToken | null>(null);
   const dialogOpen = ref(false);
   const visible = computed(() => !auth.isRoot && auth.can("tokens.personal"));
   /** Roles such as Auditor hold tokens that read the audit log only. */
   const auditOnly = computed(() => auth.session?.tokenScope === "audit");
+  /** Where a new token may reach; audit tokens reach no project. */
+  const placesWanted = computed(() => visible.value && !auditOnly.value);
+
+  const tokenList = useQuery(() =>
+    onlyWhen(visible.value, personalTokensQuery("me")),
+  );
+  const projectList = useQuery(() =>
+    onlyWhen(placesWanted.value, projectsQuery),
+  );
+  const environmentList = useQuery(() =>
+    onlyWhen(placesWanted.value, environmentsQuery(null)),
+  );
+  // Only people who can see roles read the limits; for everyone else the
+  // server still refuses anything beyond them.
+  const roleList = useQuery(() =>
+    onlyWhen(auth.can("users.view", "roles.manage"), rolesQuery),
+  );
+
+  const failed = (cause: unknown) =>
+    errorMessage(cause, "Could not load your tokens.");
+  const tokensFailure = loadFailure(tokenList, failed);
+  const projectsFailure = loadFailure(projectList, failed);
+  const environmentsFailure = loadFailure(environmentList, failed);
+  const loadError = computed(
+    () =>
+      tokensFailure.value ?? projectsFailure.value ?? environmentsFailure.value,
+  );
+  const copyError = ref<string | null>(null);
+  const error = computed(() => copyError.value ?? loadError.value);
+
+  /** Null until everything the tab needs has loaded; empty when it failed. */
+  const tokens = computed<PersonalToken[] | null>(() => {
+    if (loadError.value) return [];
+    const mine = tokenList.data.value;
+    if (!mine) return null;
+    if (
+      placesWanted.value &&
+      (!projectList.data.value || !environmentList.data.value)
+    )
+      return null;
+    return mine;
+  });
+  const projects = computed<Project[]>(() =>
+    placesWanted.value ? (projectList.data.value ?? []) : [],
+  );
+  const environments = computed<Environment[]>(() =>
+    placesWanted.value ? (environmentList.data.value ?? []) : [],
+  );
+  const role = computed<Role | null>(
+    () =>
+      roleList.data.value?.find(
+        (candidate) => candidate.name === auth.session?.roleName,
+      ) ?? null,
+  );
 
   const active = computed(() =>
     (tokens.value ?? []).filter(
@@ -92,40 +142,21 @@ export function usePersonalTokensCardController() {
     days: role.value?.tokenMaxTtlDays ?? DEFAULT_MAX_DAYS,
   }));
 
-  async function loadRole(): Promise<void> {
-    if (!auth.can("users.view", "roles.manage")) return;
-    try {
-      const roles = await fetchRoles();
-      role.value =
-        roles.find((candidate) => candidate.name === auth.session?.roleName) ??
-        null;
-    } catch {
-      role.value = null;
-    }
-  }
-
+  /** Tries again after a failed load. */
   async function load(): Promise<void> {
     if (!visible.value) return;
-    error.value = null;
-    try {
-      const [mine, shared, places] = await Promise.all([
-        listPersonalTokens(),
-        auditOnly.value ? Promise.resolve([]) : listProjects(),
-        auditOnly.value ? Promise.resolve([]) : listEnvironments(),
-      ]);
-      tokens.value = mine;
-      projects.value = shared;
-      environments.value = places;
-    } catch (cause) {
-      tokens.value = [];
-      error.value = errorMessage(cause, "Could not load your tokens.");
-    }
+    copyError.value = null;
+    await Promise.all([
+      tokenList.refetch(),
+      placesWanted.value ? projectList.refetch() : undefined,
+      placesWanted.value ? environmentList.refetch() : undefined,
+    ]);
   }
 
   function tokenCreated(token: CreatedPersonalToken): void {
     dialogOpen.value = false;
     created.value = token;
-    void load();
+    void invalidate.personalTokensChanged();
   }
 
   function acknowledge(): void {
@@ -157,7 +188,7 @@ export function usePersonalTokensCardController() {
         await revokePersonalToken("me", token.id);
       });
       revoking.value = null;
-      await load();
+      await invalidate.personalTokensChanged();
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       revokeError.value = errorMessage(cause, "Could not revoke that token.");
@@ -173,8 +204,9 @@ export function usePersonalTokensCardController() {
     notice.value = (await copyText(token.name))
       ? `Copied ${token.name}.`
       : null;
-    if (!notice.value)
-      error.value = "Copy failed. Select the name and copy it.";
+    copyError.value = notice.value
+      ? null
+      : "Copy failed. Select the name and copy it.";
   }
 
   /** Requests with your tokens are recorded with you as the actor. */
@@ -188,11 +220,6 @@ export function usePersonalTokensCardController() {
     () =>
       `curl -H "Authorization: Bearer $DOPBASE_TOKEN" \\\n  ${window.location.origin}/api/v1/audit-events`,
   );
-
-  onMounted(() => {
-    void load();
-    void loadRole();
-  });
 
   return {
     tokens,
