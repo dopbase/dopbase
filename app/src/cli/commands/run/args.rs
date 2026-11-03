@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::{constants::help::ENVIRONMENT_ARG_HELP, utils::env_layout::valid_key};
+use crate::{constants::help::RUN_ENVIRONMENT_ARG_HELP, utils::env_layout::valid_key};
 
 fn parse_key(value: &str) -> Result<String, String> {
   if valid_key(value) {
@@ -12,7 +12,7 @@ fn parse_key(value: &str) -> Result<String, String> {
 
 #[derive(Args, Debug)]
 pub struct RunArgs {
-  #[arg(value_name = "ENVIRONMENT_REF", help = ENVIRONMENT_ARG_HELP)]
+  #[arg(value_name = "ENVIRONMENT_REF", help = RUN_ENVIRONMENT_ARG_HELP)]
   pub environment: Option<String>,
   /// Inject only these secrets. Repeat the flag or separate keys with commas.
   #[arg(long, value_name = "KEY", value_delimiter = ',', value_parser = parse_key)]
@@ -37,4 +37,5 @@ Examples:
   dopbase run payment-service/production -- npm start
   dopbase run payment-service/production --only API_KEY,DATABASE_URL -- npm start
   dopbase run payment-service/development --preserve-env PORT,LOG_LEVEL -- npm run dev
+  DOPBASE_TOKEN=dbs_... dopbase run -- npm start
 ";

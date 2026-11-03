@@ -96,6 +96,29 @@ pub fn is_authentication_error(error: &anyhow::Error) -> bool {
     .is_some_and(|error| error.status == reqwest::StatusCode::UNAUTHORIZED)
 }
 
+/// The 404 a server returns for a route it doesn't have, so the CLI can
+/// tell an older server from a missing resource.
+pub(crate) fn is_missing_route(error: &anyhow::Error) -> bool {
+  error.downcast_ref::<ResponseError>().is_some_and(|error| {
+    error.status == reqwest::StatusCode::NOT_FOUND
+      && error
+        .message
+        .starts_with(crate::constants::errors::REQUEST_INVALID)
+  })
+}
+
+/// The server's message for `code`, when `error` carries that code.
+pub(crate) fn coded_message<'a>(
+  error: &'a anyhow::Error,
+  code: &str,
+) -> Option<&'a str> {
+  error
+    .downcast_ref::<ResponseError>()?
+    .message
+    .lines()
+    .find_map(|line| line.strip_prefix(code)?.strip_prefix(": "))
+}
+
 #[doc(hidden)]
 pub fn is_conflict_error(error: &anyhow::Error) -> bool {
   error

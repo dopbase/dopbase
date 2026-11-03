@@ -6,6 +6,7 @@ use crate::{
   },
   constants::{
     api,
+    errors::TOKEN_SCOPE_INVALID,
     limits::{MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
   },
   models::SecretInput,
@@ -18,6 +19,9 @@ use serde_json::Value;
 use std::{collections::HashSet, time::Duration};
 
 const LIVE_TIMEOUT: Duration = Duration::from_secs(5);
+/// The cache alias a runner token's environment is stored under, so a run
+/// without a reference finds it offline. `@` never starts a reference.
+pub const RUNNER_ALIAS: &str = "@runner";
 
 #[derive(Debug)]
 pub enum RuntimeSource {
@@ -63,6 +67,16 @@ pub async fn load(
   api: &ApiClient,
   reference: &str,
 ) -> Result<RuntimeLoad> {
+  load_aliased(server, api, reference, Vec::new()).await
+}
+
+/// [`load`], also caching the entry under `aliases`.
+async fn load_aliased(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  reference: &str,
+  aliases: Vec<String>,
+) -> Result<RuntimeLoad> {
   let live = tokio::time::timeout(LIVE_TIMEOUT, fetch_live(api, reference)).await;
   match live {
     Ok(Ok(runtime)) => {
@@ -70,7 +84,7 @@ pub async fn load(
         project: runtime.project.clone(),
         environment: runtime.environment.clone(),
         environment_id: runtime.environment_id.clone(),
-        aliases: Vec::new(),
+        aliases,
         fetched_at: Utc::now(),
         entries: runtime.entries.clone(),
       };
@@ -132,6 +146,156 @@ async fn fetch_live(
   Ok(runtime)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunnerResponse {
+  project_id: String,
+  project: String,
+  environment: String,
+  environment_id: String,
+  entries: Vec<SecretInput>,
+}
+
+/// Loads the runner token's own environment. `expected` is the reference
+/// the caller named, if any; it must be that environment.
+pub async fn load_runner(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  expected: Option<&str>,
+) -> Result<RuntimeLoad> {
+  let loaded = load_runner_live(server, api, expected).await;
+  // The server refuses a reference to another environment before it reads
+  // any value, on the new route and the older `resolve` alike.
+  match (loaded, expected) {
+    (Err(error), Some(expected))
+      if client::coded_message(&error, TOKEN_SCOPE_INVALID).is_some() =>
+    {
+      bail!(scope_refused(expected))
+    }
+    (loaded, _) => loaded,
+  }
+}
+
+async fn load_runner_live(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  expected: Option<&str>,
+) -> Result<RuntimeLoad> {
+  let live = tokio::time::timeout(LIVE_TIMEOUT, fetch_runner(api, expected)).await;
+  match live {
+    Ok(Ok(runtime)) => {
+      // `store::save` adds the environment ID and `project/environment`.
+      let aliases = vec![format!("{}/{}", runtime.project_id, runtime.environment)];
+      let cached = CachedRuntime {
+        project: runtime.project.clone(),
+        environment: runtime.environment.clone(),
+        environment_id: runtime.environment_id.clone(),
+        aliases,
+        fetched_at: Utc::now(),
+        entries: runtime.entries.clone(),
+      };
+      let cache_warning = store::save(server, api.credential_token()?, RUNNER_ALIAS, &cached)
+        .err()
+        .map(|error| {
+          format!("live secrets were loaded, but the encrypted cache was not updated: {error}")
+        });
+      Ok(RuntimeLoad {
+        project: runtime.project,
+        environment: runtime.environment,
+        environment_id: runtime.environment_id,
+        entries: runtime.entries,
+        source: RuntimeSource::Live { cache_warning },
+      })
+    }
+    // An older server. Keep the runner alias on the entry, or a later
+    // offline run without a reference would find no cache.
+    Ok(Err(error)) if client::is_missing_route(&error) => match expected {
+      Some(reference) => load_aliased(server, api, reference, vec![RUNNER_ALIAS.to_owned()]).await,
+      None => bail!(
+        "This Dopbase server can't pick the environment from a runner token. Pass ENVIRONMENT_REF or upgrade the server."
+      ),
+    },
+    Ok(Err(error)) if client::is_availability_error(&error) => {
+      load_runner_after_failure(server, api, expected, concise_reason(&error))
+    }
+    Err(_) => load_runner_after_failure(
+      server,
+      api,
+      expected,
+      format!(
+        "Dopbase at {} did not complete the runtime fetch within 5 seconds",
+        server.url
+      ),
+    ),
+    Ok(Err(error)) => Err(error),
+  }
+}
+
+async fn fetch_runner(
+  api: &ApiClient,
+  expected: Option<&str>,
+) -> Result<RunnerResponse> {
+  let value = api
+    .request_runtime(Method::GET, &api::runtime::secrets(expected), None)
+    .await?;
+  let runtime: RunnerResponse =
+    serde_json::from_value(value).context("runtime response was invalid")?;
+  if runtime.environment_id.is_empty()
+    || runtime.project_id.is_empty()
+    || runtime.project.is_empty()
+    || runtime.environment.is_empty()
+  {
+    bail!("runtime response contained empty environment metadata");
+  }
+  validate_entries(&runtime.entries)?;
+  Ok(runtime)
+}
+
+/// Stops an offline run whose reference names another environment than
+/// the cached one, before any child starts. Online, the server checks.
+fn ensure_runner_environment(
+  expected: Option<&str>,
+  aliases: &[String],
+) -> Result<()> {
+  match expected {
+    Some(expected) if !aliases.iter().any(|alias| alias == expected) => {
+      bail!(scope_refused(expected))
+    }
+    _ => Ok(()),
+  }
+}
+
+/// The refusal names only what the caller asked for, never the token's own
+/// environment, since it is printed wherever the run's output goes.
+fn scope_refused(expected: &str) -> String {
+  format!(
+    "The runner token cannot access {expected}. Drop the environment reference to run the token's own environment, or use a token made for {expected}."
+  )
+}
+
+fn load_runner_after_failure(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  expected: Option<&str>,
+  reason: String,
+) -> Result<RuntimeLoad> {
+  let token = api.credential_token()?;
+  // An entry an older CLI saved has no runner alias, only the reference.
+  let cached = store::load(server, token, RUNNER_ALIAS)
+    .or_else(|error| match expected {
+      Some(reference) => store::load(server, token, reference),
+      None => Err(error),
+    })
+    .with_context(|| {
+      format!(
+        "{reason}. \nEnvironment variables were not injected, and the child was not started because no usable encrypted cache is available for this runner token"
+      )
+    })?;
+  ensure_runner_environment(expected, &cached.aliases)?;
+  validate_entries(&cached.entries)?;
+  Ok(cached_load(cached, reason))
+}
+
 fn validate_entries(entries: &[SecretInput]) -> Result<()> {
   if entries.len() > MAX_SECRETS_PER_ENVIRONMENT {
     bail!("runtime response exceeded the maximum number of environment variables");
@@ -172,9 +336,16 @@ fn load_after_failure(
     )
   })?;
   validate_entries(&cached.entries)?;
+  Ok(cached_load(cached, reason))
+}
+
+fn cached_load(
+  cached: CachedRuntime,
+  reason: String,
+) -> RuntimeLoad {
   let fetched_at = cached.fetched_at.to_rfc3339_opts(SecondsFormat::Secs, true);
   let age = format_age(Utc::now().signed_duration_since(cached.fetched_at));
-  Ok(RuntimeLoad {
+  RuntimeLoad {
     project: cached.project,
     environment: cached.environment,
     environment_id: cached.environment_id,
@@ -184,7 +355,7 @@ fn load_after_failure(
       age,
       reason,
     },
-  })
+  }
 }
 
 fn concise_reason(error: &anyhow::Error) -> String {

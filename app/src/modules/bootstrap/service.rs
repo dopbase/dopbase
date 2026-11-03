@@ -262,10 +262,7 @@ pub async fn restore_bootstrap(
     .await
     .map_err(|e| {
       tracing::warn!(%e, "rekeying uploaded database failed");
-      HttpError::bad_request(
-        "BACKUP_REKEY_FAILED",
-        &format!("Failed to re-key backup: {e}"),
-      )
+      crate::modules::backups::service::rekey_failed()
     })?;
 
     temp_client

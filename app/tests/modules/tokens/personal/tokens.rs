@@ -419,3 +419,99 @@ async fn replacing_an_agent_s_token_revokes_its_other_live_tokens_in_one_step() 
   assert_eq!(projects(&laptop).await, 200);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn someone_who_cannot_manage_people_learns_nothing_about_other_accounts() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let other = person(&router, &root, "other@example.com", "member").await;
+
+  // A missing id, root and another person all get the role refusal.
+  for user in ["usr_missing", root.id.as_str(), other.id.as_str()] {
+    let mut refusals = Vec::new();
+    for (method, path, body) in [
+      ("GET", format!("/api/v1/users/{user}/tokens"), None),
+      (
+        "POST",
+        format!("/api/v1/users/{user}/tokens"),
+        Some(json!({"name":"x","level":"read"})),
+      ),
+      (
+        "POST",
+        format!("/api/v1/users/{user}/tokens/pat_missing/revoke"),
+        None,
+      ),
+    ] {
+      let (status, body) = send(&router, method, &path, member.browser(), body).await;
+      assert_eq!(status, 403, "{method} {path}: {body}");
+      refusals.push(body);
+    }
+    assert!(
+      refusals
+        .iter()
+        .all(|body| body["error"]["AUTHORIZATION_DENIED"]
+          == "Your role does not allow this operation."),
+      "{user}: {refusals:?}"
+    );
+  }
+
+  // Someone who manages people still hears that the account is missing.
+  let (status, _) = send(
+    &router,
+    "GET",
+    "/api/v1/users/usr_missing/tokens",
+    root.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 404);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn managing_without_seeing_people_treats_a_missing_account_like_one_out_of_reach() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/roles",
+    root.browser(),
+    Some(json!({
+      "name": "Token desk",
+      "capabilities": ["tokens.revoke_others", "users.manage"],
+      "maxLevel": "read",
+    })),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let role_id = body["data"]["id"].as_str().unwrap();
+  let desk = super::audit_scope::with_role(&router, &root, "desk@example.com", role_id).await;
+
+  // Root and an admin reach further than the desk; a missing id must look
+  // the same as they do.
+  for (method, suffix, body) in [
+    ("POST", "tokens/pat_missing/revoke", None),
+    ("POST", "tokens", Some(json!({"name":"x","level":"read"}))),
+  ] {
+    let mut refusals = Vec::new();
+    for user in ["usr_missing", root.id.as_str(), lead.id.as_str()] {
+      let path = format!("/api/v1/users/{user}/{suffix}");
+      let (status, response) = send(&router, method, &path, desk.browser(), body.clone()).await;
+      assert_eq!(status, 403, "{path}: {response}");
+      refusals.push(response);
+    }
+    assert!(
+      refusals.iter().all(|response| response == &refusals[0]),
+      "{suffix}: {refusals:?}"
+    );
+    assert!(
+      refusals[0]["error"]["ACCESS_EXCEEDS_YOURS"].is_string(),
+      "{suffix}: {}",
+      refusals[0]
+    );
+  }
+  state.db.close().await;
+}

@@ -110,29 +110,39 @@ fn self_grant() -> HttpError {
   HttpError::forbidden("SELF_GRANT", "You can't change your own access.")
 }
 
+fn principal_invalid() -> HttpError {
+  HttpError::validation(BTreeMap::from([(
+    "GRANT_PRINCIPAL_INVALID".into(),
+    "This account can't be given access.".into(),
+  )]))
+}
+
 /// The principal's label, after checking a grant at `level` may be given
-/// to it.
+/// to it. A caller grants only to groups and people they may list, as the
+/// Admin UI offers, so ids, root and role ceilings can't be probed.
 async fn principal_label(
   conn: &mut sqlx::SqliteConnection,
+  identity: &AuthIdentity,
   actor_id: &str,
   principal_type: PrincipalType,
   principal_id: &str,
   level: Level,
 ) -> Result<String, HttpError> {
+  let can = |capability| require_capability(identity, capability).is_ok();
   match principal_type {
+    PrincipalType::Group if !can(Capability::GroupsManage) && !can(Capability::UsersView) => {
+      Err(principal_invalid())
+    }
     PrincipalType::Group => repository::group_name(conn, principal_id)
       .await?
       .ok_or_else(|| HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")),
+    PrincipalType::User if !can(Capability::UsersView) => Err(principal_invalid()),
     PrincipalType::User => {
-      let (email, is_root, role_id) = repository::account(conn, principal_id)
+      // Root takes no grants, and a missing id gets the same answer.
+      let (email, _, role_id) = repository::account(conn, principal_id)
         .await?
-        .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
-      if is_root {
-        return Err(HttpError::forbidden(
-          "ROOT_PROTECTED",
-          "Root reaches everything and takes no grants.",
-        ));
-      }
+        .filter(|(_, is_root, _)| !is_root)
+        .ok_or_else(principal_invalid)?;
       if principal_id == actor_id {
         return Err(self_grant());
       }
@@ -173,6 +183,7 @@ pub async fn set(
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let label = principal_label(
     &mut tx,
+    identity,
     actor_id,
     request.principal_type,
     &request.principal_id,

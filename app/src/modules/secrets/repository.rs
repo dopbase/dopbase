@@ -47,6 +47,17 @@ pub async fn rows<'e>(
 ) -> Result<Vec<SecretRow>, sqlx::Error> {
   sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(executor).await
 }
+/// What an environment's revision is made of: each key's version and
+/// update time, without any ciphertext.
+pub async fn revision_rows<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+) -> Result<Vec<(String, i64, String)>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
+    .bind(environment_id)
+    .fetch_all(executor)
+    .await
+}
 /// The version of each of `keys` the environment has. Keys it doesn't have
 /// are left out.
 pub async fn versions_of<'e>(

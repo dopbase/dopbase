@@ -39,17 +39,28 @@ struct Target<'a> {
 }
 
 /// Resolves `me` and the account, for people signed in. Tokens never manage
-/// tokens.
+/// tokens. `others` is what acting on someone else's account needs. A
+/// missing account gets the refusal an existing one would, so ids can't be
+/// probed: the capability refusal without `others`, and the out-of-reach
+/// one without `users.view`.
 async fn target<'a>(
   state: &AppState,
   identity: &'a AuthIdentity,
   id: &str,
+  others: Capability,
 ) -> Result<Target<'a>, HttpError> {
   let (actor_id, actor_email) = require_person(identity)?;
   let id = if id == "me" { actor_id } else { id };
-  let holder = repository::holder(state.db.pool(), id)
-    .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
+  let Some(holder) = repository::holder(state.db.pool(), id).await? else {
+    require_capability(identity, others)?;
+    if require_capability(identity, Capability::UsersView).is_err() {
+      return Err(users::service::exceeds_access());
+    }
+    return Err(HttpError::not_found(
+      "USER_NOT_FOUND",
+      "The user was not found.",
+    ));
+  };
   let relation = if id == actor_id {
     Relation::Myself
   } else if holder.owner_id.as_deref() == Some(actor_id) {
@@ -78,7 +89,7 @@ pub async fn list(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<Vec<PersonalTokenResponse>, HttpError> {
-  let target = target(state, identity, id).await?;
+  let target = target(state, identity, id, Capability::UsersView).await?;
   if target.relation == Relation::Other {
     require_capability(identity, Capability::UsersView)?;
   }
@@ -92,29 +103,28 @@ async fn require_issuer(
   identity: &AuthIdentity,
   target: &Target<'_>,
 ) -> Result<(), HttpError> {
+  if target.relation != Relation::Myself {
+    require_browser(identity)?;
+  }
+  // Someone else's account says nothing about itself, root included, until
+  // the caller is known to manage it.
+  if target.relation == Relation::Other {
+    require_capability(identity, Capability::UsersManage)?;
+    users::service::require_within(state, identity, &target.id).await?;
+  }
   if target.holder.is_root {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",
       "Root has no personal tokens. Sign in instead.",
     ));
   }
-  match target.relation {
-    Relation::Myself => {
-      require_capability(identity, Capability::TokensPersonal)?;
-    }
-    Relation::Owner | Relation::Other => {
-      require_browser(identity)?;
-      if target.holder.sign_in.as_deref() != Some("token_only") {
-        return Err(HttpError::forbidden(
-          "TOKEN_OWNER_INVALID",
-          "People create their own tokens. You can create them for AI agents only.",
-        ));
-      }
-      if target.relation == Relation::Other {
-        require_capability(identity, Capability::UsersManage)?;
-        users::service::require_within(state, identity, &target.id).await?;
-      }
-    }
+  if target.relation == Relation::Myself {
+    require_capability(identity, Capability::TokensPersonal)?;
+  } else if target.holder.sign_in.as_deref() != Some("token_only") {
+    return Err(HttpError::forbidden(
+      "TOKEN_OWNER_INVALID",
+      "People create their own tokens. You can create them for AI agents only.",
+    ));
   }
   // The account's role must allow tokens at all, and it must be active.
   let mut conn = state.db.pool().acquire().await?;
@@ -195,7 +205,7 @@ pub async fn create(
 ) -> Result<CreatedPersonalTokenResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  let target = target(state, identity, id).await?;
+  let target = target(state, identity, id, Capability::UsersManage).await?;
   require_issuer(state, identity, &target).await?;
   if request.replace_existing {
     // People keep the tokens they made; only an AI agent's are swapped.
@@ -352,7 +362,7 @@ pub async fn revoke(
   token_id: &str,
 ) -> Result<PersonalTokenResponse, HttpError> {
   require_mutation(identity, headers)?;
-  let target = target(state, identity, id).await?;
+  let target = target(state, identity, id, Capability::TokensRevokeOthers).await?;
   if target.relation == Relation::Other {
     require_capability(identity, Capability::TokensRevokeOthers)?;
     users::service::require_within(state, identity, &target.id).await?;

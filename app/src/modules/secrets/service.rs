@@ -1033,13 +1033,25 @@ fn collection_revision<'a>(
   rows: impl Iterator<Item = &'a repository::SecretRow>,
   layout: Option<&str>,
 ) -> String {
+  revision_of(
+    environment_id,
+    rows.map(|row| (row.key.as_str(), row.version, row.updated_at.as_str())),
+    layout,
+  )
+}
+/// The revision from each row's key, version and update time.
+fn revision_of<'a>(
+  environment_id: &str,
+  rows: impl Iterator<Item = (&'a str, i64, &'a str)>,
+  layout: Option<&str>,
+) -> String {
   let mut hash = Sha256::new();
   hash.update(environment_id.as_bytes());
-  for row in rows {
+  for (key, version, updated_at) in rows {
     hash.update([0]);
-    hash.update(row.key.as_bytes());
-    hash.update(row.version.to_be_bytes());
-    hash.update(row.updated_at.as_bytes());
+    hash.update(key.as_bytes());
+    hash.update(version.to_be_bytes());
+    hash.update(updated_at.as_bytes());
   }
   if let Some(layout) = layout {
     hash.update([1]);
@@ -1047,20 +1059,98 @@ fn collection_revision<'a>(
   }
   format!("{:x}", hash.finalize())
 }
-async fn decrypt_all(
+/// An environment's rows and `.env` layout, read together, and the
+/// revision they make. Nothing is decrypted yet.
+pub(crate) struct Snapshot {
+  pub revision: String,
+  pub rows: Vec<repository::SecretRow>,
+  pub env_layout: Option<String>,
+}
+pub(crate) async fn snapshot(
   state: &AppState,
   id: &str,
+) -> Result<Snapshot, HttpError> {
+  let mut tx = state.db.pool().begin().await?;
+  let rows = repository::rows(&mut *tx, id).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  tx.rollback().await?;
+  Ok(Snapshot {
+    revision: collection_revision(id, rows.iter(), env_layout.as_deref()),
+    rows,
+    env_layout,
+  })
+}
+/// The environment's current revision, read without any ciphertext, so a
+/// poll that changes nothing stays cheap.
+pub(crate) async fn revision(
+  state: &AppState,
+  id: &str,
+) -> Result<String, HttpError> {
+  let mut tx = state.db.pool().begin().await?;
+  let rows = repository::revision_rows(&mut *tx, id).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  tx.rollback().await?;
+  Ok(revision_of(
+    id,
+    rows
+      .iter()
+      .map(|(key, version, updated_at)| (key.as_str(), *version, updated_at.as_str())),
+    env_layout.as_deref(),
+  ))
+}
+pub(crate) fn decrypt_rows(
+  state: &AppState,
+  id: &str,
+  rows: &[repository::SecretRow],
 ) -> Result<Vec<SecretInput>, HttpError> {
-  repository::rows(state.db.pool(), id)
-    .await?
-    .into_iter()
+  rows
+    .iter()
     .map(|row| {
-      decrypt_row(state, id, &row).map(|value| SecretInput {
-        key: row.key,
+      decrypt_row(state, id, row).map(|value| SecretInput {
+        key: row.key.clone(),
         value,
       })
     })
     .collect()
+}
+/// Who reads secrets at runtime, as the audit event names them.
+pub(crate) struct RuntimeReader<'a> {
+  pub actor_type: &'a str,
+  pub actor_id: &'a str,
+  pub actor_label: Option<&'a str>,
+}
+/// Decrypts `snapshot` for a running process and records the
+/// `secret.runtime_accessed` event. Both runtime routes read through here.
+pub(crate) async fn runtime_entries(
+  state: &AppState,
+  reader: RuntimeReader<'_>,
+  project_id: &str,
+  id: &str,
+  snapshot: &Snapshot,
+) -> Result<Vec<SecretInput>, HttpError> {
+  let entries = decrypt_rows(state, id, &snapshot.rows)?;
+  common::audit_standalone(
+    state.db.pool(),
+    reader.actor_type,
+    Some(reader.actor_id),
+    reader.actor_label,
+    "secret.runtime_accessed",
+    Some(project_id),
+    Some(id),
+    Some("environment"),
+    Some(id),
+    serde_json::json!({"count":entries.len(),"revision":snapshot.revision}),
+  )
+  .await?;
+  Ok(entries)
 }
 /// Returns the stored `.env` editor layout for the environment. Contains no
 /// secret values, so no recent-authentication is required.
@@ -1105,25 +1195,12 @@ pub async fn export(
     ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
-  let mut tx = state.db.pool().begin().await?;
-  let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
-    .bind(id).fetch_all(&mut *tx).await?;
-  let env_layout: Option<String> =
-    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
-      .bind(id)
-      .fetch_optional(&mut *tx)
-      .await?;
-  let revision = collection_revision(id, rows.iter(), env_layout.as_deref());
-  let entries = rows
-    .iter()
-    .map(|row| {
-      decrypt_row(state, id, row).map(|value| SecretInput {
-        key: row.key.clone(),
-        value,
-      })
-    })
-    .collect::<Result<Vec<_>, _>>()?;
-  tx.rollback().await?;
+  let Snapshot {
+    revision,
+    rows,
+    env_layout,
+  } = snapshot(state, id).await?;
+  let entries = decrypt_rows(state, id, &rows)?;
   common::audit_standalone(
     state.db.pool(),
     actor_type,
@@ -1148,7 +1225,8 @@ pub async fn runtime(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<RuntimeSecretsResponse, HttpError> {
-  crate::modules::environments::service::show(state, id).await?;
+  // The runner arm refuses before the lookup, so a runner can't tell a
+  // missing id from another environment's.
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin {
       admin_id, email, ..
@@ -1176,20 +1254,13 @@ pub async fn runtime(
     ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
-  let entries = decrypt_all(state, id).await?;
-  common::audit_standalone(
-    state.db.pool(),
+  let snapshot = snapshot(state, id).await?;
+  let reader = RuntimeReader {
     actor_type,
-    Some(actor_id),
+    actor_id,
     actor_label,
-    "secret.runtime_accessed",
-    Some(&env.project_id),
-    Some(id),
-    Some("environment"),
-    Some(id),
-    serde_json::json!({"count":entries.len()}),
-  )
-  .await?;
+  };
+  let entries = runtime_entries(state, reader, &env.project_id, id, &snapshot).await?;
   Ok(RuntimeSecretsResponse {
     project: env.project_name,
     environment: env.name,

@@ -39,15 +39,22 @@ async fn group_members_reach_what_the_group_is_granted() {
   .await;
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["group"]["memberCount"], 1);
-  let (status, body) = send(
-    &router,
-    "PUT",
-    &format!("{members}/{}", root.id),
-    admin.browser(),
-    None,
-  )
-  .await;
-  assert_eq!(status, 403, "{body}");
+  // Root and a missing id get the same answer, so neither can be probed.
+  for user in [root.id.as_str(), "usr_missing"] {
+    let (status, body) = send(
+      &router,
+      "PUT",
+      &format!("{members}/{user}"),
+      admin.browser(),
+      None,
+    )
+    .await;
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(
+      body["error"]["GROUP_MEMBER_INVALID"], "This account can't join a group.",
+      "{user}"
+    );
+  }
 
   // Joining gives nothing until the group has grants.
   assert!(names(&router, &member, "/api/v1/projects").await.is_empty());

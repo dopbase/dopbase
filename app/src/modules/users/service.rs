@@ -92,7 +92,7 @@ fn agents_stay_agents() -> HttpError {
   )
 }
 
-fn exceeds_access() -> HttpError {
+pub(crate) fn exceeds_access() -> HttpError {
   HttpError::forbidden(
     "ACCESS_EXCEEDS_YOURS",
     "This account has access you don't have, so you can't manage it.",

@@ -66,6 +66,12 @@ All notable changes to Dopbase are documented in this file.
   `POST /api/v1/status/checks/run` to run them now.
 - `update_check` in `server.toml` (or `DOPBASE_UPDATE_CHECK=true`) lets the
   Status page say when a newer release is out. It is off by default.
+- `GET /api/v1/runtime/secrets` gives a runner token the secrets of its own
+  environment, so an SDK needs only the server URL and the token. It returns
+  a `revision` and an `ETag`; a matching `If-None-Match` gets a `304` that
+  reads no ciphertext and writes no audit event. The `ETag` also changes when
+  the project or environment is renamed. `?reference=` checks the environment
+  first.
 
 ### Changed
 
@@ -132,6 +138,13 @@ All notable changes to Dopbase are documented in this file.
 - New runner tokens pick a lifetime, and the token dialog shows the
   `dopbase run` line to use it.
 - The project page works on phones.
+- `dopbase run` with a runner token runs the token's environment and needs no
+  reference. A reference or `DOPBASE_ENV` naming another environment stops the
+  run before the child starts, and the saved default is ignored. Against an
+  older server the refusal reads the same, and the offline cache still works
+  without a reference.
+- A runner token's `last_used_at` is written at most once a minute, and the
+  requests in between don't touch the database for it.
 - The Admin UI keeps what it has read in a shared cache. Going back to a
   screen shows its data at once and refreshes it in the background, and a
   change shows up on every screen that lists it. Signing out, an expired
@@ -158,6 +171,19 @@ All notable changes to Dopbase are documented in this file.
 - Moving quickly between users, agents or environments no longer shows the
   previous one's tokens, and **Load more** on **Activity** no longer adds
   events from the filters you just left.
+
+### Security
+
+- A runner token gets the same 403 for an environment that doesn't exist as
+  for one it can't reach, so its output can't be used to find environments.
+- `dopbase run` with a runner token prints only the key count and source, and
+  leaves out the project, environment and ID.
+- A runner token's 403 repeats the reference only when it has no control
+  characters, so a crafted reference can't add fake error lines to a CI log.
+- A failed backup re-key returns `The backup could not be re-keyed with this
+  master key.` The cause, which could name environment IDs and secret keys,
+  goes to the server log.
+- The CLI no longer prints the password of a server address it rejects.
 
 ## 0.1.10 - 2026-10-26
 

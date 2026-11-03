@@ -148,22 +148,42 @@ pub(crate) async fn show(
     .await?
     .ok_or_else(not_found)
 }
+/// The id a reference names, without any access check.
+pub(crate) async fn resolve_id(
+  state: &AppState,
+  reference: &str,
+) -> Result<Option<String>, HttpError> {
+  Ok(
+    repository::resolve(state.db.pool(), reference)
+      .await?
+      .map(|environment| environment.id),
+  )
+}
+/// The refusal for a runner that names another environment. It repeats the
+/// reference only when it has no control characters, since the message
+/// often lands in CI logs and a newline could fake another error line.
+pub(crate) fn scope_refused(reference: &str) -> HttpError {
+  let message = if reference.chars().any(char::is_control) {
+    "The runner token cannot access this environment.".to_owned()
+  } else {
+    format!("The runner token cannot access {reference}.")
+  };
+  HttpError::forbidden(TOKEN_SCOPE_INVALID, &message)
+}
 pub async fn resolve(
   state: &AppState,
   identity: &AuthIdentity,
   reference: &str,
 ) -> Result<EnvironmentResponse, HttpError> {
-  let environment = repository::resolve(state.db.pool(), reference)
-    .await?
-    .ok_or_else(not_found)?;
+  let environment = repository::resolve(state.db.pool(), reference).await?;
+  // A runner gets one answer for a missing reference and another
+  // environment's, so the refusal can't be used to find which ones exist.
   if let AuthIdentity::Runner { environment_id, .. } = identity
-    && *environment_id != environment.id
+    && environment.as_ref().map(|environment| &environment.id) != Some(environment_id)
   {
-    return Err(HttpError::forbidden(
-      TOKEN_SCOPE_INVALID,
-      "The runner token cannot access this environment.",
-    ));
+    return Err(scope_refused(reference));
   }
+  let environment = environment.ok_or_else(not_found)?;
   let environment = check(
     environment,
     &data_access(state, identity).await?,

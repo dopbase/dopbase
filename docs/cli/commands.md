@@ -727,18 +727,23 @@ Pass the environment directly:
 dopbase run payment-service/development -- npm run dev
 ```
 
-On an application server, save its runner token once:
+On an application server, save its runner token once. The token belongs to one
+environment, so `run` needs no reference:
 
 ```bash
 printf '%s' "$RUNNER_TOKEN" | dopbase login --token
-dopbase run payment-service/production -- npm start
+dopbase run -- npm start
 ```
 
 For CI jobs, inject `DOPBASE_TOKEN` through the pipeline's secret store:
 
 ```bash
-dopbase run payment-service/production -- npm start
+dopbase run -- npm start
 ```
+
+With a runner token, a positional reference or `DOPBASE_ENV` only checks the
+token. A reference to another environment stops `run` before the child starts,
+and the saved default is ignored.
 
 Automation may set `DOPBASE_ENV` instead:
 
@@ -753,14 +758,16 @@ dopbase env default payment-service/development
 dopbase run -- npm run dev
 ```
 
-An explicit positional environment takes precedence over `DOPBASE_ENV`, which
-takes precedence over the saved default. If none is available, `run` explains
+For other credentials, an explicit positional environment takes precedence over
+`DOPBASE_ENV`, which takes precedence over the saved default. If none is available, `run` explains
 how to set the default. Use `dopbase env default --clear` to remove it. An empty
 `DOPBASE_ENV` is an error and does not fall back.
 
 Before starting the child, Dopbase writes the resolved project, environment,
 immutable ID, injected key count, and whether values came from the live server or
-encrypted cache to standard error. It does not print values.
+encrypted cache to standard error. With a runner token it writes only the key
+count and the source, because that output usually ends up in CI logs. It does
+not print values.
 
 Choose which secrets reach the child and which inherited values win:
 
