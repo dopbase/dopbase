@@ -196,26 +196,31 @@ impl FromRequestParts<AppState> for AuthIdentity {
       });
     }
 
-    let runner: Option<(String, String)> = sqlx::query_as(
-      "SELECT id, environment_id FROM runner_tokens WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+    let runner: Option<(String, String, Option<String>)> = sqlx::query_as(
+      "SELECT id, environment_id, last_used_at FROM runner_tokens WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
     )
     .bind(&hash)
     .bind(now.to_rfc3339())
     .fetch_optional(state.db.pool())
     .await
     .map_err(HttpError::from)?;
-    if let Some((token_id, environment_id)) = runner {
+    if let Some((token_id, environment_id, last_used_at)) = runner {
       // A runner may poll every few seconds; one write a minute is enough
-      // for "last used".
-      sqlx::query(
-        "UPDATE runner_tokens SET last_used_at = ? WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)",
-      )
-        .bind(now.to_rfc3339())
-        .bind(&token_id)
-        .bind((now - Duration::seconds(RUNNER_LAST_USED_SECONDS)).to_rfc3339())
-        .execute(state.db.pool())
-        .await
-        .map_err(HttpError::from)?;
+      // for "last used". Deciding here skips the UPDATE, and the write lock
+      // it takes, on the polls in between.
+      let recent = last_used_at
+        .and_then(|at| chrono::DateTime::parse_from_rfc3339(&at).ok())
+        .is_some_and(|at| {
+          now.signed_duration_since(at) < Duration::seconds(RUNNER_LAST_USED_SECONDS)
+        });
+      if !recent {
+        sqlx::query("UPDATE runner_tokens SET last_used_at = ? WHERE id = ?")
+          .bind(now.to_rfc3339())
+          .bind(&token_id)
+          .execute(state.db.pool())
+          .await
+          .map_err(HttpError::from)?;
+      }
       return Ok(AuthIdentity::Runner {
         token_id,
         environment_id,
