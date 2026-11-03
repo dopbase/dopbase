@@ -44,21 +44,18 @@ pub(crate) async fn execute(
       saved_default,
     )
   };
-  let loaded = match loaded {
-    Err(error) if client::is_authentication_error(&error) => {
+  let loaded = match (loaded, saved_default) {
+    (Err(error), _) if client::is_authentication_error(&error) => {
       bail!(
         "Dopbase authentication failed. Run `dopbase login` again or set a valid DOPBASE_TOKEN."
       )
     }
-    Err(error)
-      if saved_default.is_some() && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
-    {
+    (Err(error), Some(reference)) if error.to_string().contains("ENVIRONMENT_NOT_FOUND") => {
       bail!(
-        "Saved default environment {} is unavailable. Set a new one with `dopbase env default <ENVIRONMENT_REF>` or clear it with `dopbase env default --clear`.",
-        saved_default.unwrap_or_default()
+        "Saved default environment {reference} is unavailable. Set a new one with `dopbase env default <ENVIRONMENT_REF>` or clear it with `dopbase env default --clear`."
       )
     }
-    result => result?,
+    (result, _) => result?,
   };
   match &loaded.source {
     RuntimeSource::Live { cache_warning } => {
