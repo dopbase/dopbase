@@ -1436,8 +1436,6 @@ mod grants_access;
 mod groups_members;
 #[path = "modules/instance/status.rs"]
 mod instance_status;
-#[path = "modules/personal_tokens/tokens.rs"]
-mod personal_tokens_tokens;
 #[path = "modules/roles/custom.rs"]
 mod roles_custom;
 #[path = "modules/runtime/secrets.rs"]
@@ -1460,6 +1458,8 @@ mod sso_passwords;
 mod sso_presets;
 #[path = "modules/tokens/names.rs"]
 mod tokens_names;
+#[path = "modules/tokens/personal/tokens.rs"]
+mod tokens_personal_tokens;
 #[path = "modules/users/lifecycle.rs"]
 mod users_lifecycle;
 
