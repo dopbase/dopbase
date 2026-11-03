@@ -289,11 +289,13 @@ and `entries`. The `revision` changes when a secret or the `.env` layout
 changes, and it matches the `revision` from export. A session or personal
 token gets `403` `RUNNER_TOKEN_REQUIRED`.
 
-The `ETag` header is the quoted revision. Send it back as `If-None-Match` to
-check for changes: while nothing has changed, the server answers
-`304 Not Modified` with an empty body. A 304 decrypts nothing and writes no
-audit event, so a client can poll every few seconds. A `200` writes one
-`secret.runtime_accessed` event with the revision.
+Send the `ETag` header back as `If-None-Match` to check for changes: while
+nothing has changed, the server answers `304 Not Modified` with an empty body.
+The `ETag` follows the revision and also changes when the project or
+environment is renamed, so poll with it rather than with `revision`. A 304
+reads no ciphertext, decrypts nothing and writes no audit event, so a client
+can poll every few seconds. A `200` writes one `secret.runtime_accessed` event
+with the revision.
 
 Add `?reference=` with an environment ID or `PROJECT_REF/ENVIRONMENT_NAME` to
 make sure the token is for that environment. Any other reference gets `403`

@@ -17,18 +17,18 @@ use axum::{
 /// Fetch runtime secrets
 ///
 /// Return every secret of the runner token's environment. The token decides
-/// the environment; `reference` only checks it. Send the last
-/// `revision` as `If-None-Match` to get `304 Not Modified` while nothing
-/// has changed; a 304 decrypts nothing and writes no audit event.
+/// the environment; `reference` only checks it. Send the last `ETag` back
+/// as `If-None-Match` to get `304 Not Modified` while nothing has changed;
+/// a 304 decrypts nothing and writes no audit event.
 #[utoipa::path(
   get,
   path = crate::constants::api::runtime::SECRETS,
   tag = "runtime",
   security(("bearerAuth" = [])),
-  params(RuntimeSecretsQuery, ("If-None-Match" = Option<String>, Header, description = "The quoted revision from an earlier response's ETag")),
+  params(RuntimeSecretsQuery, ("If-None-Match" = Option<String>, Header, description = "The ETag from an earlier response")),
   responses(
-    (status = 200, description = "Runtime secrets fetched", body = inline(HttpResponseFormat<RuntimeSnapshot>), headers(("ETag" = String, description = "The quoted revision"))),
-    (status = 304, description = "Nothing changed since the revision in If-None-Match", headers(("ETag" = String, description = "The quoted revision"))),
+    (status = 200, description = "Runtime secrets fetched", body = inline(HttpResponseFormat<RuntimeSnapshot>), headers(("ETag" = String, description = "Changes with the revision or a rename of the project or environment"))),
+    (status = 304, description = "Nothing changed since the ETag in If-None-Match", headers(("ETag" = String, description = "The current ETag"))),
     (status = 401, description = "The runner token is missing, revoked or expired", body = crate::http::ErrorBody),
     (status = 403, description = "The credential is not a runner token, or reference names another environment", body = crate::http::ErrorBody),
   ),
@@ -44,19 +44,18 @@ pub async fn secrets(
     .and_then(|value| value.to_str().ok());
   Ok(
     match service::secrets(&state, &identity, query.reference.as_deref(), if_none_match).await? {
-      RuntimeSecrets::Unchanged { revision } => {
-        (StatusCode::NOT_MODIFIED, [(header::ETAG, etag(&revision)?)]).into_response()
+      RuntimeSecrets::Unchanged { tag } => {
+        (StatusCode::NOT_MODIFIED, [(header::ETAG, etag(&tag)?)]).into_response()
       }
-      RuntimeSecrets::Fetched(snapshot) => {
-        let tag = etag(&snapshot.revision)?;
+      RuntimeSecrets::Fetched { tag, snapshot } => {
         HttpResponse::ok(snapshot, "RUNTIME_SECRETS_FETCHED")
-          .with_header(header::ETAG, tag)
+          .with_header(header::ETAG, etag(&tag)?)
           .into_response()
       }
     },
   )
 }
 
-fn etag(revision: &str) -> Result<HeaderValue, HttpError> {
-  HeaderValue::from_str(&format!("\"{revision}\"")).map_err(|_| HttpError::internal())
+fn etag(tag: &str) -> Result<HeaderValue, HttpError> {
+  HeaderValue::from_str(&format!("\"{tag}\"")).map_err(|_| HttpError::internal())
 }

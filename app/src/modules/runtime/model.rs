@@ -18,9 +18,9 @@ pub struct RuntimeSnapshot {
   pub project: String,
   pub environment: String,
   pub environment_id: String,
-  /// Changes whenever a secret or the `.env` layout changes. Also sent as
-  /// the `ETag`, so a client can ask with `If-None-Match` whether anything
-  /// changed.
+  /// Changes whenever a secret or the `.env` layout changes, and matches the
+  /// `revision` from export. The `ETag` also changes on a rename, so poll
+  /// with the `ETag`, not this.
   pub revision: String,
   pub entries: Vec<SecretInput>,
 }

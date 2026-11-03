@@ -3,22 +3,28 @@ use crate::{
   constants::errors::RUNNER_TOKEN_REQUIRED,
   http::HttpError,
   models::AuthIdentity,
-  modules::{common, environments, secrets},
+  modules::{
+    environments::{self, model::EnvironmentResponse},
+    secrets::{self, service::RuntimeReader},
+  },
   services::authx::Level,
   state::AppState,
 };
+use sha2::{Digest, Sha256};
 
 pub enum RuntimeSecrets {
-  /// The caller already holds this revision.
-  Unchanged {
-    revision: String,
+  /// The caller already holds this tag.
+  Unchanged { tag: String },
+  Fetched {
+    tag: String,
+    snapshot: RuntimeSnapshot,
   },
-  Fetched(RuntimeSnapshot),
 }
 
 /// The runner token's own environment. `reference`, when given, must name
 /// it; otherwise nothing is read. When `if_none_match` names the current
-/// revision nothing is decrypted or audited, so polling stays cheap.
+/// tag nothing is decrypted or audited, and no ciphertext is read, so
+/// polling stays cheap.
 pub async fn secrets(
   state: &AppState,
   identity: &AuthIdentity,
@@ -46,48 +52,64 @@ pub async fn secrets(
     // the refusal often ends up in CI logs.
     return Err(environments::service::scope_refused(reference));
   }
-  let snapshot = secrets::service::snapshot(state, environment_id).await?;
-  if if_none_match.is_some_and(|value| etag_matches(value, &snapshot.revision)) {
-    return Ok(RuntimeSecrets::Unchanged {
-      revision: snapshot.revision,
-    });
+  if let Some(value) = if_none_match {
+    let tag = tag(
+      &secrets::service::revision(state, environment_id).await?,
+      &env,
+    );
+    if etag_matches(value, &tag) {
+      return Ok(RuntimeSecrets::Unchanged { tag });
+    }
   }
-  let entries = secrets::service::decrypt_rows(state, environment_id, &snapshot.rows)?;
-  common::audit_standalone(
-    state.db.pool(),
-    identity.audit_actor_type(),
-    Some(token_id),
-    None,
-    "secret.runtime_accessed",
-    Some(&env.project_id),
-    Some(environment_id),
-    Some("environment"),
-    Some(environment_id),
-    serde_json::json!({"count":entries.len(),"revision":snapshot.revision}),
-  )
-  .await?;
-  Ok(RuntimeSecrets::Fetched(RuntimeSnapshot {
-    project_id: env.project_id,
-    project: env.project_name,
-    environment: env.name,
-    environment_id: env.id,
-    revision: snapshot.revision,
-    entries,
-  }))
+  let snapshot = secrets::service::snapshot(state, environment_id).await?;
+  let reader = RuntimeReader {
+    actor_type: identity.audit_actor_type(),
+    actor_id: token_id,
+    actor_label: None,
+  };
+  let entries =
+    secrets::service::runtime_entries(state, reader, &env.project_id, environment_id, &snapshot)
+      .await?;
+  Ok(RuntimeSecrets::Fetched {
+    tag: tag(&snapshot.revision, &env),
+    snapshot: RuntimeSnapshot {
+      project_id: env.project_id,
+      project: env.project_name,
+      environment: env.name,
+      environment_id: env.id,
+      revision: snapshot.revision,
+      entries,
+    },
+  })
 }
 
-/// Whether an `If-None-Match` value names `revision`. It may list several
-/// tags, and weak tags compare like strong ones, as a conditional GET allows.
+/// The ETag: the revision plus the names the response carries, so renaming
+/// the project or environment also ends a run of 304s. The revision alone
+/// stays what `export` returns, since imports compare against it.
+fn tag(
+  revision: &str,
+  env: &EnvironmentResponse,
+) -> String {
+  let mut hash = Sha256::new();
+  for part in [revision, &env.project_name, &env.name] {
+    hash.update(part.as_bytes());
+    hash.update([0]);
+  }
+  format!("{:x}", hash.finalize())
+}
+
+/// Whether an `If-None-Match` value names `tag`. It may list several tags,
+/// and weak tags compare like strong ones, as a conditional GET allows.
 pub fn etag_matches(
   header: &str,
-  revision: &str,
+  tag: &str,
 ) -> bool {
-  header.split(',').map(str::trim).any(|tag| {
-    let tag = tag.strip_prefix("W/").unwrap_or(tag);
-    tag == "*"
-      || tag
+  header.split(',').map(str::trim).any(|candidate| {
+    let candidate = candidate.strip_prefix("W/").unwrap_or(candidate);
+    candidate == "*"
+      || candidate
         .strip_prefix('"')
-        .and_then(|tag| tag.strip_suffix('"'))
-        .is_some_and(|tag| tag == revision)
+        .and_then(|candidate| candidate.strip_suffix('"'))
+        .is_some_and(|candidate| candidate == tag)
   })
 }

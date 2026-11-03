@@ -111,8 +111,8 @@ async fn a_runner_token_fetches_its_own_environment_and_polls_with_etags() {
     json!([{"key":"DATABASE_URL","value":"postgres://dev"}])
   );
   let revision = data["revision"].as_str().unwrap().to_owned();
-  let tag = format!("\"{revision}\"");
-  assert_eq!(headers[header::ETAG], tag.as_str());
+  let tag = headers[header::ETAG].to_str().unwrap().to_owned();
+  assert!(tag.starts_with('"') && tag.ends_with('"'), "{tag}");
   assert_eq!(headers[header::CACHE_CONTROL], "no-store");
   assert_eq!(runtime_reads(&state).await, 1);
 
@@ -141,6 +141,11 @@ async fn a_runner_token_fetches_its_own_environment_and_polls_with_etags() {
   assert_eq!(status, 200);
   assert_eq!(runtime_reads(&state).await, 2);
 
+  // A revision sent as a tag doesn't match: poll with the ETag.
+  let (status, _, _) = fetch(&router, &token, Some(&format!("\"{revision}\""))).await;
+  assert_eq!(status, 200);
+  assert_eq!(runtime_reads(&state).await, 3);
+
   // A write moves the revision, so the old tag no longer matches.
   assert_eq!(
     set_secret(&router, &root, dev, "API_KEY", "dev-key").await,
@@ -151,6 +156,25 @@ async fn a_runner_token_fetches_its_own_environment_and_polls_with_etags() {
   assert_ne!(body["data"]["revision"], revision.as_str());
   assert_ne!(headers[header::ETAG], tag.as_str());
   assert_eq!(body["data"]["entries"].as_array().unwrap().len(), 2);
+
+  // A rename keeps the revision but changes the tag, so a poller learns
+  // the new name.
+  let tag = headers[header::ETAG].to_str().unwrap().to_owned();
+  let revision = body["data"]["revision"].as_str().unwrap().to_owned();
+  let (status, body) = send(
+    &router,
+    "PATCH",
+    &format!("/api/v1/environments/{dev}"),
+    root.cli(),
+    Some(json!({"name":"development"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, body, headers) = fetch(&router, &token, Some(&tag)).await;
+  assert_eq!(status, 200);
+  assert_eq!(body["data"]["environment"], "development");
+  assert_eq!(body["data"]["revision"], revision.as_str());
+  assert_ne!(headers[header::ETAG], tag.as_str());
   state.db.close().await;
 }
 
