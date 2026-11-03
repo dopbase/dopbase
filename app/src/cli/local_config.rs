@@ -161,10 +161,10 @@ pub fn normalize(value: &str) -> Result<String> {
       "The server address must use http:// or https://. For example: https://dopbase.example.com"
     );
   }
-  validate_host(value, &url)?;
   if !url.username().is_empty() || url.password().is_some() {
     bail!("server URL must not contain credentials");
   }
+  validate_host(value, &url)?;
   if url.query().is_some() || url.fragment().is_some() {
     bail!("server URL must not contain a query or fragment");
   }
@@ -246,7 +246,29 @@ fn valid_domain(host: &str) -> bool {
     })
 }
 
+/// Drops everything up to the last `@`, so a rejected address can be echoed,
+/// often into a CI log, without its password. A password may hold `/`, `?`
+/// or `#` unencoded, so the cut doesn't stop at the authority.
+fn without_credentials(value: &str) -> String {
+  let Some(at) = value.rfind('@') else {
+    return value.to_owned();
+  };
+  let scheme = value
+    .find("://")
+    .filter(|&index| index < at)
+    .filter(|&index| {
+      let scheme = value[..index].trim_start();
+      !scheme.is_empty()
+        && scheme
+          .bytes()
+          .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+    })
+    .map_or(0, |index| index + 3);
+  format!("{}{}", &value[..scheme], &value[at + 1..])
+}
+
 fn invalid_server_address(value: &str) -> anyhow::Error {
+  let value = without_credentials(value);
   anyhow::anyhow!(
     "The server address \"{value}\" is not valid. Enter an HTTP or HTTPS domain, or an IP address with an optional port. For example: https://dopbase.example.com or 192.168.1.20:8840"
   )
