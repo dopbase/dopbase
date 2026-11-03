@@ -67,6 +67,16 @@ pub async fn load(
   api: &ApiClient,
   reference: &str,
 ) -> Result<RuntimeLoad> {
+  load_aliased(server, api, reference, Vec::new()).await
+}
+
+/// [`load`], also caching the entry under `aliases`.
+async fn load_aliased(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  reference: &str,
+  aliases: Vec<String>,
+) -> Result<RuntimeLoad> {
   let live = tokio::time::timeout(LIVE_TIMEOUT, fetch_live(api, reference)).await;
   match live {
     Ok(Ok(runtime)) => {
@@ -74,7 +84,7 @@ pub async fn load(
         project: runtime.project.clone(),
         environment: runtime.environment.clone(),
         environment_id: runtime.environment_id.clone(),
-        aliases: Vec::new(),
+        aliases,
         fetched_at: Utc::now(),
         entries: runtime.entries.clone(),
       };
@@ -153,21 +163,29 @@ pub async fn load_runner(
   api: &ApiClient,
   expected: Option<&str>,
 ) -> Result<RuntimeLoad> {
-  let live = tokio::time::timeout(LIVE_TIMEOUT, fetch_runner(api, expected)).await;
+  let loaded = load_runner_live(server, api, expected).await;
   // The server refuses a reference to another environment before it reads
-  // any value.
-  if let (Ok(Err(error)), Some(expected)) = (&live, expected)
-    && client::coded_message(error, TOKEN_SCOPE_INVALID).is_some()
-  {
-    bail!(scope_refused(expected));
+  // any value, on the new route and the older `resolve` alike.
+  match (loaded, expected) {
+    (Err(error), Some(expected))
+      if client::coded_message(&error, TOKEN_SCOPE_INVALID).is_some() =>
+    {
+      bail!(scope_refused(expected))
+    }
+    (loaded, _) => loaded,
   }
+}
+
+async fn load_runner_live(
+  server: &ResolvedServer,
+  api: &ApiClient,
+  expected: Option<&str>,
+) -> Result<RuntimeLoad> {
+  let live = tokio::time::timeout(LIVE_TIMEOUT, fetch_runner(api, expected)).await;
   match live {
     Ok(Ok(runtime)) => {
-      let aliases = vec![
-        runtime.environment_id.clone(),
-        format!("{}/{}", runtime.project, runtime.environment),
-        format!("{}/{}", runtime.project_id, runtime.environment),
-      ];
+      // `store::save` adds the environment ID and `project/environment`.
+      let aliases = vec![format!("{}/{}", runtime.project_id, runtime.environment)];
       let cached = CachedRuntime {
         project: runtime.project.clone(),
         environment: runtime.environment.clone(),
@@ -189,8 +207,10 @@ pub async fn load_runner(
         source: RuntimeSource::Live { cache_warning },
       })
     }
+    // An older server. Keep the runner alias on the entry, or a later
+    // offline run without a reference would find no cache.
     Ok(Err(error)) if client::is_missing_route(&error) => match expected {
-      Some(reference) => load(server, api, reference).await,
+      Some(reference) => load_aliased(server, api, reference, vec![RUNNER_ALIAS.to_owned()]).await,
       None => bail!(
         "This Dopbase server can't pick the environment from a runner token. Pass ENVIRONMENT_REF or upgrade the server."
       ),

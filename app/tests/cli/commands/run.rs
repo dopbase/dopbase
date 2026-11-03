@@ -49,7 +49,23 @@ fn cache_paths(server: &ResolvedServer) -> (PathBuf, PathBuf, PathBuf) {
   )
 }
 
-async fn resolve_handler(State(mode): State<Arc<AtomicU8>>) -> axum::response::Response {
+/// Mode 10 is an older server, which refuses a runner's reference to
+/// another environment with its old message.
+async fn resolve_handler(
+  State(mode): State<Arc<AtomicU8>>,
+  Query(query): Query<std::collections::HashMap<String, String>>,
+) -> axum::response::Response {
+  if mode.load(Ordering::SeqCst) == 10
+    && query.get("reference").map(String::as_str) != Some("env_01CACHE")
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(
+        json!({"error":{"TOKEN_SCOPE_INVALID":"The runner token cannot access this environment."}}),
+      ),
+    )
+      .into_response();
+  }
   match mode.load(Ordering::SeqCst) {
     7 => {
       return (
@@ -444,6 +460,26 @@ async fn a_runner_token_falls_back_to_its_cache_and_to_the_old_routes() {
     error.contains("Pass ENVIRONMENT_REF or upgrade the server"),
     "{error}"
   );
+  // The older server's refusal reads like the new one's.
+  let error = runtime_cache::load_runner(&server, &api, Some("payment-service/local"))
+    .await
+    .unwrap_err()
+    .to_string();
+  assert!(
+    error.contains(
+      "The runner token cannot access payment-service/local. Drop the environment reference"
+    ),
+    "{error}"
+  );
+
+  // The old-route fetch kept the runner alias, so an offline run without a
+  // reference still finds the cache.
+  mode.store(1, Ordering::SeqCst);
+  let cached = runtime_cache::load_runner(&server, &api, None)
+    .await
+    .unwrap();
+  assert_eq!(cached.source.as_str(), "cache");
+  assert_eq!(cached.entries[0].value, SECRET);
   task.abort();
 }
 
