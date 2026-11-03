@@ -157,9 +157,9 @@ pub async fn load_runner(
   // The server refuses a reference to another environment before it reads
   // any value.
   if let (Ok(Err(error)), Some(expected)) = (&live, expected)
-    && let Some(message) = client::coded_message(error, TOKEN_SCOPE_INVALID)
+    && client::coded_message(error, TOKEN_SCOPE_INVALID).is_some()
   {
-    bail!("{message} Drop the environment reference, or use a token made for {expected}.");
+    bail!(scope_refused(expected));
   }
   match live {
     Ok(Ok(runtime)) => {
@@ -235,16 +235,22 @@ async fn fetch_runner(
 /// the cached one, before any child starts. Online, the server checks.
 fn ensure_runner_environment(
   expected: Option<&str>,
-  project: &str,
-  environment: &str,
   aliases: &[String],
 ) -> Result<()> {
   match expected {
-    Some(expected) if !aliases.iter().any(|alias| alias == expected) => bail!(
-      "This runner token is for {project}/{environment}, not {expected}. Drop the environment reference, or use a token made for {expected}."
-    ),
+    Some(expected) if !aliases.iter().any(|alias| alias == expected) => {
+      bail!(scope_refused(expected))
+    }
     _ => Ok(()),
   }
+}
+
+/// The refusal names only what the caller asked for, never the token's own
+/// environment, since it is printed wherever the run's output goes.
+fn scope_refused(expected: &str) -> String {
+  format!(
+    "The runner token cannot access {expected}. Drop the environment reference to run the token's own environment, or use a token made for {expected}."
+  )
 }
 
 fn load_runner_after_failure(
@@ -265,12 +271,7 @@ fn load_runner_after_failure(
         "{reason}. \nEnvironment variables were not injected, and the child was not started because no usable encrypted cache is available for this runner token"
       )
     })?;
-  ensure_runner_environment(
-    expected,
-    &cached.project,
-    &cached.environment,
-    &cached.aliases,
-  )?;
+  ensure_runner_environment(expected, &cached.aliases)?;
   validate_entries(&cached.entries)?;
   Ok(cached_load(cached, reason))
 }

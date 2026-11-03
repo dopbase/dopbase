@@ -184,7 +184,7 @@ async fn a_reference_only_checks_the_token_s_environment_and_reads_nothing_when_
     assert_eq!(status, 403, "{reference}");
     assert_eq!(
       body["error"]["TOKEN_SCOPE_INVALID"],
-      format!("This runner token is for payments/dev, not {reference}."),
+      format!("The runner token cannot access {reference}."),
     );
   }
   assert_eq!(runtime_reads(&state).await, reads);

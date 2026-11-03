@@ -42,13 +42,11 @@ pub async fn secrets(
       .as_ref()
       != Some(environment_id)
   {
-    // Whether `reference` exists elsewhere is not the token's business.
+    // Name neither the token's environment nor whether `reference` exists:
+    // the refusal often ends up in CI logs.
     return Err(HttpError::forbidden(
       TOKEN_SCOPE_INVALID,
-      &format!(
-        "This runner token is for {}/{}, not {reference}.",
-        env.project_name, env.name
-      ),
+      &format!("The runner token cannot access {reference}."),
     ));
   }
   let snapshot = secrets::service::snapshot(state, environment_id).await?;

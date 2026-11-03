@@ -54,7 +54,7 @@ environment, `run` stops before the application starts and before the server
 reads any value:
 
 ```text
-Error: This runner token is for payment-service/production, not payment-service/staging. Drop the environment reference, or use a token made for payment-service/staging.
+Error: The runner token cannot access payment-service/staging. Drop the environment reference to run the token's own environment, or use a token made for payment-service/staging.
 ```
 
 `DOPBASE_ENV` works the same way. A runner token ignores the saved default from

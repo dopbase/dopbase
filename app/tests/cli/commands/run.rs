@@ -129,7 +129,7 @@ async fn runner_handler(
     return (
       StatusCode::FORBIDDEN,
       Json(json!({"error":{"TOKEN_SCOPE_INVALID":format!(
-        "This runner token is for payment-service/development, not {reference}."
+        "The runner token cannot access {reference}."
       )}})),
     );
   }
@@ -391,10 +391,10 @@ async fn a_runner_token_loads_its_own_environment_and_a_reference_only_checks_it
     .unwrap_err()
     .to_string();
   assert!(
-    error
-      .contains("This runner token is for payment-service/development, not payment-service/local"),
+    error.contains("The runner token cannot access payment-service/local."),
     "{error}"
   );
+  assert!(!error.contains("development"), "{error}");
   task.abort();
 }
 
@@ -424,7 +424,11 @@ async fn a_runner_token_falls_back_to_its_cache_and_to_the_old_routes() {
     .await
     .unwrap_err()
     .to_string();
-  assert!(error.contains("This runner token is for"), "{error}");
+  assert!(
+    error.contains("The runner token cannot access payment-service/local."),
+    "{error}"
+  );
+  assert!(!error.contains("development"), "{error}");
 
   // An older server: a reference takes the resolve + runtime routes.
   mode.store(10, Ordering::SeqCst);
@@ -632,9 +636,10 @@ async fn run_with_a_runner_token_refuses_another_environment_before_the_child_st
       r#"printf started > "$DOPBASE_CHILD_MARKER""#,
     ]);
     let result = output(command, None).await;
-    failure(
-      &result,
-      "This runner token is for fixture/local, not fixture/staging",
+    failure(&result, "The runner token cannot access fixture/staging.");
+    assert!(
+      !String::from_utf8_lossy(&result.stderr).contains("fixture/local"),
+      "the refusal named the token's environment"
     );
     assert!(
       !marker.exists(),
