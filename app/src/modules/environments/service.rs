@@ -159,6 +159,17 @@ pub(crate) async fn resolve_id(
       .map(|environment| environment.id),
   )
 }
+/// The refusal for a runner that names another environment. It repeats the
+/// reference only when it has no control characters, since the message
+/// often lands in CI logs and a newline could fake another error line.
+pub(crate) fn scope_refused(reference: &str) -> HttpError {
+  let message = if reference.chars().any(char::is_control) {
+    "The runner token cannot access this environment.".to_owned()
+  } else {
+    format!("The runner token cannot access {reference}.")
+  };
+  HttpError::forbidden(TOKEN_SCOPE_INVALID, &message)
+}
 pub async fn resolve(
   state: &AppState,
   identity: &AuthIdentity,
@@ -170,10 +181,7 @@ pub async fn resolve(
   if let AuthIdentity::Runner { environment_id, .. } = identity
     && environment.as_ref().map(|environment| &environment.id) != Some(environment_id)
   {
-    return Err(HttpError::forbidden(
-      TOKEN_SCOPE_INVALID,
-      &format!("The runner token cannot access {reference}."),
-    ));
+    return Err(scope_refused(reference));
   }
   let environment = environment.ok_or_else(not_found)?;
   let environment = check(

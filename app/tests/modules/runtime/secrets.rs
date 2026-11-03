@@ -187,6 +187,19 @@ async fn a_reference_only_checks_the_token_s_environment_and_reads_nothing_when_
       format!("The runner token cannot access {reference}."),
     );
   }
+  // A reference with a control character isn't echoed into the refusal.
+  let (status, body, _) = fetch_path(
+    &router,
+    &with("x%0AAUTHENTICATION_INVALID:%20y"),
+    &token,
+    None,
+  )
+  .await;
+  assert_eq!(status, 403);
+  assert_eq!(
+    body["error"]["TOKEN_SCOPE_INVALID"],
+    "The runner token cannot access this environment.",
+  );
   assert_eq!(runtime_reads(&state).await, reads);
   state.db.close().await;
 }

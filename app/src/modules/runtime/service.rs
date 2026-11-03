@@ -1,6 +1,6 @@
 use super::model::RuntimeSnapshot;
 use crate::{
-  constants::errors::{RUNNER_TOKEN_REQUIRED, TOKEN_SCOPE_INVALID},
+  constants::errors::RUNNER_TOKEN_REQUIRED,
   http::HttpError,
   models::AuthIdentity,
   modules::{common, environments, secrets},
@@ -44,10 +44,7 @@ pub async fn secrets(
   {
     // Name neither the token's environment nor whether `reference` exists:
     // the refusal often ends up in CI logs.
-    return Err(HttpError::forbidden(
-      TOKEN_SCOPE_INVALID,
-      &format!("The runner token cannot access {reference}."),
-    ));
+    return Err(environments::service::scope_refused(reference));
   }
   let snapshot = secrets::service::snapshot(state, environment_id).await?;
   if if_none_match.is_some_and(|value| etag_matches(value, &snapshot.revision)) {
