@@ -278,15 +278,17 @@ pub async fn add_member(
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;
-  let (email, is_root) = repository::account(&mut tx, user_id)
+  // Root can't join groups. A missing id gets the same answer, so ids
+  // can't be probed.
+  let (email, _) = repository::account(&mut tx, user_id)
     .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
-  if is_root {
-    return Err(HttpError::forbidden(
-      "ROOT_PROTECTED",
-      "Root reaches everything and can't join groups.",
-    ));
-  }
+    .filter(|(_, is_root)| !is_root)
+    .ok_or_else(|| {
+      HttpError::validation(BTreeMap::from([(
+        "GROUP_MEMBER_INVALID".into(),
+        "This account can't join a group.".into(),
+      )]))
+    })?;
   let now = Utc::now().to_rfc3339();
   if repository::add_member(&mut tx, id, user_id, &actor_id, &now).await? {
     common::audit(

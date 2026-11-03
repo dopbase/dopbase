@@ -484,7 +484,11 @@ async fn grant_requests_are_checked_before_they_change_anything() {
     "read",
   )
   .await;
-  assert_eq!(status, 403, "{body}");
+  assert_eq!(status, 422, "{body}");
+  assert!(
+    body["error"]["GRANT_PRINCIPAL_INVALID"].is_string(),
+    "{body}"
+  );
   let (status, _) = grant(
     &router,
     &root,
@@ -613,6 +617,22 @@ async fn a_scoped_admin_cannot_reach_past_its_own_access() {
   .await;
   assert_eq!(status, 403, "{body}");
   assert!(body["error"]["SELF_GRANT"].is_string());
+  // Root and a missing id get the same answer, so neither can be probed.
+  for user in [root.id.as_str(), "usr_missing"] {
+    let (status, body) = grant(
+      &router,
+      &admin,
+      ("user", user),
+      ("project", Some("payments")),
+      "read",
+    )
+    .await;
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(
+      body["error"]["GRANT_PRINCIPAL_INVALID"], "This account can't be given access.",
+      "{user}"
+    );
+  }
 
   // A peer with every project is out of reach, the member is not.
   let (status, body) = send(
@@ -654,5 +674,67 @@ async fn a_scoped_admin_cannot_reach_past_its_own_access() {
     names(&router, &admin, "/api/v1/projects").await,
     ["billing", "payments"]
   );
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn a_project_manager_grants_only_to_people_and_groups_they_can_list() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/roles",
+    root.browser(),
+    Some(json!({"name":"Lead","capabilities":[],"maxLevel":"project_manager"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let role_id = body["data"]["id"].as_str().unwrap();
+  let lead = super::audit_scope::with_role(&router, &root, "lead@example.com", role_id).await;
+  let (status, body) = grant(
+    &router,
+    &root,
+    ("user", &lead.id),
+    ("project", Some("payments")),
+    "project_manager",
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/groups",
+    root.browser(),
+    Some(json!({"name":"backend"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let group = body["data"]["group"]["id"].as_str().unwrap().to_owned();
+
+  // Real or not, root or not, every principal gets the same answer and no
+  // email comes back.
+  for principal in [
+    ("user", member.id.as_str()),
+    ("user", "usr_missing"),
+    ("user", root.id.as_str()),
+    ("group", group.as_str()),
+    ("group", "grp_missing"),
+  ] {
+    let (status, body) = grant(
+      &router,
+      &lead,
+      principal,
+      ("project", Some("payments")),
+      "read",
+    )
+    .await;
+    assert_eq!(status, 422, "{principal:?}: {body}");
+    assert_eq!(
+      body["error"]["GRANT_PRINCIPAL_INVALID"], "This account can't be given access.",
+      "{principal:?}"
+    );
+  }
   state.db.close().await;
 }
