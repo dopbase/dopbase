@@ -69,8 +69,9 @@ All notable changes to Dopbase are documented in this file.
 - `GET /api/v1/runtime/secrets` gives a runner token the secrets of its own
   environment, so an SDK needs only the server URL and the token. It returns
   a `revision` and an `ETag`; a matching `If-None-Match` gets a `304` that
-  decrypts nothing and writes no audit event. `?reference=` checks the
-  environment first.
+  reads no ciphertext and writes no audit event. The `ETag` also changes when
+  the project or environment is renamed. `?reference=` checks the environment
+  first.
 
 ### Changed
 
@@ -139,8 +140,11 @@ All notable changes to Dopbase are documented in this file.
 - The project page works on phones.
 - `dopbase run` with a runner token runs the token's environment and needs no
   reference. A reference or `DOPBASE_ENV` naming another environment stops the
-  run before the child starts, and the saved default is ignored.
-- A runner token's `last_used_at` is written at most once a minute.
+  run before the child starts, and the saved default is ignored. Against an
+  older server the refusal reads the same, and the offline cache still works
+  without a reference.
+- A runner token's `last_used_at` is written at most once a minute, and the
+  requests in between don't touch the database for it.
 - The Admin UI keeps what it has read in a shared cache. Going back to a
   screen shows its data at once and refreshes it in the background, and a
   change shows up on every screen that lists it. Signing out, an expired
@@ -174,6 +178,8 @@ All notable changes to Dopbase are documented in this file.
   for one it can't reach, so its output can't be used to find environments.
 - `dopbase run` with a runner token prints only the key count and source, and
   leaves out the project, environment and ID.
+- A runner token's 403 repeats the reference only when it has no control
+  characters, so a crafted reference can't add fake error lines to a CI log.
 - A failed backup re-key returns `The backup could not be re-keyed with this
   master key.` The cause, which could name environment IDs and secret keys,
   goes to the server log.
