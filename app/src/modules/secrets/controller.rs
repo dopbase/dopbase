@@ -371,8 +371,8 @@ pub async fn export(
   responses(
     (status = 200, description = "Runtime secrets fetched", body = inline(HttpResponseFormat<RuntimeSecretsResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "The runner token cannot access this environment", body = crate::http::ErrorBody),
-    (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
+    (status = 403, description = "A runner token names an environment other than its own, whether or not it exists", body = crate::http::ErrorBody),
+    (status = 404, description = "The environment was not found (not returned to runner tokens)", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn runtime(

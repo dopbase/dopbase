@@ -192,6 +192,33 @@ async fn a_reference_only_checks_the_token_s_environment_and_reads_nothing_when_
 }
 
 #[tokio::test]
+async fn the_older_routes_refuse_a_runner_the_same_way_whether_or_not_the_target_exists() {
+  let (_dir, state, router) = test_app().await;
+  let (root, env) = instance(&state, &router).await;
+  let (token, _) = runner(&router, &root, &env["payments/dev"]).await;
+
+  for reference in ["payments/prod", "payments/nope"] {
+    let path = format!("/api/v1/environments/resolve?reference={reference}");
+    let (status, body, _) = fetch_path(&router, &path, &token, None).await;
+    assert_eq!(status, 403, "{reference}: {body}");
+    assert_eq!(
+      body["error"]["TOKEN_SCOPE_INVALID"],
+      format!("The runner token cannot access {reference}."),
+    );
+  }
+
+  let mut refusals = Vec::new();
+  for id in [env["payments/prod"].as_str(), "env_000000"] {
+    let path = format!("/api/v1/environments/{id}/secrets/runtime");
+    let (status, body, _) = fetch_path(&router, &path, &token, None).await;
+    refusals.push((status, body));
+  }
+  assert_eq!(refusals[0].0, 403, "{}", refusals[0].1);
+  assert_eq!(refusals[0], refusals[1]);
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn only_runner_tokens_reach_the_runtime_gate() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;

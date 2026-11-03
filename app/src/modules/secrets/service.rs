@@ -1175,7 +1175,8 @@ pub async fn runtime(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<RuntimeSecretsResponse, HttpError> {
-  crate::modules::environments::service::show(state, id).await?;
+  // The runner arm refuses before the lookup, so a runner can't tell a
+  // missing id from another environment's.
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin {
       admin_id, email, ..

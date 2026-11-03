@@ -164,17 +164,18 @@ pub async fn resolve(
   identity: &AuthIdentity,
   reference: &str,
 ) -> Result<EnvironmentResponse, HttpError> {
-  let environment = repository::resolve(state.db.pool(), reference)
-    .await?
-    .ok_or_else(not_found)?;
+  let environment = repository::resolve(state.db.pool(), reference).await?;
+  // A runner gets one answer for a missing reference and another
+  // environment's, so the refusal can't be used to find which ones exist.
   if let AuthIdentity::Runner { environment_id, .. } = identity
-    && *environment_id != environment.id
+    && environment.as_ref().map(|environment| &environment.id) != Some(environment_id)
   {
     return Err(HttpError::forbidden(
       TOKEN_SCOPE_INVALID,
-      "The runner token cannot access this environment.",
+      &format!("The runner token cannot access {reference}."),
     ));
   }
+  let environment = environment.ok_or_else(not_found)?;
   let environment = check(
     environment,
     &data_access(state, identity).await?,
