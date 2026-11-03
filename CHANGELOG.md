@@ -75,8 +75,8 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
-- **Breaking:** Refused admin requests say `Your role does not allow this
-  operation.` instead of `This operation requires an administrator.`
+- **Breaking:** Refused admin requests say `Your role does not allow this operation.`
+  instead of `This operation requires an administrator.`
 - **Breaking:** `PATCH /api/v1/environments/{id}` returns
   `ENVIRONMENT_UPDATED` instead of `ENVIRONMENT_RENAMED`.
 - **Breaking:** New runner token names must be lowercase letters, numbers and
@@ -149,6 +149,9 @@ All notable changes to Dopbase are documented in this file.
   screen shows its data at once and refreshes it in the background, and a
   change shows up on every screen that lists it. Signing out, an expired
   session or signing in as someone else empties the cache.
+- The personal token code moved from `modules/personal_tokens` to
+  `modules/tokens/personal`, next to runner tokens, and its tests moved to
+  match. Routes, the API and behavior are unchanged.
 
 ### Removed
 
@@ -161,8 +164,8 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
-- Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string
-  pool` while loading `sqlx-macros`.
+- Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string pool`
+  while loading `sqlx-macros`.
 - Right after first-run setup, root's role name and session details now show
   without a reload, and the Users page no longer says root never signed in.
 - **Transfer owner** no longer hands an AI agent to someone who can't see it.
@@ -180,9 +183,8 @@ All notable changes to Dopbase are documented in this file.
   leaves out the project, environment and ID.
 - A runner token's 403 repeats the reference only when it has no control
   characters, so a crafted reference can't add fake error lines to a CI log.
-- A failed backup re-key returns `The backup could not be re-keyed with this
-  master key.` The cause, which could name environment IDs and secret keys,
-  goes to the server log.
+- A failed backup re-key returns `The backup could not be re-keyed with this master key.`
+  The cause, which could name environment IDs and secret keys, goes to the server log.
 - The CLI no longer prints the password of a server address it rejects.
 
 ## 0.1.10 - 2026-10-26
