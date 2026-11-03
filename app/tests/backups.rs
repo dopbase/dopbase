@@ -1158,3 +1158,101 @@ fn backup_names_reject_path_syntax_and_deceptive_extensions() {
     );
   }
 }
+
+#[tokio::test]
+async fn a_failed_rekey_names_no_environment_or_secret() {
+  let (dir1, state1, router1, token1) = admin_setup().await;
+  let (status, proj, _) = call(
+    &router1,
+    "POST",
+    "/api/v1/projects",
+    Some(&token1),
+    Some(json!({"name": "shop-project"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let project_id = proj["data"]["id"].as_str().unwrap();
+  let (status, env, _) = call(
+    &router1,
+    "POST",
+    &format!("/api/v1/projects/{project_id}/environments"),
+    Some(&token1),
+    Some(json!({"name": "production"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let env_id = env["data"]["id"].as_str().unwrap();
+  let (status, _, _) = call(
+    &router1,
+    "PUT",
+    &format!("/api/v1/environments/{env_id}/secrets/STRIPE_KEY"),
+    Some(&token1),
+    Some(json!({"value": "sk-marker"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  // The archive still decrypts, but this row's data key can't be unwrapped.
+  sqlx::query("UPDATE secrets SET wrapped_key = zeroblob(48)")
+    .execute(state1.db.pool())
+    .await
+    .unwrap();
+  let (status, backup_res, _) = call(
+    &router1,
+    "POST",
+    "/api/v1/backups",
+    Some(&token1),
+    Some(json!({"name": "broken_backup"})),
+  )
+  .await;
+  assert_eq!(status, 201);
+  let backup_key = backup_res["data"]["key"].as_str().unwrap();
+  let (status, raw_backup, _) = call_raw(
+    &router1,
+    "GET",
+    &format!("/api/v1/backups/{backup_key}"),
+    Some(&token1),
+  )
+  .await;
+  assert_eq!(status, 200);
+  let server1_key = std::fs::read(dir1.path().join("master.key")).unwrap();
+
+  let (_dir2, _state2, router2, token2) = admin_setup().await;
+  let boundary = "---------------------------111122223333444455556666777";
+  let mut body = Vec::new();
+  body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+  body.extend_from_slice(
+    b"Content-Disposition: form-data; name=\"file\"; filename=\"broken.dop\"\r\n",
+  );
+  body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+  body.extend_from_slice(&raw_backup);
+  body.extend_from_slice(format!("\r\n--{boundary}\r\n").as_bytes());
+  body.extend_from_slice(
+    b"Content-Disposition: form-data; name=\"master_key\"; filename=\"master.key\"\r\n",
+  );
+  body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+  body.extend_from_slice(&server1_key);
+  body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+  let request = Request::builder()
+    .method("POST")
+    .uri("/api/v1/backups/upload")
+    .header(header::AUTHORIZATION, format!("Bearer {token2}"))
+    .header(
+      header::CONTENT_TYPE,
+      format!("multipart/form-data; boundary={boundary}"),
+    )
+    .body(Body::from(body))
+    .unwrap();
+  let response = router2.clone().oneshot(request).await.unwrap();
+  assert_eq!(response.status().as_u16(), 400);
+  let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+    .await
+    .unwrap();
+  let text = String::from_utf8_lossy(&bytes);
+  let json: Value = serde_json::from_slice(&bytes).unwrap();
+  assert_eq!(
+    json["error"]["BACKUP_REKEY_FAILED"], "The backup could not be re-keyed with this master key.",
+    "{text}"
+  );
+  assert!(!text.contains(env_id), "{text}");
+  assert!(!text.contains("STRIPE_KEY"), "{text}");
+}

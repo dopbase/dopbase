@@ -29,6 +29,15 @@ const MANIFEST_MAGIC: &str = "DOPBASE_BACKUP_V2";
 const MAX_BACKUP_FILE_BYTES: usize = 250 * 1024 * 1024; // 250 MB
 const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 
+/// The cause names environment ids, secret keys and database internals, so
+/// it goes to the log and the caller gets a fixed message.
+pub(crate) fn rekey_failed() -> HttpError {
+  HttpError::bad_request(
+    "BACKUP_REKEY_FAILED",
+    "The backup could not be re-keyed with this master key.",
+  )
+}
+
 pub fn backup_dir(state: &AppState) -> PathBuf {
   let dir = state.config.data_dir.join(BACKUP_DIR_NAME);
   if !dir.exists() {
@@ -381,10 +390,7 @@ pub async fn upload(
     .await
     .map_err(|e| {
       tracing::warn!(%e, "rekeying uploaded database failed");
-      HttpError::bad_request(
-        "BACKUP_REKEY_FAILED",
-        &format!("Failed to re-key backup: {e}"),
-      )
+      rekey_failed()
     })?;
 
     temp_client
@@ -649,10 +655,7 @@ pub async fn restore_database_from_archive(
     .await
     .map_err(|e| {
       tracing::warn!(%e, "rekeying database during restore failed");
-      HttpError::bad_request(
-        "BACKUP_REKEY_FAILED",
-        &format!("Failed to re-key backup: {e}"),
-      )
+      rekey_failed()
     })?;
   }
 
