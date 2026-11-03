@@ -168,6 +168,17 @@ All notable changes to Dopbase are documented in this file.
   previous one's tokens, and **Load more** on **Activity** no longer adds
   events from the filters you just left.
 
+### Security
+
+- A runner token gets the same 403 for an environment that doesn't exist as
+  for one it can't reach, so its output can't be used to find environments.
+- `dopbase run` with a runner token prints only the key count and source, and
+  leaves out the project, environment and ID.
+- A failed backup re-key returns `The backup could not be re-keyed with this
+  master key.` The cause, which could name environment IDs and secret keys,
+  goes to the server log.
+- The CLI no longer prints the password of a server address it rejects.
+
 ## 0.1.10 - 2026-10-26
 
 [Dopbase](https://dopbase.com) 0.1.10 adds single sign-on for the Admin UI
