@@ -765,7 +765,9 @@ how to set the default. Use `dopbase env default --clear` to remove it. An empty
 
 Before starting the child, Dopbase writes the resolved project, environment,
 immutable ID, injected key count, and whether values came from the live server or
-encrypted cache to standard error. It does not print values.
+encrypted cache to standard error. With a runner token it writes only the key
+count and the source, because that output usually ends up in CI logs. It does
+not print values.
 
 Choose which secrets reach the child and which inherited values win:
 

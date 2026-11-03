@@ -580,7 +580,22 @@ async fn run_injects_secrets_preserves_child_status_and_never_launches_with_a_re
   let result = output(command, None).await;
   assert_eq!(result.status.code(), Some(23));
   assert_eq!(result.stdout, b"child-ok");
-  assert!(!String::from_utf8_lossy(&result.stderr).contains("runtime-private-marker"));
+  let stderr = String::from_utf8_lossy(&result.stderr);
+  assert!(!stderr.contains("runtime-private-marker"));
+  // CI logs get the count and source, not the token's environment.
+  assert!(stderr.contains("source=live"), "{stderr}");
+  assert!(!stderr.contains("fixture/"), "{stderr}");
+  assert!(!stderr.contains(&id), "{stderr}");
+  // A signed-in person still sees where the values came from.
+  let mut command = fixture.command();
+  command.args(["run", &id, "--", "true"]);
+  let result = output(command, None).await;
+  assert!(result.status.success());
+  let stderr = String::from_utf8_lossy(&result.stderr);
+  assert!(
+    stderr.contains(&format!("Dopbase: fixture/local ({id})")),
+    "{stderr}"
+  );
   fixture
     .json(&["token", "revoke", created["token"]["id"].as_str().unwrap()])
     .await;

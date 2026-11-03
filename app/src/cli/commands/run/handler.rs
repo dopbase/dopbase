@@ -24,7 +24,8 @@ pub(crate) async fn execute(
   };
   let api = client::any_authenticated_client(server).await?;
   // A runner token reaches one environment, so the token decides it.
-  let (loaded, saved_default) = if api.credential_token()?.starts_with(RUNNER_TOKEN_PREFIX) {
+  let runner = api.credential_token()?.starts_with(RUNNER_TOKEN_PREFIX);
+  let (loaded, saved_default) = if runner {
     let expected = runner_environment(environment, env::var(ENV_RUN_ENVIRONMENT))?;
     (
       runtime_cache::load_runner(server, &api, expected.as_deref()).await,
@@ -112,13 +113,19 @@ pub(crate) async fn execute(
   } else {
     format!("{} of {loaded_count} key(s)", selection.inject.len())
   };
-  eprintln!(
-    "Dopbase: {}/{} ({}), {injected}, source={}",
-    loaded.project,
-    loaded.environment,
-    loaded.environment_id,
-    loaded.source.as_str(),
-  );
+  // A runner token's output usually lands in CI logs, so it keeps the
+  // token's environment to itself.
+  if runner {
+    eprintln!("Dopbase: {injected}, source={}", loaded.source.as_str());
+  } else {
+    eprintln!(
+      "Dopbase: {}/{} ({}), {injected}, source={}",
+      loaded.project,
+      loaded.environment,
+      loaded.environment_id,
+      loaded.source.as_str(),
+    );
+  }
   let program = command.first().context("run requires a child command")?;
   let mut child_command = tokio::process::Command::new(program);
   child_command

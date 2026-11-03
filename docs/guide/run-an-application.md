@@ -306,6 +306,13 @@ environment, immutable ID, injected key count, and `live` or `cache` source to
 standard error. When filtering left keys out, the count reads `2 of 7 key(s)`. Cached runs also print the fetch timestamp and age. Values are
 never printed.
 
+With a runner token the line leaves out the project, environment and ID, since
+that output usually lands in CI logs:
+
+```text
+Dopbase: 12 key(s), source=live
+```
+
 Dopbase then:
 
 - Stops before launch if live retrieval fails and no usable matching cache is
