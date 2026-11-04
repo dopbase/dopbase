@@ -81,7 +81,7 @@ describe("toRoleRow", () => {
       name: "role",
       params: { roleId: "rol_ai_agent" },
     });
-    expect(row.reach.label).toBe("Read");
+    expect(row.reach.label).toBe("Write");
     expect(row.holders).toBe(1);
   });
 });

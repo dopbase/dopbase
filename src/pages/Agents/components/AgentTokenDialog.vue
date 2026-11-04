@@ -106,6 +106,14 @@ async function save(): Promise<void> {
           :description="choice.hint"
           :disabled="choice.disabled"
           @select="level = choice.level" />
+        <p
+          v-if="level === 'write'"
+          class="text-xs text-ink-muted"
+          data-testid="agent-token-write-note">
+          <b>IMPORTANT</b>: Whoever holds this token can change secrets anywhere
+          this agent has Write. Protected environments stay out of reach unless
+          the agent is granted them directly.
+        </p>
       </div>
       <DbSelect
         v-model="where"

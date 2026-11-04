@@ -33,6 +33,11 @@ export const AGENT_TOKEN_LEVELS: {
     hint: "List projects, environments and secret names. No values.",
   },
   { level: "read", label: "Read", hint: "Also read values, export and run." },
+  {
+    level: "write",
+    label: "Write",
+    hint: "Also change, import and roll back secrets.",
+  },
 ];
 
 /** Where a token may reach: everything the agent does, or one place. */
@@ -59,7 +64,11 @@ export function useAgentTokenDialog(
   const { runWithReauth } = useReauthentication();
 
   const name = ref("");
-  const level = ref<Level>("metadata");
+  /** Read when the role allows it, so the default is never a disabled choice. */
+  const startLevel = (): Level =>
+    reaches(role.value?.tokenMaxLevel ?? "read", "read") ? "read" : "metadata";
+
+  const level = ref<Level>(startLevel());
   const where = ref("all");
   const expiry = ref("30d");
   const customDays = ref("");
@@ -114,7 +123,7 @@ export function useAgentTokenDialog(
     (isOpen) => {
       if (!isOpen) return;
       name.value = "";
-      level.value = "metadata";
+      level.value = startLevel();
       where.value = "all";
       expiry.value = maxDays.value >= 30 ? "30d" : "7d";
       customDays.value = "";

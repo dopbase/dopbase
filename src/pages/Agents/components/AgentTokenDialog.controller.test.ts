@@ -84,16 +84,40 @@ describe("useAgentTokenDialog", () => {
     );
   });
 
-  it("disables Read when the role's tokens may only see names", async () => {
+  it("starts on Read and offers Write to the built-in agent role", async () => {
+    const { dialog } = await openDialog();
+
+    expect(dialog.level.value).toBe("read");
+    expect(dialog.levels.value.every((choice) => !choice.disabled)).toBe(true);
+  });
+
+  it("disables Write when the role's tokens stop at Read", async () => {
+    const { dialog } = await openDialog({
+      role: roleFixture({ ...agentRole, tokenMaxLevel: "read" }),
+    });
+
+    expect(dialog.level.value).toBe("read");
+    expect(
+      dialog.levels.value.map(({ level, disabled }) => ({ level, disabled })),
+    ).toEqual([
+      { level: "metadata", disabled: false },
+      { level: "read", disabled: false },
+      { level: "write", disabled: true },
+    ]);
+  });
+
+  it("starts on Names only when the role's tokens may only see names", async () => {
     const { dialog } = await openDialog({
       role: roleFixture({ ...agentRole, tokenMaxLevel: "metadata" }),
     });
 
+    expect(dialog.level.value).toBe("metadata");
     expect(
       dialog.levels.value.map(({ level, disabled }) => ({ level, disabled })),
     ).toEqual([
       { level: "metadata", disabled: false },
       { level: "read", disabled: true },
+      { level: "write", disabled: true },
     ]);
   });
 
@@ -160,17 +184,24 @@ describe("useAgentTokenDialog", () => {
     expect(dialog.expiry.value).toBe("7d");
   });
 
-  it("assumes 90 days at most when the role is unknown", async () => {
+  it("assumes 90 days and Read at most when the role is unknown", async () => {
     const { dialog } = await openDialog({ role: null });
 
     expect(dialog.maxDays.value).toBe(90);
-    expect(dialog.levels.value.every((choice) => !choice.disabled)).toBe(true);
+    expect(dialog.level.value).toBe("read");
+    expect(
+      dialog.levels.value.map(({ level, disabled }) => ({ level, disabled })),
+    ).toEqual([
+      { level: "metadata", disabled: false },
+      { level: "read", disabled: false },
+      { level: "write", disabled: true },
+    ]);
   });
 
   it("clears the form each time it opens", async () => {
     const { open, dialog } = await openDialog();
     dialog.name.value = "Bad Name";
-    dialog.level.value = "read";
+    dialog.level.value = "write";
     dialog.where.value = "project:prj_pay";
     dialog.expiry.value = "custom";
     dialog.customDays.value = "12";
@@ -182,7 +213,7 @@ describe("useAgentTokenDialog", () => {
     await nextTick();
 
     expect(dialog.name.value).toBe("");
-    expect(dialog.level.value).toBe("metadata");
+    expect(dialog.level.value).toBe("read");
     expect(dialog.where.value).toBe("all");
     expect(dialog.expiry.value).toBe("30d");
     expect(dialog.customDays.value).toBe("");
@@ -256,7 +287,7 @@ describe("useAgentTokenDialog", () => {
 
     expect(tokensApi.createPersonalToken).toHaveBeenCalledWith("usr_bot", {
       name: "nightly",
-      level: "metadata",
+      level: "read",
       expiresIn: "45d",
       replaceExisting: true,
     });

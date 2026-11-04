@@ -108,9 +108,10 @@ export const memberRole = roleFixture();
 export const agentRole = roleFixture({
   id: "rol_ai_agent",
   name: "AI agent",
-  maxLevel: "read",
+  maxLevel: "write",
   signIn: "token_only",
   requiresOwner: true,
+  tokenMaxLevel: "write",
   tokenMaxTtlDays: 90,
   rank: 50,
 });
