@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuditController } from "./Audit.controller";
+import { actionTone } from "~/utils/audit";
 import { DashboardLayout } from "~/layouts";
 import PageHeader from "~/components/app/PageHeader.vue";
 import {
@@ -52,11 +53,6 @@ const {
   chainSummary,
   selected,
 } = controller;
-
-/** Failures stand out; everything else reads as identity. */
-function actionTone(action: string): "crit" | "accent" {
-  return /(failed|denied)$/.test(action) ? "crit" : "accent";
-}
 
 const chainTone = {
   ok: "bg-ok/15 text-ink-strong [&>svg]:text-ok",
