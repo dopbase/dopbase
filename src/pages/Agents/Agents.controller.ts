@@ -278,6 +278,11 @@ export function useAgentsController() {
 
   const actions = useAccountActions(() => invalidate.usersChanged());
 
+  /** Root holds no personal tokens, so the hint to make one is for others. */
+  const showsPersonalTokenHint = computed(
+    () => !auth.isRoot && auth.can("tokens.personal"),
+  );
+
   return {
     agents,
     people,
@@ -291,6 +296,7 @@ export function useAgentsController() {
     visibleRows,
     agentRole,
     canAdd,
+    showsPersonalTokenHint,
     addOpen,
     added,
     tokenFor,

@@ -367,6 +367,16 @@ describe("useAgentsController", () => {
     expect(controller.canAdd.value).toBe(false);
   });
 
+  it("points people at personal tokens, but not root, which has none", async () => {
+    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+    const member = await mountAgents();
+    expect(member.showsPersonalTokenHint.value).toBe(true);
+
+    signInAs([], { role: "root" });
+    const root = await mountAgents();
+    expect(root.showsPersonalTokenHint.value).toBe(false);
+  });
+
   it("opens the new agent's page once it is added", async () => {
     const controller = await mountAgents();
     controller.addOpen.value = true;

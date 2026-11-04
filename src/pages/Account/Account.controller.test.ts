@@ -155,6 +155,7 @@ describe("useAccountController", () => {
       },
     ]);
     expect(c.subtitle.value).toBe("Your profile, sign-in and personal tokens.");
+    expect(c.showsAgentNote.value).toBe(false);
   });
 
   it("shows Audit tokens in place of Personal tokens for audit roles", () => {
@@ -190,6 +191,8 @@ describe("useAccountController", () => {
     expect(c.activeTab.value).toBe("profile");
     expect(c.subtitle.value).toBe("Your profile and sign-in.");
     expect(routerReplace).toHaveBeenCalledWith({ name: "account" });
+    // Root gets pointed at AI agents for scripts instead.
+    expect(c.showsAgentNote.value).toBe(true);
   });
 
   it("lists the groups you belong to", async () => {

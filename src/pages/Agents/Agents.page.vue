@@ -47,6 +47,7 @@ const {
   visibleRows,
   agentRole,
   canAdd,
+  showsPersonalTokenHint,
   addOpen,
   tokenFor,
   tokenGrants,
@@ -248,6 +249,7 @@ const tokenUsage = computed(() =>
         </ul>
 
         <p
+          v-if="showsPersonalTokenHint"
           class="flex items-start gap-2 rounded-card border border-line bg-panel px-4 py-3 text-sm text-ink-muted">
           <KeyIcon class="mt-0.5 h-4 w-4 shrink-0" />
           An agent on your own machine doesn't need an account. Create a
