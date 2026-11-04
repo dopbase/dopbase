@@ -15,6 +15,7 @@ import { formatDate } from "~/utils/format";
 import { mountController } from "~/tests/mount-controller";
 import {
   accessFixture,
+  adminRole,
   agentRole,
   grantFixture,
   lead,
@@ -189,23 +190,27 @@ describe("useAgentsController", () => {
     expect(rowOf(controller, "usr_stray").owner).toBe("Unknown");
   });
 
-  it("shows how far an agent can reach from its role's highest level", async () => {
-    const controller = await mountAgents();
-
-    expect(rowOf(controller, "usr_bot").reach).toEqual({
-      label: "Read",
-      filled: 2,
-      strong: false,
-    });
-  });
-
-  it("still lists agents without a reach when the roles list fails", async () => {
+  it("still lists agents when the roles list fails", async () => {
     vi.mocked(rolesApi.fetchRoles).mockRejectedValue(new Error("down"));
     const controller = await mountAgents();
 
     expect(controller.loadError.value).toBeNull();
-    expect(rowOf(controller, "usr_bot").reach).toBeNull();
+    expect(rowOf(controller, "usr_bot").owner).toBe("maya@example.com");
     expect(controller.agentRole.value).toBeNull();
+  });
+
+  it("offers Transfer owner only when someone else could own the agent", async () => {
+    // Lead's role can see users, so lead could take maya's bot; maya's
+    // can't, so nobody could take lead's.
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      memberRole,
+      adminRole,
+      agentRole,
+    ]);
+    const controller = await mountAgents();
+
+    expect(rowOf(controller, "usr_bot").canTransfer).toBe(true);
+    expect(rowOf(controller, "usr_deploy").canTransfer).toBe(false);
   });
 
   it("marks a token with months left as active", async () => {

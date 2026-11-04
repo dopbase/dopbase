@@ -21,6 +21,7 @@ import { formatDate, formatLevel, formatRelativeTime } from "~/utils/format";
 import { isAgent, tokenState, type TokenState } from "~/pages/Users/people";
 import { useAccountActions } from "~/pages/Users/account-actions";
 import { liveToken } from "./Agents.controller";
+import { transferCandidates } from "./components/TransferOwnerDialog.controller";
 
 export type AgentTab = "access" | "tokens" | "danger";
 
@@ -149,6 +150,12 @@ export function useAgentController() {
     () =>
       auth.can("users.manage") ||
       (agent.value !== null && agent.value.ownerId === auth.session?.adminId),
+  );
+  /** Transfer owner shows only when someone else could take the agent. */
+  const canTransfer = computed(
+    () =>
+      canManage.value &&
+      transferCandidates(people.value, roles.value, agent.value).length > 0,
   );
 
   const subtitle = computed(() => {
@@ -286,6 +293,7 @@ export function useAgentController() {
     loadError,
     load,
     canManage,
+    canTransfer,
     subtitle,
     principal,
     accessSummary,

@@ -10,6 +10,7 @@ import { formatDate } from "~/utils/format";
 import { mountController } from "~/tests/mount-controller";
 import {
   accessFixture,
+  adminRole,
   agentRole,
   lead,
   maya,
@@ -216,6 +217,25 @@ describe("useAgentController", () => {
       "access",
       "tokens",
     ]);
+  });
+
+  it("hides Transfer owner when nobody else could own the agent", async () => {
+    // Maya owns it, and lead's role isn't listed as one that sees users.
+    const controller = await mountAgent();
+
+    expect(controller.canManage.value).toBe(true);
+    expect(controller.canTransfer.value).toBe(false);
+  });
+
+  it("offers Transfer owner once someone else could own the agent", async () => {
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      memberRole,
+      adminRole,
+      agentRole,
+    ]);
+    const controller = await mountAgent();
+
+    expect(controller.canTransfer.value).toBe(true);
   });
 
   it("sums up the owner and how far the agent reaches under its name", async () => {

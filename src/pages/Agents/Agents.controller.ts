@@ -18,9 +18,9 @@ import { useInvalidate } from "~/queries/invalidate";
 import { agentTokensQuery } from "~/queries/personal-tokens";
 import { rolesQuery, usersQuery } from "~/queries/users";
 import { formatDate, formatRelativeTime } from "~/utils/format";
-import { levelMeter, type LevelMeter } from "~/utils/level";
 import { isAgent, tokenState } from "~/pages/Users/people";
 import { useAccountActions } from "~/pages/Users/account-actions";
+import { transferCandidates } from "./components/TransferOwnerDialog.controller";
 
 /** Token state as the Token column shows it. */
 export type AgentTokenStatus = "active" | "expiring" | "none" | "unknown";
@@ -31,8 +31,6 @@ const EXPIRING_SOON_MS = 7 * 24 * 60 * 60 * 1000;
 export interface AgentRow {
   agent: User;
   owner: string;
-  /** The most its role lets it reach. */
-  reach: LevelMeter | null;
   token: PersonalToken | null;
   status: AgentTokenStatus;
   /** "active", "expires in 2 days", "no token". */
@@ -41,6 +39,8 @@ export interface AgentRow {
   lastUsed: string;
   /** You own it, or may manage users. */
   canManage: boolean;
+  /** You manage it and someone else could own it. */
+  canTransfer: boolean;
   activity: RouteLocationRaw;
 }
 
@@ -162,14 +162,12 @@ export function useAgentsController() {
           statusLabel = "active";
         }
       }
-      const role = roles.value.find(
-        (candidate) => candidate.id === agent.roleId,
-      );
       const owner = people.value.find((person) => person.id === agent.ownerId);
+      const canManage =
+        auth.can("users.manage") || agent.ownerId === auth.session?.adminId;
       return {
         agent,
         owner: owner?.email ?? (agent.ownerId ? "Unknown" : "No owner"),
-        reach: role ? levelMeter(role.maxLevel) : null,
         token,
         status,
         statusLabel,
@@ -177,8 +175,10 @@ export function useAgentsController() {
         lastUsed: token?.lastUsedAt
           ? formatRelativeTime(token.lastUsedAt)
           : "Never",
-        canManage:
-          auth.can("users.manage") || agent.ownerId === auth.session?.adminId,
+        canManage,
+        canTransfer:
+          canManage &&
+          transferCandidates(people.value, roles.value, agent).length > 0,
         activity: { name: "audit", query: { actor: agent.id } },
       };
     });

@@ -32,6 +32,7 @@ const {
   people,
   loadError,
   canManage,
+  canTransfer,
   subtitle,
   principal,
   accessSummary,
@@ -80,7 +81,7 @@ const usage = computed(() =>
               Activity
             </DbButton>
             <DbButton
-              v-if="canManage"
+              v-if="canTransfer"
               data-testid="transfer-owner"
               @click="transferOpen = true">
               <UserIcon class="h-4 w-4" />
