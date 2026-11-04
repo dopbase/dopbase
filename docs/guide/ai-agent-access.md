@@ -33,7 +33,8 @@ covers tasks such as:
 
 Give **Read** only when the agent must run something with real values, such as
 integration tests, and only on the environment it needs. An AI agent account
-never goes past Read. For a deployed application, use an environment-scoped
+can go as far as Write, for an agent that sets or rotates secrets. Give Write
+only on the environment it changes. For a deployed application, use an environment-scoped
 [runner token](./run-an-application) instead.
 
 ::: warning Names are sensitive too

@@ -38,6 +38,10 @@ A personal token lets a script or an AI agent on your machine act as you,
 through `DOPBASE_TOKEN`. It never reaches more than you do: if you lose access
 to a project, your tokens lose it too.
 
+Root has no personal tokens, since it's the account you fall back on. Its
+profile has a **Tokens** card that points to **AI agents**: create an agent
+there and give it a token for scripts and AI tools.
+
 The tab lists your tokens with what each can do, where, when it was last used,
 and when it expires. A row's **⋯** menu revokes it.
 

@@ -40,7 +40,7 @@ one environment overrides the grant on the whole project, so you can give a
 team write on the project and names only on production.
 
 A person can't get more than their role allows: a member stops at manage, an
-AI agent at read. You can't change your own access or give anyone access to
+AI agent at write. You can't change your own access or give anyone access to
 root. Each row's **⋯** menu has **Change level** and **Remove access**.
 Removing takes effect on the person's next request, personal tokens included.
 

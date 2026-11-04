@@ -8,17 +8,17 @@ description: "Add token-only accounts for bots and CI in Dopbase, give them acce
 An AI agent is an account for a bot or a CI job. It has no email and no
 password, only a token, and it always has an owner: the person who answers for
 it. An agent reaches only what it is granted, never past its role's level
-(Read for the built-in AI agent role), and never more than its owner does. If
+(Write for the built-in AI agent role), and never more than its owner does. If
 the owner is disabled, so is the agent.
 
-An agent running on your own machine doesn't need an account. Create a
-personal token with **Names only** from your account menu instead.
+An agent running on your own machine doesn't need an account: create a
+personal token with **Names only** from your account menu. Root has no
+personal tokens, so if root is your only account, add an agent.
 
 Open **AI agents** from the sidebar. Anyone with `users.view` can see the list.
-The table shows each agent's owner, the deepest level it can reach, its token
-(`active`, `expires in 3 days` once it is a week from expiring, or
-`no token`), when the token expires, and when it was last used. Add an
-**Owner** chip to see one person's agents.
+The table shows each agent's owner, its token (`active`, `expires in 3 days`
+once it is a week from expiring, or `no token`), when the token expires, and
+when it was last used. Add an **Owner** chip to see one person's agents.
 
 ## Add an agent
 
@@ -47,7 +47,9 @@ in the list's **⋯** menu, and set:
 
 - **Name**: lowercase letters, numbers, and hyphens, such as `ci-deploy`. Name
   it after where it's used.
-- **Can**: Names only, or Read. The role sets the most a token can do.
+- **Can**: Names only, Read, or Write. It starts on Read. The role sets the
+  most a token can do. A Write token changes secrets wherever the agent has
+  Write; protected environments still need a grant of their own.
 - **Where**: every project the agent reaches, or one of its grants.
 - **Expires**: 7, 30, or 90 days, or a custom number of days, within the
   role's limit.
@@ -65,7 +67,9 @@ or **Revoke token** in the list's **⋯** menu.
 
 **Transfer owner** lists the people who can own it: root and anyone whose role
 has `users.view`, so the new owner can see the agent. The agent keeps its
-grants and token, but never reaches more than its new owner does.
+grants and token, but never reaches more than its new owner does. With no one
+else who could own it, as on a solo install with only root, the button and
+the menu item are hidden.
 
 **Disable agent** stops its token; its access and history stay. **Delete
 agent** asks you to type its name, then removes it with its grants and tokens.
