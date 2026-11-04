@@ -90,6 +90,11 @@ All notable changes to Dopbase are documented in this file.
 - Root's profile has a **Tokens** card that points to **AI agents**, since
   root has no personal tokens. The **AI agents** page no longer tells root to
   make one.
+- Root's page under **Users** drops its Access, Groups and Tokens tabs, which
+  were always empty or locked. It shows root's account (with its ID and single
+  sign-on link), a **Full access** card that explains why, and root's five
+  latest audit events with what each touched and the address it came from, to
+  people who can read the whole audit log. Links to the old tabs open the page.
 - The **AI agents** list drops the **Reaches at most** column; an agent's page
   still shows how far it reaches. **Transfer owner** is hidden when no one
   else could own the agent.
@@ -169,6 +174,11 @@ All notable changes to Dopbase are documented in this file.
 - The personal token code moved from `modules/personal_tokens` to
   `modules/tokens/personal`, next to runner tokens, and its tests moved to
   match. Routes, the API and behavior are unchanged.
+- The **Source** column on a user's, agent's or group's Access tab has an ⓘ
+  that says what **Direct** and **via** a group mean.
+- An environment's **Tokens** tab drops the **Can** column, since every
+  runner token only reads. The intro now says so, and **New runner token**
+  still shows it.
 
 ### Removed
 
