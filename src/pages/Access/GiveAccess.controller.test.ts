@@ -348,6 +348,54 @@ describe("useGiveAccessController", () => {
     expect(page.loadError.value).toBe("Could not load their access.");
   });
 
+  it.each([
+    [
+      "user-access-give",
+      { userId: "usr_maya" },
+      ["Users", { name: "users" }],
+      [
+        "maya@example.com",
+        { name: "user-access", params: { userId: "usr_maya" } },
+      ],
+    ],
+    [
+      "agent-access-give",
+      { agentId: "usr_maya" },
+      ["AI agents", { name: "agents" }],
+      ["maya@example.com", { name: "agent", params: { agentId: "usr_maya" } }],
+    ],
+    [
+      "group-access-give",
+      { groupId: "grp_backend" },
+      ["Groups", { name: "groups" }],
+      ["Backend", { name: "group-access", params: { groupId: "grp_backend" } }],
+    ],
+  ] as const)(
+    "from %s, the breadcrumb starts at the list and links back",
+    async (name, params, [listLabel, listTo], [label, to]) => {
+      route.name = name;
+      route.params = { ...params };
+      vi.mocked(accessApi.fetchGroup).mockResolvedValueOnce(
+        groupDetailFixture(),
+      );
+      const page = await open();
+      expect(page.breadcrumbs.value).toEqual([
+        { label: listLabel, to: listTo },
+        { label, to },
+      ]);
+    },
+  );
+
+  it("keeps the breadcrumb to the list while their name loads", async () => {
+    vi.mocked(accessApi.fetchUserAccess).mockReturnValueOnce(
+      new Promise(() => {}),
+    );
+    const page = await open();
+    expect(page.breadcrumbs.value).toEqual([
+      { label: "Users", to: { name: "users" } },
+    ]);
+  });
+
   it("says how far it got when one grant is refused", async () => {
     vi.mocked(accessApi.setGrant)
       .mockResolvedValueOnce(grantFixture())
@@ -512,6 +560,17 @@ describe("useGiveAccessController from a project", () => {
     expect(page.summary.value).toBe(
       "Everyone in Backend will be able to manage, and give others access to, all of payments.",
     );
+  });
+
+  it("starts the breadcrumb at Projects and links back to the Access tab", async () => {
+    const page = await open();
+    expect(page.breadcrumbs.value).toEqual([
+      { label: "Projects", to: { name: "projects" } },
+      {
+        label: "payments",
+        to: { name: "project-access", params: { projectRef: "payments" } },
+      },
+    ]);
   });
 
   it("says when the project's access won't load", async () => {

@@ -22,6 +22,8 @@ import { readQuery } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { environmentsQuery, projectsQuery } from "~/queries/projects";
 import { usersQuery } from "~/queries/users";
+import { pages } from "~/navigation/access-map";
+import type { Breadcrumb } from "~/navigation/breadcrumb";
 import { formatLevel, formatList } from "~/utils/format";
 import {
   grantSentence,
@@ -42,6 +44,14 @@ const KIND_FOR_ROUTE: Record<string, GiveAccessKind> = {
   "group-access-give": "group",
   "project-access-give": "project",
 };
+
+/** The list each kind of page opens from, first in the breadcrumb. */
+const SECTION_FOR_KIND = {
+  user: "users",
+  agent: "agents",
+  group: "groups",
+  project: "projects",
+} as const satisfies Record<GiveAccessKind, keyof typeof pages>;
 
 export interface ProjectChoice {
   project: Project;
@@ -516,6 +526,27 @@ export function useGiveAccessController() {
     }
   });
 
+  /** The project, or the person, agent or group, the page opened from. */
+  const parentLabel = computed(() =>
+    kind.value === "project"
+      ? (projects.value?.[0]?.name ?? "")
+      : (principal.value?.label ?? ""),
+  );
+
+  /**
+   * "Users / maya@example.com", then the page's own title. The name is left
+   * out until it loads, so the breadcrumb never shows an empty link.
+   */
+  const breadcrumbs = computed<Breadcrumb[]>(() => {
+    const section = SECTION_FOR_KIND[kind.value];
+    const trail: Breadcrumb[] = [
+      { label: pages[section].label, to: { name: section } },
+    ];
+    if (parentLabel.value)
+      trail.push({ label: parentLabel.value, to: backTo.value });
+    return trail;
+  });
+
   async function submit(): Promise<boolean> {
     error.value = null;
     const who = principal.value;
@@ -625,6 +656,8 @@ export function useGiveAccessController() {
     summary,
     protectedNote,
     backTo,
+    parentLabel,
+    breadcrumbs,
     saving,
     error,
     submit,

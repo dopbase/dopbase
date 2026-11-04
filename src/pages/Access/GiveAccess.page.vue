@@ -43,19 +43,13 @@ const {
   planned,
   summary,
   protectedNote,
-  backTo,
+  parentLabel,
+  breadcrumbs,
   saving,
   error,
 } = controller;
 
 const fromProject = computed(() => kind.value === "project");
-
-/** The page you came from: the project, or the person, agent or group. */
-const parentLabel = computed(() =>
-  fromProject.value
-    ? (controller.projects.value?.[0]?.name ?? "")
-    : (principal.value?.label ?? ""),
-);
 
 const subtitle = computed(() => {
   if (fromProject.value)
@@ -102,7 +96,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
         <PageHeader
           title="Give access"
           :subtitle="subtitle"
-          :parent="{ label: parentLabel, to: backTo }" />
+          :trail="breadcrumbs" />
 
         <div
           v-if="manageable.length === 0"
