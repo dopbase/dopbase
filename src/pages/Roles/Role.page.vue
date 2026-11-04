@@ -47,16 +47,23 @@ const {
   saveError,
 } = controller;
 
-const SIGN_IN_CHOICES: { value: SignIn; label: string; hint: string }[] = [
+const SIGN_IN_CHOICES: {
+  value: SignIn;
+  label: string;
+  hint: string;
+  disabled: boolean;
+}[] = [
   {
     value: "interactive",
     label: "Password or single sign-on",
     hint: "For people who use the console.",
+    disabled: false,
   },
   {
     value: "token_only",
     label: "Token only",
     hint: "For AI agents and CI. Each one needs an owner.",
+    disabled: true,
   },
 ];
 const TOKEN_SCOPE_OPTIONS = [
@@ -263,8 +270,9 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           </div>
         </section>
 
-        <!-- Sign-in -->
-        <section :class="card" aria-labelledby="signin-heading">
+        <!-- Hidden on New role for now: picking a sign-in method comes in a
+             later release. Existing roles still show theirs. -->
+        <section v-if="!isNew" :class="card" aria-labelledby="signin-heading">
           <h2
             id="signin-heading"
             class="text-[15px] font-semibold text-ink-strong">
@@ -274,6 +282,7 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
             <InfoIcon class="mt-0.5 h-4 w-4 shrink-0" />
             Picked once, when the role is created.
           </p>
+
           <div
             v-if="isNew"
             class="flex flex-col gap-2"
@@ -287,9 +296,10 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
               :checked="signIn === choice.value"
               :label="choice.label"
               :description="choice.hint"
+              :disabled="choice.disabled"
               @select="signIn = $event as SignIn" />
           </div>
-          <p v-else class="text-sm text-ink">
+          <p class="text-sm text-ink">
             {{
               SIGN_IN_CHOICES.find((choice) => choice.value === signIn)?.label
             }}

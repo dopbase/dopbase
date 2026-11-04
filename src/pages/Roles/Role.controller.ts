@@ -117,7 +117,9 @@ export function useRoleController() {
           ROLE_CAPABILITIES.includes(capability),
         )
       : ["tokens.personal"];
-    signIn.value = from?.signIn ?? "interactive";
+    // New roles, duplicates included, sign in with password or single sign-on
+    // for now. Next phase: let custom roles pick their own sign-in method.
+    signIn.value = from && !copy ? from.signIn : "interactive";
     tokenScope.value = from?.tokenScope === "audit" ? "audit" : "data";
     tokenMaxLevel.value = TOKEN_LEVELS.includes(from?.tokenMaxLevel ?? "read")
       ? (from?.tokenMaxLevel ?? "read")

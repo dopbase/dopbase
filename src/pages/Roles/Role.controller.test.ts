@@ -167,11 +167,11 @@ describe("useRoleController", () => {
     expect(controller.isNew.value).toBe(true);
   });
 
-  it("copies an agent role's sign-in so the duplicate stays token only", async () => {
+  it("starts a duplicate of an agent role on password or single sign-on", async () => {
     await at("role-new", {}, { from: "rol_ai_agent" });
     const { controller } = mountController(useRoleController);
     await settle();
-    expect(controller.signIn.value).toBe("token_only");
+    expect(controller.signIn.value).toBe("interactive");
     // 90 days is a choice; the role's lifetime stays as it was.
     expect(controller.tokenLifetime.value).toBe("90");
   });
