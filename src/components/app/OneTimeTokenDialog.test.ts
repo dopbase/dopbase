@@ -43,7 +43,7 @@ describe("OneTimeTokenDialog", () => {
     expect(document.body.textContent).toContain("expires in 30 days");
 
     const acknowledge = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("stored it safely"),
+      (button) => button.textContent?.includes("I've stored it"),
     );
     acknowledge?.click();
     expect(onAcknowledge).toHaveBeenCalledOnce();

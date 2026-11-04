@@ -203,7 +203,8 @@ pub enum Command {
   /// Run a command with an environment's secrets injected as env vars.
   ///
   /// Falls back to DOPBASE_ENV, then the active server's saved default, when
-  /// no environment argument is given. Secret values are passed to the child
+  /// no environment argument is given. A runner token needs neither: it
+  /// always runs its own environment. Secret values are passed to the child
   /// process only and are never printed. A successful fetch refreshes an
   /// encrypted local cache. If the server is unavailable, the last cache for
   /// the same server, environment, and credential is used. Everything after

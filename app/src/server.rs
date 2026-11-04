@@ -147,6 +147,7 @@ async fn build_instance_state(
     oidc: Default::default(),
     maintenance: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     started_at: std::time::Instant::now(),
+    status: Default::default(),
   })
 }
 

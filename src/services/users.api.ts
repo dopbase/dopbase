@@ -17,10 +17,29 @@ export interface User {
   updatedAt: string;
   hasPassword: boolean;
   ssoLinked: boolean;
+  /** A disabled account can't sign in, and its tokens stop working. */
+  status: "active" | "disabled";
+  /** The last interactive sign-in, or null if they never signed in. */
+  lastSignInAt: string | null;
+  /** The groups the account belongs to. */
+  groups: { id: string; name: string }[];
 }
+/** Just enough of an account to name it. */
+export type UserIdentity = Pick<User, "id" | "email">;
+
 const BASE = "/api/v1/users";
-export async function fetchUsers(): Promise<User[]> {
-  const { data } = await apiRequest<User[]>(BASE);
+export async function fetchUsers(signal?: AbortSignal): Promise<User[]> {
+  const { data } = await apiRequest<User[]>(BASE, { signal });
+  return data;
+}
+
+/** Every account's id and email, by email. Lighter than `fetchUsers`. */
+export async function fetchUserIdentities(
+  signal?: AbortSignal,
+): Promise<UserIdentity[]> {
+  const { data } = await apiRequest<UserIdentity[]>(`${BASE}/identities`, {
+    signal,
+  });
   return data;
 }
 
@@ -67,6 +86,33 @@ export async function unlinkUserSso(id: string): Promise<User> {
   const { data } = await apiRequest<User>(
     `${BASE}/${encodeURIComponent(id)}/sso`,
     { method: "DELETE" },
+  );
+  return data;
+}
+
+export async function fetchUser(
+  id: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const { data } = await apiRequest<User>(`${BASE}/${encodeURIComponent(id)}`, {
+    signal,
+  });
+  return data;
+}
+
+/** Stop an account signing in; its sessions end and its tokens stop. */
+export async function disableUser(id: string): Promise<User> {
+  const { data } = await apiRequest<User>(
+    `${BASE}/${encodeURIComponent(id)}/disable`,
+    { method: "POST" },
+  );
+  return data;
+}
+
+export async function enableUser(id: string): Promise<User> {
+  const { data } = await apiRequest<User>(
+    `${BASE}/${encodeURIComponent(id)}/enable`,
+    { method: "POST" },
   );
   return data;
 }

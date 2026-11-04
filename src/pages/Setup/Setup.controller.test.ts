@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { MIN_PASSWORD_LENGTH, useSetupController } from "./Setup.controller";
 import * as bootstrapApi from "~/services/bootstrap.api";
+import * as backupsApi from "~/services/backups.api";
 import { ApiError } from "~/services/http.client";
 
 const routerPush = vi.hoisted(() => vi.fn());
@@ -14,6 +15,13 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("~/services/bootstrap.api");
+vi.mock("~/services/auth.api");
+vi.mock("~/services/backups.api", () => ({
+  downloadMasterKeyBlob: vi.fn(),
+}));
+vi.mock("~/utils/clipboard", () => ({
+  copyText: vi.fn().mockResolvedValue(true),
+}));
 
 const VALID = {
   setupToken: "dbs_setup",
@@ -30,7 +38,7 @@ function fill(c: ReturnType<typeof useSetupController>): void {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   routerPush.mockReset();
   routerReplace.mockReset();
   vi.mocked(bootstrapApi.bootstrapAdmin).mockReset();
@@ -43,6 +51,7 @@ describe("useSetupController", () => {
     routeQuery.other = "kept";
     const c = useSetupController();
     expect(c.setupToken.value).toBe("setup_first-run-token");
+    expect(c.tokenFromLink).toBe(true);
     expect(routerReplace).toHaveBeenCalledTimes(1);
     expect(routerReplace).toHaveBeenCalledWith({ query: { other: "kept" } });
   });
@@ -51,6 +60,7 @@ describe("useSetupController", () => {
     routeQuery.token = ["setup_array"];
     const c = useSetupController();
     expect(c.setupToken.value).toBe("");
+    expect(c.tokenFromLink).toBe(false);
     expect(routerReplace).not.toHaveBeenCalled();
   });
   it("prefills email and token, removing both in one replacement", () => {
@@ -125,12 +135,15 @@ describe("useSetupController", () => {
     expect(c.passwordsMatch.value).toBe(false);
   });
 
-  it("claims the server and routes to projects", async () => {
+  it("claims the server, then asks for the recovery kit before the console", async () => {
     vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
       adminId: "usr_1",
       email: "a@b.c",
       csrfToken: "csrf_1",
     });
+    vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(
+      new Blob([new Uint8Array(32).fill(0xab)]),
+    );
     const c = useSetupController();
     fill(c);
     c.email.value = "  A@B.C  ";
@@ -140,7 +153,87 @@ describe("useSetupController", () => {
       email: "a@b.c",
       password: VALID.password,
     });
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(c.step.value).toBe("recovery");
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(c.masterKey.value).toBe("ab".repeat(32));
+    expect(c.shownKey.value).toMatch(/^[•-]+$/);
+    c.keyRevealed.value = true;
+    expect(c.shownKey.value.startsWith("abababab-")).toBe(true);
+  });
+
+  it("keeps Continue off until the kit is stored", async () => {
+    vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      csrfToken: "csrf_1",
+    });
+    vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(
+      new Blob([new Uint8Array(32)]),
+    );
+    const c = useSetupController();
+    fill(c);
+    await c.submit();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(c.canContinue.value).toBe(false);
+    c.kitStored.value = true;
+    expect(c.canContinue.value).toBe(true);
+    await c.finish();
     expect(routerPush).toHaveBeenCalledWith({ name: "projects" });
+  });
+
+  it("downloads the kit as a text file and copies the key", async () => {
+    vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      csrfToken: "csrf_1",
+    });
+    vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(
+      new Blob([new Uint8Array(32).fill(1)]),
+    );
+    const createUrl = vi.fn(() => "blob:kit");
+    const revokeUrl = vi.fn();
+    Object.assign(URL, {
+      createObjectURL: createUrl,
+      revokeObjectURL: revokeUrl,
+    });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const c = useSetupController();
+    fill(c);
+    await c.submit();
+    await new Promise((resolve) => setTimeout(resolve));
+    c.downloadKit();
+    expect(click).toHaveBeenCalledOnce();
+    expect(createUrl).toHaveBeenCalledOnce();
+    expect(revokeUrl).toHaveBeenCalledWith("blob:kit");
+    expect(c.kitDownloaded.value).toBe(true);
+    await c.copyKey();
+    expect(c.keyCopied.value).toBe(true);
+    click.mockRestore();
+  });
+
+  it("offers a retry, and a way past, when the key can't be read", async () => {
+    vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
+      adminId: "usr_1",
+      email: "a@b.c",
+      csrfToken: "csrf_1",
+    });
+    vi.mocked(backupsApi.downloadMasterKeyBlob)
+      .mockRejectedValueOnce(new Error(""))
+      .mockResolvedValueOnce(new Blob([new Uint8Array(32)]));
+    const c = useSetupController();
+    fill(c);
+    await c.submit();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(c.keyError.value).toBe(
+      "Could not read the master key from the server.",
+    );
+    expect(c.canContinue.value).toBe(false);
+    await c.loadRecoveryKey();
+    expect(c.keyError.value).toBeNull();
+    expect(c.masterKey.value).toHaveLength(64);
   });
 
   it("maps SETUP_TOKEN_INVALID to the token field", async () => {

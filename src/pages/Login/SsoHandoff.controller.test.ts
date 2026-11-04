@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { useSsoHandoffController } from "./SsoHandoff.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
@@ -19,7 +19,7 @@ function settle(): Promise<void> {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   window.history.replaceState(null, "", "/login/sso");
 });

@@ -13,6 +13,7 @@ import { useImportSecretsDialogController } from "./ImportSecretsDialog.controll
 const props = defineProps<{
   open: boolean;
   environmentId: string;
+  environmentName: string;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
@@ -21,6 +22,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const { parseErrors, fileError, parsing, processFile } =
   useImportSecretsDialogController(
     toRef(props, "environmentId"),
+    toRef(props, "environmentName"),
     toRef(props, "open"),
   );
 

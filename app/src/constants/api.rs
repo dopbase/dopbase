@@ -141,6 +141,11 @@ pub mod secrets {
   pub const VERSION_REVEAL: &str =
     api_path!("/environments/{environment_id}/secrets/{key}/versions/{version}/reveal");
   pub const ROLLBACK: &str = api_path!("/environments/{environment_id}/secrets/{key}/rollback");
+  pub const COPY: &str = api_path!("/environments/{environment_id}/secrets/{key}/copy");
+  /// Outside `/secrets/` so it never shadows a secret named `compare`.
+  pub const COMPARE: &str = api_path!("/environments/{environment_id}/compare");
+  /// Outside `/secrets/` so it never shadows a secret named `copy`.
+  pub const COPY_MANY: &str = api_path!("/environments/{environment_id}/copy-secrets");
 
   pub fn collection(environment_id: &str) -> String {
     super::render(COLLECTION, &[("environment_id", environment_id)])
@@ -229,6 +234,19 @@ pub mod tokens {
   }
 }
 
+/// The runner-only gate. The token decides the environment.
+pub mod runtime {
+  pub const SECRETS: &str = api_path!("/runtime/secrets");
+
+  /// The gate, checking that the token's environment is `reference`.
+  pub fn secrets(reference: Option<&str>) -> String {
+    match reference {
+      Some(reference) => super::with_query(SECRETS, "reference", reference),
+      None => SECRETS.to_owned(),
+    }
+  }
+}
+
 pub mod audit {
   use super::with_params as with_query;
 
@@ -256,6 +274,7 @@ pub mod audit {
 pub mod instance {
   pub const ROOT: &str = api_path!("/instance");
   pub const PUBLIC_STATUS: &str = api_path!("/status");
+  pub const RUN_CHECKS: &str = api_path!("/status/checks/run");
   pub const FACTORY_RESET: &str = api_path!("/instance/factory-reset");
 }
 
@@ -275,14 +294,25 @@ pub mod sso {
 
 pub mod users {
   pub const COLLECTION: &str = api_path!("/users");
+  pub const IDENTITIES: &str = api_path!("/users/identities");
   pub const ITEM: &str = api_path!("/users/{id}");
   pub const SSO: &str = api_path!("/users/{id}/sso");
+  pub const DISABLE: &str = api_path!("/users/{id}/disable");
+  pub const ENABLE: &str = api_path!("/users/{id}/enable");
   pub const ACCESS: &str = api_path!("/users/{id}/access");
   pub const TOKENS: &str = api_path!("/users/{id}/tokens");
   pub const TOKEN_REVOKE: &str = api_path!("/users/{id}/tokens/{token_id}/revoke");
 
   pub fn item(id: &str) -> String {
     super::render(ITEM, &[("id", id)])
+  }
+
+  pub fn disable(id: &str) -> String {
+    super::render(DISABLE, &[("id", id)])
+  }
+
+  pub fn enable(id: &str) -> String {
+    super::render(ENABLE, &[("id", id)])
   }
 
   pub fn access(id: &str) -> String {

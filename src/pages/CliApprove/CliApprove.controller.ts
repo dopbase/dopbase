@@ -15,13 +15,21 @@ import {
 import { formatRole } from "~/utils/format";
 
 export type CliApproveStep =
-  "checking" | "enter" | "review" | "approved" | "denied";
+  "checking" | "enter" | "review" | "approved" | "denied" | "expired";
 
 /** The characters a code is made of; see the server's user code alphabet. */
 export const CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ";
 export const CODE_LENGTH = 8;
 /** Seconds the approved page waits before it closes its tab. */
 export const CLOSE_DELAY_SECONDS = 5;
+/** The CLI session length when an older server doesn't say. */
+export const DEFAULT_SESSION_DAYS = 90;
+
+/** `4:32` for 272 seconds. */
+export function formatCountdown(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+}
 
 /** `wdjb-mjht`, `WDJB MJHT`, and `WDJBMJHT` are the same code. */
 export function normalizeCode(value: unknown): string {
@@ -62,8 +70,55 @@ export function useCliApproveController() {
   const closeBlocked = ref(false);
   let countdown: ReturnType<typeof setInterval> | null = null;
   let closeCheck: ReturnType<typeof setTimeout> | null = null;
+  /** Seconds until the request expires, while it's on screen. */
+  const secondsLeft = ref<number | null>(null);
+  let expiryTimer: ReturnType<typeof setInterval> | null = null;
 
   const isConfirmation = computed(() => request.value?.purpose === "reauth");
+  /** The machine's name, for the button and the done screen. */
+  const machine = computed(() => request.value?.hostname ?? null);
+  const sessionDays = computed(
+    () => request.value?.sessionDays ?? DEFAULT_SESSION_DAYS,
+  );
+  const expiresIn = computed(() =>
+    secondsLeft.value === null ? "" : formatCountdown(secondsLeft.value),
+  );
+
+  function stopExpiry(): void {
+    if (expiryTimer) clearInterval(expiryTimer);
+    expiryTimer = null;
+  }
+
+  /**
+   * Count down to the request's expiry; at zero it can't be approved. The
+   * server just said it is pending, so a deadline already past, or further
+   * off than the request's whole lifetime, means this clock is off: count
+   * the lifetime from now instead.
+   */
+  function watchExpiry(): void {
+    stopExpiry();
+    const expiresAt = request.value ? Date.parse(request.value.expiresAt) : NaN;
+    const createdAt = request.value ? Date.parse(request.value.createdAt) : NaN;
+    if (Number.isNaN(expiresAt) || Number.isNaN(createdAt)) {
+      secondsLeft.value = null;
+      return;
+    }
+    const lifetime = expiresAt - createdAt;
+    const remaining = expiresAt - Date.now();
+    const deadline =
+      Date.now() +
+      (remaining > 0 && remaining <= lifetime ? remaining : lifetime);
+    const tick = (): void => {
+      const left = Math.round((deadline - Date.now()) / 1000);
+      secondsLeft.value = Math.max(0, left);
+      if (left <= 0) {
+        stopExpiry();
+        if (step.value === "review") step.value = "expired";
+      }
+    };
+    tick();
+    expiryTimer = setInterval(tick, 1000);
+  }
   /** The account an approval signs in, shown on every step. */
   const account = computed(() => {
     const session = auth.session;
@@ -154,6 +209,7 @@ export function useCliApproveController() {
     try {
       request.value = await inspectCliLogin(code.value);
       step.value = "review";
+      watchExpiry();
     } catch (error) {
       if (await recover(error)) return;
       step.value = "enter";
@@ -207,12 +263,13 @@ export function useCliApproveController() {
             requestConfirmation(
               isConfirmation.value
                 ? "Confirm it's you before this terminal can show secrets."
-                : "Confirm it's you before signing in this terminal. It stays signed in for up to 90 days.",
+                : `Confirm it's you before signing in this terminal. It stays signed in for up to ${sessionDays.value} days.`,
             ),
         );
       } else {
         await denyCliLogin(code.value);
       }
+      stopExpiry();
       step.value = approve ? "approved" : "denied";
       if (approve) startClosing();
     } catch (error) {
@@ -230,6 +287,8 @@ export function useCliApproveController() {
 
   function startOver(): void {
     stopClosing();
+    stopExpiry();
+    secondsLeft.value = null;
     closeBlocked.value = false;
     step.value = "enter";
     request.value = null;
@@ -239,7 +298,10 @@ export function useCliApproveController() {
   }
 
   onMounted(() => void start());
-  onBeforeUnmount(stopClosing);
+  onBeforeUnmount(() => {
+    stopClosing();
+    stopExpiry();
+  });
 
   return {
     step,
@@ -247,6 +309,10 @@ export function useCliApproveController() {
     request,
     account,
     isConfirmation,
+    machine,
+    sessionDays,
+    secondsLeft,
+    expiresIn,
     codeError,
     formError,
     looking,

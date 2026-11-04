@@ -12,3 +12,4 @@ export * from "./personal-tokens.api";
 export * from "./roles.api";
 export * from "./access.api";
 export * from "./health.api";
+export * from "./compare.api";

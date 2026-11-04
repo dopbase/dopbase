@@ -54,8 +54,8 @@ export const ROOT_ONLY_CAPABILITIES: readonly Capability[] = [
 
 const BASE = "/api/v1/roles";
 
-export async function fetchRoles(): Promise<Role[]> {
-  const { data } = await apiRequest<Role[]>(BASE);
+export async function fetchRoles(signal?: AbortSignal): Promise<Role[]> {
+  const { data } = await apiRequest<Role[]>(BASE, { signal });
   return data;
 }
 

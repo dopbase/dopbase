@@ -137,6 +137,30 @@ async fn browser_login_saves_the_approved_session_without_printing_it() {
   );
 
   let (cookie, csrf) = browser_credentials(&fixture).await;
+  // The approval page names the program that asked.
+  let details: serde_json::Value = reqwest::Client::new()
+    .post(format!("{}/api/v1/auth/cli/inspect", fixture.url))
+    .header("cookie", &cookie)
+    .header("x-dopbase-csrf", &csrf)
+    .json(&serde_json::json!({"userCode":code}))
+    .send()
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+  let os = match std::env::consts::OS {
+    "macos" => "macOS",
+    "linux" => "Linux",
+    "windows" => "Windows",
+    other => other,
+  };
+  assert_eq!(
+    details["data"]["client"],
+    format!("dopbase {} on {os}", env!("CARGO_PKG_VERSION"))
+  );
   reqwest::Client::new()
     .post(format!("{}/api/v1/auth/cli/approve", fixture.url))
     .header("cookie", &cookie)

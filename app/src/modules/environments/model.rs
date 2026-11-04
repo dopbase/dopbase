@@ -11,6 +11,8 @@ pub struct EnvironmentResponse {
   /// Reached only through a grant on the environment itself or a project
   /// manager grant.
   pub protected: bool,
+  /// How many secrets it holds.
+  pub secret_count: i64,
   /// What the caller can do here.
   #[sqlx(skip)]
   pub level: Level,
@@ -20,6 +22,10 @@ pub struct EnvironmentResponse {
 #[derive(Deserialize, ToSchema)]
 pub struct CreateEnvironmentRequest {
   pub name: String,
+  /// Create it already protected, so no project grant below project
+  /// manager ever reaches it.
+  #[serde(default)]
+  pub protected: bool,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateEnvironmentRequest {

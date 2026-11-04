@@ -298,11 +298,30 @@ pub async fn load_access(
   conn: &mut SqliteConnection,
   admin_id: &str,
 ) -> Result<Option<Access>, sqlx::Error> {
-  let row: Option<(i64, Option<String>)> =
-    sqlx::query_as("SELECT is_root, role_id FROM admins WHERE id = ? AND status = 'active'")
-      .bind(admin_id)
-      .fetch_optional(&mut *conn)
-      .await?;
+  access_of(conn, admin_id, true).await
+}
+
+/// The access an account's role gives even while it is disabled, for
+/// deciding who may manage it. `None` when it does not exist.
+pub async fn account_access(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+) -> Result<Option<Access>, sqlx::Error> {
+  access_of(conn, admin_id, false).await
+}
+
+async fn access_of(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+  active_only: bool,
+) -> Result<Option<Access>, sqlx::Error> {
+  let row: Option<(i64, Option<String>)> = sqlx::query_as(
+    "SELECT is_root, role_id FROM admins WHERE id = ? AND (status = 'active' OR ? = 0)",
+  )
+  .bind(admin_id)
+  .bind(active_only)
+  .fetch_optional(&mut *conn)
+  .await?;
   match row {
     None => Ok(None),
     Some((1, _)) => Ok(Some(Access::root())),

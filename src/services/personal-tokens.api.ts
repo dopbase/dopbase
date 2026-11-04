@@ -32,6 +32,11 @@ export interface CreatePersonalTokenRequest {
   scope?: string;
   /** Such as `12h` or `30d`. Personal tokens always expire. */
   expiresIn?: string;
+  /**
+   * AI agents only: revoke the agent's other live tokens in the same step,
+   * so it holds one token at a time.
+   */
+  replaceExisting?: boolean;
 }
 
 /** `userId` is `me` for your own tokens. */
@@ -41,8 +46,9 @@ function base(userId: string): string {
 
 export async function listPersonalTokens(
   userId = "me",
+  signal?: AbortSignal,
 ): Promise<PersonalToken[]> {
-  const { data } = await apiRequest<PersonalToken[]>(base(userId));
+  const { data } = await apiRequest<PersonalToken[]>(base(userId), { signal });
   return data;
 }
 

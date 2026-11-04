@@ -9,6 +9,7 @@ import {
   onUnauthorized,
   registerCsrfProvider,
 } from "~/services/http.client";
+import { clearQueryCache, refetchActiveQueries } from "~/queries/session-cache";
 
 export interface AdminSession {
   adminId: string;
@@ -62,6 +63,10 @@ function persistCsrf(token: string | null): void {
  * `X-Dopbase-CSRF` header, and the public bootstrap state that decides
  * whether new visitors land on `/setup` or `/login`. Registering the CSRF
  * provider and session listeners here keeps `services/` store-free.
+ *
+ * Every session change goes through {@link startSession} or
+ * {@link endSession}, which empty the query cache, so no data read as one
+ * account is ever shown to the next.
  */
 export const useAuthStore = defineStore("auth", () => {
   const session = ref<AdminSession | null>(null);
@@ -70,9 +75,22 @@ export const useAuthStore = defineStore("auth", () => {
   const sessionExpired = ref(false);
 
   registerCsrfProvider(() => csrfToken.value);
-  function expireSession(): void {
+
+  /** Takes on a new session, starting from an empty query cache. */
+  function startSession(next: AdminSession): void {
+    clearQueryCache();
+    session.value = next;
+  }
+
+  /** Drops the local session together with everything read as it. */
+  function endSession(): void {
+    clearQueryCache();
     session.value = null;
     setCsrf(null);
+  }
+
+  function expireSession(): void {
+    endSession();
     sessionExpired.value = true;
   }
   onUnauthorized(expireSession);
@@ -119,17 +137,20 @@ export const useAuthStore = defineStore("auth", () => {
     password: string;
   }): Promise<void> {
     const response = await bootstrapAdmin(request);
-    session.value = {
+    startSession({
       adminId: response.adminId,
       email: response.email,
       sessionKind: "browser",
       recentAuthentication: true,
       role: response.role ?? "root",
       lastLoginAt: response.lastLoginAt ?? null,
-    };
+    });
     setCsrf(response.csrfToken);
     sessionExpired.value = false;
     bootstrapState.value = "ready";
+    // The setup response has no role name or capabilities; the session
+    // endpoint does.
+    await fetchSession().catch(() => undefined);
   }
 
   /** Signs in with email + password and stores the browser session. */
@@ -159,14 +180,14 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function adopt(response: authApi.LoginResponse): void {
-    session.value = {
+    startSession({
       adminId: response.adminId,
       email: response.email,
       sessionKind: response.sessionKind,
       recentAuthentication: true,
       role: response.role ?? "admin",
       lastLoginAt: response.lastLoginAt ?? null,
-    };
+    });
     if (response.csrfToken) setCsrf(response.csrfToken);
     sessionExpired.value = false;
   }
@@ -174,6 +195,10 @@ export const useAuthStore = defineStore("auth", () => {
   /**
    * Re-checks the cookie session and throws ApiError(401) when absent.
    * `quiet` skips the global "session expired" handling for that 401.
+   *
+   * The same account keeps its cached reads. A different one, such as after
+   * signing in as someone else in another tab, starts from an empty cache and
+   * refetches whatever is on screen.
    */
   async function fetchSession(
     options: { quiet?: boolean } = {},
@@ -181,7 +206,7 @@ export const useAuthStore = defineStore("auth", () => {
     const response = await authApi.fetchSession(
       options.quiet ? { notifyAuthEvents: false } : {},
     );
-    session.value = {
+    const next: AdminSession = {
       adminId: response.adminId,
       email: response.email,
       sessionKind: response.sessionKind,
@@ -196,6 +221,13 @@ export const useAuthStore = defineStore("auth", () => {
       passwordConfirmation: response.passwordConfirmation,
       ssoConfirmation: response.ssoConfirmation,
     };
+    const previous = session.value;
+    if (previous?.adminId === next.adminId) {
+      session.value = next;
+    } else {
+      startSession(next);
+      if (previous) void refetchActiveQueries();
+    }
     // A tab opened after sign-in, such as a CLI approval link, has no token
     // yet, and one left from an earlier session no longer matches.
     if (response.csrfToken) setCsrf(response.csrfToken);
@@ -207,15 +239,13 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       await authApi.logout();
     } finally {
-      session.value = null;
-      setCsrf(null);
+      endSession();
       sessionExpired.value = false;
     }
   }
 
   function clearLocalSession(): void {
-    session.value = null;
-    setCsrf(null);
+    endSession();
     bootstrapState.value = "unknown";
     sessionExpired.value = false;
   }
@@ -238,8 +268,7 @@ export const useAuthStore = defineStore("auth", () => {
     newPassword: string,
   ): Promise<void> {
     await authApi.changePassword(currentPassword, newPassword);
-    session.value = null;
-    setCsrf(null);
+    endSession();
     sessionExpired.value = false;
   }
 

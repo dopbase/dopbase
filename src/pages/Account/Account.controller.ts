@@ -1,8 +1,12 @@
-import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
+import { useQuery } from "@pinia/colada";
 import { ApiError } from "~/services/http.client";
+import type { GroupRef } from "~/services/access.api";
 import { useAuthStore } from "~/stores/auth.store";
 import { useReauthentication } from "~/composable/reauthentication";
+import { userAccessQuery } from "~/queries/access";
+import { shownData } from "~/queries/helpers";
 import { formatDateTime, formatRelativeTime, formatRole } from "~/utils/format";
 import {
   MAX_PASSWORD_LENGTH,
@@ -10,13 +14,30 @@ import {
   validatePasswordLength,
 } from "~/utils/validation";
 
+export type AccountTab = "profile" | "tokens" | "audit-tokens";
+
+const TAB_ROUTES: Record<AccountTab, string> = {
+  profile: "account",
+  tokens: "account-tokens",
+  "audit-tokens": "account-audit-tokens",
+};
+const TAB_FOR_ROUTE = Object.fromEntries(
+  Object.entries(TAB_ROUTES).map(([tab, route]) => [route, tab]),
+) as Record<string, AccountTab>;
+
 /**
- * Account screen controller: session display and password rotation.
+ * Account screen controller: tabs, the profile, and password rotation.
+ *
+ * The second tab depends on the role: Personal tokens, or Audit tokens
+ * for roles whose tokens read the audit log. Root and roles without
+ * personal tokens get the profile only. An address for the other tab
+ * moves to the one this account has.
  *
  * Changing the password revokes every human session server-side. The
  * controller clears local session state and routes back to `/login`.
  */
 export function useAccountController() {
+  const route = useRoute();
   const router = useRouter();
   const auth = useAuthStore();
   const { runWithReauth } = useReauthentication();
@@ -58,6 +79,76 @@ export function useAccountController() {
   const recentAuthentication = computed(
     () => auth.session?.recentAuthentication ?? false,
   );
+
+  // Tabs
+
+  /** The tokens tab this account has, if any. */
+  const tokensTab = computed<AccountTab | null>(() => {
+    if (auth.isRoot || !auth.can("tokens.personal")) return null;
+    return auth.session?.tokenScope === "audit" ? "audit-tokens" : "tokens";
+  });
+  const activeTab = computed<AccountTab>(() => {
+    const asked = TAB_FOR_ROUTE[String(route.name)] ?? "profile";
+    return asked === "profile" ? asked : (tokensTab.value ?? "profile");
+  });
+  const tabs = computed(() => {
+    const all: { key: AccountTab; label: string }[] = [
+      { key: "profile", label: "Profile & sign-in" },
+    ];
+    if (tokensTab.value === "tokens")
+      all.push({ key: "tokens", label: "Personal tokens" });
+    if (tokensTab.value === "audit-tokens")
+      all.push({ key: "audit-tokens", label: "Audit tokens" });
+    return all.map((tab) => ({
+      ...tab,
+      to: { name: TAB_ROUTES[tab.key] } as RouteLocationRaw,
+    }));
+  });
+  const subtitle = computed(() => {
+    if (tokensTab.value === "tokens")
+      return "Your profile, sign-in and personal tokens.";
+    if (tokensTab.value === "audit-tokens")
+      return "Your profile, sign-in and audit tokens.";
+    return "Your profile and sign-in.";
+  });
+
+  // Keep the address on the tab that shows.
+  watch(
+    () => [route.name, activeTab.value] as const,
+    ([name, tab]) => {
+      if (name && TAB_FOR_ROUTE[String(name)] && TAB_ROUTES[tab] !== name)
+        void router.replace({ name: TAB_ROUTES[tab] });
+    },
+    { immediate: true },
+  );
+
+  // Profile
+
+  const ownAccess = useQuery(() => userAccessQuery("me"));
+  const ownAccessData = shownData(ownAccess);
+  /** Null until loaded, or when your access can't be read. */
+  const groups = computed<GroupRef[] | null>(
+    () => ownAccessData.value?.groups ?? null,
+  );
+  /** Group pages open for people who can see groups. */
+  const canOpenGroups = computed(() => auth.can("users.view", "groups.manage"));
+
+  async function loadGroups(): Promise<void> {
+    await ownAccess.refetch();
+  }
+
+  // Password
+
+  const passwordOpen = ref(false);
+
+  function openPassword(): void {
+    currentPassword.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
+    fieldErrors.value = {};
+    formError.value = null;
+    passwordOpen.value = true;
+  }
 
   function validate(): boolean {
     const errors: typeof fieldErrors.value = {};
@@ -118,6 +209,14 @@ export function useAccountController() {
   }
 
   return {
+    activeTab,
+    tabs,
+    subtitle,
+    groups,
+    canOpenGroups,
+    loadGroups,
+    passwordOpen,
+    openPassword,
     email,
     role,
     formattedRole,

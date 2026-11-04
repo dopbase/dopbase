@@ -6,12 +6,15 @@ use crate::{
       IMPORT_DUPLICATE_KEY, SECRET_COUNT_LIMIT_MESSAGE, SECRET_LIMIT_EXCEEDED,
       SECRET_TOTAL_SIZE_LIMIT_MESSAGE, TOKEN_SCOPE_INVALID,
     },
-    limits::{MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES, MAX_SECRETS_PER_ENVIRONMENT},
+    limits::{
+      MAX_COMPARE_ENVIRONMENTS, MAX_ENV_LAYOUT_BYTES, MAX_SECRET_COLLECTION_BYTES,
+      MAX_SECRETS_PER_ENVIRONMENT,
+    },
   },
   extractors::{require_account, require_metadata_access, require_recent_browser_auth},
   http::HttpError,
   models::{AuthIdentity, SecretInput},
-  services::authx::Level,
+  services::{authx::Level, token},
   state::AppState,
 };
 use chrono::Utc;
@@ -19,6 +22,7 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::OnceLock;
+use zeroize::Zeroizing;
 pub fn validate_entry(entry: &SecretInput) -> Result<(), HttpError> {
   static KEY: OnceLock<Regex> = OnceLock::new();
   let valid = KEY.get_or_init(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap());
@@ -84,41 +88,94 @@ pub async fn set(
     value: request.value,
   };
   validate_entry(&input)?;
-  let (admin_id, email) = require_account(identity)?;
+  let account = require_account(identity)?;
   let env = environment(state, identity, id, Level::Write).await?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
-  let existing: Option<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key=?")
-    .bind(id).bind(&key).fetch_optional(&mut *tx).await?;
-  let version = existing.as_ref().map_or(1, |row| row.version + 1);
-  let created_at = existing
-    .as_ref()
-    .map_or_else(|| Utc::now().to_rfc3339(), |row| row.created_at.clone());
-  let encrypted = state
-    .crypto
-    .encrypt(input.value.as_bytes(), id, &key, version)
-    .map_err(|_| HttpError::internal())?;
-  let now = Utc::now().to_rfc3339();
-  let metadata = SecretMetadata {
-    key: key.clone(),
-    version,
-    created_at: created_at.clone(),
-    updated_at: now.clone(),
-  };
-  let action = if existing.is_some() {
+  let current = current_version(&mut tx, id, &key).await?;
+  let existed = current.is_some();
+  if request.create_only && existed {
+    return Err(version_conflict());
+  }
+  let metadata = write_value(
+    state,
+    &mut tx,
+    identity,
+    account,
+    id,
+    &key,
+    &input.value,
+    current,
+  )
+  .await?;
+  let action = if existed {
     "secret.updated"
   } else {
     "secret.created"
   };
-  repository::write_version(
+  common::audit(
     &mut tx,
+    identity.audit_actor_type(),
+    Some(account.0),
+    Some(account.1),
+    action,
+    Some(&env.project_id),
+    Some(id),
+    Some("secret"),
+    Some(&key),
+    serde_json::json!({"key":key,"version":metadata.version}),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(metadata)
+}
+/// The key's current version and creation time in an environment, read
+/// inside the caller's write transaction.
+async fn current_version(
+  conn: &mut sqlx::SqliteConnection,
+  id: &str,
+  key: &str,
+) -> Result<Option<(i64, String)>, HttpError> {
+  Ok(
+    sqlx::query_as("SELECT version,created_at FROM secrets WHERE environment_id=? AND key=?")
+      .bind(id)
+      .bind(key)
+      .fetch_optional(conn)
+      .await?,
+  )
+}
+/// Stores `value` as the next version of `key`, after `current`. Every
+/// path that sets a value outright goes through here.
+#[allow(clippy::too_many_arguments)]
+async fn write_value(
+  state: &AppState,
+  conn: &mut sqlx::SqliteConnection,
+  identity: &AuthIdentity,
+  (admin_id, email): (&str, &str),
+  id: &str,
+  key: &str,
+  value: &str,
+  current: Option<(i64, String)>,
+) -> Result<SecretMetadata, HttpError> {
+  let version = current.as_ref().map_or(1, |(version, _)| version + 1);
+  let created_at = current.as_ref().map_or_else(
+    || Utc::now().to_rfc3339(),
+    |(_, created_at)| created_at.clone(),
+  );
+  let encrypted = state
+    .crypto
+    .encrypt(value.as_bytes(), id, key, version)
+    .map_err(|_| HttpError::internal())?;
+  let now = Utc::now().to_rfc3339();
+  repository::write_version(
+    conn,
     repository::NewVersion {
       environment_id: id,
-      key: &key,
+      key,
       version,
       encrypted,
       created_at: &created_at,
       now: &now,
-      change: if existing.is_some() {
+      change: if current.is_some() {
         repository::ChangeType::Updated
       } else {
         repository::ChangeType::Created
@@ -133,21 +190,356 @@ pub async fn set(
     },
   )
   .await?;
+  Ok(SecretMetadata {
+    key: key.into(),
+    version,
+    created_at,
+    updated_at: now,
+  })
+}
+/// Copies the current value of `key` from another environment in the same
+/// project into this one, as a new version. The value never leaves the
+/// server. Needs Read on the source and Write here.
+pub async fn copy(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  key: String,
+  request: CopySecretRequest,
+) -> Result<SecretMetadata, HttpError> {
+  let account = require_account(identity)?;
+  if request.from == id {
+    return Err(copy_source_invalid("Copy from a different environment."));
+  }
+  let target = environment(state, identity, id, Level::Write).await?;
+  let source = environment(state, identity, &request.from, Level::Read).await?;
+  if source.project_id != target.project_id {
+    return Err(copy_source_invalid(
+      "Copy from an environment in the same project.",
+    ));
+  }
+  let row = repository::find(state.db.pool(), &source.id, &key)
+    .await?
+    .ok_or_else(secret_not_found)?;
+  let value = Zeroizing::new(decrypt_row(state, &source.id, &row)?);
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let current = current_version(&mut tx, id, &key).await?;
+  if current.as_ref().map(|(version, _)| *version) != request.expected_version {
+    return Err(version_conflict());
+  }
+  // A new key counts toward the environment's limits like a bulk copy's.
+  if current.is_none() && repository::count(&mut *tx, id).await? >= MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  if repository::value_bytes(&mut *tx, id, Some(&key)).await? + value.len()
+    > MAX_SECRET_COLLECTION_BYTES
+  {
+    return Err(secret_size_limit());
+  }
+  let metadata = write_value(state, &mut tx, identity, account, id, &key, &value, current).await?;
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
-    Some(admin_id),
-    Some(email),
-    action,
-    Some(&env.project_id),
+    Some(account.0),
+    Some(account.1),
+    "secret.copied",
+    Some(&target.project_id),
     Some(id),
     Some("secret"),
     Some(&key),
-    serde_json::json!({"key":key,"version":version}),
+    serde_json::json!({
+      "key": key,
+      "version": metadata.version,
+      "fromEnvironmentId": source.id,
+      "fromVersion": row.version,
+    }),
   )
   .await?;
   tx.commit().await?;
   Ok(metadata)
+}
+/// Creates `keys` here from another environment in the same project, in
+/// one transaction with one audit event. Keys this environment already has
+/// are skipped, never overwritten. With `values` each key gets the source's
+/// current value, decrypted and re-encrypted on the server, which needs
+/// Read on the source; without it each key starts empty and Metadata is
+/// enough. Needs Write here.
+pub async fn copy_many(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  request: CopySecretsRequest,
+) -> Result<CopySecretsResponse, HttpError> {
+  require_metadata_access(identity)?;
+  let account = require_account(identity)?;
+  if request.from == id {
+    return Err(copy_source_invalid("Copy from a different environment."));
+  }
+  let keys: std::collections::BTreeSet<String> = request.keys.into_iter().collect();
+  if keys.is_empty() {
+    return Err(HttpError::validation(BTreeMap::from([(
+      "COPY_KEYS_REQUIRED".into(),
+      "Pick at least one key to copy.".into(),
+    )])));
+  }
+  if keys.len() > MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  let target = environment(state, identity, id, Level::Write).await?;
+  let needed = if request.values {
+    Level::Read
+  } else {
+    Level::Metadata
+  };
+  let source = environment(state, identity, &request.from, needed).await?;
+  if source.project_id != target.project_id {
+    return Err(copy_source_invalid(
+      "Copy from an environment in the same project.",
+    ));
+  }
+  // The source is read in the write transaction, so what is copied and the
+  // versions the audit event records are the source as it is at the write.
+  // Only the chosen keys are read, and ciphertext only when values are
+  // copied, since the write lock is held meanwhile.
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
+  let chosen: Vec<&String> = keys.iter().collect();
+  let source_versions: HashMap<String, i64> =
+    repository::versions_of(&mut *tx, &source.id, &chosen)
+      .await?
+      .into_iter()
+      .collect();
+  if source_versions.len() != keys.len() {
+    return Err(secret_not_found());
+  }
+  let existing: HashSet<String> =
+    sqlx::query_scalar("SELECT key FROM secrets WHERE environment_id=?")
+      .bind(id)
+      .fetch_all(&mut *tx)
+      .await?
+      .into_iter()
+      .collect();
+  let (skipped, copied): (Vec<String>, Vec<String>) =
+    keys.into_iter().partition(|key| existing.contains(key));
+  if existing.len() + copied.len() > MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  let source_rows: HashMap<String, repository::SecretRow> = if request.values {
+    let wanted: Vec<&String> = copied.iter().collect();
+    repository::rows_of(&mut *tx, &source.id, &wanted)
+      .await?
+      .into_iter()
+      .map(|row| (row.key.clone(), row))
+      .collect()
+  } else {
+    HashMap::new()
+  };
+  let mut values = Vec::with_capacity(copied.len());
+  for key in &copied {
+    let value = if request.values {
+      let row = source_rows.get(key).ok_or_else(secret_not_found)?;
+      Zeroizing::new(decrypt_row(state, &source.id, row)?)
+    } else {
+      Zeroizing::new(String::new())
+    };
+    values.push((key, source_versions[key], value));
+  }
+  // The copied keys are new here, so they add to what is already stored.
+  let stored = repository::value_bytes(&mut *tx, id, None).await?;
+  if stored
+    + values
+      .iter()
+      .map(|(_, _, value)| value.len())
+      .sum::<usize>()
+    > MAX_SECRET_COLLECTION_BYTES
+  {
+    return Err(secret_size_limit());
+  }
+  let mut from_versions = serde_json::Map::new();
+  for (key, version, value) in &values {
+    write_value(state, &mut tx, identity, account, id, key, value, None).await?;
+    from_versions.insert((*key).clone(), (*version).into());
+  }
+  common::audit(
+    &mut tx,
+    identity.audit_actor_type(),
+    Some(account.0),
+    Some(account.1),
+    "secret.bulk_copied",
+    Some(&target.project_id),
+    Some(id),
+    Some("environment"),
+    Some(id),
+    serde_json::json!({
+      "fromEnvironmentId": source.id,
+      "values": request.values,
+      "copied": from_versions,
+      "skipped": skipped,
+    }),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(CopySecretsResponse {
+    copied_keys: copied,
+    skipped_keys: skipped,
+  })
+}
+fn version_conflict() -> HttpError {
+  HttpError::conflict(
+    "SECRET_VERSION_CONFLICT",
+    "The secret changed since you loaded it. Reload and try again.",
+  )
+}
+fn secret_count_limit() -> HttpError {
+  HttpError::new(
+    axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+    SECRET_LIMIT_EXCEEDED,
+    SECRET_COUNT_LIMIT_MESSAGE,
+  )
+}
+fn secret_size_limit() -> HttpError {
+  HttpError::new(
+    axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+    SECRET_LIMIT_EXCEEDED,
+    SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
+  )
+}
+fn copy_source_invalid(message: &str) -> HttpError {
+  HttpError::validation(BTreeMap::from([(
+    "COPY_SOURCE_INVALID".into(),
+    message.into(),
+  )]))
+}
+fn compare_invalid(
+  code: &str,
+  message: &str,
+) -> HttpError {
+  HttpError::validation(BTreeMap::from([(code.into(), message.into())]))
+}
+/// Lines up every key of the base environment and up to three others in
+/// its project. Values are decrypted only to compare them, and only where
+/// the caller has Read on both sides; nothing derived from a value except
+/// whether it matches the base is returned. Like listing secrets, a
+/// comparison isn't audited.
+pub async fn compare(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  with: Option<&str>,
+) -> Result<CompareResponse, HttpError> {
+  require_metadata_access(identity)?;
+  let base = environment(state, identity, id, Level::Metadata).await?;
+  let ids: Vec<&str> = with
+    .unwrap_or_default()
+    .split(',')
+    .map(str::trim)
+    .filter(|part| !part.is_empty())
+    .collect();
+  if ids.len() > MAX_COMPARE_ENVIRONMENTS {
+    return Err(compare_invalid(
+      "COMPARE_LIMIT_EXCEEDED",
+      "Compare with at most 3 environments at a time.",
+    ));
+  }
+  let mut seen = HashSet::new();
+  let mut others = Vec::with_capacity(ids.len());
+  for other in ids {
+    if other == id || !seen.insert(other) {
+      return Err(compare_invalid(
+        "COMPARE_ENVIRONMENT_INVALID",
+        "List each environment once, and not the base itself.",
+      ));
+    }
+    let environment = environment(state, identity, other, Level::Metadata).await?;
+    if environment.project_id != base.project_id {
+      return Err(compare_invalid(
+        "COMPARE_ENVIRONMENT_INVALID",
+        "Compare environments in the same project as the base.",
+      ));
+    }
+    others.push(environment);
+  }
+
+  let base_reads = base.level >= Level::Read;
+  let compares: Vec<bool> = others
+    .iter()
+    .map(|environment| base_reads && environment.level >= Level::Read)
+    .collect();
+  let pool = state.db.pool();
+  let base_rows: HashMap<String, repository::SecretRow> = repository::rows(pool, id)
+    .await?
+    .into_iter()
+    .map(|row| (row.key.clone(), row))
+    .collect();
+  let mut other_rows = Vec::with_capacity(others.len());
+  for environment in &others {
+    let rows: HashMap<String, repository::SecretRow> = repository::rows(pool, &environment.id)
+      .await?
+      .into_iter()
+      .map(|row| (row.key.clone(), row))
+      .collect();
+    other_rows.push(rows);
+  }
+
+  let mut keys: Vec<&String> = base_rows
+    .keys()
+    .chain(other_rows.iter().flat_map(HashMap::keys))
+    .collect::<HashSet<_>>()
+    .into_iter()
+    .collect();
+  keys.sort();
+  let mut out = Vec::with_capacity(keys.len());
+  for key in keys {
+    let base_row = base_rows.get(key);
+    // Decrypt the base value at most once, and only if a column needs it.
+    let mut base_value: Option<Zeroizing<String>> = None;
+    let mut cells = Vec::with_capacity(others.len());
+    for (index, rows) in other_rows.iter().enumerate() {
+      let row = rows.get(key);
+      let same_as_base = match (base_row, row) {
+        (Some(base_row), Some(row)) if compares[index] => {
+          if base_value.is_none() {
+            base_value = Some(Zeroizing::new(decrypt_row(state, id, base_row)?));
+          }
+          let value = Zeroizing::new(decrypt_row(state, &others[index].id, row)?);
+          Some(token::constant_time_eq(
+            base_value
+              .as_deref()
+              .map(String::as_str)
+              .unwrap_or_default(),
+            &value,
+          ))
+        }
+        _ => None,
+      };
+      cells.push(CompareCell {
+        version: row.map(|row| row.version),
+        same_as_base,
+      });
+    }
+    out.push(CompareKey {
+      key: key.clone(),
+      base: base_row.map(|row| row.version),
+      others: cells,
+    });
+  }
+
+  let describe = |environment: &crate::modules::environments::model::EnvironmentResponse,
+                  values_compared: bool| CompareEnvironment {
+    id: environment.id.clone(),
+    name: environment.name.clone(),
+    protected: environment.protected,
+    level: environment.level,
+    values_compared,
+  };
+  Ok(CompareResponse {
+    base: describe(&base, base_reads),
+    environments: others
+      .iter()
+      .zip(&compares)
+      .map(|(environment, compared)| describe(environment, *compared))
+      .collect(),
+    keys: out,
+  })
 }
 pub async fn delete(
   state: &AppState,
@@ -662,13 +1054,25 @@ fn collection_revision<'a>(
   rows: impl Iterator<Item = &'a repository::SecretRow>,
   layout: Option<&str>,
 ) -> String {
+  revision_of(
+    environment_id,
+    rows.map(|row| (row.key.as_str(), row.version, row.updated_at.as_str())),
+    layout,
+  )
+}
+/// The revision from each row's key, version and update time.
+fn revision_of<'a>(
+  environment_id: &str,
+  rows: impl Iterator<Item = (&'a str, i64, &'a str)>,
+  layout: Option<&str>,
+) -> String {
   let mut hash = Sha256::new();
   hash.update(environment_id.as_bytes());
-  for row in rows {
+  for (key, version, updated_at) in rows {
     hash.update([0]);
-    hash.update(row.key.as_bytes());
-    hash.update(row.version.to_be_bytes());
-    hash.update(row.updated_at.as_bytes());
+    hash.update(key.as_bytes());
+    hash.update(version.to_be_bytes());
+    hash.update(updated_at.as_bytes());
   }
   if let Some(layout) = layout {
     hash.update([1]);
@@ -676,20 +1080,98 @@ fn collection_revision<'a>(
   }
   format!("{:x}", hash.finalize())
 }
-async fn decrypt_all(
+/// An environment's rows and `.env` layout, read together, and the
+/// revision they make. Nothing is decrypted yet.
+pub(crate) struct Snapshot {
+  pub revision: String,
+  pub rows: Vec<repository::SecretRow>,
+  pub env_layout: Option<String>,
+}
+pub(crate) async fn snapshot(
   state: &AppState,
   id: &str,
+) -> Result<Snapshot, HttpError> {
+  let mut tx = state.db.pool().begin().await?;
+  let rows = repository::rows(&mut *tx, id).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  tx.rollback().await?;
+  Ok(Snapshot {
+    revision: collection_revision(id, rows.iter(), env_layout.as_deref()),
+    rows,
+    env_layout,
+  })
+}
+/// The environment's current revision, read without any ciphertext, so a
+/// poll that changes nothing stays cheap.
+pub(crate) async fn revision(
+  state: &AppState,
+  id: &str,
+) -> Result<String, HttpError> {
+  let mut tx = state.db.pool().begin().await?;
+  let rows = repository::revision_rows(&mut *tx, id).await?;
+  let env_layout: Option<String> =
+    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
+      .bind(id)
+      .fetch_optional(&mut *tx)
+      .await?;
+  tx.rollback().await?;
+  Ok(revision_of(
+    id,
+    rows
+      .iter()
+      .map(|(key, version, updated_at)| (key.as_str(), *version, updated_at.as_str())),
+    env_layout.as_deref(),
+  ))
+}
+pub(crate) fn decrypt_rows(
+  state: &AppState,
+  id: &str,
+  rows: &[repository::SecretRow],
 ) -> Result<Vec<SecretInput>, HttpError> {
-  repository::rows(state.db.pool(), id)
-    .await?
-    .into_iter()
+  rows
+    .iter()
     .map(|row| {
-      decrypt_row(state, id, &row).map(|value| SecretInput {
-        key: row.key,
+      decrypt_row(state, id, row).map(|value| SecretInput {
+        key: row.key.clone(),
         value,
       })
     })
     .collect()
+}
+/// Who reads secrets at runtime, as the audit event names them.
+pub(crate) struct RuntimeReader<'a> {
+  pub actor_type: &'a str,
+  pub actor_id: &'a str,
+  pub actor_label: Option<&'a str>,
+}
+/// Decrypts `snapshot` for a running process and records the
+/// `secret.runtime_accessed` event. Both runtime routes read through here.
+pub(crate) async fn runtime_entries(
+  state: &AppState,
+  reader: RuntimeReader<'_>,
+  project_id: &str,
+  id: &str,
+  snapshot: &Snapshot,
+) -> Result<Vec<SecretInput>, HttpError> {
+  let entries = decrypt_rows(state, id, &snapshot.rows)?;
+  common::audit_standalone(
+    state.db.pool(),
+    reader.actor_type,
+    Some(reader.actor_id),
+    reader.actor_label,
+    "secret.runtime_accessed",
+    Some(project_id),
+    Some(id),
+    Some("environment"),
+    Some(id),
+    serde_json::json!({"count":entries.len(),"revision":snapshot.revision}),
+  )
+  .await?;
+  Ok(entries)
 }
 /// Returns the stored `.env` editor layout for the environment. Contains no
 /// secret values, so no recent-authentication is required.
@@ -734,25 +1216,12 @@ pub async fn export(
     ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
-  let mut tx = state.db.pool().begin().await?;
-  let rows: Vec<repository::SecretRow> = sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
-    .bind(id).fetch_all(&mut *tx).await?;
-  let env_layout: Option<String> =
-    sqlx::query_scalar("SELECT layout FROM environment_env_layout WHERE environment_id=?")
-      .bind(id)
-      .fetch_optional(&mut *tx)
-      .await?;
-  let revision = collection_revision(id, rows.iter(), env_layout.as_deref());
-  let entries = rows
-    .iter()
-    .map(|row| {
-      decrypt_row(state, id, row).map(|value| SecretInput {
-        key: row.key.clone(),
-        value,
-      })
-    })
-    .collect::<Result<Vec<_>, _>>()?;
-  tx.rollback().await?;
+  let Snapshot {
+    revision,
+    rows,
+    env_layout,
+  } = snapshot(state, id).await?;
+  let entries = decrypt_rows(state, id, &rows)?;
   common::audit_standalone(
     state.db.pool(),
     actor_type,
@@ -777,7 +1246,8 @@ pub async fn runtime(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<RuntimeSecretsResponse, HttpError> {
-  crate::modules::environments::service::show(state, id).await?;
+  // The runner arm refuses before the lookup, so a runner can't tell a
+  // missing id from another environment's.
   let (actor_type, actor_id, actor_label) = match identity {
     AuthIdentity::Admin {
       admin_id, email, ..
@@ -805,20 +1275,13 @@ pub async fn runtime(
     ),
   };
   let env = environment(state, identity, id, Level::Read).await?;
-  let entries = decrypt_all(state, id).await?;
-  common::audit_standalone(
-    state.db.pool(),
+  let snapshot = snapshot(state, id).await?;
+  let reader = RuntimeReader {
     actor_type,
-    Some(actor_id),
+    actor_id,
     actor_label,
-    "secret.runtime_accessed",
-    Some(&env.project_id),
-    Some(id),
-    Some("environment"),
-    Some(id),
-    serde_json::json!({"count":entries.len()}),
-  )
-  .await?;
+  };
+  let entries = runtime_entries(state, reader, &env.project_id, id, &snapshot).await?;
   Ok(RuntimeSecretsResponse {
     project: env.project_name,
     environment: env.name,

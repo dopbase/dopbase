@@ -1,96 +1,131 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useTokensPanelController } from "./TokensPanel.controller";
 import {
   DbAlert,
-  DbBadge,
   DbButton,
   DbConfirmDialog,
   DbEmptyState,
   DbInput,
+  DbLevelBadge,
+  DbMenu,
+  DbMenuItem,
   DbModal,
+  DbRadioCard,
+  DbSearchField,
+  DbSegment,
   DbSelect,
   DbSkeleton,
 } from "~/components/ui";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
-import { KeyIcon } from "~/assets/icons";
-import { formatRelativeTime, formatDateTime } from "~/utils/format";
+import { isValidSlug } from "~/utils/validation";
+import {
+  ActivityIcon,
+  CopyIcon,
+  InfoIcon,
+  KeyIcon,
+  PlusIcon,
+  XIcon,
+} from "~/assets/icons";
+import { formatDate } from "~/utils/format";
+import { levelMeter } from "~/utils/level";
 import type { RunnerToken } from "~/services";
 import {
   MAX_TOKEN_EXPIRY_DAYS,
   MAX_TOKEN_EXPIRY_HOURS,
+  expiryDate,
+  runnerTokenExpiryPresets,
   tokenExpiresIn,
-  tokenExpiryOptions,
   tokenExpiryUnits,
 } from "~/utils/token-expiry";
 
 /**
- * TokensPanel — runner-token management for one environment.
+ * TokensPanel — runner tokens for one environment. A runner token lets a
+ * deployed app read this environment's values and nothing else.
  *
- * A newly created token's plaintext is shown exactly once inside a
- * persistent dialog. Closing it after explicit acknowledgment discards the
- * value permanently.
+ * A new token's plaintext shows once, in a dialog that stays open until
+ * it's acknowledged. Revoking takes effect right away.
  */
-const props = defineProps<{ environmentId: string }>();
+const props = defineProps<{
+  environmentId: string;
+  environmentName: string;
+  projectName: string;
+  protected?: boolean;
+}>();
+
+const emit = defineEmits<{
+  /** Open this environment's activity. */
+  activity: [];
+}>();
 
 const environmentIdRef = computed(() => props.environmentId);
 const controller = useTokensPanelController(environmentIdRef);
-// Destructure so refs auto-unwrap in the template.
 const {
-  tokens,
+  rows,
+  filter,
+  copiedId,
   loading,
   loadError,
   actionError,
   creating,
   created,
-  create,
   acknowledgeCreated,
 } = controller;
 
+/** Runner tokens can only read. The meter makes that plain. */
+const readMeter = levelMeter("read");
+const scope = computed(() => `${props.projectName} / ${props.environmentName}`);
+
 const showCreate = ref(false);
 const newName = ref("");
-const expiryChoice = ref("never");
+const expiryChoice = ref("90d");
 const customAmount = ref("");
-const customUnit = ref("h");
+const customUnit = ref("d");
 const createError = ref<string | null>(null);
 const expiryError = ref<string | null>(null);
 const revokeTarget = ref<RunnerToken | null>(null);
 const revokeLoading = ref(false);
 const revokeError = ref<string | null>(null);
-const now = ref(Date.now());
-let expiryTimer: ReturnType<typeof setTimeout> | undefined;
-
-function scheduleExpiry(): void {
-  clearTimeout(expiryTimer);
-  now.value = Date.now();
-  const futureExpiries = tokens.value
-    ?.filter((token) => !token.revokedAt && token.expiresAt)
-    .map((token) => new Date(token.expiresAt!).getTime())
-    .filter((expiry) => expiry > now.value);
-  if (!futureExpiries?.length) return;
-  const nextExpiry = Math.min(...futureExpiries);
-  expiryTimer = setTimeout(
-    scheduleExpiry,
-    Math.min(nextExpiry - now.value + 1, 2_147_483_647),
-  );
-}
-
-watch(tokens, scheduleExpiry, { immediate: true });
-onUnmounted(() => clearTimeout(expiryTimer));
 
 function openCreate(): void {
   newName.value = "";
-  expiryChoice.value = "never";
+  expiryChoice.value = "90d";
   customAmount.value = "";
-  customUnit.value = "h";
+  customUnit.value = "d";
   createError.value = null;
   expiryError.value = null;
   showCreate.value = true;
 }
 
+/** "deploy-prod can read every value in payments / prod until Jan 25, 2027." */
+const createSummary = computed(() => {
+  const name = newName.value.trim() || "This token";
+  let until: Date | null = null;
+  try {
+    until = expiryDate(
+      tokenExpiresIn(expiryChoice.value, customAmount.value, customUnit.value),
+    );
+  } catch {
+    return `${name} can read every value in ${scope.value}.`;
+  }
+  return until
+    ? `${name} can read every value in ${scope.value} until ${formatDate(until.toISOString())}.`
+    : `${name} can read every value in ${scope.value}.`;
+});
+
+/** Where the last token was created, for its one-time dialog. */
+const createdScope = ref("");
+
 async function submitCreate(): Promise<void> {
-  if (newName.value.trim() === "") {
+  const name = newName.value.trim();
+  if (name === "") {
     createError.value = "Enter a token name.";
+    return;
+  }
+  // Same rule as environment names, so a name works in scripts and logs.
+  if (!isValidSlug(name)) {
+    createError.value =
+      "Use lowercase letters, numbers and single hyphens, starting with a letter. 63 characters at most.";
     return;
   }
   createError.value = null;
@@ -107,8 +142,9 @@ async function submitCreate(): Promise<void> {
       error instanceof Error ? error.message : "Enter a valid expiry.";
     return;
   }
+  createdScope.value = scope.value;
   try {
-    await create(newName.value.trim(), expiresIn);
+    await controller.create(name, expiresIn);
     showCreate.value = false;
   } catch {
     // Keep the dialog open because controller.actionError shows the error.
@@ -129,191 +165,139 @@ async function confirmRevoke(): Promise<void> {
   }
 }
 
-function tokenStatus(token: RunnerToken): {
-  label: string;
-  tone: "ok" | "crit" | "neutral";
-} {
-  if (token.revokedAt) return { label: "revoked", tone: "crit" };
-  if (token.expiresAt && new Date(token.expiresAt).getTime() <= now.value)
-    return { label: "expired", tone: "crit" };
-  return { label: "active", tone: "ok" };
-}
+const createdUsage = computed(() =>
+  created.value
+    ? [
+        `export DOPBASE_TOKEN=${created.value.plaintextToken}`,
+        `dopbase run ${created.value.token.environmentId} -- ./start.sh`,
+      ].join("\n")
+    : "",
+);
+
+const expiresClass: Record<string, string> = {
+  default: "text-ink",
+  warn: "text-warn",
+  crit: "text-ink-faint",
+};
 </script>
 
 <template>
-  <div class="@container flex flex-col gap-4">
-    <header class="flex flex-wrap items-center gap-2">
-      <div>
-        <h3 class="text-sm font-semibold">
-          Runner tokens
-          <DbBadge v-if="tokens" class="ml-1">{{ tokens.length }}</DbBadge>
-        </h3>
-        <p class="mt-0.5 text-sm text-ink-muted">
-          Scoped to this environment only.
-        </p>
-      </div>
-      <DbButton class="ml-auto" size="sm" variant="primary" @click="openCreate">
-        New token
+  <div class="flex flex-col gap-4">
+    <p class="text-sm leading-[22px] text-ink-muted">
+      Runner tokens let a deployed app read one environment's values. For your
+      own scripts or an AI agent, use a personal token from your account menu.
+    </p>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <DbSearchField
+        v-model="filter"
+        class="w-full sm:w-[232px]"
+        placeholder="Filter tokens" />
+      <DbButton
+        class="ml-auto"
+        variant="primary"
+        data-testid="tokens-new"
+        @click="openCreate">
+        <PlusIcon class="h-4 w-4" />
+        New runner token
       </DbButton>
-    </header>
+    </div>
 
-    <DbAlert v-if="actionError">{{ actionError }}</DbAlert>
+    <DbAlert v-if="actionError && !showCreate">{{ actionError }}</DbAlert>
 
-    <!-- Loading skeleton tokens table -->
     <div
       v-if="loading"
-      class="overflow-x-auto rounded-card border border-line bg-panel"
+      class="overflow-hidden rounded-card border border-line bg-panel"
       data-testid="tokens-skeleton">
-      <table class="min-w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-line">
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">Name</th>
-            <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
-              Created
-            </th>
-            <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
-              Expires
-            </th>
-            <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
-              Last used
-            </th>
-            <th
-              class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="i in 3"
-            :key="i"
-            class="border-b border-line-soft last:border-b-0">
-            <td class="px-4 py-3">
-              <DbSkeleton class="h-4 w-32" />
-            </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
-              <DbSkeleton class="h-4 w-20" />
-            </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
-              <DbSkeleton class="h-4 w-24" />
-            </td>
-            <td class="hidden px-4 py-3 @2xl:table-cell">
-              <DbSkeleton class="h-4 w-20" />
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex items-center justify-end">
-                <DbSkeleton class="h-6 w-14 rounded-control" />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div
+        v-for="i in 3"
+        :key="i"
+        class="flex h-11 items-center gap-6 border-b border-line-soft px-4 last:border-b-0">
+        <DbSkeleton class="h-4 w-32" />
+        <DbSkeleton class="h-4 w-16" />
+        <DbSkeleton class="ml-auto h-4 w-24" />
+      </div>
     </div>
 
     <DbAlert v-else-if="loadError">{{ loadError }}</DbAlert>
 
     <DbEmptyState
-      v-else-if="tokens && tokens.length === 0"
-      title="No runner tokens"
-      description="Create a token to let one application read this environment's secret values at runtime.">
+      v-else-if="rows && rows.length === 0 && !filter.trim()"
+      title="No runner tokens yet"
+      description="Create a token for each app or pipeline that reads this environment, so you can revoke one without touching the others.">
       <template #icon>
         <KeyIcon class="h-5 w-5" />
-      </template>
-      <template #actions>
-        <DbButton variant="primary" size="sm" @click="openCreate">
-          New token
-        </DbButton>
       </template>
     </DbEmptyState>
 
     <div
-      v-else-if="tokens"
+      v-else-if="rows"
       class="overflow-x-auto rounded-card border border-line bg-panel">
       <table class="min-w-full text-left text-sm" data-testid="tokens-table">
         <thead>
-          <tr class="border-b border-line">
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">Name</th>
+          <tr class="border-b border-line-soft">
+            <th class="h-11 px-4 font-medium text-ink-muted">Name</th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
-              Created
+              class="hidden h-11 px-4 font-medium text-ink-muted sm:table-cell">
+              Can
             </th>
             <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
-              Expires
-            </th>
-            <th
-              class="hidden px-4 py-2.5 text-xs font-medium text-ink-muted @2xl:table-cell">
+              class="hidden h-11 px-4 font-medium text-ink-muted md:table-cell">
               Last used
             </th>
-            <th class="px-4 py-2.5 text-xs font-medium text-ink-muted">
-              Status
-            </th>
-            <th
-              class="px-4 py-2.5 text-right text-xs font-medium text-ink-muted">
-              Actions
-            </th>
+            <th class="h-11 px-4 font-medium text-ink-muted">Expires</th>
+            <th class="h-11 w-12 px-2"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
+          <tr v-if="rows.length === 0">
+            <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+              No tokens match “{{ filter.trim() }}”.
+            </td>
+          </tr>
           <tr
-            v-for="token in tokens"
-            :key="token.id"
-            class="border-b border-line-soft last:border-b-0">
-            <td class="w-full max-w-0 px-4 py-2.5">
+            v-for="row in rows"
+            :key="row.token.id"
+            class="border-b border-line-soft transition-colors last:border-b-0 hover:bg-raised"
+            data-testid="token-row">
+            <td class="h-11 w-full max-w-0 px-4 sm:w-[34%]">
               <p
-                class="truncate font-mono text-sm text-ink-strong"
-                :title="token.name">
-                {{ token.name }}
-              </p>
-              <p class="truncate text-xs text-ink-muted @2xl:hidden">
-                {{
-                  token.expiresAt
-                    ? `Expires ${formatDateTime(token.expiresAt)}`
-                    : "No expiry"
-                }}
-                ·
-                {{
-                  token.lastUsedAt
-                    ? `used ${formatRelativeTime(token.lastUsedAt)}`
-                    : "never used"
-                }}
+                class="truncate font-mono text-sm"
+                :class="row.active ? 'text-ink-strong' : 'text-ink-faint'"
+                :title="row.token.name">
+                {{ row.token.name }}
               </p>
             </td>
-            <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
-              {{ formatRelativeTime(token.createdAt) }}
+            <td class="hidden h-11 px-4 sm:table-cell">
+              <DbLevelBadge v-bind="readMeter" />
             </td>
             <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
-              {{ token.expiresAt ? formatDateTime(token.expiresAt) : "never" }}
+              class="hidden h-11 whitespace-nowrap px-4 text-ink md:table-cell">
+              {{ row.lastUsed }}
             </td>
             <td
-              class="hidden px-4 py-2.5 text-sm text-ink-muted @2xl:table-cell">
-              {{
-                token.lastUsedAt
-                  ? formatRelativeTime(token.lastUsedAt)
-                  : "never"
-              }}
+              class="h-11 whitespace-nowrap px-4"
+              :class="expiresClass[row.expiresTone]">
+              {{ copiedId === row.token.id ? "Name copied" : row.expires }}
             </td>
-            <td class="px-4 py-2.5">
-              <DbBadge :tone="tokenStatus(token).tone">
-                {{ tokenStatus(token).label }}
-              </DbBadge>
-            </td>
-            <td class="px-4 py-2.5 text-right">
-              <button
-                v-if="!token.revokedAt"
-                type="button"
-                class="cursor-pointer rounded border border-crit/40 bg-crit/10 px-2 py-1 font-mono text-xs text-crit transition-colors hover:bg-crit/20 pointer-coarse:py-2"
-                @click="revokeTarget = token">
-                revoke
-              </button>
-              <span v-else class="text-xs text-ink-muted">
-                {{ formatDateTime(token.revokedAt) }}
-              </span>
+            <td class="h-11 px-2 text-right">
+              <DbMenu :label="`Actions for ${row.token.name}`">
+                <DbMenuItem @select="controller.copyName(row.token)">
+                  <template #icon><CopyIcon class="h-4 w-4" /></template>
+                  Copy name
+                </DbMenuItem>
+                <DbMenuItem @select="emit('activity')">
+                  <template #icon><ActivityIcon class="h-4 w-4" /></template>
+                  Activity
+                </DbMenuItem>
+                <template v-if="row.active">
+                  <div class="my-0.5 h-px bg-line-soft" role="separator" />
+                  <DbMenuItem tone="danger" @select="revokeTarget = row.token">
+                    <template #icon><XIcon class="h-4 w-4" /></template>
+                    Revoke token
+                  </DbMenuItem>
+                </template>
+              </DbMenu>
             </td>
           </tr>
         </tbody>
@@ -324,22 +308,51 @@ function tokenStatus(token: RunnerToken): {
     <DbModal
       :open="showCreate"
       title="New runner token"
+      size="xl"
       @close="!creating && (showCreate = false)">
       <form
+        id="new-runner-token"
         class="flex flex-col gap-4"
         novalidate
         @submit.prevent="submitCreate">
-        <DbInput
-          v-model="newName"
-          label="Token name"
-          name="tokenName"
-          placeholder="deploy-worker"
-          mono
-          hint="A readable label, e.g. the deployment target's name." />
-        <DbSelect
-          v-model="expiryChoice"
-          label="Expires"
-          :options="tokenExpiryOptions" />
+        <!-- Side by side once the dialog is wide enough. -->
+        <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
+          <DbInput
+            v-model="newName"
+            label="Name"
+            name="tokenName"
+            placeholder="deploy-prod"
+            mono
+            :error="createError"
+            hint="Lowercase letters, numbers and hyphens. Name it after the app or pipeline that will use it."
+            @input="createError = null" />
+          <DbInput
+            :model-value="
+              protected ? `${environmentName} (protected)` : environmentName
+            "
+            label="Environment"
+            name="tokenEnvironment"
+            mono
+            readonly
+            :title="environmentName" />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <p class="text-sm text-ink-muted">Can</p>
+          <DbRadioCard
+            name="token-can"
+            value="read"
+            checked
+            label="Read values"
+            description="Runner tokens only read. They can't change secrets or see other environments." />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <p class="text-sm text-ink-muted">Expires</p>
+          <DbSegment
+            v-model="expiryChoice"
+            class="self-start"
+            :options="runnerTokenExpiryPresets"
+            label="Expires" />
+        </div>
         <div v-if="expiryChoice === 'custom'" class="grid grid-cols-2 gap-2">
           <DbInput
             v-model="customAmount"
@@ -359,49 +372,48 @@ function tokenStatus(token: RunnerToken): {
             label="Unit"
             :options="tokenExpiryUnits" />
         </div>
-        <p class="text-sm text-ink-muted">
-          Role: <DbBadge tone="accent">runner</DbBadge>
-          - the token can read this environment's runtime values but cannot list
-          metadata, mutate secrets, reveal, or export.
+        <p
+          class="flex items-start gap-2.5 rounded-control bg-raised px-3.5 py-3 text-sm text-ink"
+          data-testid="token-summary">
+          <InfoIcon class="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
+          {{ createSummary }}
         </p>
-        <p v-if="createError" class="text-xs text-crit">
-          {{ createError }}
-        </p>
-        <p v-if="actionError" class="text-xs text-crit">
-          {{ actionError }}
-        </p>
-        <div class="flex items-center justify-end gap-2">
-          <DbButton
-            variant="ghost"
-            :disabled="creating"
-            @click="showCreate = false">
-            Cancel
-          </DbButton>
-          <DbButton variant="primary" type="submit" :loading="creating">
-            Create token
-          </DbButton>
-        </div>
+        <DbAlert v-if="actionError">{{ actionError }}</DbAlert>
       </form>
+      <template #footer>
+        <DbButton
+          variant="ghost"
+          :disabled="creating"
+          @click="showCreate = false">
+          Cancel
+        </DbButton>
+        <DbButton
+          variant="primary"
+          type="submit"
+          form="new-runner-token"
+          :loading="creating">
+          Create token
+        </DbButton>
+      </template>
     </DbModal>
 
     <OneTimeTokenDialog
       :id="created?.token.id ?? ''"
       :open="created !== null"
-      title="Runner token created"
+      title="Copy your token"
       :name="created?.token.name ?? ''"
       :token="created?.plaintextToken ?? ''"
-      :detail="
-        created?.token.expiresAt
-          ? `Expires ${formatDateTime(created.token.expiresAt)}.`
-          : 'This token does not expire.'
+      :scope="createdScope"
+      :expires="
+        created?.token.expiresAt ? formatDate(created.token.expiresAt) : 'Never'
       "
+      :usage="createdUsage"
       @acknowledge="acknowledgeCreated" />
 
-    <!-- Revoke token -->
     <DbConfirmDialog
       :open="revokeTarget !== null"
       title="Revoke runner token"
-      :description="`Applications using '${revokeTarget?.name}' will immediately lose access to this environment.`"
+      :description="`Apps using '${revokeTarget?.name}' lose access to ${scope} right away.`"
       :confirm-word="revokeTarget?.name"
       confirm-label="Revoke token"
       :loading="revokeLoading"

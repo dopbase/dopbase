@@ -41,11 +41,67 @@ pub async fn list(
   .fetch_all(pool)
   .await
 }
-pub async fn rows(
-  pool: &SqlitePool,
+pub async fn rows<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
   environment_id: &str,
 ) -> Result<Vec<SecretRow>, sqlx::Error> {
-  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(pool).await
+  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? ORDER BY key").bind(environment_id).fetch_all(executor).await
+}
+/// What an environment's revision is made of: each key's version and
+/// update time, without any ciphertext.
+pub async fn revision_rows<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+) -> Result<Vec<(String, i64, String)>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version,updated_at FROM secrets WHERE environment_id=? ORDER BY key")
+    .bind(environment_id)
+    .fetch_all(executor)
+    .await
+}
+/// The version of each of `keys` the environment has. Keys it doesn't have
+/// are left out.
+pub async fn versions_of<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  keys: &[&String],
+) -> Result<Vec<(String, i64)>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version FROM secrets WHERE environment_id=? AND key IN (SELECT value FROM json_each(?))").bind(environment_id).bind(serde_json::json!(keys).to_string()).fetch_all(executor).await
+}
+/// How many keys the environment holds.
+pub async fn count<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+) -> Result<usize, sqlx::Error> {
+  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id=?")
+    .bind(environment_id)
+    .fetch_one(executor)
+    .await?;
+  Ok(usize::try_from(count).unwrap_or_default())
+}
+/// The bytes of every value the environment holds, apart from `except`,
+/// worked out from the ciphertext lengths so nothing is decrypted.
+pub async fn value_bytes<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  except: Option<&str>,
+) -> Result<usize, sqlx::Error> {
+  let bytes: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(length(ciphertext) - ?), 0) FROM secrets WHERE environment_id=? AND key IS NOT ?",
+  )
+  .bind(crate::services::crypto::VALUE_TAG_BYTES)
+  .bind(environment_id)
+  .bind(except)
+  .fetch_one(executor)
+  .await?;
+  Ok(usize::try_from(bytes).unwrap_or_default())
+}
+/// Like [`rows`], for `keys` only.
+pub async fn rows_of<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  keys: &[&String],
+) -> Result<Vec<SecretRow>, sqlx::Error> {
+  sqlx::query_as("SELECT key,version,ciphertext,value_nonce,wrapped_key,key_nonce,created_at,updated_at FROM secrets WHERE environment_id=? AND key IN (SELECT value FROM json_each(?)) ORDER BY key").bind(environment_id).bind(serde_json::json!(keys).to_string()).fetch_all(executor).await
 }
 pub async fn find(
   pool: &SqlitePool,

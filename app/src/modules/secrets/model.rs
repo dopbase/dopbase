@@ -1,4 +1,4 @@
-use crate::models::SecretInput;
+use crate::{models::SecretInput, services::authx::Level};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 #[derive(Clone, Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -10,8 +10,15 @@ pub struct SecretMetadata {
   pub updated_at: String,
 }
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SetSecretRequest {
   pub value: String,
+  /// Only create the key. If it exists by the time the write runs, the
+  /// request is refused with `SECRET_VERSION_CONFLICT` and nothing changes,
+  /// so a value someone else just set isn't overwritten. Defaults to
+  /// `false`.
+  #[serde(default)]
+  pub create_only: bool,
 }
 #[derive(Serialize, ToSchema)]
 pub struct RevealedSecret {
@@ -124,6 +131,84 @@ pub struct RollbackSecretRequest {
   /// rollback is refused with `SECRET_VERSION_CONFLICT`.
   #[serde(default)]
   pub expected_version: Option<i64>,
+}
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in=Query)]
+pub struct CompareQuery {
+  /// Comma-separated ids of up to three environments in the base's
+  /// project. Each is read against the base.
+  pub with: Option<String>,
+}
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareEnvironment {
+  pub id: String,
+  pub name: String,
+  pub protected: bool,
+  /// What the caller can do in this environment.
+  pub level: Level,
+  /// False when the caller lacks Read here or on the base, so only which
+  /// keys exist is known.
+  pub values_compared: bool,
+}
+/// One environment's state for one key.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareCell {
+  /// The current version, or absent when the key isn't set there.
+  pub version: Option<i64>,
+  /// Whether the value matches the base. Absent when either side is
+  /// missing or values weren't compared.
+  pub same_as_base: Option<bool>,
+}
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareKey {
+  pub key: String,
+  /// The base's current version, or absent when the base lacks the key.
+  pub base: Option<i64>,
+  /// One cell per compared environment, in request order.
+  pub others: Vec<CompareCell>,
+}
+/// Every key in the base or any compared environment. Never contains
+/// values or anything derived from them beyond `sameAsBase`.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareResponse {
+  pub base: CompareEnvironment,
+  pub environments: Vec<CompareEnvironment>,
+  pub keys: Vec<CompareKey>,
+}
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CopySecretRequest {
+  /// The environment to copy the value from, in the same project.
+  pub from: String,
+  /// The target's current version the caller saw, or absent when the
+  /// target didn't have the key. A mismatch is refused with
+  /// `SECRET_VERSION_CONFLICT`.
+  #[serde(default)]
+  pub expected_version: Option<i64>,
+}
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CopySecretsRequest {
+  /// The environment to copy from, in the same project.
+  pub from: String,
+  /// Keys to copy. Each must exist in the source.
+  pub keys: Vec<String>,
+  /// Copy the source's values too. Without it every key is created with an
+  /// empty value, and Names only on the source is enough.
+  #[serde(default)]
+  pub values: bool,
+}
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CopySecretsResponse {
+  /// Keys created here, A to Z.
+  pub copied_keys: Vec<String>,
+  /// Keys left alone because this environment already has them.
+  pub skipped_keys: Vec<String>,
 }
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

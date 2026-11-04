@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { freshPinia } from "~/tests/pinia";
 import { ApiError } from "~/services/http.client";
 import * as authApi from "~/services/auth.api";
 import { useReauthentication } from "./reauthentication";
@@ -7,7 +7,7 @@ import { useReauthentication } from "./reauthentication";
 vi.mock("~/services/auth.api");
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.mocked(authApi.reauthenticate).mockReset();
   useReauthentication().dismiss();
 });

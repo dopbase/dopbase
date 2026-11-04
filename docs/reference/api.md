@@ -30,7 +30,10 @@ in your installed version.
 | Projects                                           | `/api/v1/projects`                                   |
 | Environments                                       | `/api/v1/environments`                               |
 | Secrets, import, export, and runtime values        | `/api/v1/environments/{id}/secrets`                  |
+| Comparing environments, copying a value across     | `/api/v1/environments/{id}/compare`                  |
+| Copying keys from another environment              | `/api/v1/environments/{id}/copy-secrets`             |
 | Runner tokens                                      | `/api/v1/environments/{id}/tokens`, `/api/v1/tokens` |
+| Runtime secrets for a runner token                 | `/api/v1/runtime/secrets`                            |
 | System backups and restoration                     | `/api/v1/backups`, `/api/v1/bootstrap/restore`       |
 | Audit log, chain verification, and instance status | `/api/v1/audit-events`, `/api/v1/instance`           |
 | People and AI agents                               | `/api/v1/users`                                      |
@@ -39,7 +42,7 @@ in your installed version.
 | Roles                                              | `/api/v1/roles`                                      |
 | Grants                                             | `/api/v1/grants`, `/api/v1/projects/{ref}/access`    |
 | Groups                                             | `/api/v1/groups`                                     |
-| Instance summary                                   | `/api/v1/status`                                     |
+| Instance summary and health checks                 | `/api/v1/status`, `/api/v1/status/checks`            |
 
 Consult Swagger for request bodies, parameters, authentication schemes, and
 the responses supported by each operation.
@@ -92,6 +95,47 @@ Successful previews record `secret.import_previewed` with the actor,
 project/environment, mode, and submitted entry count. They do not change
 secrets, versions, or layout. If the audit event cannot be saved, the server
 returns an error without the comparison results.
+
+## Creating a protected environment
+
+`POST /api/v1/projects/{ref}/environments` with
+`{ "name": "production", "protected": true }` creates the environment already
+protected, in one request, so grants on the whole project below project
+manager never reach it. Without `protected`, or with `false`, it is created
+unprotected. The `environment.created` audit event records `protected`.
+
+## Copying keys between environments
+
+`POST /api/v1/environments/{id}/copy-secrets` with
+`{ "from": "env_918201", "keys": ["API_KEY", "DATABASE_URL"], "values": false }`
+creates those keys in this environment from another one in the same project,
+in one transaction. Without `values`, or with `false`, each key starts with an
+empty value and Names only on the source is enough. With `values: true` each
+key gets the source's current value, copied on the server and never returned,
+which needs Read on the source. Writing needs Write here. Keys this
+environment already has are skipped, never overwritten. The response lists
+`copiedKeys` and `skippedKeys`.
+
+It is refused, without writing anything, with:
+
+| Status | Code                    | Meaning                                                    |
+| ------ | ----------------------- | ---------------------------------------------------------- |
+| `404`  | `SECRET_NOT_FOUND`      | A key does not exist in the source                         |
+| `422`  | `COPY_KEYS_REQUIRED`    | `keys` is empty                                            |
+| `422`  | `COPY_SOURCE_INVALID`   | The source is this environment or in another project       |
+| `422`  | `SECRET_LIMIT_EXCEEDED` | The copy would pass the environment's secret or size limit |
+
+Environment responses include `secretCount`, the number of secrets the
+environment holds.
+
+## Creating a key only when it is missing
+
+`PUT /api/v1/environments/{id}/secrets/{key}` with
+`{ "value": "...", "createOnly": true }` only creates the key. If the key
+exists by the time the write runs, the request is refused with `409`
+`SECRET_VERSION_CONFLICT` and nothing changes, so a value someone else just
+set is kept. The Compare tab sends it when you type a value for a missing key.
+Without `createOnly`, `PUT` creates the key or stores a new version as before.
 
 ## Secret versions
 
@@ -167,6 +211,40 @@ the stored bytes the hash covers. Verification reads no secret values. `dopbase 
 verify` runs the same check from the terminal, and `dopbase audit export`
 streams the filtered list as JSON lines.
 
+## People, groups, and agent tokens
+
+User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
+last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
+`GET /api/v1/users/{id}` returns one account. `GET /api/v1/users/identities`
+returns only each account's `id` and `email`, ordered by email, for screens
+that just need to name people. It needs the same `users.view` capability and
+browser session as the full list.
+
+`POST /api/v1/users/{id}/disable` signs the account out everywhere and stops
+its tokens without deleting anything. `POST /api/v1/users/{id}/enable` lets it
+sign in again, and its unexpired tokens work again. Both answer with the
+account, need `users.manage`, the CSRF header, and recent password
+confirmation, and change nothing when the account already has that status.
+They are audited as `user.disabled` and `user.enabled`. They are refused with:
+
+| Status | Code                     | Meaning                                         |
+| ------ | ------------------------ | ----------------------------------------------- |
+| `403`  | `SELF_DISABLE_FORBIDDEN` | The account is your own                         |
+| `403`  | `ROOT_PROTECTED`         | The account is root                             |
+| `403`  | `ACCESS_EXCEEDS_YOURS`   | The account has access or a role you don't have |
+| `404`  | `USER_NOT_FOUND`         | The account does not exist                      |
+
+`GET /api/v1/groups` lists each group with `members` (`id` and `email`) and
+`grants`. Groups carry `createdBy`, and each member in
+`GET /api/v1/groups/{id}` carries `addedAt` and `addedBy`. `createdBy` and
+`addedBy` are `{ "id", "email" }`, or `null` when that account is gone.
+
+`POST /api/v1/users/{id}/tokens` takes `"replaceExisting": true` for an AI
+agent: the new token is created and the agent's other live tokens are revoked
+in the same step, so it holds one token at a time. For anyone else's agent
+this also needs `tokens.revoke_others`. On an account that isn't an AI agent it
+is refused with `422` `TOKEN_REPLACE_INVALID`.
+
 ## Authentication
 
 - Browser sessions use an HttpOnly, SameSite Strict cookie and require the
@@ -175,6 +253,11 @@ streams the filtered list as JSON lines.
   opened later can get one. That token is derived from the session's own, and
   both stay valid.
 - CLI sessions, runner tokens, and personal tokens use `Authorization: Bearer <token>`.
+- `POST /api/v1/auth/login` answers a wrong email or password with `401`
+  `AUTHENTICATION_INVALID`, worded the same either way. When 1 to 3 tries are
+  left before a pause, the message says so, for example
+  `Email or password is wrong. 2 more tries, then a 15-minute pause.` During
+  the pause it answers `429` `RATE_LIMITED` with how many minutes to wait.
 - A personal token acts for its account within its own scope and level. It
   never holds the account's capabilities, so it can't manage people, grants,
   projects, or tokens.
@@ -199,6 +282,81 @@ CLI bearer sessions cannot administer accounts. AI bearer tokens may only read
 metadata and [instance status](/ui/audit-instance#instance-status). See
 [identity and tokens](/reference/identity) for the complete role matrix.
 
+## Runtime secrets for runner tokens
+
+`GET /api/v1/runtime/secrets` returns the secrets of the runner token's
+environment. The token decides the environment, so an SDK or script needs only
+the server URL and the token:
+
+```bash
+curl -H "Authorization: Bearer $DOPBASE_TOKEN" \
+  https://dopbase.example.com/api/v1/runtime/secrets
+```
+
+`data` holds `projectId`, `project`, `environment`, `environmentId`, `revision`,
+and `entries`. The `revision` changes when a secret or the `.env` layout
+changes, and it matches the `revision` from export. A session or personal
+token gets `403` `RUNNER_TOKEN_REQUIRED`.
+
+Send the `ETag` header back as `If-None-Match` to check for changes: while
+nothing has changed, the server answers `304 Not Modified` with an empty body.
+The `ETag` follows the revision and also changes when the project or
+environment is renamed, so poll with it rather than with `revision`. A 304
+reads no ciphertext, decrypts nothing and writes no audit event, so a client
+can poll every few seconds. A `200` writes one `secret.runtime_accessed` event
+with the revision.
+
+Add `?reference=` with an environment ID or `PROJECT_REF/ENVIRONMENT_NAME` to
+make sure the token is for that environment. Any other reference gets `403`
+`TOKEN_SCOPE_INVALID`, and the server reads no value.
+
+A runner token's `lastUsedAt` is updated at most once a minute.
+
+## Instance status and health checks
+
+`GET /api/v1/status` returns the version, uptime, `platform` (`os` and
+`arch`), and resource counts to any signed-in account or personal token. A
+count is `null` when its query failed, so one broken query never fails the
+whole response.
+
+Accounts holding `instance.view` also get:
+
+- `checks`: every health check, most severe first. Each has an `id` such as
+  `backup.age`, a `status` of `crit`, `warn`, `tip`, or `ok`, a `title`, a
+  `detail`, an optional short `value`, a `fixPath` (an Admin UI path or a
+  documentation URL), and `lastRunAt`. A check that fails to run comes back
+  as a `warn` titled "Couldn't check ...", and the server log has the error.
+  The public URL and HTTPS checks pass while the public URL points at this
+  machine. On a network address, HTTP is `crit` and a missing public URL is
+  `warn`.
+- `summary`: how many checks are critical, warnings, tips, and passed.
+- `health`: the readings behind the Database, Master key, Disk, and Audit log
+  cards. `masterKey.file` compares the key file on disk with the key the
+  server loaded at startup (`matches`, `changed`, `missing`, or
+  `unreadable`). `disk` is `null` where free space can't be read.
+- `activity`: the last 24 hours in hourly buckets: secret reads (with how
+  many runner tokens, people and AI agents read), failed sign-ins, requests
+  refused by the sign-in rate limits, and live browser and CLI sessions. The
+  rate-limit count lives in memory and starts again when the server restarts.
+
+With the opt-in `update_check` setting on (`DOPBASE_UPDATE_CHECK=true`), the
+server asks GitHub for the latest release and adds a `version.latest` check
+and a `latestRelease` object (`version`, `updateAvailable`, `url`,
+`checkedAt`). Reading the status starts the lookup when none has run in the
+last day, without waiting for it, so the answer shows up on a later read. A
+failed lookup keeps the last answer and is retried an hour later. A server
+nobody reads the status of never calls GitHub.
+
+The emails and addresses behind failed sign-ins need `audit.read`. Names of
+expiring tokens need `tokens.revoke_others`. `fixPath` is always returned;
+the Admin UI hides fixes the viewer can't use.
+
+Walking the audit hash chain reads every record, so it runs every 10 minutes
+in the background and the response carries the last result.
+`POST /api/v1/status/checks/run` walks it again right away and returns the
+same body. It needs `instance.view` and, from the Admin UI, the CSRF header.
+It answers `429 RATE_LIMITED` when checks ran less than 10 seconds before.
+
 ## Browser CLI login
 
 The CLI signs in through the Admin UI with a device flow:
@@ -218,6 +376,12 @@ The CLI signs in through the Admin UI with a device flow:
 
 `GET /api/v1/auth/methods` is public and reports whether the server accepts
 passwords, shows the password form, and offers single sign-on.
+
+`POST /api/v1/auth/cli/device` takes an optional `client`, such as
+`dopbase 0.2.0 on macOS`, next to `hostname`. The server keeps printable text
+only, up to 80 characters. `POST /api/v1/auth/cli/inspect` returns it as
+`client` (or `null`), with `sessionDays`, the most days the approved CLI
+session lasts.
 
 ## Single sign-on
 

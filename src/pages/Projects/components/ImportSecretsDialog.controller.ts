@@ -6,6 +6,7 @@ import { useImportStore } from "~/stores/import.store";
 /** Owns local .env parsing and navigation to the import review screen. */
 export function useImportSecretsDialogController(
   environmentId: Ref<string>,
+  environmentName: Ref<string>,
   open: Ref<boolean>,
 ) {
   const route = useRoute();
@@ -26,6 +27,12 @@ export function useImportSecretsDialogController(
     fileError.value = null;
     parseErrors.value = [];
     parsing.value = true;
+    // Read the target now: the environment can change while the file loads.
+    const target = {
+      projectRef: route.params.projectRef,
+      environmentId: environmentId.value,
+      environmentName: environmentName.value,
+    };
     try {
       const parsed = parseEnvFile(await file.text());
       if (parsed.entries.length === 0 && parsed.errors.length > 0) {
@@ -33,18 +40,24 @@ export function useImportSecretsDialogController(
         return false;
       }
       importStore.begin({
-        environmentId: environmentId.value,
+        environmentId: target.environmentId,
+        environmentName: target.environmentName,
         fileName: file.name,
         entries: parsed.entries,
         errors: parsed.errors,
       });
-      await router.push({
+      const failure = await router.push({
         name: "environment-import",
         params: {
-          projectRef: route.params.projectRef,
-          environmentId: environmentId.value,
+          projectRef: target.projectRef,
+          environmentName: target.environmentName,
         },
       });
+      if (failure) {
+        // The review screen never opened, so don't leave the file staged.
+        importStore.clear();
+        return false;
+      }
       return true;
     } catch {
       fileError.value = "The file could not be read.";

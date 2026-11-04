@@ -15,10 +15,34 @@ use sqlx::SqlitePool;
 use zeroize::Zeroizing;
 
 const VERIFICATION_TEXT: &[u8] = b"dopbase-master-key-v1";
+/// Bytes XChaCha20-Poly1305 adds to every value: its authentication tag. A
+/// stored ciphertext is the value's length plus this.
+pub const VALUE_TAG_BYTES: i64 = 16;
 
 #[derive(Clone)]
 pub struct CryptoService {
   master_key: Arc<RwLock<Zeroizing<Vec<u8>>>>,
+}
+
+/// How the master key file on disk compares with the key the server loaded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyFileState {
+  Matches,
+  Changed,
+  Missing,
+  Unreadable,
+}
+
+impl KeyFileState {
+  /// The name the Status page uses.
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Matches => "matches",
+      Self::Changed => "changed",
+      Self::Missing => "missing",
+      Self::Unreadable => "unreadable",
+    }
+  }
 }
 
 #[derive(Debug)]
@@ -63,6 +87,27 @@ impl CryptoService {
                 .bind(ciphertext).bind(nonce).bind(Utc::now().to_rfc3339()).execute(pool).await?;
     }
     Ok(service)
+  }
+
+  /// How the key file at `path` compares with the key in use. Both copies
+  /// stay in zeroized buffers and are compared in constant time.
+  pub fn key_file_state(
+    &self,
+    path: &Path,
+  ) -> KeyFileState {
+    use subtle::ConstantTimeEq;
+    match fs::read(path).map(Zeroizing::new) {
+      Ok(bytes) => {
+        let key = self.master_key.read().unwrap();
+        if bool::from(bytes.as_slice().ct_eq(key.as_slice())) {
+          KeyFileState::Matches
+        } else {
+          KeyFileState::Changed
+        }
+      }
+      Err(error) if error.kind() == std::io::ErrorKind::NotFound => KeyFileState::Missing,
+      Err(_) => KeyFileState::Unreadable,
+    }
   }
 
   pub fn master_key_bytes(&self) -> Vec<u8> {

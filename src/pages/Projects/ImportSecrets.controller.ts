@@ -6,18 +6,27 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable";
 import { ApiError } from "~/services/http.client";
 import { useImportStore } from "~/stores/import.store";
+import { useInvalidate } from "~/queries/invalidate";
 
 /** Owns the review and confirmation flow for an in-memory .env import. */
 export function useImportSecretsController() {
   const route = useRoute();
+  // The environment page reads the new secrets when it opens.
+  const markStale = useInvalidate({ refetch: false });
   const router = useRouter();
   const importStore = useImportStore();
   const { runWithReauth } = useReauthentication();
   let operationScope = new AbortController();
 
+  const environmentName = computed(() =>
+    typeof route.params.environmentName === "string"
+      ? route.params.environmentName
+      : null,
+  );
+  // The URL names the environment; the parsed file carries its id.
   const environmentId = computed(() =>
-    typeof route.params.environmentId === "string"
-      ? route.params.environmentId
+    importStore.pending?.environmentName === environmentName.value
+      ? (importStore.pending?.environmentId ?? null)
       : null,
   );
   const projectRef = computed(() =>
@@ -28,7 +37,6 @@ export function useImportSecretsController() {
   const valid = computed(
     () =>
       environmentId.value !== null &&
-      importStore.pending?.environmentId === environmentId.value &&
       (importStore.pending?.entries.length ?? 0) > 0,
   );
 
@@ -139,6 +147,7 @@ export function useImportSecretsController() {
         await importSecrets(target, request, signal);
       }, signal);
       if (signal.aborted) return;
+      void markStale.secretsChanged(target);
       void router.push({
         name: "environment",
         params,
@@ -167,6 +176,7 @@ export function useImportSecretsController() {
 
   return {
     environmentId,
+    environmentName,
     projectRef,
     fileName,
     keys,

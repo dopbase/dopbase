@@ -4,6 +4,8 @@ import type { ParsedEnvEntry } from "~/utils/env-file";
 
 export interface PendingImport {
   environmentId: string;
+  /** The environment's name, as the review page's URL carries it. */
+  environmentName: string;
   fileName: string;
   entries: ParsedEnvEntry[];
   /** Human-readable problems for lines skipped during parsing. */

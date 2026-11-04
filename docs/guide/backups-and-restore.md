@@ -220,7 +220,7 @@ The Dopbase Admin UI provides point-and-click management for backups and disaste
 You should store a secure copy of your instance's master key in your team's password
 manager or cold storage vault.
 
-1. Navigate to **Backups** in the top navigation bar.
+1. Open **Backups** under **Instance** in the sidebar.
 2. Click **Download Master Key** in the upper-right actions toolbar.
 3. If your administrator session requires re-authentication, enter your password to confirm.
 4. Your browser downloads `master.key` (a 32-byte binary file).

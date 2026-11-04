@@ -33,7 +33,7 @@ onMounted(() => {
     </div>
     <div v-else class="flex flex-col items-center gap-5 text-center">
       <div
-        class="flex h-14 w-14 items-center justify-center rounded-full bg-ok/15 text-ok">
+        class="flex h-14 w-14 items-center justify-center rounded-control bg-ok/15 text-ok">
         <CheckIcon class="h-7 w-7" />
       </div>
       <div class="flex flex-col gap-2">

@@ -17,8 +17,8 @@ use crate::{
       RATE_LIMITED,
     },
     limits::{
-      CLI_DEVICE_CODE_MINUTES, CLI_DEVICE_POLL_INTERVAL_SECONDS, MAX_PENDING_CLI_DEVICE_REQUESTS,
-      MAX_PENDING_CLI_DEVICE_REQUESTS_PER_CLIENT,
+      CLI_DEVICE_CODE_MINUTES, CLI_DEVICE_POLL_INTERVAL_SECONDS, CLI_SESSION_ABSOLUTE_DAYS,
+      MAX_PENDING_CLI_DEVICE_REQUESTS, MAX_PENDING_CLI_DEVICE_REQUESTS_PER_CLIENT,
     },
     tokens::{DEVICE_CODE_PREFIX, DEVICE_REQUEST_ID_PREFIX},
   },
@@ -37,6 +37,7 @@ use chrono::{DateTime, Duration, Utc};
 const USER_CODE_ALPHABET: &[u8] = b"BCDFGHJKLMNPQRSTVWXZ";
 const USER_CODE_LENGTH: usize = 8;
 const MAX_HOSTNAME_LENGTH: usize = 64;
+const MAX_CLIENT_LENGTH: usize = 80;
 
 fn generate_user_code() -> Result<String, HttpError> {
   let mut code = String::with_capacity(USER_CODE_LENGTH);
@@ -79,6 +80,32 @@ fn sanitize_hostname(value: Option<&str>) -> Option<String> {
     .take(MAX_HOSTNAME_LENGTH)
     .collect();
   (!hostname.is_empty()).then_some(hostname)
+}
+
+/// The client name is shown to the approver too. Unlike a hostname it has
+/// spaces, so keep printable ASCII and fold runs of whitespace into one.
+fn sanitize_client(value: Option<&str>) -> Option<String> {
+  let printable: String = value?
+    .chars()
+    .map(|character| {
+      if character.is_whitespace() {
+        ' '
+      } else {
+        character
+      }
+    })
+    .filter(|character| character.is_ascii_graphic() || *character == ' ')
+    .collect();
+  let client: String = printable
+    .split(' ')
+    .filter(|word| !word.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
+    .chars()
+    .take(MAX_CLIENT_LENGTH)
+    .collect();
+  let client = client.trim_end();
+  (!client.is_empty()).then(|| client.to_owned())
 }
 
 fn parse_time(value: &str) -> Result<DateTime<Utc>, HttpError> {
@@ -169,6 +196,7 @@ pub async fn start(
   let now = Utc::now();
   let expires_at = now + Duration::minutes(CLI_DEVICE_CODE_MINUTES);
   let hostname = sanitize_hostname(request.hostname.as_deref());
+  let client = sanitize_client(request.client.as_deref());
   let ip_address = client_ip::current().map(|address| address.to_string());
   let device_code = token::generate(DEVICE_CODE_PREFIX).map_err(|_| HttpError::internal())?;
 
@@ -200,6 +228,7 @@ pub async fn start(
         purpose,
         target_session_id: target_session,
         client_hostname: hostname.as_deref(),
+        client_name: client.as_deref(),
         client_ip: ip_address.as_deref(),
         now: &now_text,
         expires_at: &expires_at.to_rfc3339(),
@@ -395,6 +424,7 @@ pub async fn inspect(
   };
   Ok(DeviceRequestDetails {
     hostname: row.client_hostname,
+    client: row.client_name,
     ip_address: row.client_ip,
     created_at: row.created_at,
     expires_at: row.expires_at,
@@ -403,6 +433,8 @@ pub async fn inspect(
     } else {
       DevicePurpose::Login
     },
+    // The same limit `issue_session` gives a CLI session.
+    session_days: u32::try_from(CLI_SESSION_ABSOLUTE_DAYS).map_err(|_| HttpError::internal())?,
   })
 }
 

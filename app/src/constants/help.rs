@@ -10,6 +10,7 @@ Environment variables:
   DOPBASE_PUBLIC_URL              Public URL
   DOPBASE_DOCS                    Enable or disable Swagger UI (true or false)
   DOPBASE_WEB_UI                  Enable or disable the web UI (default: true)
+  DOPBASE_UPDATE_CHECK            Check for a newer release on the Status page (default: false)
   DOPBASE_MASTER_KEY_PATH         Path to the server master key file `./path/to/your.key`
   DOPBASE_SHUTDOWN_GRACE_SECONDS  Seconds allowed for graceful shutdown
   DOPBASE_AUDIT_RETENTION_DAYS    Days to keep audit records (unset keeps the whole log)
@@ -36,5 +37,16 @@ Common server options:
 Run 'dopbase help <command>' for details on any command.
 ";
 
-pub(crate) const ENVIRONMENT_ARG_HELP: &str = "Existing environment reference: an environment ID or \
-PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production.";
+/// A macro, not a const, so `concat!` can extend it for `run`.
+macro_rules! environment_arg_help {
+  () => {
+    "Existing environment reference: an environment ID or \
+PROJECT_REF/ENVIRONMENT_NAME. PROJECT_REF can be a project ID or name. For example: payment-service/production."
+  };
+}
+
+pub(crate) const ENVIRONMENT_ARG_HELP: &str = environment_arg_help!();
+pub(crate) const RUN_ENVIRONMENT_ARG_HELP: &str = concat!(
+  environment_arg_help!(),
+  " With a runner token, leave it out: the token's own environment is used, and a reference only checks it."
+);

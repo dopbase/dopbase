@@ -34,6 +34,17 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** Formats an RFC 3339 timestamp as a date in the browser locale, e.g. `Jan 25, 2027`. */
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /** Zero-pads seconds for the reveal countdown, e.g. `28s`. */
 export function formatCountdown(seconds: number): string {
   return `${seconds}s`;
@@ -92,4 +103,20 @@ const LEVEL_LABELS: Record<Level, string> = {
 /** An access level as people see it, e.g. `Names only`. */
 export function formatLevel(level: Level): string {
   return LEVEL_LABELS[level];
+}
+
+/** "staging", "staging and prod", "staging, prod and qa". */
+export function formatList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Names how this server is run for auth page footers: `Secure cloud` on a
+ * `*.dopbase.dev` workspace, `Self-hosted` anywhere else.
+ */
+export function formatHosting(hostname: string): string {
+  return hostname.toLowerCase().endsWith(".dopbase.dev")
+    ? "Secure cloud"
+    : "Self-hosted";
 }

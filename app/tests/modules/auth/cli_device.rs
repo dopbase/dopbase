@@ -134,6 +134,52 @@ async fn approved_browser_login_issues_one_cli_session() {
 }
 
 #[tokio::test]
+async fn inspect_names_the_client_and_how_long_the_session_lasts() {
+  let (_dir, state, router) = test_app().await;
+  bootstrap_admin(&state, &router).await;
+  let (cookie, csrf) = browser_login(&router).await;
+  let long = "x".repeat(200);
+  let cases = [
+    (
+      json!({"hostname":"dev-box","client":"  dopbase 0.2.0\ton   macOS \u{7}"}),
+      json!("dopbase 0.2.0 on macOS"),
+    ),
+    (json!({"hostname":"dev-box"}), Value::Null),
+    (json!({"client":null}), Value::Null),
+    (json!({"client":" \u{1}\u{2}\n\u{1b} "}), Value::Null),
+    (
+      json!({"client":"dopbase\u{202e} 0.2.0"}),
+      json!("dopbase 0.2.0"),
+    ),
+    (json!({"client":long}), json!("x".repeat(80))),
+  ];
+  for (request, client) in cases {
+    let (status, device, _) = call(
+      &router,
+      "POST",
+      "/api/v1/auth/cli/device",
+      None,
+      Some(request.clone()),
+    )
+    .await;
+    assert_eq!(status, 201, "{device}");
+    let (status, details) = browser_call(
+      &router,
+      "/api/v1/auth/cli/inspect",
+      &cookie,
+      Some(&csrf),
+      json!({"userCode":device["data"]["userCode"]}),
+    )
+    .await;
+    assert_eq!(status, 200, "{details}");
+    assert_eq!(details["data"]["client"], client, "{request}");
+    // CLI_SESSION_ABSOLUTE_DAYS, the limit `issue_session` gives a CLI
+    // session.
+    assert_eq!(details["data"]["sessionDays"], 90, "{request}");
+  }
+}
+
+#[tokio::test]
 async fn polling_faster_than_the_interval_slows_down() {
   let (_dir, state, router) = test_app().await;
   let device = start_device(&router).await;

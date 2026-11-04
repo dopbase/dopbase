@@ -13,9 +13,9 @@ use crate::constants::config::{
   AUDIT_ARCHIVE_DIRECTORY_NAME, CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME,
   DEFAULT_PORT, DEFAULT_SECRET_HISTORY_VERSIONS, ENV_AUDIT_RETENTION_DAYS, ENV_DATA_DIR, ENV_DOCS,
   ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT, ENV_PUBLIC_URL, ENV_SECRET_HISTORY_VERSIONS,
-  ENV_SHUTDOWN_GRACE_SECONDS, ENV_TRUSTED_PROXIES, ENV_WEB_UI, MASTER_KEY_FILENAME,
-  MAX_SECRET_HISTORY_VERSIONS, MIN_SECRET_HISTORY_VERSIONS, SERVER_CONFIG_FILENAME,
-  SERVER_HOST_PLACEHOLDER,
+  ENV_SHUTDOWN_GRACE_SECONDS, ENV_TRUSTED_PROXIES, ENV_UPDATE_CHECK, ENV_WEB_UI,
+  MASTER_KEY_FILENAME, MAX_SECRET_HISTORY_VERSIONS, MIN_SECRET_HISTORY_VERSIONS,
+  SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -61,6 +61,11 @@ pub struct ServerConfig {
   pub docs_enabled: bool,
   #[serde(skip)]
   pub web_ui_enabled: bool,
+  /// Ask GitHub whether a newer Dopbase release is out when the Status page
+  /// is open, at most once a day. Off by default: the server makes no outbound calls unless
+  /// asked to.
+  #[serde(skip)]
+  pub update_check: bool,
   /// True when this process runs as a supervised background server and must
   /// manage the PID file.
   #[serde(skip)]
@@ -107,6 +112,7 @@ struct ServerConfigFile {
   trusted_proxies: Option<Vec<String>>,
   docs: Option<bool>,
   web_ui: Option<bool>,
+  update_check: Option<bool>,
   master_key: Option<MasterKeyConfigFile>,
 }
 
@@ -130,6 +136,7 @@ pub struct EnvironmentOverrides {
   pub trusted_proxies: Option<String>,
   pub docs: Option<String>,
   pub web_ui: Option<String>,
+  pub update_check: Option<String>,
   pub master_key_path: Option<PathBuf>,
 }
 
@@ -146,6 +153,7 @@ impl EnvironmentOverrides {
       trusted_proxies: env::var(ENV_TRUSTED_PROXIES).ok(),
       docs: env::var(ENV_DOCS).ok(),
       web_ui: env::var(ENV_WEB_UI).ok(),
+      update_check: env::var(ENV_UPDATE_CHECK).ok(),
       master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
     }
   }
@@ -185,6 +193,7 @@ impl ServerConfig {
       trusted_proxies: Vec::new(),
       docs_enabled: false,
       web_ui_enabled: true,
+      update_check: false,
       daemonized: false,
       daemon_launch: None,
       public_url_source: PublicUrlSource::LoopbackDefault,
@@ -292,6 +301,9 @@ impl ServerConfig {
     if let Some(value) = file.docs {
       self.docs_enabled = value;
     }
+    if let Some(value) = file.update_check {
+      self.update_check = value;
+    }
     if let Some(master_key) = file.master_key {
       if let Some(value) = master_key.provider {
         self.master_key.provider = value;
@@ -337,6 +349,9 @@ impl ServerConfig {
     }
     if let Some(value) = environment.docs {
       self.docs_enabled = value.parse().context("invalid DOPBASE_DOCS")?;
+    }
+    if let Some(value) = environment.update_check {
+      self.update_check = value.parse().context("invalid DOPBASE_UPDATE_CHECK")?;
     }
     if let Some(value) = environment.master_key_path {
       self.master_key.path = value;

@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { useQuery } from "@pinia/colada";
+import { keys } from "~/queries/keys";
+import { freshPinia } from "~/tests/pinia";
 import { useBackupsController } from "./Backups.controller";
 import * as backupsApi from "~/services/backups.api";
-
-vi.mock("vue", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("vue")>()),
-  onMounted: vi.fn(),
-}));
+import { ApiError } from "~/services/http.client";
+import { saveBlob } from "~/utils/download";
+import { mountController } from "~/tests/mount-controller";
+import { settle } from "~/tests/people";
 
 vi.mock("~/services/backups.api");
+vi.mock("~/utils/download");
 
 const sampleBackup: backupsApi.BackupItem = {
   key: "backup_test.dop",
@@ -17,16 +19,21 @@ const sampleBackup: backupsApi.BackupItem = {
 };
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
 });
 
+/** Opens the page with `list` on the server. */
+async function mounted(list: backupsApi.BackupItem[] = []) {
+  vi.mocked(backupsApi.fetchBackups).mockResolvedValueOnce(list);
+  const { controller } = mountController(useBackupsController);
+  await settle();
+  return controller;
+}
+
 describe("useBackupsController", () => {
   it("loads backups successfully", async () => {
-    vi.mocked(backupsApi.fetchBackups).mockResolvedValueOnce([sampleBackup]);
-
-    const c = useBackupsController();
-    await c.load();
+    const c = await mounted([sampleBackup]);
 
     expect(backupsApi.fetchBackups).toHaveBeenCalledTimes(1);
     expect(c.backups.value).toEqual([sampleBackup]);
@@ -38,8 +45,8 @@ describe("useBackupsController", () => {
       new Error("Network failed"),
     );
 
-    const c = useBackupsController();
-    await c.load();
+    const { controller: c } = mountController(useBackupsController);
+    await settle();
 
     expect(c.backups.value).toEqual([]);
     expect(c.loadError.value).toBe("Could not load the list of backups.");
@@ -53,7 +60,7 @@ describe("useBackupsController", () => {
     };
     vi.mocked(backupsApi.createBackup).mockResolvedValueOnce(created);
 
-    const c = useBackupsController();
+    const c = await mounted();
     c.openCreateModal();
     c.customName.value = "custom_name";
 
@@ -63,6 +70,11 @@ describe("useBackupsController", () => {
     expect(c.backups.value[0]).toEqual(created);
     expect(c.createModalOpen.value).toBe(false);
     expect(c.actionMessage.value?.tone).toBe("ok");
+
+    // Coming back shows it at once, with no new request.
+    const again = mountController(useBackupsController).controller;
+    expect(again.backups.value[0]).toEqual(created);
+    expect(backupsApi.fetchBackups).toHaveBeenCalledTimes(1);
   });
 
   it("handles create error", async () => {
@@ -70,7 +82,7 @@ describe("useBackupsController", () => {
       new Error("Disk full"),
     );
 
-    const c = useBackupsController();
+    const c = await mounted();
     c.openCreateModal();
 
     await c.submitCreate();
@@ -80,7 +92,7 @@ describe("useBackupsController", () => {
   });
 
   it("validates file before uploading", async () => {
-    const c = useBackupsController();
+    const c = await mounted();
     c.openUploadModal();
 
     await c.submitUpload();
@@ -101,7 +113,7 @@ describe("useBackupsController", () => {
       };
       vi.mocked(backupsApi.uploadBackup).mockResolvedValueOnce(uploaded);
 
-      const c = useBackupsController();
+      const c = await mounted();
       c.openUploadModal();
       const fakeFile = new File(["test"], "uploaded.dop");
       const fakeKey = new File(["key-data"], "master.key");
@@ -130,8 +142,13 @@ describe("useBackupsController", () => {
   ])("restores a backup $label and triggers a refresh", async ({ keyHex }) => {
     vi.mocked(backupsApi.restoreBackup).mockResolvedValueOnce();
     vi.mocked(backupsApi.fetchBackups).mockResolvedValueOnce([sampleBackup]);
+    // Another screen's data, which the restore replaced too.
+    const listProjects = vi.fn().mockResolvedValue([]);
+    mountController(() =>
+      useQuery({ key: keys.projects, query: listProjects }),
+    );
 
-    const c = useBackupsController();
+    const c = await mounted();
     c.openRestoreDialog(sampleBackup);
     if (keyHex !== undefined) c.restoreKeyHex.value = keyHex;
 
@@ -144,13 +161,13 @@ describe("useBackupsController", () => {
     expect(c.restoreTarget.value).toBeNull();
     expect(c.actionMessage.value?.tone).toBe("ok");
     expect(backupsApi.fetchBackups).toHaveBeenCalled();
+    expect(listProjects).toHaveBeenCalledTimes(2);
   });
 
   it("deletes a backup and removes it from the list", async () => {
     vi.mocked(backupsApi.deleteBackup).mockResolvedValueOnce();
 
-    const c = useBackupsController();
-    c.backups.value = [sampleBackup];
+    const c = await mounted([sampleBackup]);
     c.openDeleteDialog(sampleBackup);
 
     await c.submitDelete();
@@ -159,5 +176,74 @@ describe("useBackupsController", () => {
     expect(c.backups.value).toEqual([]);
     expect(c.deleteTarget.value).toBeNull();
     expect(c.actionMessage.value?.tone).toBe("ok");
+  });
+
+  describe("row menu", () => {
+    it("downloads the backup file from its own URL", async () => {
+      vi.mocked(backupsApi.downloadBackupUrl).mockReturnValueOnce(
+        "/api/v1/backups/backup_test.dop",
+      );
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => {});
+
+      const c = await mounted();
+      c.triggerDownload(sampleBackup.key);
+
+      expect(backupsApi.downloadBackupUrl).toHaveBeenCalledWith(
+        sampleBackup.key,
+      );
+      const link = click.mock.contexts[0] as HTMLAnchorElement;
+      expect(link.getAttribute("href")).toBe("/api/v1/backups/backup_test.dop");
+      expect(link.getAttribute("download")).toBe(sampleBackup.key);
+      expect(document.querySelector("a[download]")).toBeNull();
+      click.mockRestore();
+    });
+
+    it("keeps the restore dialog open with the server's reason", async () => {
+      vi.mocked(backupsApi.restoreBackup).mockRejectedValueOnce(
+        new ApiError(400, {}, "This backup was made with another master key."),
+      );
+
+      const c = await mounted();
+      c.openRestoreDialog(sampleBackup);
+      await c.submitRestore();
+
+      expect(c.restoreTarget.value).toEqual(sampleBackup);
+      expect(c.restoreError.value).toBe(
+        "This backup was made with another master key.",
+      );
+      // Only the first load: a failed restore changes nothing to reload.
+      expect(backupsApi.fetchBackups).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the backup listed when deleting fails", async () => {
+      vi.mocked(backupsApi.deleteBackup).mockRejectedValueOnce(
+        new ApiError(500, {}, "The file is in use."),
+      );
+
+      const c = await mounted([sampleBackup]);
+      c.openDeleteDialog(sampleBackup);
+      await c.submitDelete();
+
+      expect(c.backups.value).toEqual([sampleBackup]);
+      expect(c.deleteTarget.value).toEqual(sampleBackup);
+      expect(c.deleteError.value).toBe("The file is in use.");
+    });
+  });
+
+  it("saves the master key from the banner", async () => {
+    const key = new Blob(["key"]);
+    vi.mocked(backupsApi.downloadMasterKeyBlob).mockResolvedValueOnce(key);
+
+    const c = await mounted();
+    await c.triggerDownloadMasterKey();
+
+    expect(saveBlob).toHaveBeenCalledWith(key, "master.key");
+    expect(c.actionMessage.value).toEqual({
+      text: "Master key downloaded. Store it apart from your backups.",
+      tone: "ok",
+    });
+    expect(c.downloadingMasterKey.value).toBe(false);
   });
 });

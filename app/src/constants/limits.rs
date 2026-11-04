@@ -3,6 +3,9 @@ pub const BROWSER_SESSION_IDLE_HOURS: i64 = 8;
 pub const CLI_SESSION_ABSOLUTE_DAYS: i64 = 90;
 pub const CLI_SESSION_IDLE_DAYS: i64 = 30;
 pub const RECENT_AUTHENTICATION_MINUTES: i64 = 10;
+/// A runner token's `last_used_at` is written at most this often, so a
+/// polling runner doesn't write on every request.
+pub const RUNNER_LAST_USED_SECONDS: i64 = 60;
 /// How long a browser CLI login stays open for approval.
 pub const CLI_DEVICE_CODE_MINUTES: i64 = 10;
 /// The slowest the CLI may poll; faster polls get `slowDown`.
@@ -21,6 +24,8 @@ pub const MAX_PENDING_SSO_FLOWS: i64 = 1_000;
 pub const MAX_PENDING_SSO_FLOWS_PER_CLIENT: i64 = 20;
 
 pub const MAX_SECRETS_PER_ENVIRONMENT: usize = 1_000;
+/// How many environments one comparison reads against its base.
+pub const MAX_COMPARE_ENVIRONMENTS: usize = 3;
 pub const MAX_SECRET_COLLECTION_BYTES: usize = 2 * 1024 * 1024;
 /// Upper bound for a stored `.env` editor layout (comments, ordering, and
 /// empty `KEY=` slots — never secret values).

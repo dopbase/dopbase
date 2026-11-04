@@ -36,7 +36,7 @@ function onChange(event: Event): void {
     <!-- Track: 41×24px with a 7px radius. -->
     <span
       aria-hidden="true"
-      class="relative inline-flex h-6 w-[41px] shrink-0 rounded-[7px] transition-colors duration-150 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+      class="relative inline-flex h-6 w-[41px] shrink-0 rounded-[6px] transition-colors duration-150 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
       :class="modelValue ? 'bg-accent' : 'bg-line'">
       <!-- Knob: 19×16px white pill with a soft edge shadow. -->
       <span

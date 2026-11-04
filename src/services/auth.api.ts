@@ -124,11 +124,18 @@ export interface CliLoginRequest {
   expiresAt: string;
   /** `reauth` confirms a terminal that is already signed in. */
   purpose: "login" | "reauth";
+  /** `dopbase 0.2.0 on macOS`, when the CLI said. Older CLIs don't. */
+  client?: string | null;
+  /** How long the CLI session an approval starts lasts. */
+  sessionDays?: number;
 }
 
-export async function fetchAuthMethods(): Promise<AuthMethods> {
+export async function fetchAuthMethods(
+  signal?: AbortSignal,
+): Promise<AuthMethods> {
   const { data } = await apiRequest<AuthMethods>(`${BASE}/methods`, {
     anonymous: true,
+    signal,
   });
   return data;
 }
@@ -200,8 +207,12 @@ export async function startSsoLink(): Promise<string> {
   return data.authorizeUrl;
 }
 
-export async function fetchSsoIdentity(): Promise<SsoIdentity> {
-  const { data } = await apiRequest<SsoIdentity>(`${BASE}/sso/identity`);
+export async function fetchSsoIdentity(
+  signal?: AbortSignal,
+): Promise<SsoIdentity> {
+  const { data } = await apiRequest<SsoIdentity>(`${BASE}/sso/identity`, {
+    signal,
+  });
   return data;
 }
 

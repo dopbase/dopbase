@@ -85,9 +85,18 @@ export interface GroupRef {
 }
 
 export interface UserAccess {
+  userId: string;
+  email: string;
+  roleName: string;
   maxLevel: Level;
   groups: GroupRef[];
   grants: Grant[];
+}
+
+/** An account named in a response: who did something. */
+export interface AccountRef {
+  id: string;
+  email: string;
 }
 
 export interface Group {
@@ -95,14 +104,23 @@ export interface Group {
   name: string;
   description: string;
   memberCount: number;
+  /** Null when the account that created it is gone. */
+  createdBy: AccountRef | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A group in the list, with enough to show who's in it and what it reaches. */
+export interface GroupSummary extends Group {
+  members: AccountRef[];
+  grants: Grant[];
 }
 
 export interface GroupMember {
   id: string;
   email: string;
   addedAt: string;
+  addedBy: AccountRef | null;
 }
 
 export interface GroupDetail {
@@ -136,23 +154,33 @@ export async function fetchProjectAccess(
   return data;
 }
 
-export async function fetchUserAccess(id: string): Promise<UserAccess> {
+export async function fetchUserAccess(
+  id: string,
+  signal?: AbortSignal,
+): Promise<UserAccess> {
   const { data } = await apiRequest<UserAccess>(
     `/api/v1/users/${encodeURIComponent(id)}/access`,
+    { signal },
   );
   return data;
 }
 
 const GROUPS = "/api/v1/groups";
 
-export async function fetchGroups(): Promise<Group[]> {
-  const { data } = await apiRequest<Group[]>(GROUPS);
+export async function fetchGroups(
+  signal?: AbortSignal,
+): Promise<GroupSummary[]> {
+  const { data } = await apiRequest<GroupSummary[]>(GROUPS, { signal });
   return data;
 }
 
-export async function fetchGroup(id: string): Promise<GroupDetail> {
+export async function fetchGroup(
+  id: string,
+  signal?: AbortSignal,
+): Promise<GroupDetail> {
   const { data } = await apiRequest<GroupDetail>(
     `${GROUPS}/${encodeURIComponent(id)}`,
+    { signal },
   );
   return data;
 }

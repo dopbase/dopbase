@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { cacheContents, freshPinia } from "~/tests/pinia";
 import {
   REVEAL_SECONDS,
   useSecretsPanelController,
@@ -16,7 +16,7 @@ vi.mock("~/services/secrets.api");
 vi.mock("~/services/auth.api");
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   useReauthentication().dismiss();
   vi.mocked(secretsApi.listSecrets).mockReset();
   vi.mocked(secretsApi.setSecret).mockReset();
@@ -80,11 +80,44 @@ describe("useSecretsPanelController", () => {
     expect(c.loading.value).toBe(false);
   });
 
+  it("drops the old environment's rows as soon as it changes", async () => {
+    vi.mocked(secretsApi.listSecrets)
+      .mockResolvedValueOnce([metadata])
+      .mockReturnValueOnce(new Promise(() => {}));
+    const environmentId = ref("env_1");
+    const c = mountController(() =>
+      useSecretsPanelController(environmentId),
+    ).controller;
+    await vi.waitFor(() => expect(c.secrets.value).toEqual([metadata]));
+
+    environmentId.value = "env_2";
+    await nextTick();
+
+    expect(c.secrets.value).toBeNull();
+  });
+
   it("loads metadata only, never values", async () => {
     vi.mocked(secretsApi.listSecrets).mockResolvedValueOnce([metadata]);
     const c = makeController();
     await vi.waitFor(() => expect(c.secrets.value).toEqual([metadata]));
     expect(c.secrets.value?.[0]).not.toHaveProperty("value");
+  });
+
+  it("shows an environment opened before at once, with no new request", async () => {
+    vi.mocked(secretsApi.listSecrets).mockResolvedValue([metadata]);
+    const first = mountController(() =>
+      useSecretsPanelController(ref("env_1")),
+    );
+    await vi.waitFor(() =>
+      expect(first.controller.secrets.value).toEqual([metadata]),
+    );
+    first.unmount();
+
+    const again = makeController();
+
+    expect(again.secrets.value).toEqual([metadata]);
+    await nextTick();
+    expect(secretsApi.listSecrets).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces listing failures", async () => {
@@ -108,6 +141,8 @@ describe("useSecretsPanelController", () => {
       expect(c.revealedKey.value).toBe("DATABASE_URL");
       expect(c.revealedValue.value).toBe("postgres://secret");
       expect(c.revealedValue.value).not.toContain("undefined");
+      // The plaintext lives in this controller only, never in the cache.
+      expect(cacheContents()).not.toContain("postgres://secret");
 
       await vi.advanceTimersByTimeAsync((REVEAL_SECONDS - 1) * 1000);
       expect(c.revealedKey.value).toBe("DATABASE_URL");
@@ -228,6 +263,73 @@ describe("useSecretsPanelController", () => {
   });
 });
 
+describe("useSecretsPanelController — filter and copy", () => {
+  it("filters keys without asking the server again", async () => {
+    vi.mocked(secretsApi.listSecrets).mockResolvedValue([
+      metadata,
+      { ...metadata, key: "API_KEY" },
+    ]);
+    const c = makeController();
+    await vi.waitFor(() => expect(c.secrets.value).toHaveLength(2));
+
+    c.filter.value = "  api ";
+
+    expect(c.visibleSecrets.value?.map((secret) => secret.key)).toEqual([
+      "API_KEY",
+    ]);
+    expect(secretsApi.listSecrets).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies a value without showing it", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    vi.mocked(secretsApi.revealSecret).mockResolvedValue({
+      key: "DATABASE_URL",
+      value: "postgres://secret",
+      version: 2,
+    });
+    const c = makeController();
+
+    await c.copyValue("DATABASE_URL");
+
+    expect(writeText).toHaveBeenCalledWith("postgres://secret");
+    expect(c.copiedKey.value).toBe("DATABASE_URL");
+    expect(c.revealedValue.value).toBeNull();
+    expect(cacheContents()).not.toContain("postgres://secret");
+  });
+
+  it("says so when the browser blocks the copy", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn(async () => {
+          throw new Error("denied");
+        }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: vi.fn(() => false),
+      configurable: true,
+    });
+    vi.mocked(secretsApi.revealSecret).mockResolvedValue({
+      key: "DATABASE_URL",
+      value: "postgres://secret",
+      version: 2,
+    });
+    const c = makeController();
+
+    await c.copyValue("DATABASE_URL");
+
+    expect(c.copiedKey.value).toBeNull();
+    expect(c.actionError.value).toBe(
+      "The browser blocked the copy. Reveal the value and copy it from there.",
+    );
+  });
+});
+
 describe("useSecretsPanelController — .env editor", () => {
   it("openEditor merges the stored layout with the revealed values", async () => {
     mockEditorLoad();
@@ -242,6 +344,8 @@ describe("useSecretsPanelController — .env editor", () => {
       "# app\nDATABASE_URL=postgres://secret\nAPI_KEY=k-123\n",
     );
     expect(c.editorDirty.value).toBe(false);
+    expect(cacheContents()).not.toContain("postgres://secret");
+    expect(cacheContents()).not.toContain("k-123");
   });
 
   it("openEditor generates a fresh layout when none is stored", async () => {

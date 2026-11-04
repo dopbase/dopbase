@@ -1,7 +1,7 @@
 {
   "name": "dopbase",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@fontsource-variable/fira-code": "^5.3.0",
+    "@pinia/colada": "^1.4.9",
     "@tailwindcss/vite": "^4.3.3",
     "pinia": "^4.0.3",
     "tailwind-merge": "^3.6.0",

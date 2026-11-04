@@ -1,11 +1,11 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useQuery, useQueryCache } from "@pinia/colada";
 import { useReauthentication } from "~/composable";
 import { startSsoLink } from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import {
   deleteSsoProvider,
-  fetchSsoSettings,
   saveSsoProvider,
   setSsoEnabled,
   setSsoPasswordFormHidden,
@@ -13,6 +13,9 @@ import {
 } from "~/services/sso.api";
 import { GENERIC_PRESET } from "~/services/sso.api";
 import type { SsoPreset, SsoSettings } from "~/services/sso.api";
+import { loadFailure } from "~/queries/helpers";
+import { useInvalidate } from "~/queries/invalidate";
+import { ssoSettingsQuery } from "~/queries/sso";
 import { ssoErrorMessage } from "~/utils/sso";
 
 export type SsoStatus = "none" | "unverified" | "ready" | "enabled";
@@ -38,9 +41,26 @@ export function useSsoController() {
   const router = useRouter();
   const { runWithReauth } = useReauthentication();
 
-  const settings = ref<SsoSettings | null>(null);
-  const loading = ref(true);
-  const loadError = ref<string | null>(null);
+  const cache = useQueryCache();
+  const invalidate = useInvalidate();
+  const settingsQuery = useQuery(ssoSettingsQuery);
+  // The form starts from a fresh read, never a cached copy someone may have
+  // changed since.
+  const answered = ref(false);
+  void settingsQuery.refetch().then(() => {
+    answered.value = true;
+  });
+  const settings = computed<SsoSettings | null>(
+    () => settingsQuery.data.value ?? null,
+  );
+  /** True until the first fresh answer, good or bad. */
+  const loading = computed(
+    () => !answered.value || settingsQuery.isPending.value,
+  );
+  const loadError = loadFailure(
+    settingsQuery,
+    "Could not load the single sign-on settings.",
+  );
 
   const preset = ref(GENERIC_PRESET);
   const displayName = ref("");
@@ -86,13 +106,51 @@ export function useSsoController() {
     () => findPreset(preset.value)?.issuer ?? "",
   );
   const presetHint = computed(() => findPreset(preset.value)?.hint ?? "");
+  /** The summary card's title: the preset's name, or the button label for the generic one. */
+  const providerName = computed(() => {
+    const current = provider.value;
+    if (!current) return "";
+    const entry = presets.value.find((item) => item.id === current.preset);
+    return entry && entry.id !== GENERIC_PRESET
+      ? entry.label
+      : current.displayName;
+  });
+
+  /** One line under the provider's name saying where setup stands. */
+  const providerSummary = computed(() => {
+    const current = provider.value;
+    if (!current) {
+      return "Fill in the provider below and save. Then run a test sign-in before you turn it on.";
+    }
+    if (status.value === "enabled") {
+      const linked = current.linkedAccounts;
+      return linked === 1
+        ? "1 person has linked their account."
+        : `${linked} people have linked their account.`;
+    }
+    if (status.value === "ready") {
+      return "The last test sign-in worked, so you can turn it on.";
+    }
+    return "Saved. Run a test sign-in as root before you turn it on. Nobody else sees a change yet.";
+  });
+
+  /** What removing the provider costs, for the danger card. */
+  const removeSummary = computed(() => {
+    const linked = provider.value?.linkedAccounts ?? 0;
+    const unlinks =
+      linked === 0
+        ? "No accounts are linked yet."
+        : `Unlinks ${linked} ${linked === 1 ? "account" : "accounts"}.`;
+    return `${unlinks} People without a password can't sign in until you set one.`;
+  });
+
   /** Without an HTTPS public URL nothing here can be set up. */
   const blocked = computed(
     () => settings.value !== null && !settings.value.publicUrlSecure,
   );
 
-  function fill(next: SsoSettings): void {
-    settings.value = next;
+  /** Puts the saved provider in the form. The client secret is never sent back. */
+  function fillForm(next: SsoSettings): void {
     const current = next.provider;
     preset.value = current?.preset ?? GENERIC_PRESET;
     displayName.value = current?.displayName ?? "";
@@ -100,6 +158,29 @@ export function useSsoController() {
     clientId.value = current?.clientId ?? "";
     clientSecret.value = "";
   }
+
+  /**
+   * Shows settings the server just returned: in the cache, in the form, and
+   * on every screen that shows sign-in methods.
+   */
+  function fill(next: SsoSettings): void {
+    cache.setQueryData(ssoSettingsQuery.key, next);
+    fillForm(next);
+    void invalidate.signInChanged(ssoSettingsQuery.key);
+  }
+
+  // The form fills once from the first fresh answer, so a background
+  // refresh never overwrites what is being typed.
+  let formFilled = false;
+  watch(
+    [settingsQuery.data, answered],
+    ([next, ready]) => {
+      if (!next || !ready || formFilled) return;
+      formFilled = true;
+      fillForm(next);
+    },
+    { immediate: true },
+  );
 
   function choosePreset(value: string): void {
     const previousDefault = findPreset(preset.value)?.buttonLabel;
@@ -121,16 +202,11 @@ export function useSsoController() {
     }
   }
 
+  /** Reads the settings again and puts them in the form. */
   async function load(): Promise<void> {
-    loading.value = true;
-    loadError.value = null;
-    try {
-      fill(await fetchSsoSettings());
-    } catch {
-      loadError.value = "Could not load the single sign-on settings.";
-    } finally {
-      loading.value = false;
-    }
+    await settingsQuery.refetch();
+    const next = settingsQuery.data.value;
+    if (next) fillForm(next);
   }
 
   function validate(): boolean {
@@ -324,6 +400,7 @@ export function useSsoController() {
       confirmingRemove.value = false;
       notice.value = "Single sign-on was removed.";
       await load();
+      void invalidate.signInChanged(ssoSettingsQuery.key);
     } catch (error) {
       if (!cancelled(error)) {
         removeError.value =
@@ -336,14 +413,14 @@ export function useSsoController() {
     }
   }
 
-  onMounted(() => {
-    readCallback();
-    void load();
-  });
+  onMounted(readCallback);
 
   return {
     settings,
     provider,
+    providerName,
+    providerSummary,
+    removeSummary,
     status,
     loading,
     loadError,

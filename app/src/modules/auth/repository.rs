@@ -65,6 +65,20 @@ pub async fn insert_session(
   Ok(())
 }
 
+/// Records an interactive sign-in on the account.
+pub async fn mark_signed_in(
+  conn: &mut SqliteConnection,
+  admin_id: &str,
+  now: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query("UPDATE admins SET last_sign_in_at=? WHERE id=?")
+    .bind(now)
+    .bind(admin_id)
+    .execute(conn)
+    .await?;
+  Ok(())
+}
+
 pub async fn revoke_session(
   conn: &mut SqliteConnection,
   session_id: &str,
@@ -139,12 +153,13 @@ pub async fn set_password_hash(
   Ok(())
 }
 
-/// The email and role of an account.
+/// The email and role of an active account. A disabled one gets `None`, so
+/// a login it approved before being disabled issues no session.
 pub async fn account(
   conn: &mut SqliteConnection,
   admin_id: &str,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
-  sqlx::query_as("SELECT email,role FROM admins WHERE id=?")
+  sqlx::query_as("SELECT email,role FROM admins WHERE id=? AND status='active'")
     .bind(admin_id)
     .fetch_optional(conn)
     .await
@@ -185,6 +200,7 @@ pub struct NewDeviceRequest<'a> {
   pub purpose: &'a str,
   pub target_session_id: Option<&'a str>,
   pub client_hostname: Option<&'a str>,
+  pub client_name: Option<&'a str>,
   pub client_ip: Option<&'a str>,
   pub now: &'a str,
   pub expires_at: &'a str,
@@ -195,13 +211,14 @@ pub async fn insert_device_request(
   conn: &mut SqliteConnection,
   request: NewDeviceRequest<'_>,
 ) -> Result<bool, sqlx::Error> {
-  let inserted = sqlx::query("INSERT INTO cli_device_requests(id,device_code_hash,user_code_hash,status,purpose,target_session_id,client_hostname,client_ip,created_at,expires_at) VALUES(?,?,?,'pending',?,?,?,?,?,?) ON CONFLICT(user_code_hash) DO NOTHING")
+  let inserted = sqlx::query("INSERT INTO cli_device_requests(id,device_code_hash,user_code_hash,status,purpose,target_session_id,client_hostname,client_name,client_ip,created_at,expires_at) VALUES(?,?,?,'pending',?,?,?,?,?,?,?) ON CONFLICT(user_code_hash) DO NOTHING")
     .bind(request.id)
     .bind(request.device_code_hash)
     .bind(request.user_code_hash)
     .bind(request.purpose)
     .bind(request.target_session_id)
     .bind(request.client_hostname)
+    .bind(request.client_name)
     .bind(request.client_ip)
     .bind(request.now)
     .bind(request.expires_at)
@@ -280,6 +297,7 @@ const OWNED_BY_APPROVER: &str =
 #[derive(sqlx::FromRow)]
 pub struct PendingDeviceRow {
   pub client_hostname: Option<String>,
+  pub client_name: Option<String>,
   pub client_ip: Option<String>,
   pub created_at: String,
   pub expires_at: String,
@@ -294,7 +312,7 @@ pub async fn pending_device_request(
   now: &str,
 ) -> Result<Option<PendingDeviceRow>, sqlx::Error> {
   sqlx::query_as(&format!(
-    "SELECT client_hostname,client_ip,created_at,expires_at,purpose FROM cli_device_requests WHERE user_code_hash=? AND status='pending' AND expires_at > ? AND {OWNED_BY_APPROVER}"
+    "SELECT client_hostname,client_name,client_ip,created_at,expires_at,purpose FROM cli_device_requests WHERE user_code_hash=? AND status='pending' AND expires_at > ? AND {OWNED_BY_APPROVER}"
   ))
   .bind(user_code_hash)
   .bind(now)

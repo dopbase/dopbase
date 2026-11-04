@@ -1,8 +1,10 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
-use crate::{constants::tokens::GRANT_ID_PREFIX, services::token};
+use crate::{
+  constants::tokens::GRANT_ID_PREFIX, modules::grants::model::GroupRef, services::token,
+};
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,a.status,a.last_sign_in_at";
 
 #[derive(sqlx::FromRow)]
 pub struct UserRow {
@@ -16,6 +18,8 @@ pub struct UserRow {
   pub has_password: bool,
   pub sso_linked: bool,
   pub owner_id: Option<String>,
+  pub status: String,
+  pub last_sign_in_at: Option<String>,
 }
 
 /// Root first, then by role rank, each by email.
@@ -25,6 +29,13 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<UserRow>, sqlx::Error> {
   ))
   .fetch_all(pool)
   .await
+}
+
+/// Every account's id and email, by email.
+pub async fn identities(pool: &SqlitePool) -> Result<Vec<(String, String)>, sqlx::Error> {
+  sqlx::query_as("SELECT id, email FROM admins ORDER BY email")
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn find(
@@ -37,6 +48,42 @@ pub async fn find(
   .bind(id)
   .fetch_optional(pool)
   .await
+}
+
+/// Every group membership as (user id, group), each user's by group name.
+pub async fn memberships(pool: &SqlitePool) -> Result<Vec<(String, GroupRef)>, sqlx::Error> {
+  let rows: Vec<(String, String, String)> = sqlx::query_as(
+    "SELECT m.user_id, g.id, g.name FROM group_members m JOIN groups g ON g.id = m.group_id ORDER BY g.name",
+  )
+  .fetch_all(pool)
+  .await?;
+  Ok(
+    rows
+      .into_iter()
+      .map(|(user_id, id, name)| (user_id, GroupRef { id, name }))
+      .collect(),
+  )
+}
+
+/// Sets `status` and returns false when the account already had it. Root
+/// is never disabled.
+pub async fn set_status(
+  conn: &mut SqliteConnection,
+  id: &str,
+  status: &str,
+  now: &str,
+) -> Result<bool, sqlx::Error> {
+  Ok(
+    sqlx::query("UPDATE admins SET status=?,updated_at=? WHERE id=? AND is_root=0 AND status<>?")
+      .bind(status)
+      .bind(now)
+      .bind(id)
+      .bind(status)
+      .execute(conn)
+      .await?
+      .rows_affected()
+      == 1,
+  )
 }
 
 /// The email, root flag, role id, and whether the role signs in with tokens
@@ -149,6 +196,21 @@ pub async fn revoke_sessions(
   Ok(())
 }
 
+/// Cancels the CLI logins the account approved that the CLI hasn't picked
+/// up yet, so none of them turns into a session.
+pub async fn cancel_device_approvals(
+  conn: &mut SqliteConnection,
+  id: &str,
+  now: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query("UPDATE cli_device_requests SET status='cancelled',decided_at=? WHERE approved_by=? AND status='approved'")
+    .bind(now)
+    .bind(id)
+    .execute(conn)
+    .await?;
+  Ok(())
+}
+
 /// Root can never be deleted.
 pub async fn delete(
   conn: &mut SqliteConnection,
@@ -172,13 +234,14 @@ pub async fn owned_count(
     .await
 }
 
-/// Whether `id` can own an AI agent: an active account that signs in.
+/// Whether `id` can own an AI agent: an active account that signs in and
+/// can see users, so the agent shows up for them.
 pub async fn can_own(
   conn: &mut SqliteConnection,
   id: &str,
 ) -> Result<bool, sqlx::Error> {
   let found: Option<i64> = sqlx::query_scalar(
-    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR r.sign_in = 'interactive')",
+    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'users.view')))",
   )
   .bind(id)
   .fetch_optional(conn)

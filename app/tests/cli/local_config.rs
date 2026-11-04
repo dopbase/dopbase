@@ -199,6 +199,20 @@ fn unsupported_schemes_and_url_metadata_are_rejected() {
       .to_string()
       .contains("must not contain credentials")
   );
+  // A rejected address is echoed, often into CI logs, without its password.
+  for value in [
+    "https://ci:hunter2@intranet",
+    " https://ci:hunter2@dopbase.example.com",
+    "https://ci:hunter2@exa mple.com",
+    "ci:hunter2@sdkfsdf",
+    " https://ci:hun/ter2@dopbase.example.com",
+    "https://ci:hunter2@dopbase.example.com\n",
+    "https://ci:12/hunter2@intranet",
+    " ci:hunter2@host/a://b",
+  ] {
+    let error = normalize_connect_target(value).unwrap_err().to_string();
+    assert!(!error.contains("hunter2"), "{value}: {error}");
+  }
   assert!(
     normalize_connect_target("https://dopbase.example.com?mode=test")
       .unwrap_err()

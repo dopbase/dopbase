@@ -59,9 +59,16 @@
   /* Text selection highlight. */
   --color-selection: rgba(255, 255, 255, 0.22);
 
-  --radius-card: 10px;
+  /* Corners stay small: nothing in the console rounds past 6px. */
+  --radius-card: 6px;
   /* Form controls, including buttons, fields, and chips. */
   --radius-control: 5px;
+  /* Cap Tailwind's own scale too, so rounded-lg and up can't exceed 6px. */
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+  --radius-4xl: 6px;
 
   /**
    * Typography scale tuned for comfort on a dark, developer-facing UI.
@@ -73,6 +80,26 @@
   --text-xs--line-height: 1.55;
   --text-sm: 0.875rem;
   --text-sm--line-height: 1.55;
+}
+
+/*
+ * The one content column every signed-in page uses: centred in the area
+ * beside the sidebar, 1440px at most, with the same side padding. The
+ * sidebar stays pinned to the left edge. Full-width bars (the context bar,
+ * tabs) keep their border edge to edge and put their contents in this
+ * column. See the wide-screen proposal in Figma for why.
+ */
+@utility page-width {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1440px;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
 }
 
 @layer base {
@@ -135,6 +162,6 @@
     background: var(--color-line);
     border: 3px solid transparent;
     background-clip: content-box;
-    border-radius: 8px;
+    border-radius: 6px;
   }
 }

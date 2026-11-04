@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { forgetQueries, freshPinia } from "~/tests/pinia";
 import { useSsoLinkCardController } from "./SsoLinkCard.controller";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
@@ -30,7 +30,7 @@ function settle(): Promise<void> {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   vi.clearAllMocks();
   query.value = {};
 });
@@ -59,6 +59,7 @@ describe("useSsoLinkCardController", () => {
 
     query.value = { sso_error: "identity_taken" };
     vi.mocked(authApi.fetchSsoIdentity).mockResolvedValueOnce(unlinked);
+    forgetQueries();
     const second = mountController(useSsoLinkCardController).controller;
     await settle();
     expect(second.error.value).toContain("another Dopbase account");

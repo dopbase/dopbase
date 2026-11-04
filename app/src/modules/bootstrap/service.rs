@@ -3,19 +3,15 @@ use std::{
   io::{Cursor, Write},
 };
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use super::{model::*, repository};
 use crate::modules::common;
 use crate::{
-  constants::{
-    errors::RATE_LIMITED,
-    limits::{BROWSER_SESSION_ABSOLUTE_HOURS, BROWSER_SESSION_IDLE_HOURS},
-    tokens::{ADMIN_ID_PREFIX, ADMIN_SESSION_PREFIX, CSRF_TOKEN_PREFIX, SESSION_ID_PREFIX},
-  },
+  constants::{errors::RATE_LIMITED, tokens::ADMIN_ID_PREFIX},
   http::HttpError,
-  models::AdminRole,
+  models::{AdminRole, SessionKind},
   services::token,
   state::AppState,
 };
@@ -117,23 +113,12 @@ pub async fn create(
     ));
   }
   let credentials = prepare_root(&email, request.password).await?;
-  let session_id = token::public_id(SESSION_ID_PREFIX);
-  let session_token = token::generate(ADMIN_SESSION_PREFIX).map_err(|_| HttpError::internal())?;
-  let csrf = token::generate(CSRF_TOKEN_PREFIX).map_err(|_| HttpError::internal())?;
-  let now = Utc::now();
   let mut tx = state.db.pool().begin().await?;
-  let admin_id = create_root(&mut tx, &credentials, &now).await?;
-  repository::insert_session(
-    &mut tx,
-    &session_id,
-    &admin_id,
-    &token::hash(&session_token),
-    &token::hash(&csrf),
-    &now.to_rfc3339(),
-    &(now + Duration::hours(BROWSER_SESSION_IDLE_HOURS)).to_rfc3339(),
-    &(now + Duration::hours(BROWSER_SESSION_ABSOLUTE_HOURS)).to_rfc3339(),
-  )
-  .await?;
+  let admin_id = create_root(&mut tx, &credentials, &Utc::now()).await?;
+  // The same session every other sign-in gets, so root's first sign-in is
+  // recorded too.
+  let session =
+    crate::modules::auth::service::issue_session(&mut tx, &admin_id, SessionKind::Browser).await?;
   tx.commit().await?;
   setup.token = None;
   state.rate_limiter.clear("bootstrap").await;
@@ -142,10 +127,10 @@ pub async fn create(
       admin_id,
       email,
       role: AdminRole::Root,
-      csrf_token: csrf,
-      last_login_at: Some(now.to_rfc3339()),
+      csrf_token: session.csrf.ok_or_else(HttpError::internal)?,
+      last_login_at: Some(session.created_at.to_rfc3339()),
     },
-    session_token,
+    session_token: session.token,
   })
 }
 
@@ -277,10 +262,7 @@ pub async fn restore_bootstrap(
     .await
     .map_err(|e| {
       tracing::warn!(%e, "rekeying uploaded database failed");
-      HttpError::bad_request(
-        "BACKUP_REKEY_FAILED",
-        &format!("Failed to re-key backup: {e}"),
-      )
+      crate::modules::backups::service::rekey_failed()
     })?;
 
     temp_client

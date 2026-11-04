@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useSsoLinkCardController } from "./SsoLinkCard.controller";
-import { DbAlert, DbBadge, DbButton } from "~/components/ui";
-import { KeyIcon } from "~/assets/icons";
-import { formatDateTime } from "~/utils/format";
+import { DbAlert, DbButton } from "~/components/ui";
+import { formatDate } from "~/utils/format";
 
 const {
   identity,
@@ -20,49 +19,44 @@ const {
 <template>
   <section
     v-if="visible && identity"
-    class="rounded-card border border-line bg-panel p-5 shadow-xs"
+    class="flex flex-col gap-3 rounded-card border border-line bg-panel px-5 py-4"
     aria-labelledby="sso-heading"
     data-testid="sso-link-card">
-    <div class="flex items-center gap-2">
-      <KeyIcon class="h-4 w-4 text-ink-muted" />
-      <h2 id="sso-heading" class="text-sm font-semibold text-ink-strong">
-        Single sign-on
-      </h2>
-      <DbBadge :tone="identity.linked ? 'ok' : 'neutral'">
-        {{ identity.linked ? "Linked" : "Not linked" }}
-      </DbBadge>
-    </div>
-    <DbAlert v-if="notice" tone="success" class="mt-3">{{ notice }}</DbAlert>
-    <DbAlert v-if="error" class="mt-3">{{ error }}</DbAlert>
-    <template v-if="identity.linked">
-      <p class="mt-2 text-xs leading-relaxed text-ink-muted">
-        Linked to {{ identity.providerName }}
-        <template v-if="identity.emailAtLink"
-          >as {{ identity.emailAtLink }}</template
-        >
-        <template v-if="identity.linkedAt">
-          on {{ formatDateTime(identity.linkedAt) }}</template
-        >.
-      </p>
-      <DbButton
-        v-if="canUnlink"
-        class="mt-3"
-        size="sm"
-        variant="secondary"
-        :loading="unlinking"
-        data-testid="sso-unlink"
-        @click="unlink">
-        Unlink
-      </DbButton>
-    </template>
-    <template v-else>
-      <p class="mt-2 text-xs leading-relaxed text-ink-muted">
-        Link your {{ identity.providerName }} identity to sign in with it next
-        time.
-      </p>
-      <DbButton class="mt-3" size="sm" :loading="linking" @click="link">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="min-w-0 flex-1">
+        <h2
+          id="sso-heading"
+          class="text-[15px] font-semibold leading-[22px] text-ink-strong">
+          Single sign-on
+        </h2>
+        <p v-if="identity.linked" class="text-sm text-ink-muted">
+          Linked to {{ identity.providerName }}
+          <template v-if="identity.emailAtLink"
+            >as {{ identity.emailAtLink }}</template
+          ><template v-if="identity.linkedAt">
+            on {{ formatDate(identity.linkedAt) }}</template
+          >.
+        </p>
+        <p v-else class="text-sm text-ink-muted">
+          Link your {{ identity.providerName }} account to sign in with it next
+          time.
+        </p>
+      </div>
+      <template v-if="identity.linked">
+        <DbButton
+          v-if="canUnlink"
+          variant="ghost"
+          :loading="unlinking"
+          data-testid="sso-unlink"
+          @click="unlink">
+          Unlink
+        </DbButton>
+      </template>
+      <DbButton v-else :loading="linking" @click="link">
         Link {{ identity.providerName }}
       </DbButton>
-    </template>
+    </div>
+    <DbAlert v-if="notice" tone="success">{{ notice }}</DbAlert>
+    <DbAlert v-if="error">{{ error }}</DbAlert>
   </section>
 </template>

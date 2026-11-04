@@ -10,11 +10,13 @@ The Admin UI follows a layered design:
 ```mermaid
 flowchart LR
     accTitle: Dopbase Admin UI Layered Architecture
-    accDescr: Visual flow showing how pages interact with controllers, services, stores, and the HTTP client.
+    accDescr: Visual flow showing how pages interact with controllers, queries, services, stores, and the HTTP client.
 
     PAGE["Page or Component"] -->|"User actions & events"| CONTROLLER["Controller"]
     CONTROLLER -->|"Reactive state"| PAGE
-    CONTROLLER -->|"API methods"| SERVICE["Service"]
+    CONTROLLER -->|"Reads"| QUERY[("Query cache")]
+    QUERY -->|"Query factories"| SERVICE["Service"]
+    CONTROLLER -->|"Writes"| SERVICE
     CONTROLLER <-->|"Cross-screen state"| STORE[("Pinia Store")]
     SERVICE -->|"Transport request"| HTTP["HTTP Client"]
     HTTP -->|"fetch"| BACKEND[("REST API")]
@@ -28,18 +30,20 @@ flowchart LR
     class PAGE view;
     class CONTROLLER logic;
     class SERVICE,HTTP network;
-    class STORE storage;
+    class STORE,QUERY storage;
     class BACKEND backend;
 ```
 
 Pages render values and events returned by their controller. A page does not
-import an API module or a Pinia store directly. A controller owns screen state,
-validation, navigation, and feedback messages. A service contains endpoint paths,
-request and response types, and transport mapping. The HTTP client is the only
-place that calls `fetch`.
+import an API module, a query or a Pinia store directly. A controller owns
+screen state, validation, navigation, and feedback messages. A service contains
+endpoint paths, request and response types, and transport mapping. The HTTP
+client is the only place that calls `fetch`.
 
 ## State and logic boundaries
 
+- **Server data**: Data a screen reads from the API lives in the query cache
+  (`src/queries`), not in a store. See [Reading data](#reading-data).
 - **Stores**: Use a store only when state is shared across multiple screens.
 - **Utilities**: Keep pure parsing, formatting, and validation in `src/utils`.
 - **Composables**: Put reactive behavior shared by multiple controllers in `src/composable`.
@@ -52,14 +56,104 @@ returned to that template, then follow its service call.
 Error codes come from `ApiError`. Controllers map stable error codes to field or
 operation messages. Never branch on English server messages.
 
-## Asynchronous requests
+## Reading data
 
-Read requests should accept an `AbortSignal` when the screen can change while
-they are in flight. The owner cancels an older request before starting a newer
-one and ignores completions from a different target.
+Screens read server data through **Pinia Colada** its a vue native data fetching
+queries defined in `src/queries`. A controller calls `useQuery()` with a factory
+from that folder and returns the result in the shape its page already binds:
+`null` while nothing has loaded, then the data. Services stay plain transport
+functions. Query factories call them and pass the `AbortSignal` the cache gives
+them.
 
-Mutations snapshot their target before awaiting and refresh state only after the
-mutation succeeds.
+Each area has its own factory file, such as `projects.ts` or `users.ts`, and
+every key comes from `src/queries/keys.ts`. Keys are arrays, and everything the
+result depends on goes in the key, as in `keys.secrets.of(environmentId)`. When
+the route moves to another environment the key changes, so the screen shows its
+loading state at once, and a late answer for the old environment lands in the
+old entry instead of on screen. Controllers need no AbortController or version
+counter of their own for reads.
+
+| Data                                          | Fresh for                               |
+| --------------------------------------------- | --------------------------------------- |
+| Most reads                                    | 5 seconds                               |
+| Roles and sign-in methods                     | 3 minutes                               |
+| Pre-session reads (login page, server health) | Dropped as soon as no screen shows them |
+
+A cached copy always shows at once. Once it is no longer fresh, the next mount,
+window focus or reconnect refreshes it in the background. Data no screen uses is
+dropped after five minutes. The audit feed and secret history don't refresh on
+focus, because that would refetch every page already loaded.
+
+Freshness and lifetime are set in `src/queries/options.ts` or in a factory,
+never by a screen. Colada keeps one set of options per cache entry, so a
+screen-level override would apply to every screen showing the same data. For
+the same reason, turn a query off with `onlyWhen(condition, factory(...))` from
+`src/queries/helpers.ts` instead of `enabled`.
+
+The same file has `shownData()` and `loadFailure()`, which map a query to a
+controller's data and error refs. A failed background refresh keeps the last
+data on screen, and a 403 or 404 removes it. Screens that already said "Could
+not load" above an older list pass `{ withData: true }` to keep doing so.
+`readQuery()` reads a query from an event handler, such as fresh counts before
+a delete confirmation, and stores the answer in the shared entry. Settings
+counts and the AI agents' tokens use it to build one query out of many entries.
+
+Paged lists (the audit feed, Activity and secret history) use
+`useInfiniteQuery()`. Load more extends the feed on screen, so a page asked for
+under the old filters never lands under new ones.
+
+Data a screen fills a form from, such as a role or the single sign-on
+settings, fills the form once per target. A background refresh then can't
+overwrite what someone is typing.
+
+Cached data is shared between screens and isn't deeply reactive, so never
+change it in place. Copy an array before sorting or appending to it, and hold
+an item a dialog works on in a `shallowRef`.
+
+### Writes
+
+Writes stay plain service calls with their own busy and error state, inside
+`runWithReauth` when they need a recent password. After the server confirms,
+call the helper from `useInvalidate()` that names what changed, such as
+`secretsChanged(environmentId)` or `accessChanged()`. It refetches the affected
+reads on screen and empties the rest, so data known to be out of date is never
+shown again: the next screen shows its loading state and reads fresh data.
+Everything is marked stale before anything refetches, so a query built from
+other entries never reuses an old one. The helpers never reject, so a failed
+reload can't turn a successful write into an error. When the response already
+holds the new state, write it with `setQueryData` instead.
+
+A write that navigates away next uses `useInvalidate({ refetch: false })`. It
+empties the affected reads without refetching, so the screen being left
+doesn't refetch, and the next one reads fresh data when it opens.
+
+The UI doesn't use `useMutation`. Its cache keeps each call's arguments for a
+minute, and some arguments are secret values.
+
+### Never cached
+
+These stay one-off calls whose results live in the controller only while the
+screen needs them: revealed secret values, exports and the `.env` editor
+contents, import previews and entries, one-time tokens, the master key download
+and recovery key, CLI approval codes, and the session itself.
+
+### Sessions
+
+The auth store empties the cache whenever the signed-in account changes or the
+session ends. That covers sign-in, single sign-on, first-run setup, logout,
+expiry, a rejected CSRF token, a password change, and a session check that
+returns a different account. Pending requests are cancelled first. Reads a
+mounted screen still shows are emptied in place, so the screen shows its
+loading state instead of the previous account's data and refetches on next use.
+Only pre-session reads under the `public` key prefix stay.
+
+### Tests
+
+`src/tests/setup.ts` gives every test a fresh Pinia with the query layer, and
+`mountController` installs it on the test app. A test that mounts a screen again
+with different fixtures calls `forgetQueries()` from `src/tests/pinia.ts` first.
+`cacheContents()` returns everything the cache holds, for checks that a value
+was never cached.
 
 ## Pages and controllers
 
@@ -115,37 +209,53 @@ page's components.
 
 ## Design source
 
-The console is designed in the Figma file
-[Dopbase admin console](https://www.figma.com/design/JkWa51Xg9VDnFvvdvFojmw/-POC--ADMIN-CONSOLE).
 Its Foundations page uses the same tokens as `src/style.css`, and its
 Components page holds the shared set every screen is built from. Each Figma
 component maps to one component in code:
 
-| Figma component                                | Code                                                 | Status                    |
-| ---------------------------------------------- | ---------------------------------------------------- | ------------------------- |
-| Button                                         | `DbButton`                                           | Exists; restyle to Figma  |
-| IconButton                                     | `DbButton` with an icon slot                         | To build                  |
-| Badge                                          | `DbBadge`                                            | Exists                    |
-| LevelBadge, RoleChip                           | `DbLevelBadge`, `DbRoleChip`                         | To build                  |
-| EnvPill, EnvSwitcher, EnvMenu                  | `DbEnvPill`, `DbEnvSwitcher`, `DbEnvMenu`            | To build                  |
-| Kbd, Avatar                                    | `DbKbd`, `DbAvatar`                                  | To build                  |
-| Input, Select, Checkbox, Switch                | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`      | Exist; restyle to Figma   |
-| SearchField                                    | `DbInput` with a search icon                         | To build                  |
-| RadioCard, Segment, Tab, FilterChip            | `DbRadioCard`, `DbSegment`, `DbTabs`, `DbFilterChip` | To build                  |
-| SelectMenu, SelectOption, Combobox             | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`       | To build                  |
-| Menu, MenuItem, row ⋯ menu                     | `DbMenu`, `DbMenuItem`, `DbRowMenu`                  | To build                  |
-| Toast                                          | `DbToast` and a `useToast` store                     | To build                  |
-| Alert                                          | `DbAlert`                                            | Exists; add the warn tone |
-| EmptyState                                     | `DbEmptyState`                                       | Exists                    |
-| CopyField, CodeSnippet                         | `DbCopyButton`, `DbCode`                             | Exist; restyle to Figma   |
-| Table rows on every screen                     | `DbTable`                                            | To build                  |
-| Modal, Drawer, mobile Sheet                    | `DbModal`, `DbSheet`                                 | Exist                     |
-| PageHeader, Card, Stat                         | `DbPageHeader`, `DbCard`, `DbStat`                   | To build                  |
-| Sidebar, SidebarItem, AccountMenu, ProjectTabs | `src/layouts`                                        | Rebuild with the shell    |
-| ProjectTreeRow, EnvTreeRow, ProjectAccordion   | `src/pages/Projects/components`                      | Rebuild with Projects     |
+| Figma component                              | Code                                               | Status                    |
+| -------------------------------------------- | -------------------------------------------------- | ------------------------- |
+| Button                                       | `DbButton`                                         | Exists; restyle to Figma  |
+| IconButton                                   | `DbMenu`'s ⋯ trigger, `DbCopyButton` `icon-only`   | Partly built              |
+| Badge                                        | `DbBadge`                                          | Exists                    |
+| LevelBadge, RoleChip                         | `DbLevelBadge` (with `levelMeter()`), `DbRoleChip` | LevelBadge exists         |
+| EnvSwitcher, EnvMenu                         | `ContextBar` in `src/pages/Projects/components`    | Exist                     |
+| Kbd                                          | `DbKbd`                                            | Exists                    |
+| Input, Select, Checkbox, Switch              | `DbInput`, `DbSelect`, `DbCheckbox`, `DbSwitch`    | Exist; restyle to Figma   |
+| SearchField                                  | `DbSearchField`                                    | Exists                    |
+| Segment                                      | `DbSegment`                                        | Exists                    |
+| RadioCard                                    | `DbRadioCard`                                      | Exists                    |
+| Tab, FilterChip                              | `ProjectTabs`; filter chips inside `ActivityPanel` | Built where used          |
+| SelectMenu, SelectOption, Combobox           | `DbSelectMenu`, `DbSelectOption`, `DbCombobox`     | To build                  |
+| Menu, MenuItem, row ⋯ menu                   | `DbMenu` (⋯ trigger by default), `DbMenuItem`      | Exist                     |
+| Toast                                        | `DbToast` and a `useToast` store                   | To build                  |
+| Alert                                        | `DbAlert`                                          | Exists; add the warn tone |
+| EmptyState                                   | `DbEmptyState`                                     | Exists                    |
+| CopyField, CodeSnippet                       | `DbCopyButton`, `DbCode`                           | Exist; restyle to Figma   |
+| Table rows on every screen                   | `DbTable`                                          | To build                  |
+| Modal, Drawer, mobile Sheet                  | `DbModal`, `DbSheet` (`side="left"` or `"bottom"`) | Exist                     |
+| PageHeader, Card, Stat                       | `DbPageHeader`, `DbCard`, `DbStat`                 | To build                  |
+| Sidebar, SidebarItem, AccountMenu            | `DashboardNav`, `AccountMenu` in `src/layouts`     | Exist                     |
+| ProjectTabs, Context bar                     | `ProjectTabs`, `ContextBar`                        | Exist                     |
+| ProjectTreeRow, EnvTreeRow, ProjectAccordion | `ProjectTree` in `src/pages/Projects/components`   | Exist                     |
 
 Sidebar and project pieces know about Dopbase, so they live with their layout or
 page rather than in `src/components/ui`.
+
+Every signed-in page puts its content in one column: the `page-width`
+utility in `src/style.css` centres it in the area beside the sidebar, 1440px
+at most, with the same side padding everywhere. The sidebar stays pinned to
+the left edge at every width. Bars that run edge to edge, such as the project context
+bar and tabs, keep their border full width and put their contents in the
+same column, so headers and tables line up from tab to tab. The "13 Proposals ·
+Wide-screen layout" page in Figma compares the alternatives and lists the
+research behind this choice: an edge-pinned nav is the easiest mouse target,
+and centred content keeps the work where the eyes rest.
+
+Corners stay small. `--radius-card` and Tailwind's own `rounded-lg` and up
+are capped at 6px in `src/style.css`, and `--radius-control` is 5px. Use
+`rounded-full` only for dots, thin bars and radio buttons, where it never
+reads as a rounded box.
 
 ## Brand and icons
 
@@ -170,26 +280,53 @@ file here. Delete an icon file once nothing imports it.
 
 ## Routes
 
-The route table moves to the shape the design uses. Project pages are addressed
-by project name and environment name, and each project tab gets its own path:
+Project pages are addressed by project name and environment name, and each
+project tab has its own path:
 
 ```text
-/projects
-/projects/:project
-/projects/:project/:env/secrets
-/projects/:project/:env/tokens
-/projects/:project/:env/activity
-/projects/:project/access
-/projects/:project/settings
-/status
+/projects                              the project tree
+/projects/:projectRef                  opens the first environment
+/projects/:projectRef/:env/secrets     route "environment"
+/projects/:projectRef/:env/tokens      route "environment-tokens"
+/projects/:projectRef/:env/activity    route "environment-activity"
+/projects/:projectRef/:env/import      route "environment-import"
+/projects/:projectRef/access           route "project-access"
+/projects/:projectRef/settings         route "project-settings"
+/status                                was /instance
 ```
 
-Every old path keeps working through a redirect: `/projects/p/:projectRef`,
-`/projects/p/:projectRef/e/:environmentId` and its `tokens` and `import`
-children, `/projects/p/:projectRef/access`, and `/instance`. The selection
-still lives only in the URL. The sidebar and the router guards read the same
-capability map, so a link to a page the viewer can't open shows the No access
-screen instead of a silent redirect.
+Every project route renders `Project.page.vue`; `Project.controller.ts` maps
+the route name to a tab and decides which tabs the viewer gets. Access and
+Settings have no environment in the address, so the controller keeps the one
+last opened in the context bar. The selection still lives only in the URL.
+
+Older addresses still work. `/instance`, `/projects/p/:projectRef` and
+`/projects/p/:projectRef/access` are plain redirects.
+`/projects/p/:projectRef/e/:environmentId` (and its `tokens` and `import`
+children) runs `redirectLegacyEnvironment` in `src/router.legacy.ts`, which
+looks the id up and moves to the named address, or to the project if the
+environment is gone. Because `p` is a fixed segment, a project literally named `p` can't open `/projects/p/access` or `/projects/p/settings`; the legacy redirect wins there.
+
+Machines should keep using the immutable `env_...` id, which survives
+renames.
+
+## Capability map
+
+`src/navigation/access-map.ts` says which capabilities open each signed-in
+page. A page opens for anyone holding one of them; a page with none listed, or
+a route that isn't in the map, opens for every signed-in account. Two things
+read it:
+
+- The sidebar. `visibleSections()` keeps the pages the viewer can open and
+  drops a section with nothing left in it.
+- The router guard. A page the viewer can't open renders the No access screen
+  at the address they asked for, so a shared link explains what's missing
+  instead of landing on Projects.
+
+To gate a new page, add it to `pages` with its capabilities, and to
+`sidebarSections` if it belongs in the nav. Don't add `meta` to the route for
+access: the guard ignores it. The server still refuses anything the map lets
+through, so the map only decides what the console offers.
 
 ## Verification
 

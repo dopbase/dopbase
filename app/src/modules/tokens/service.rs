@@ -35,13 +35,9 @@ pub async fn create(
       "Only the runner role is supported by this token endpoint.".into(),
     )])));
   }
+  // Same rule as project and environment names.
   let name = request.name.trim();
-  if name.is_empty() || name.len() > 64 {
-    return Err(HttpError::validation(std::collections::BTreeMap::from([(
-      "TOKEN_NAME_INVALID".into(),
-      "Token names must contain between 1 and 64 characters.".into(),
-    )])));
-  }
+  common::validate_slug(name, "TOKEN_NAME_INVALID", "Token name")?;
   let env = authorize(state, identity, id, Level::Manage).await?;
   let now = Utc::now();
   let expires_at = request.expires_in.as_deref().unwrap_or("never");

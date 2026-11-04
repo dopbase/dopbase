@@ -4,13 +4,92 @@ import { router } from "./router";
 describe("project routes", () => {
   it.each([
     ["/projects", "projects"],
-    ["/projects/p/billing", "project"],
-    ["/projects/p/billing/e/env_1", "environment"],
-    ["/projects/p/billing/e/env_1/tokens", "environment-tokens"],
-    ["/projects/p/billing/e/env_1/import", "environment-import"],
+    ["/projects/billing", "project"],
+    ["/projects/billing/access", "project-access"],
+    ["/projects/billing/settings", "project-settings"],
+    ["/projects/billing/prod/activity", "environment-activity"],
+    ["/projects/billing/prod/compare", "environment-compare"],
+    ["/projects/billing/prod/secrets", "environment"],
+    ["/projects/billing/prod/tokens", "environment-tokens"],
+    ["/projects/billing/prod/import", "environment-import"],
+    ["/projects/p/billing", "legacy-project"],
+    // Project `p`'s own pages pass through the same guard.
+    ["/projects/p/access", "legacy-project"],
+    ["/projects/p/settings", "legacy-project"],
+    ["/projects/p/staging/secrets", "environment"],
+    ["/projects/p/billing/e/env_1", "legacy-environment"],
+    ["/projects/p/billing/e/env_1/tokens", "legacy-environment"],
+    ["/projects/p/billing/e/env_1/import", "legacy-environment"],
+    ["/status", "status"],
+    ["/users/usr_1", "user"],
+    ["/users/usr_1/access", "user-access"],
+    ["/users/usr_1/access/new", "user-access-give"],
+    ["/users/usr_1/tokens", "user-tokens"],
+    ["/agents", "agents"],
+    ["/agents/usr_9/tokens", "agent-tokens"],
+    ["/agents/usr_9/access/new", "agent-access-give"],
+    ["/groups/grp_1", "group"],
+    ["/groups/grp_1/access", "group-access"],
+    ["/groups/grp_1/access/new", "group-access-give"],
+    ["/roles/new", "role-new"],
+    ["/roles/role_1", "role"],
+    ["/account", "account"],
+    ["/account/tokens", "account-tokens"],
+    ["/account/audit-tokens", "account-audit-tokens"],
     // Legacy workspace URLs fall through to the not-found page.
     ["/workspace", "not-found"],
   ])("resolves %s", (path, routeName) => {
     expect(router.resolve(path).name).toBe(routeName);
+  });
+
+  it("reads the environment name from the address", () => {
+    expect(router.resolve("/projects/billing/prod/secrets").params).toEqual({
+      projectRef: "billing",
+      environmentName: "prod",
+    });
+  });
+});
+
+describe("account routes", () => {
+  it.each(["/account", "/account/tokens", "/account/audit-tokens"])(
+    "opens %s as the account page",
+    (path) => {
+      expect(router.resolve(path).meta.page).toBe("account");
+    },
+  );
+
+  it("sends the old personal tokens link to the tokens tab", () => {
+    const resolved = router.resolve("/account#personal-tokens");
+    const enter = resolved.matched[0]?.beforeEnter as unknown as (
+      to: typeof resolved,
+    ) => unknown;
+
+    expect(enter(resolved)).toEqual({ name: "account-tokens" });
+    expect(enter(router.resolve("/account"))).toBe(true);
+  });
+});
+
+describe("renamed routes", () => {
+  it.each([
+    ["/instance", { name: "status" }],
+    [
+      "/projects/p/billing/access",
+      { name: "project-access", params: { projectRef: "billing" } },
+    ],
+    [
+      "/projects/billing/prod",
+      {
+        name: "environment",
+        params: { projectRef: "billing", environmentName: "prod" },
+      },
+    ],
+  ])("sends %s to its new address", (path, expected) => {
+    const resolved = router.resolve(path);
+    const redirect = resolved.matched[0]?.redirect;
+    const target =
+      typeof redirect === "function"
+        ? (redirect as unknown as (to: typeof resolved) => unknown)(resolved)
+        : redirect;
+    expect(target).toEqual(expected);
   });
 });

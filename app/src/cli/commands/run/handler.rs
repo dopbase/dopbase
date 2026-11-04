@@ -2,7 +2,7 @@ use super::RunArgs;
 use super::cache::{self as runtime_cache, RuntimeSource};
 use super::selection::{SelectionOptions, select};
 use crate::cli::{client, local_config};
-use crate::constants::config::ENV_RUN_ENVIRONMENT;
+use crate::constants::{config::ENV_RUN_ENVIRONMENT, tokens::RUNNER_TOKEN_PREFIX};
 use anyhow::{Context, Result, bail};
 use std::env;
 
@@ -23,28 +23,39 @@ pub(crate) async fn execute(
     preserve_env,
   };
   let api = client::any_authenticated_client(server).await?;
-  let selection = run_environment(
-    environment,
-    env::var(ENV_RUN_ENVIRONMENT),
-    server.default_environment(),
-  )?;
-  let loaded = runtime_cache::load(server, &api, &selection.reference).await;
-  let loaded = match loaded {
-    Err(error) if client::is_authentication_error(&error) => {
+  // A runner token reaches one environment, so the token decides it.
+  let runner = api.credential_token()?.starts_with(RUNNER_TOKEN_PREFIX);
+  let (loaded, saved_default) = if runner {
+    let expected = runner_environment(environment, env::var(ENV_RUN_ENVIRONMENT))?;
+    (
+      runtime_cache::load_runner(server, &api, expected.as_deref()).await,
+      None,
+    )
+  } else {
+    let selection = run_environment(
+      environment,
+      env::var(ENV_RUN_ENVIRONMENT),
+      server.default_environment(),
+    )?;
+    let saved_default =
+      (selection.source == RunEnvironmentSource::Default).then(|| selection.reference.clone());
+    (
+      runtime_cache::load(server, &api, &selection.reference).await,
+      saved_default,
+    )
+  };
+  let loaded = match (loaded, saved_default) {
+    (Err(error), _) if client::is_authentication_error(&error) => {
       bail!(
         "Dopbase authentication failed. Run `dopbase login` again or set a valid DOPBASE_TOKEN."
       )
     }
-    Err(error)
-      if selection.source == RunEnvironmentSource::Default
-        && error.to_string().contains("ENVIRONMENT_NOT_FOUND") =>
-    {
+    (Err(error), Some(reference)) if error.to_string().contains("ENVIRONMENT_NOT_FOUND") => {
       bail!(
-        "Saved default environment {} is unavailable. Set a new one with `dopbase env default <ENVIRONMENT_REF>` or clear it with `dopbase env default --clear`.",
-        selection.reference
+        "Saved default environment {reference} is unavailable. Set a new one with `dopbase env default <ENVIRONMENT_REF>` or clear it with `dopbase env default --clear`."
       )
     }
-    result => result?,
+    (result, _) => result?,
   };
   match &loaded.source {
     RuntimeSource::Live { cache_warning } => {
@@ -99,13 +110,19 @@ pub(crate) async fn execute(
   } else {
     format!("{} of {loaded_count} key(s)", selection.inject.len())
   };
-  eprintln!(
-    "Dopbase: {}/{} ({}), {injected}, source={}",
-    loaded.project,
-    loaded.environment,
-    loaded.environment_id,
-    loaded.source.as_str(),
-  );
+  // A runner token's output usually lands in CI logs, so it keeps the
+  // token's environment to itself.
+  if runner {
+    eprintln!("Dopbase: {injected}, source={}", loaded.source.as_str());
+  } else {
+    eprintln!(
+      "Dopbase: {}/{} ({}), {injected}, source={}",
+      loaded.project,
+      loaded.environment,
+      loaded.environment_id,
+      loaded.source.as_str(),
+    );
+  }
   let program = command.first().context("run requires a child command")?;
   let mut child_command = tokio::process::Command::new(program);
   child_command
@@ -147,22 +164,13 @@ pub fn run_environment(
   environment: Result<String, env::VarError>,
   default: Option<&str>,
 ) -> Result<RunEnvironment> {
-  if let Some(reference) = argument {
-    return Ok(RunEnvironment {
-      reference,
-      source: RunEnvironmentSource::Argument,
-    });
-  }
-  match environment {
-    Ok(reference) if reference.is_empty() => bail!("DOPBASE_ENV is set but empty"),
-    Ok(reference) => {
-      return Ok(RunEnvironment {
-        reference,
-        source: RunEnvironmentSource::Environment,
-      });
-    }
-    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_ENV contains invalid Unicode"),
-    Err(env::VarError::NotPresent) => {}
+  let source = if argument.is_some() {
+    RunEnvironmentSource::Argument
+  } else {
+    RunEnvironmentSource::Environment
+  };
+  if let Some(reference) = runner_environment(argument, environment)? {
+    return Ok(RunEnvironment { reference, source });
   }
   if let Some(reference) = default {
     return Ok(RunEnvironment {
@@ -171,4 +179,22 @@ pub fn run_environment(
     });
   }
   bail!("No default environment is set. Set one with: dopbase env default <ENVIRONMENT_REF>")
+}
+
+/// The reference the argument or `DOPBASE_ENV` names, if any. With a runner
+/// token this is all there is: it only checks the token's environment, and
+/// the saved default, which belongs to people, is ignored.
+pub fn runner_environment(
+  argument: Option<String>,
+  environment: Result<String, env::VarError>,
+) -> Result<Option<String>> {
+  if argument.is_some() {
+    return Ok(argument);
+  }
+  match environment {
+    Ok(reference) if reference.is_empty() => bail!("DOPBASE_ENV is set but empty"),
+    Ok(reference) => Ok(Some(reference)),
+    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_ENV contains invalid Unicode"),
+    Err(env::VarError::NotPresent) => Ok(None),
+  }
 }

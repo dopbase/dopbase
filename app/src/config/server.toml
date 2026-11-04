@@ -63,6 +63,12 @@ secret_history_versions = 20
 # Environment: DOPBASE_DOCS
 # docs = false
 
+# Check GitHub for a newer Dopbase release when the Status page is open, at
+# most once a day. The server makes no outbound calls while this is off.
+# Accepts: true or false. Default: false.
+# Environment: DOPBASE_UPDATE_CHECK
+# update_check = false
+
 # Master encryption key settings.
 # Uncomment the table header before enabling settings below.
 # [master_key]

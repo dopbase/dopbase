@@ -1,7 +1,12 @@
 import { createApp } from "vue";
 import { onTestFinished } from "vitest";
+import { installQueryLayer } from "./pinia";
 
-/** Run a controller in component setup and dispose it when the test ends. */
+/**
+ * Run a controller in component setup and dispose it when the test ends.
+ * The app gets the test's active Pinia and the query layer, so controllers
+ * that read through queries work as they do in the real app.
+ */
 export function mountController<T>(factory: () => T) {
   let controller!: T;
   const app = createApp({
@@ -10,6 +15,7 @@ export function mountController<T>(factory: () => T) {
       return () => null;
     },
   });
+  installQueryLayer(app);
   app.mount(document.createElement("div"));
 
   let mounted = true;

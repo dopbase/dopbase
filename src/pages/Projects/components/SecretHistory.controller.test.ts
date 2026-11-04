@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
-import { createPinia, setActivePinia } from "pinia";
+import { cacheContents, freshPinia } from "~/tests/pinia";
 import {
   HISTORY_PAGE_SIZE,
   changeLabel,
@@ -44,7 +44,7 @@ function page(
 const firstPage = page([version(3, { current: true }), version(2)], 2);
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  freshPinia();
   useReauthentication().dismiss();
   vi.mocked(secretsApi.listSecretVersions).mockReset();
   vi.mocked(secretsApi.revealSecretVersion).mockReset();
@@ -158,6 +158,8 @@ describe("useSecretHistoryController", () => {
       );
       expect(c.revealedVersion.value).toBe(2);
       expect(c.revealedValue.value).toBe("old-value");
+      // Kept in this controller only; the cached history is metadata.
+      expect(cacheContents()).not.toContain("old-value");
 
       await vi.advanceTimersByTimeAsync(REVEAL_SECONDS * 1000);
       expect(c.revealedVersion.value).toBeNull();

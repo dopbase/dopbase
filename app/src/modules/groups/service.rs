@@ -9,7 +9,10 @@ use crate::{
   models::AuthIdentity,
   modules::{
     common,
-    grants::{self, model::ScopeType},
+    grants::{
+      self,
+      model::{GrantResponse, ScopeType},
+    },
   },
   services::{
     authx::{self, Capability, Level},
@@ -19,7 +22,7 @@ use crate::{
 };
 use axum::http::HeaderMap;
 use chrono::Utc;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 fn not_found() -> HttpError {
   HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")
@@ -110,12 +113,36 @@ async fn detail(
   })
 }
 
+/// Every group with its members and grants, in three queries however many
+/// groups there are.
 pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
-) -> Result<Vec<GroupResponse>, HttpError> {
+) -> Result<Vec<GroupListItem>, HttpError> {
   require_view(identity)?;
-  Ok(repository::list(state.db.pool()).await?)
+  let pool = state.db.pool();
+  let mut members: HashMap<String, Vec<AccountRef>> = HashMap::new();
+  for (group_id, member) in repository::all_members(pool).await? {
+    members.entry(group_id).or_default().push(member);
+  }
+  let mut grants: HashMap<String, Vec<GrantResponse>> = HashMap::new();
+  for grant in grants::repository::for_groups(pool).await? {
+    grants
+      .entry(grant.principal_id.clone())
+      .or_default()
+      .push(grant);
+  }
+  Ok(
+    repository::list(pool)
+      .await?
+      .into_iter()
+      .map(|group| GroupListItem {
+        members: members.remove(&group.id).unwrap_or_default(),
+        grants: grants.remove(&group.id).unwrap_or_default(),
+        group,
+      })
+      .collect(),
+  )
 }
 
 pub async fn get(
@@ -251,15 +278,17 @@ pub async fn add_member(
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;
-  let (email, is_root) = repository::account(&mut tx, user_id)
+  // Root can't join groups. A missing id gets the same answer, so ids
+  // can't be probed.
+  let (email, _) = repository::account(&mut tx, user_id)
     .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
-  if is_root {
-    return Err(HttpError::forbidden(
-      "ROOT_PROTECTED",
-      "Root reaches everything and can't join groups.",
-    ));
-  }
+    .filter(|(_, is_root)| !is_root)
+    .ok_or_else(|| {
+      HttpError::validation(BTreeMap::from([(
+        "GROUP_MEMBER_INVALID".into(),
+        "This account can't join a group.".into(),
+      )]))
+    })?;
   let now = Utc::now().to_rfc3339();
   if repository::add_member(&mut tx, id, user_id, &actor_id, &now).await? {
     common::audit(
