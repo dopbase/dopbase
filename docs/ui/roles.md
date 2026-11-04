@@ -37,9 +37,11 @@ Choose **New role**, or **Duplicate** in a role's **⋯** menu, and fill in:
 - **Personal tokens**: appears when the role holds personal tokens. Pick
   whether tokens reach project data or the audit log only, what they can do
   (Names only or Read), and their longest lifetime: 30, 90, or 365 days.
-- **Signs in with**: password or single sign-on, for people, or token only,
-  for AI agents and CI. Token-only accounts always have an owner. This is
-  picked once and can't change later.
+
+New roles sign in with password or single sign-on, and that can't change
+later. A custom role with its own sign-in method, such as token only for AI
+agents and CI, comes in a later release. An existing role's page shows how its
+holders sign in under **Signs in with**.
 
 Then choose **Create role**.
 
