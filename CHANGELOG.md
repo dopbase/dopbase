@@ -95,6 +95,10 @@ All notable changes to Dopbase are documented in this file.
   sign-on link), a **Full access** card that explains why, and root's five
   latest audit events with what each touched and the address it came from, to
   people who can read the whole audit log. Links to the old tabs open the page.
+- New roles sign in with password or single sign-on. The **Signs in with**
+  choice is hidden on **New role** for now, and a duplicate of a token-only
+  role starts on password or single sign-on. Existing roles still show how
+  their holders sign in.
 - The **AI agents** list drops the **Reaches at most** column; an agent's page
   still shows how far it reaches. **Transfer owner** is hidden when no one
   else could own the agent.
