@@ -12,7 +12,7 @@ import { ApiError } from "~/services/http.client";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { tokenExpiresIn } from "~/utils/token-expiry";
-import { isValidSlug } from "~/utils/validation";
+import { isValidSlug, MAX_SLUG_LENGTH } from "~/utils/validation";
 
 /** Every preset; the role's longest lifetime trims the list. */
 const EXPIRY_PRESETS = [
@@ -48,6 +48,23 @@ export interface TokenScopeOption {
   scope?: string;
 }
 
+const TOKEN_SUFFIX = "-token";
+
+/**
+ * A suggested token name for an agent: its name plus "-token", made into a
+ * valid token name. Agent names may hold capitals, dots, underscores or a
+ * leading digit, which token names can't, so those become hyphens or drop.
+ */
+export function suggestedTokenName(agentName: string): string {
+  const base = agentName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, MAX_SLUG_LENGTH - TOKEN_SUFFIX.length)
+    .replace(/-+$/, "");
+  return `${base || "agent"}${TOKEN_SUFFIX}`;
+}
+
 /**
  * New token for an AI agent. An agent holds one token at a time, so the
  * new one replaces any live token in the same request. The role decides
@@ -64,6 +81,7 @@ export function useAgentTokenDialog(
   const { runWithReauth } = useReauthentication();
 
   const name = ref("");
+  const namePlaceholder = computed(() => suggestedTokenName(agent.value.email));
   /** Read when the role allows it, so the default is never a disabled choice. */
   const startLevel = (): Level =>
     reaches(role.value?.tokenMaxLevel ?? "read", "read") ? "read" : "metadata";
@@ -144,7 +162,7 @@ export function useAgentTokenDialog(
     error.value = null;
     const trimmed = name.value.trim();
     if (!trimmed) {
-      nameError.value = "Name the token after where it's used, like ci-deploy.";
+      nameError.value = `Name the token, like ${namePlaceholder.value}.`;
       return false;
     }
     if (!isValidSlug(trimmed)) {
@@ -197,6 +215,7 @@ export function useAgentTokenDialog(
 
   return {
     name,
+    namePlaceholder,
     level,
     levels,
     where,

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { freshPinia } from "~/tests/pinia";
 import { nextTick, ref } from "vue";
-import { useAgentTokenDialog } from "./AgentTokenDialog.controller";
+import {
+  suggestedTokenName,
+  useAgentTokenDialog,
+} from "./AgentTokenDialog.controller";
 import * as tokensApi from "~/services/personal-tokens.api";
 import type { Grant } from "~/services/access.api";
 import type { Role } from "~/services/roles.api";
@@ -67,9 +70,10 @@ describe("useAgentTokenDialog", () => {
   it("asks for a name before creating anything", async () => {
     const { dialog } = await openDialog();
 
+    expect(dialog.namePlaceholder.value).toBe("review-bot-token");
     expect(await dialog.submit()).toBe(false);
     expect(dialog.nameError.value).toBe(
-      "Name the token after where it's used, like ci-deploy.",
+      "Name the token, like review-bot-token.",
     );
     expect(tokensApi.createPersonalToken).not.toHaveBeenCalled();
   });
@@ -317,5 +321,28 @@ describe("useAgentTokenDialog", () => {
     expect(await dialog.submit()).toBe(false);
     expect(dialog.error.value).toBe("The role can't hold Read tokens.");
     expect(dialog.saving.value).toBe(false);
+  });
+});
+
+describe("suggestedTokenName", () => {
+  it("adds -token to the agent's name", () => {
+    expect(suggestedTokenName("main-agent")).toBe("main-agent-token");
+  });
+
+  it("turns what a token name can't hold into hyphens", () => {
+    expect(suggestedTokenName("Deploy.Bot_v2")).toBe("deploy-bot-v2-token");
+    expect(suggestedTokenName("ci--bot")).toBe("ci-bot-token");
+  });
+
+  it("starts with a letter and falls back when none is left", () => {
+    expect(suggestedTokenName("2fa-bot")).toBe("fa-bot-token");
+    expect(suggestedTokenName("42")).toBe("agent-token");
+  });
+
+  it("stays within the token name length", () => {
+    const name = suggestedTokenName("a".repeat(64));
+
+    expect(name).toHaveLength(63);
+    expect(name.endsWith("-token")).toBe(true);
   });
 });

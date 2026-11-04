@@ -45,6 +45,7 @@ const dialog = useAgentTokenDialog(
 );
 const {
   name,
+  namePlaceholder,
   level,
   levels,
   where,
@@ -90,7 +91,7 @@ async function save(): Promise<void> {
         v-model="name"
         label="Name"
         name="tokenName"
-        placeholder="ci-deploy"
+        :placeholder="namePlaceholder"
         mono
         :error="nameError"
         hint="Name it after where it's used." />
