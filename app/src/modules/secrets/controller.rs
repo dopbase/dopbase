@@ -67,8 +67,9 @@ pub async fn get(
 
 /// Set a secret
 ///
-/// Create the secret or store a new encrypted version of its value.
-/// Requires the CSRF header for browser sessions.
+/// Create the secret or store a new encrypted version of its value. With
+/// `createOnly`, only create it. Requires the CSRF header for browser
+/// sessions.
 #[utoipa::path(
   put,
   path = crate::constants::api::secrets::ITEM,
@@ -81,6 +82,7 @@ pub async fn get(
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Administrator with a valid CSRF token is required", body = crate::http::ErrorBody),
     (status = 404, description = "The environment was not found", body = crate::http::ErrorBody),
+    (status = 409, description = "createOnly was set and the key already exists", body = crate::http::ErrorBody),
     (status = 422, description = "The secret key or value is invalid", body = crate::http::ErrorBody),
   ),
 )]

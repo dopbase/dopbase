@@ -253,6 +253,48 @@ async fn copy_writes_a_new_version_on_the_server_and_is_audited() {
 }
 
 #[tokio::test]
+async fn create_only_set_refuses_a_key_that_was_set_meanwhile() {
+  let (_dir, state, router) = test_app().await;
+  let (root, env) = instance(&state, &router).await;
+  let prod = &env["payments/prod"];
+  let set = |body: Value| {
+    let path = format!("/api/v1/environments/{prod}/secrets/FEATURE_FLAGS");
+    let router = router.clone();
+    let auth = root.browser();
+    async move { send(&router, "PUT", &path, auth, Some(body)).await }
+  };
+
+  // Compare's typed fill: the key is missing, so it is created.
+  let (status, body) = set(json!({ "value": "beta", "createOnly": true })).await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["version"], 1);
+
+  // Someone set it since the table loaded: refused, the value stays.
+  let (status, body) = set(json!({ "value": "gamma", "createOnly": true })).await;
+  assert_eq!(status, 409, "{body}");
+  assert!(
+    body["error"]["SECRET_VERSION_CONFLICT"].is_string(),
+    "{body}"
+  );
+  let (status, body) = send(
+    &router,
+    "POST",
+    &format!("/api/v1/environments/{prod}/secrets/FEATURE_FLAGS/reveal"),
+    root.cli(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["value"], "beta");
+
+  // Without the flag, setting still writes a new version.
+  let (status, body) = set(json!({ "value": "gamma" })).await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["version"], 2);
+  state.db.close().await;
+}
+
+#[tokio::test]
 async fn copy_needs_read_on_the_source_and_write_on_the_target() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;

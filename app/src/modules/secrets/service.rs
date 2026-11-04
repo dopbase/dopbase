@@ -93,6 +93,9 @@ pub async fn set(
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let current = current_version(&mut tx, id, &key).await?;
   let existed = current.is_some();
+  if request.create_only && existed {
+    return Err(version_conflict());
+  }
   let metadata = write_value(
     state,
     &mut tx,
@@ -222,10 +225,7 @@ pub async fn copy(
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let current = current_version(&mut tx, id, &key).await?;
   if current.as_ref().map(|(version, _)| *version) != request.expected_version {
-    return Err(HttpError::conflict(
-      "SECRET_VERSION_CONFLICT",
-      "The secret changed since you loaded it. Reload and try again.",
-    ));
+    return Err(version_conflict());
   }
   let metadata = write_value(state, &mut tx, identity, account, id, &key, &value, current).await?;
   common::audit(
@@ -374,6 +374,12 @@ pub async fn copy_many(
     copied_keys: copied,
     skipped_keys: skipped,
   })
+}
+fn version_conflict() -> HttpError {
+  HttpError::conflict(
+    "SECRET_VERSION_CONFLICT",
+    "The secret changed since you loaded it. Reload and try again.",
+  )
 }
 fn secret_count_limit() -> HttpError {
   HttpError::new(

@@ -75,14 +75,23 @@ export async function getSecret(
   return data;
 }
 
+/**
+ * Creates or updates a secret. With `createOnly`, the server refuses with
+ * `SECRET_VERSION_CONFLICT` (409) when the key exists by then, instead of
+ * overwriting a value set meanwhile.
+ */
 export async function setSecret(
   environmentId: string,
   key: string,
   value: string,
+  { createOnly = false }: { createOnly?: boolean } = {},
 ): Promise<SecretMetadata> {
   const { data } = await apiRequest<SecretMetadata>(
     `${base(environmentId)}/${encodeURIComponent(key)}`,
-    { method: "PUT", body: { value } },
+    {
+      method: "PUT",
+      body: createOnly ? { value, createOnly } : { value },
+    },
   );
   return data;
 }

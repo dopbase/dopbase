@@ -313,23 +313,33 @@ describe("useComparePanelController — filling a Not set cell", () => {
       "env_prod",
       "FEATURE_FLAGS",
       "beta",
+      { createOnly: true },
     );
     expect(compareApi.copySecret).not.toHaveBeenCalled();
     expect(c.fillDialog.value).toBeNull();
   });
 
-  it("explains a fill that lost a race", async () => {
-    vi.mocked(compareApi.copySecret).mockRejectedValue(
-      new ApiError(409, { SECRET_VERSION_CONFLICT: "changed" }),
-    );
-    const { c } = panel();
-    await vi.waitFor(() => expect(c.rows.value).toHaveLength(4));
-    const flags = c.rows.value.find((r) => r.key === "FEATURE_FLAGS")!;
+  it.each(["match", "own"])(
+    "explains a %s fill that lost a race",
+    async (mode) => {
+      const conflict = new ApiError(409, {
+        SECRET_VERSION_CONFLICT: "changed",
+      });
+      vi.mocked(compareApi.copySecret).mockRejectedValue(conflict);
+      vi.mocked(secretsApi.setSecret).mockRejectedValue(conflict);
+      const { c } = panel();
+      await vi.waitFor(() => expect(c.rows.value).toHaveLength(4));
+      const flags = c.rows.value.find((r) => r.key === "FEATURE_FLAGS")!;
 
-    c.openFill(flags, flags.base);
-    await c.confirmFill();
+      c.openFill(flags, flags.base);
+      if (mode === "own") {
+        c.fillDialog.value!.choice = "own";
+        c.fillDialog.value!.value = "beta";
+      }
+      await c.confirmFill();
 
-    expect(c.fillDialog.value).not.toBeNull();
-    expect(c.fillError.value).toContain("set since this page loaded");
-  });
+      expect(c.fillDialog.value).not.toBeNull();
+      expect(c.fillError.value).toContain("set since this page loaded");
+    },
+  );
 });

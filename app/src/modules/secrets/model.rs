@@ -10,8 +10,15 @@ pub struct SecretMetadata {
   pub updated_at: String,
 }
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SetSecretRequest {
   pub value: String,
+  /// Only create the key. If it exists by the time the write runs, the
+  /// request is refused with `SECRET_VERSION_CONFLICT` and nothing changes,
+  /// so a value someone else just set isn't overwritten. Defaults to
+  /// `false`.
+  #[serde(default)]
+  pub create_only: bool,
 }
 #[derive(Serialize, ToSchema)]
 pub struct RevealedSecret {

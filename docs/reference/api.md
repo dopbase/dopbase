@@ -128,6 +128,15 @@ It is refused, without writing anything, with:
 Environment responses include `secretCount`, the number of secrets the
 environment holds.
 
+## Creating a key only when it is missing
+
+`PUT /api/v1/environments/{id}/secrets/{key}` with
+`{ "value": "...", "createOnly": true }` only creates the key. If the key
+exists by the time the write runs, the request is refused with `409`
+`SECRET_VERSION_CONFLICT` and nothing changes, so a value someone else just
+set is kept. The Compare tab sends it when you type a value for a missing key.
+Without `createOnly`, `PUT` creates the key or stores a new version as before.
+
 ## Secret versions
 
 `GET /api/v1/environments/{id}/secrets/{key}/versions` lists a secret's

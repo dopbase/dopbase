@@ -331,10 +331,13 @@ export function useComparePanelController(
     fillError.value = null;
     try {
       if (own) {
+        // The cell was Not set when the table loaded. Only create, so a
+        // value set since then gets the same conflict a copy would.
         await secretsApi.setSecret(
           dialog.target.column.id,
           dialog.key,
           dialog.value,
+          { createOnly: true },
         );
       } else {
         await compareApi.copySecret(
