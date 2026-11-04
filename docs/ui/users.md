@@ -72,6 +72,19 @@ Choose someone's email to open their page. It has five tabs:
   when it was last used. People with `tokens.revoke_others` can revoke them.
 - **Danger zone**: unlink single sign-on, disable, or delete the account.
 
+Root's page has no tabs, because root reaches everything without grants, can't
+join a group, and has no personal tokens. The **Account** card shows root's
+email, account ID with a copy button, how it signs in, whether single sign-on
+is linked, and when it last signed in. Next to it, **Full access**
+explains why grants, groups and tokens don't apply, with a link to
+[AI agents](./ai-agents) for scripts and AI tools.
+
+If you can read the whole audit log, **Recent activity** lists root's five
+latest events: when, the action, what it touched (such as
+`maya@example.com · Read`), and the address it came from.
+**See all in Audit log** opens the log filtered to root. A link to one of
+root's old tabs opens this page.
+
 Choose **Edit** at the top to change their email, role, or password. Leave the
 password empty to keep it. Changing someone signs them out everywhere, and
 changing their role drops their access to every project at once; their grants
