@@ -103,6 +103,13 @@ export function useAccessGrantsPanel(
       ),
   );
 
+  /** What the Source column's ⓘ says. A group's grants are all its own. */
+  const sourceHint = computed(() =>
+    principal.value.type === "group"
+      ? "Direct means the grant was given to this group. Everyone in the group gets it."
+      : "Direct means the grant was given to them on its own. “via” a group means they get it from a group they’re in, so you change it on that group.",
+  );
+
   const visibleRows = computed(() => {
     const needle = filter.value.trim().toLowerCase();
     return needle
@@ -307,6 +314,7 @@ export function useAccessGrantsPanel(
   return {
     filter,
     rows,
+    sourceHint,
     visibleRows,
     overrides,
     editing,

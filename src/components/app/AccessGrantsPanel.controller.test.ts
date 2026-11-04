@@ -130,6 +130,17 @@ describe("useAccessGrantsPanel", () => {
     expect(p.rows.value[0]?.viaGroup).toBeNull();
   });
 
+  it("explains the Source column, without groups-of-groups on a group's page", () => {
+    expect(panel([]).panel.sourceHint.value).toContain("via");
+    const { panel: group } = panel([], {
+      type: "group",
+      id: "grp_backend",
+      label: "Backend",
+    });
+    expect(group.sourceHint.value).toContain("given to this group");
+    expect(group.sourceHint.value).not.toContain("via");
+  });
+
   it("lists an environment grant that overrides the project grant, with both levels", () => {
     const { panel: p } = panel([direct, prodOverride]);
     expect(p.overrides.value).toEqual([
