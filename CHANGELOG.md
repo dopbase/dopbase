@@ -184,6 +184,8 @@ All notable changes to Dopbase are documented in this file.
 - Moving quickly between users, agents or environments no longer shows the
   previous one's tokens, and **Load more** on **Activity** no longer adds
   events from the filters you just left.
+- The breadcrumb on **Give access** now starts at the list you came from, as in
+  **Projects** / payment / Give access, and each part links back.
 
 ### Security
 
