@@ -1,4 +1,4 @@
-import { defineInfiniteQueryOptions } from "@pinia/colada";
+import { defineInfiniteQueryOptions, defineQueryOptions } from "@pinia/colada";
 import { listAuditEvents, type AuditPage } from "~/services/audit.api";
 import { keys } from "./keys";
 
@@ -38,3 +38,16 @@ export const auditEventsQuery = defineInfiniteQueryOptions(
     refetchOnWindowFocus: false,
   }),
 );
+
+/** How many events a recent-activity card shows. */
+export const RECENT_ACTIVITY_SIZE = 5;
+
+/** One account's latest audit events, newest first. Every write refreshes it. */
+export const recentActivityQuery = defineQueryOptions((actorId: string) => ({
+  key: keys.audit.recent(actorId),
+  query: ({ signal }) =>
+    listAuditEvents(
+      { actor: actorId, limit: RECENT_ACTIVITY_SIZE },
+      signal,
+    ).then((page) => page.items),
+}));

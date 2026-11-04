@@ -1,6 +1,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
-import { useQuery } from "@pinia/colada";
+import { useQuery, useQueryCache } from "@pinia/colada";
+import { keys } from "~/queries/keys";
 import type { User } from "~/services/users.api";
 import type { Role } from "~/services/roles.api";
 import { addGroupMember, removeGroupMember } from "~/services/access.api";
@@ -16,8 +17,12 @@ import { loadFailure, onlyWhen, shownData } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { personalTokensQuery } from "~/queries/personal-tokens";
 import { rolesQuery, userQuery } from "~/queries/users";
+import { recentActivityQuery } from "~/queries/audit";
+import { actionTone, eventDetail, eventOrigin } from "~/utils/audit";
+import type { AuditEvent } from "~/services/audit.api";
 import {
   formatDate,
+  formatDateTime,
   formatLevel,
   formatList,
   formatRelativeTime,
@@ -55,9 +60,24 @@ export interface TokenRow {
   lastUsed: string;
 }
 
+export interface ActivityRow {
+  event: AuditEvent;
+  when: string;
+  at: string;
+  tone: "crit" | "accent";
+  /** What it touched, from its metadata, such as `maya@example.com · Write`. */
+  detail: string;
+  /** Address and client, when the record has them. */
+  origin: string;
+}
+
 /**
  * One user's page: Overview, Access (where each grant comes from), Groups,
  * Tokens and the Danger zone. AI agents open on their own page instead.
+ *
+ * Root gets the overview alone: it reaches everything without grants, can't
+ * join groups and has no personal tokens, so those tabs would always be
+ * empty. Its old tab links land on the overview.
  *
  * Changing the account needs `users.manage`, and nobody changes root or
  * themselves here; the server refuses both too.
@@ -71,7 +91,7 @@ export function useUserController() {
   const markStale = useInvalidate({ refetch: false });
 
   const userId = computed(() => String(route.params.userId ?? ""));
-  const activeTab = computed<UserTab>(
+  const routeTab = computed<UserTab>(
     () => TAB_FOR_ROUTE[String(route.name)] ?? "overview",
   );
 
@@ -80,13 +100,31 @@ export function useUserController() {
   const account = useQuery(() =>
     onlyWhen(userId.value !== "", userQuery(userId.value)),
   );
+  const accountData = shownData<User>(account);
+  // Root needs neither its access nor the role list: it has no grants and no
+  // role. The Users list, when already loaded, names the role before the
+  // account itself answers, so other accounts don't wait an extra request.
+  const queryCache = useQueryCache();
+  const knownRole = computed<User["role"] | null>(
+    () =>
+      accountData.value?.role ??
+      queryCache
+        .getQueryData<User[]>(keys.users.list)
+        ?.find((listed) => listed.id === userId.value)?.role ??
+      null,
+  );
+  const needsAccess = computed(
+    () => knownRole.value !== null && knownRole.value !== "root",
+  );
   const accountAccess = useQuery(() =>
-    onlyWhen(userId.value !== "", userAccessQuery(userId.value)),
+    onlyWhen(
+      userId.value !== "" && needsAccess.value,
+      userAccessQuery(userId.value),
+    ),
   );
   // Roles and sign-in methods only add detail, so a failure leaves them out.
-  const roleList = useQuery(rolesQuery);
+  const roleList = useQuery(() => onlyWhen(needsAccess.value, rolesQuery));
   const methods = useQuery(authMethodsQuery);
-  const accountData = shownData<User>(account);
   const accessData = shownData<UserAccess>(accountAccess);
   const failed = (cause: unknown) =>
     errorMessage(cause, "Could not load this account.");
@@ -98,27 +136,41 @@ export function useUserController() {
     () => accountFailure.value ?? accessFailure.value ?? reloadError.value,
   );
 
-  /** The account, once it and its access have loaded. Agents never show. */
-  const user = computed<User | null>(() =>
-    accountData.value && accessData.value && !isAgent(accountData.value)
-      ? accountData.value
-      : null,
-  );
+  /** Known as soon as the account loads. */
+  const rootAccount = computed(() => accountData.value?.role === "root");
+
+  /**
+   * The account, once it and its access have loaded; root has no access to
+   * load. Agents never show.
+   */
+  const user = computed<User | null>(() => {
+    const current = accountData.value;
+    if (!current || isAgent(current)) return null;
+    return rootAccount.value || accessData.value ? current : null;
+  });
   const access = computed<UserAccess | null>(() =>
-    user.value ? accessData.value : null,
+    user.value && !rootAccount.value ? (accessData.value ?? null) : null,
   );
   const roles = computed<Role[]>(() => roleList.data.value ?? []);
   const ssoEnabled = computed(() => methods.data.value?.sso != null);
+  const activeTab = computed<UserTab>(() =>
+    rootAccount.value ? "overview" : routeTab.value,
+  );
 
-  // Agents have their own page, with their tokens.
+  // Agents have their own page, with their tokens. Root's page has no tabs,
+  // so a link to one of them opens the overview.
   watch(
-    accountData,
-    (current) => {
-      if (!current || !isAgent(current)) return;
-      void router.replace({
-        name: activeTab.value === "tokens" ? "agent-tokens" : "agent",
-        params: { agentId: current.id },
-      });
+    [accountData, routeTab],
+    ([current, tab]) => {
+      if (!current) return;
+      if (isAgent(current)) {
+        void router.replace({
+          name: tab === "tokens" ? "agent-tokens" : "agent",
+          params: { agentId: current.id },
+        });
+      } else if (current.role === "root" && tab !== "overview") {
+        void router.replace({ name: "user", params: { userId: current.id } });
+      }
     },
     { immediate: true },
   );
@@ -136,7 +188,7 @@ export function useUserController() {
   const role = computed(() =>
     user.value ? roleOf(user.value, roles.value) : null,
   );
-  const isRoot = computed(() => user.value?.role === "root");
+  const isRoot = computed(() => !!user.value && rootAccount.value);
   const isYou = computed(() => user.value?.id === auth.session?.adminId);
   const canManage = computed(
     () => auth.can("users.manage") && !isRoot.value && !isYou.value,
@@ -156,6 +208,7 @@ export function useUserController() {
   });
 
   const tabs = computed(() => {
+    if (rootAccount.value) return [];
     const id = userId.value;
     const all: { key: UserTab; label: string }[] = [
       { key: "overview", label: "Overview" },
@@ -295,6 +348,39 @@ export function useUserController() {
     }
   }
 
+  // Root's recent activity, for those who read the whole audit log. Anyone
+  // else would see only part of it.
+  const canSeeActivity = computed(
+    () => isRoot.value && auth.can("audit.read_all"),
+  );
+  const activityList = useQuery(() =>
+    onlyWhen(canSeeActivity.value, recentActivityQuery(userId.value)),
+  );
+  const activityError = loadFailure(activityList, (cause) =>
+    errorMessage(cause, "Could not load recent activity."),
+  );
+  // Each row reads only its own event, so the card needs no other list.
+  const activity = computed<ActivityRow[] | null>(() => {
+    const events = activityList.data.value;
+    if (!events) return activityError.value ? [] : null;
+    return events.map((event) => ({
+      event,
+      when: formatRelativeTime(event.createdAt),
+      at: formatDateTime(event.createdAt),
+      tone: actionTone(event.action),
+      detail: eventDetail(event),
+      origin: eventOrigin(event),
+    }));
+  });
+  const auditLink = computed<RouteLocationRaw>(() => ({
+    name: "audit",
+    query: { actor: userId.value },
+  }));
+  const lastSignIn = computed(() => {
+    const at = user.value?.lastSignInAt;
+    return at ? `${formatRelativeTime(at)} · ${formatDateTime(at)}` : "Never";
+  });
+
   // Edit and account actions
   const editOpen = ref(false);
 
@@ -345,6 +431,11 @@ export function useUserController() {
     tokensError,
     canRevokeTokens,
     revokeToken,
+    canSeeActivity,
+    activity,
+    activityError,
+    auditLink,
+    lastSignIn,
     editOpen,
     edited,
     actions,

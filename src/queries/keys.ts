@@ -63,6 +63,7 @@ export const keys = {
       "events",
       filters,
     ],
+    recent: (actorId: string): EntryKey => ["audit", "recent", actorId],
   },
   access: {
     root: ["access"],

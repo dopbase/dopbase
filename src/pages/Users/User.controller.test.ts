@@ -7,6 +7,9 @@ import * as rolesApi from "~/services/roles.api";
 import * as accessApi from "~/services/access.api";
 import * as authApi from "~/services/auth.api";
 import * as tokensApi from "~/services/personal-tokens.api";
+import * as auditApi from "~/services/audit.api";
+import * as projectsApi from "~/services/projects.api";
+import * as environmentsApi from "~/services/environments.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
 import {
@@ -45,6 +48,9 @@ vi.mock("~/services/users.api");
 vi.mock("~/services/roles.api");
 vi.mock("~/services/auth.api");
 vi.mock("~/services/personal-tokens.api");
+vi.mock("~/services/audit.api");
+vi.mock("~/services/projects.api");
+vi.mock("~/services/environments.api");
 vi.mock("~/services/access.api", async (original) => ({
   ...(await original<typeof accessApi>()),
   fetchUserAccess: vi.fn(),
@@ -265,13 +271,14 @@ describe("useUserController", () => {
       expect(c.tabs.value.map((tab) => tab.key)).not.toContain("danger");
     });
 
-    it("hides the Danger zone on root's page", async () => {
+    it("gives root's page no tabs at all", async () => {
       route.params = { userId: "usr_root" };
       vi.mocked(usersApi.fetchUser).mockResolvedValue(root);
       const c = await open();
       expect(c.isRoot.value).toBe(true);
       expect(c.canManage.value).toBe(false);
-      expect(c.tabs.value.map((tab) => tab.key)).not.toContain("danger");
+      expect(c.tabs.value).toEqual([]);
+      expect(c.activeTab.value).toBe("overview");
     });
 
     it("hides the Danger zone on your own page", async () => {
@@ -431,6 +438,167 @@ describe("useUserController", () => {
       expect(c.groupsError.value).toBe(
         "Could not take them out of that group.",
       );
+    });
+  });
+
+  describe("root's page", () => {
+    const signedIn: auditApi.AuditEvent = {
+      id: "evt_1",
+      actorType: "root",
+      actorId: "usr_root",
+      actorLabel: "root@example.com",
+      action: "login.succeeded",
+      projectId: null,
+      environmentId: null,
+      resourceType: null,
+      resourceId: null,
+      ipAddress: "127.0.0.1",
+      metadata: {},
+      createdAt: "2026-11-04T09:12:00Z",
+    };
+
+    async function openRoot(
+      capabilities: accessApi.Capability[] = [...MANAGER, "audit.read_all"],
+    ) {
+      route.params = { userId: "usr_root" };
+      vi.mocked(usersApi.fetchUser).mockResolvedValue(root);
+      return open(capabilities);
+    }
+
+    beforeEach(() => {
+      vi.mocked(auditApi.listAuditEvents).mockResolvedValue({
+        items: [signedIn],
+        nextCursor: null,
+      });
+    });
+
+    it.each(["user-access", "user-groups", "user-tokens", "user-danger"])(
+      "sends %s to the overview",
+      async (name) => {
+        route.name = name;
+        const c = await openRoot();
+        expect(replace).toHaveBeenCalledWith({
+          name: "user",
+          params: { userId: "usr_root" },
+        });
+        expect(c.activeTab.value).toBe("overview");
+        expect(tokensApi.listPersonalTokens).not.toHaveBeenCalled();
+      },
+    );
+
+    it("leaves the overview where it is", async () => {
+      await openRoot();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("never asks for root's access or the role list", async () => {
+      const c = await openRoot();
+      expect(c.user.value).toStrictEqual(root);
+      expect(c.access.value).toBeNull();
+      expect(accessApi.fetchUserAccess).not.toHaveBeenCalled();
+      expect(rolesApi.fetchRoles).not.toHaveBeenCalled();
+    });
+
+    it("lists root's last five events for whoever reads the whole audit log", async () => {
+      const c = await openRoot();
+      expect(auditApi.listAuditEvents).toHaveBeenCalledWith(
+        { actor: "usr_root", limit: 5 },
+        expect.any(AbortSignal),
+      );
+      expect(c.canSeeActivity.value).toBe(true);
+      expect(c.activity.value?.map((row) => row.event.action)).toEqual([
+        "login.succeeded",
+      ]);
+      expect(c.activity.value?.[0]?.when).not.toBe("");
+      expect(c.auditLink.value).toEqual({
+        name: "audit",
+        query: { actor: "usr_root" },
+      });
+    });
+
+    it("describes each event from its own record alone", async () => {
+      vi.mocked(auditApi.listAuditEvents).mockResolvedValue({
+        items: [
+          {
+            ...signedIn,
+            id: "evt_2",
+            action: "grant.set",
+            projectId: "prj_pay",
+            environmentId: "env_prod",
+            metadata: { principal: "maya@example.com", level: "read" },
+          },
+          {
+            ...signedIn,
+            id: "evt_3",
+            action: "login.failed",
+            metadata: { client: "dopbase-cli 0.2.0" },
+          },
+          {
+            ...signedIn,
+            id: "evt_4",
+            action: "environment.created",
+            projectId: "prj_pay",
+            environmentId: "env_prod",
+            metadata: { name: "prod" },
+          },
+        ],
+        nextCursor: null,
+      });
+      const c = await openRoot();
+      expect(
+        c.activity.value?.map(({ tone, detail, origin }) => ({
+          tone,
+          detail,
+          origin,
+        })),
+      ).toEqual([
+        {
+          tone: "accent",
+          detail: "maya@example.com · Read",
+          origin: "127.0.0.1",
+        },
+        {
+          tone: "crit",
+          detail: "",
+          origin: "127.0.0.1 · dopbase-cli 0.2.0",
+        },
+        { tone: "accent", detail: "prod", origin: "127.0.0.1" },
+      ]);
+      expect(projectsApi.listProjects).not.toHaveBeenCalled();
+      expect(environmentsApi.listEnvironments).not.toHaveBeenCalled();
+    });
+
+    it("hides the activity from anyone who sees only part of the audit log", async () => {
+      const c = await openRoot([...MANAGER, "audit.read"]);
+      expect(c.canSeeActivity.value).toBe(false);
+      expect(auditApi.listAuditEvents).not.toHaveBeenCalled();
+    });
+
+    it("shows no activity card on anyone else's page", async () => {
+      signInAs([...MANAGER, "audit.read_all"]);
+      const { controller: c } = mountController(useUserController);
+      await settle();
+      expect(c.canSeeActivity.value).toBe(false);
+      expect(auditApi.listAuditEvents).not.toHaveBeenCalled();
+    });
+
+    it("says so when the activity can't load", async () => {
+      vi.mocked(auditApi.listAuditEvents).mockRejectedValue(
+        new ApiError(500, { INTERNAL_ERROR: "An internal error occurred." }),
+      );
+      const c = await openRoot();
+      expect(c.activityError.value).toBe("An internal error occurred.");
+      expect(c.activity.value).toEqual([]);
+    });
+
+    it("shows when root last signed in", async () => {
+      vi.mocked(usersApi.fetchUser).mockResolvedValue({
+        ...root,
+        lastSignInAt: "2026-11-04T09:12:00Z",
+      });
+      route.params = { userId: "usr_root" };
+      const c = await open();
+      expect(c.lastSignIn.value).toContain(" · ");
     });
   });
 
