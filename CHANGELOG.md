@@ -93,6 +93,13 @@ All notable changes to Dopbase are documented in this file.
 - The **AI agents** list drops the **Reaches at most** column; an agent's page
   still shows how far it reaches. **Transfer owner** is hidden when no one
   else could own the agent.
+- An agent's **Tokens** tab shows state in its own **Status** column and puts
+  the live token first. Revoked and expired tokens follow, dimmed, and past
+  ten the older ones wait behind **Show older**. The tab now says why a new
+  token revokes the old one, and **New token** suggests a name from the
+  agent's, like `main-agent-token`.
+  Long names and places stay on one line and show in full on hover, and
+  columns drop as the table narrows instead of squeezing the name.
 - Lists show only the projects and environments your grants reach, and the
   rest return 404. The upgrade gives admins `project_manager` and members
   `write` on all projects; new members start with no access.
