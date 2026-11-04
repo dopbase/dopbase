@@ -246,6 +246,12 @@ async fn upgrading_to_roles_keeps_every_account_s_access() {
     built_in,
     ["rol_admin", "rol_member", "rol_auditor", "rol_ai_agent"]
   );
+  let agent_levels: (String, String) =
+    sqlx::query_as("SELECT max_level, token_max_level FROM roles WHERE id = 'rol_ai_agent'")
+      .fetch_one(db.pool())
+      .await
+      .unwrap();
+  assert_eq!(agent_levels, ("write".into(), "write".into()));
   db.close().await;
 }
 

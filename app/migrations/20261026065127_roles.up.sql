@@ -50,7 +50,7 @@ INSERT INTO roles (
     1, 'metadata', 'interactive', 0, 'audit', 'metadata', 30, 365, 30,
     strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'), strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')),
   ('rol_ai_agent', 'AI agent', 'Signs in with tokens only and never exceeds its owner.',
-    1, 'read', 'token_only', 1, 'data', 'read', 30, 90, 40,
+    1, 'write', 'token_only', 1, 'data', 'write', 30, 90, 40,
     strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'), strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'));
 
 INSERT INTO role_capabilities (role_id, capability) VALUES

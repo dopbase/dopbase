@@ -518,7 +518,7 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
     )
   };
 
-  // Agent tokens always expire, within 90 days, and reach at most read.
+  // Agent tokens always expire, within 90 days, and reach at most write.
   for (body, status) in [
     (
       json!({"name":"never","level":"metadata","expiresIn":"never"}),
@@ -528,7 +528,8 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
       json!({"name":"long","level":"metadata","expiresIn":"91d"}),
       422,
     ),
-    (json!({"name":"writer","level":"write"}), 422),
+    (json!({"name":"manager","level":"manage"}), 422),
+    (json!({"name":"writer","level":"write"}), 201),
     (
       json!({"name":"limit","level":"read","expiresIn":"90d"}),
       201,
