@@ -75,7 +75,7 @@ afterEach(() => {
 });
 
 describe("TokensPanel", () => {
-  it("lists tokens with what they can do and when they expire", () => {
+  it("lists tokens with when they expire", () => {
     controller.rows.value = [
       {
         token,
@@ -89,13 +89,25 @@ describe("TokensPanel", () => {
     const table = host.querySelector('[data-testid="tokens-table"]');
 
     expect(table?.textContent).toContain("deploy-prod");
-    expect(table?.textContent).toContain("Read");
+    expect(
+      Array.from(table?.querySelectorAll("th") ?? []).map((cell) =>
+        cell.textContent?.trim(),
+      ),
+    ).toEqual(["Name", "Last used", "Expires", "Actions"]);
     expect(table?.textContent).toContain("Expires in 3 days");
     expect(
       Array.from(table?.querySelectorAll("td") ?? []).find((cell) =>
         cell.textContent?.includes("Expires in 3 days"),
       )?.className,
     ).toContain("text-warn");
+  });
+
+  it("says runner tokens only read", () => {
+    const host = mountPanel();
+
+    expect(host.textContent).toContain(
+      "They can't change values or reach other environments.",
+    );
   });
 
   it("offers copy, activity and revoke for an active token", async () => {
@@ -148,6 +160,10 @@ describe("TokensPanel", () => {
     )!;
     expect(environment.value).toBe("prod (protected)");
     expect(environment.readOnly).toBe(true);
+    expect(
+      document.querySelector('input[name="token-can"]')?.closest("label")
+        ?.textContent,
+    ).toContain("Read values");
 
     document
       .querySelector<HTMLButtonElement>('[role="radio"][data-value="30d"]')!
