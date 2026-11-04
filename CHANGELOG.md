@@ -84,6 +84,15 @@ All notable changes to Dopbase are documented in this file.
   single hyphens; others get `TOKEN_NAME_INVALID`. Existing tokens keep theirs.
 - Service accounts are now AI agent accounts. The upgrade makes each one an
   agent owned by root with the same reach, and its `dpa_` tokens keep working.
+- The built-in AI agent role reaches up to Write, so an agent can set and
+  rotate secrets where it is granted Write. New agent tokens start on Read
+  instead of Names only.
+- Root's profile has a **Tokens** card that points to **AI agents**, since
+  root has no personal tokens. The **AI agents** page no longer tells root to
+  make one.
+- The **AI agents** list drops the **Reaches at most** column; an agent's page
+  still shows how far it reaches. **Transfer owner** is hidden when no one
+  else could own the agent.
 - Lists show only the projects and environments your grants reach, and the
   rest return 404. The upgrade gives admins `project_manager` and members
   `write` on all projects; new members start with no access.
