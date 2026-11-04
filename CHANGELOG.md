@@ -36,8 +36,9 @@ All notable changes to Dopbase are documented in this file.
 - **Compare** tab on the project page shows which keys match, differ or are
   missing across up to four environments, and fills a missing key from
   another environment without showing the value. API:
-  `GET /api/v1/environments/{id}/compare` and
-  `POST /api/v1/environments/{id}/secrets/{key}/copy`.
+  `GET /api/v1/environments/{id}/compare`,
+  `POST /api/v1/environments/{id}/secrets/{key}/copy`, and `"createOnly": true`
+  on `PUT /api/v1/environments/{id}/secrets/{key}` to refuse a key that exists.
 - Environment IDs in the console. Click one to copy it, then use it in place
   of `project/environment`, as in `dopbase run env_918204 -- npm start`.
 - **Activity** tab with the audit trail for an environment or its project,
