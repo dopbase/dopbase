@@ -227,6 +227,15 @@ pub async fn copy(
   if current.as_ref().map(|(version, _)| *version) != request.expected_version {
     return Err(version_conflict());
   }
+  // A new key counts toward the environment's limits like a bulk copy's.
+  if current.is_none() && repository::count(&mut *tx, id).await? >= MAX_SECRETS_PER_ENVIRONMENT {
+    return Err(secret_count_limit());
+  }
+  if repository::value_bytes(&mut *tx, id, Some(&key)).await? + value.len()
+    > MAX_SECRET_COLLECTION_BYTES
+  {
+    return Err(secret_size_limit());
+  }
   let metadata = write_value(state, &mut tx, identity, account, id, &key, &value, current).await?;
   common::audit(
     &mut tx,
@@ -334,17 +343,16 @@ pub async fn copy_many(
     };
     values.push((key, source_versions[key], value));
   }
-  if values
-    .iter()
-    .map(|(_, _, value)| value.len())
-    .sum::<usize>()
+  // The copied keys are new here, so they add to what is already stored.
+  let stored = repository::value_bytes(&mut *tx, id, None).await?;
+  if stored
+    + values
+      .iter()
+      .map(|(_, _, value)| value.len())
+      .sum::<usize>()
     > MAX_SECRET_COLLECTION_BYTES
   {
-    return Err(HttpError::new(
-      axum::http::StatusCode::UNPROCESSABLE_ENTITY,
-      SECRET_LIMIT_EXCEEDED,
-      SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
-    ));
+    return Err(secret_size_limit());
   }
   let mut from_versions = serde_json::Map::new();
   for (key, version, value) in &values {
@@ -386,6 +394,13 @@ fn secret_count_limit() -> HttpError {
     axum::http::StatusCode::UNPROCESSABLE_ENTITY,
     SECRET_LIMIT_EXCEEDED,
     SECRET_COUNT_LIMIT_MESSAGE,
+  )
+}
+fn secret_size_limit() -> HttpError {
+  HttpError::new(
+    axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+    SECRET_LIMIT_EXCEEDED,
+    SECRET_TOTAL_SIZE_LIMIT_MESSAGE,
   )
 }
 fn copy_source_invalid(message: &str) -> HttpError {

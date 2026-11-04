@@ -67,6 +67,34 @@ pub async fn versions_of<'e>(
 ) -> Result<Vec<(String, i64)>, sqlx::Error> {
   sqlx::query_as("SELECT key,version FROM secrets WHERE environment_id=? AND key IN (SELECT value FROM json_each(?))").bind(environment_id).bind(serde_json::json!(keys).to_string()).fetch_all(executor).await
 }
+/// How many keys the environment holds.
+pub async fn count<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+) -> Result<usize, sqlx::Error> {
+  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM secrets WHERE environment_id=?")
+    .bind(environment_id)
+    .fetch_one(executor)
+    .await?;
+  Ok(usize::try_from(count).unwrap_or_default())
+}
+/// The bytes of every value the environment holds, apart from `except`,
+/// worked out from the ciphertext lengths so nothing is decrypted.
+pub async fn value_bytes<'e>(
+  executor: impl sqlx::SqliteExecutor<'e>,
+  environment_id: &str,
+  except: Option<&str>,
+) -> Result<usize, sqlx::Error> {
+  let bytes: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(length(ciphertext) - ?), 0) FROM secrets WHERE environment_id=? AND key IS NOT ?",
+  )
+  .bind(crate::services::crypto::VALUE_TAG_BYTES)
+  .bind(environment_id)
+  .bind(except)
+  .fetch_one(executor)
+  .await?;
+  Ok(usize::try_from(bytes).unwrap_or_default())
+}
 /// Like [`rows`], for `keys` only.
 pub async fn rows_of<'e>(
   executor: impl sqlx::SqliteExecutor<'e>,

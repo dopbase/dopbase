@@ -15,6 +15,9 @@ use sqlx::SqlitePool;
 use zeroize::Zeroizing;
 
 const VERIFICATION_TEXT: &[u8] = b"dopbase-master-key-v1";
+/// Bytes XChaCha20-Poly1305 adds to every value: its authentication tag. A
+/// stored ciphertext is the value's length plus this.
+pub const VALUE_TAG_BYTES: i64 = 16;
 
 #[derive(Clone)]
 pub struct CryptoService {
