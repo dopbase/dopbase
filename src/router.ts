@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { installRouterGuards } from "./router.guards";
-import { redirectLegacyEnvironment } from "./router.legacy";
+import {
+  redirectLegacyEnvironment,
+  redirectLegacyProject,
+} from "./router.legacy";
 
 /**
  * Route table for the Admin UI.
@@ -106,13 +109,14 @@ export const router = createRouter({
       name: "environment-import",
       component: () => import("~/pages/Projects/ImportSecrets.page.vue"),
     },
-    // Addresses from before environments were named in the URL.
+    // Addresses from before environments were named in the URL. The static
+    // `p` outranks `:projectRef`, so this one also catches project `p`'s own
+    // Access, Settings and environment addresses and sorts them out.
     {
       path: "/projects/p/:projectRef",
-      redirect: (to) => ({
-        name: "project",
-        params: { projectRef: to.params.projectRef },
-      }),
+      name: "legacy-project",
+      component: () => import("~/pages/NotFound/NotFound.page.vue"),
+      beforeEnter: redirectLegacyProject,
     },
     {
       path: "/projects/p/:projectRef/access",

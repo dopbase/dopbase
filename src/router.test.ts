@@ -12,6 +12,11 @@ describe("project routes", () => {
     ["/projects/billing/prod/secrets", "environment"],
     ["/projects/billing/prod/tokens", "environment-tokens"],
     ["/projects/billing/prod/import", "environment-import"],
+    ["/projects/p/billing", "legacy-project"],
+    // Project `p`'s own pages pass through the same guard.
+    ["/projects/p/access", "legacy-project"],
+    ["/projects/p/settings", "legacy-project"],
+    ["/projects/p/staging/secrets", "environment"],
     ["/projects/p/billing/e/env_1", "legacy-environment"],
     ["/projects/p/billing/e/env_1/tokens", "legacy-environment"],
     ["/projects/p/billing/e/env_1/import", "legacy-environment"],
@@ -67,10 +72,6 @@ describe("account routes", () => {
 describe("renamed routes", () => {
   it.each([
     ["/instance", { name: "status" }],
-    [
-      "/projects/p/billing",
-      { name: "project", params: { projectRef: "billing" } },
-    ],
     [
       "/projects/p/billing/access",
       { name: "project-access", params: { projectRef: "billing" } },
