@@ -196,6 +196,21 @@ pub async fn revoke_sessions(
   Ok(())
 }
 
+/// Cancels the CLI logins the account approved that the CLI hasn't picked
+/// up yet, so none of them turns into a session.
+pub async fn cancel_device_approvals(
+  conn: &mut SqliteConnection,
+  id: &str,
+  now: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query("UPDATE cli_device_requests SET status='cancelled',decided_at=? WHERE approved_by=? AND status='approved'")
+    .bind(now)
+    .bind(id)
+    .execute(conn)
+    .await?;
+  Ok(())
+}
+
 /// Root can never be deleted.
 pub async fn delete(
   conn: &mut SqliteConnection,

@@ -153,12 +153,13 @@ pub async fn set_password_hash(
   Ok(())
 }
 
-/// The email and role of an account.
+/// The email and role of an active account. A disabled one gets `None`, so
+/// a login it approved before being disabled issues no session.
 pub async fn account(
   conn: &mut SqliteConnection,
   admin_id: &str,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
-  sqlx::query_as("SELECT email,role FROM admins WHERE id=?")
+  sqlx::query_as("SELECT email,role FROM admins WHERE id=? AND status='active'")
     .bind(admin_id)
     .fetch_optional(conn)
     .await

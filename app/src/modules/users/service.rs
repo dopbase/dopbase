@@ -614,6 +614,7 @@ pub async fn set_status(
   if repository::set_status(&mut tx, id, value, &now).await? {
     if disable {
       repository::revoke_sessions(&mut tx, id, &now).await?;
+      repository::cancel_device_approvals(&mut tx, id, &now).await?;
     }
     common::audit(
       &mut tx,

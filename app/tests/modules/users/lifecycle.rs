@@ -127,6 +127,103 @@ async fn a_disabled_account_is_shut_out_until_it_is_enabled() {
   state.db.close().await;
 }
 
+/// Starts a browser CLI login and has `who` approve it. Returns the device
+/// code the CLI would poll with.
+async fn approved_cli_login(
+  router: &Router,
+  who: &Person,
+) -> String {
+  let (status, body, _) = call(
+    router,
+    "POST",
+    "/api/v1/auth/cli/device",
+    None,
+    Some(json!({})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let (status, approval) = send(
+    router,
+    "POST",
+    "/api/v1/auth/cli/approve",
+    who.browser(),
+    Some(json!({"userCode":body["data"]["userCode"]})),
+  )
+  .await;
+  assert_eq!(status, 200, "{approval}");
+  body["data"]["deviceCode"].as_str().unwrap().to_owned()
+}
+
+/// Polls like the CLI and expects the request to be refused as used up.
+async fn poll_refused(
+  router: &Router,
+  device_code: &str,
+) {
+  let (status, body, _) = call(
+    router,
+    "POST",
+    "/api/v1/auth/cli/token",
+    None,
+    Some(json!({"deviceCode":device_code})),
+  )
+  .await;
+  assert_eq!(status, 400, "{body}");
+  assert!(body["error"]["DEVICE_CODE_INVALID"].is_string(), "{body}");
+}
+
+async fn live_sessions(
+  state: &app::state::AppState,
+  user: &str,
+) -> i64 {
+  sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE admin_id = ? AND revoked_at IS NULL")
+    .bind(user)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_cli_login_approved_before_disabling_issues_no_session() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let admin = person(&router, &root, "lead@example.com", "admin").await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+
+  // Disabling cancels the approval before the CLI picks it up.
+  let device_code = approved_cli_login(&router, &member).await;
+  forget_sign_in(&state, &member.id).await;
+  let (status, body) = set_status(&router, &admin, &member.id, "disable").await;
+  assert_eq!(status, 200, "{body}");
+  poll_refused(&router, &device_code).await;
+  assert_eq!(live_sessions(&state, &member.id).await, 0);
+  assert!(last_sign_in(&router, &admin, &member.id).await.is_null());
+  // `person` signed in with a password; only a browser login would count.
+  let browser_logins: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM audit_events WHERE action = 'login.succeeded' AND actor_id = ? AND json_extract(metadata, '$.method') = 'browser'",
+  )
+  .bind(&member.id)
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(browser_logins, 0);
+
+  // An approval still standing when the account is disabled some other
+  // way issues nothing either.
+  let (status, _) = set_status(&router, &admin, &member.id, "enable").await;
+  assert_eq!(status, 200);
+  let member = super::grants_access::sign_in(&router, "member@example.com").await;
+  let device_code = approved_cli_login(&router, &member).await;
+  sqlx::query("UPDATE admins SET status = 'disabled' WHERE id = ?")
+    .bind(&member.id)
+    .execute(state.db.pool())
+    .await
+    .unwrap();
+  let before = live_sessions(&state, &member.id).await;
+  poll_refused(&router, &device_code).await;
+  assert_eq!(live_sessions(&state, &member.id).await, before);
+  state.db.close().await;
+}
+
 #[tokio::test]
 async fn only_someone_who_reaches_further_disables_an_account() {
   let (_dir, state, router) = test_app().await;
