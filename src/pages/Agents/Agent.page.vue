@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useAgentController } from "./Agent.controller";
+import { HISTORY_SHOWN, useAgentController } from "./Agent.controller";
 import { agentTokenUsage } from "./Agents.controller";
 import AgentTokenDialog from "./components/AgentTokenDialog.vue";
 import TransferOwnerDialog from "./components/TransferOwnerDialog.vue";
@@ -10,6 +10,7 @@ import AccessGrantsPanel from "~/components/app/AccessGrantsPanel.vue";
 import OneTimeTokenDialog from "~/components/app/OneTimeTokenDialog.vue";
 import {
   DbAlert,
+  DbBadge,
   DbButton,
   DbConfirmDialog,
   DbLevelBadge,
@@ -38,6 +39,11 @@ const {
   accessSummary,
   current,
   tokenRows,
+  liveRows,
+  historyRows,
+  shownHistory,
+  showAllHistory,
+  olderCount,
   tokensError,
   tokenOpen,
   createdToken,
@@ -47,10 +53,22 @@ const {
 } = controller;
 const { pending, copy, busy, error: actionError } = actions;
 
-const stateClass: Record<TokenState, string> = {
-  active: "bg-ok/15 text-ok",
-  expired: "bg-raised text-ink-muted",
-  revoked: "bg-crit/15 text-crit",
+const stateTone: Record<TokenState, "ok" | "neutral" | "crit"> = {
+  active: "ok",
+  expired: "neutral",
+  revoked: "crit",
+};
+/**
+ * Columns that drop on a narrow table, by the table's own width. Hidden
+ * cells stay in the grid (display:none would shift the rest left under the
+ * wrong column) with zero width and visibility:hidden.
+ */
+const narrowHidden = {
+  can: "invisible overflow-hidden p-0 @lg:visible @lg:px-4",
+  expires: "invisible overflow-hidden p-0 @2xl:visible @2xl:px-4",
+  where: "invisible overflow-hidden p-0 @3xl:visible @3xl:px-4",
+  lastUsed: "invisible overflow-hidden p-0 @4xl:visible @4xl:px-4",
+  created: "invisible overflow-hidden p-0 @5xl:visible @5xl:px-4",
 };
 const usage = computed(() =>
   createdToken.value ? agentTokenUsage(createdToken.value) : "",
@@ -107,13 +125,17 @@ const usage = computed(() =>
           v-else-if="activeTab === 'tokens'"
           class="flex flex-col gap-4"
           data-testid="agent-tokens">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <p class="text-sm text-ink-muted">
-              An agent holds one token at a time. A new one replaces it.
+          <div
+            class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <p class="max-w-2xl text-sm text-ink-muted">
+              An agent holds one token at a time. A new one revokes the old, so
+              a copy left in a script or leaked somewhere stops working. Past
+              tokens stay below as history.
             </p>
             <DbButton
               v-if="canManage"
               variant="primary"
+              class="shrink-0 self-start"
               data-testid="new-agent-token"
               @click="tokenOpen = true">
               <KeyIcon class="h-4 w-4" />
@@ -126,57 +148,149 @@ const usage = computed(() =>
             class="rounded-card border border-dashed border-line px-6 py-10 text-center text-sm text-ink-muted">
             No token yet. Create one when the agent has the access it needs.
           </div>
+          <!-- Columns drop by the table's own width, so Token always keeps room. -->
           <div
             v-else
-            class="overflow-x-auto rounded-card border border-line bg-panel">
-            <table class="min-w-full text-left text-sm">
+            class="@container overflow-hidden rounded-card border border-line bg-panel">
+            <table class="w-full table-fixed text-left text-sm">
+              <!-- A dropped column keeps width 0, so Token gets the room. -->
+              <colgroup>
+                <col />
+                <col class="w-24" />
+                <col class="w-0 @lg:w-28" />
+                <col class="w-0 @3xl:w-60" />
+                <col class="w-0 @5xl:w-32" />
+                <col class="w-0 @2xl:w-32" />
+                <col class="w-0 @4xl:w-28" />
+                <col class="w-24" />
+              </colgroup>
               <thead>
-                <tr class="border-b border-line-soft bg-raised/50">
+                <tr
+                  class="whitespace-nowrap border-b border-line-soft bg-raised/50">
                   <th class="h-11 px-4 font-medium text-ink-muted">Token</th>
-                  <th class="h-11 px-4 font-medium text-ink-muted">Can</th>
-                  <th class="h-11 px-4 font-medium text-ink-muted">Where</th>
-                  <th class="h-11 px-4 font-medium text-ink-muted">Created</th>
-                  <th class="h-11 px-4 font-medium text-ink-muted">Expires</th>
-                  <th class="h-11 px-4 font-medium text-ink-muted">
+                  <th class="h-11 px-3 font-medium text-ink-muted">Status</th>
+                  <th
+                    class="h-11 font-medium text-ink-muted"
+                    :class="narrowHidden.can">
+                    Can
+                  </th>
+                  <th
+                    class="h-11 font-medium text-ink-muted"
+                    :class="narrowHidden.where">
+                    Where
+                  </th>
+                  <th
+                    class="h-11 font-medium text-ink-muted"
+                    :class="narrowHidden.created">
+                    Created
+                  </th>
+                  <th
+                    class="h-11 font-medium text-ink-muted"
+                    :class="narrowHidden.expires">
+                    Expires
+                  </th>
+                  <th
+                    class="h-11 font-medium text-ink-muted"
+                    :class="narrowHidden.lastUsed">
                     Last used
                   </th>
-                  <th class="h-11 w-24 px-2">
+                  <th class="h-11 px-2">
                     <span class="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="row in tokenRows"
-                  :key="row.token.id"
-                  class="border-b border-line-soft last:border-b-0"
-                  data-testid="agent-token-row">
-                  <td class="h-[52px] px-4">
-                    <span class="inline-flex items-center gap-2">
-                      <span class="font-mono text-ink-strong">
+                <tr v-if="!liveRows.length" class="border-b border-line-soft">
+                  <td colspan="8" class="h-[52px] px-4 text-ink-muted">
+                    No live token. The agent can't sign in until it has one.
+                  </td>
+                </tr>
+                <template
+                  v-for="row in [...liveRows, ...shownHistory]"
+                  :key="row.token.id">
+                  <tr
+                    class="border-b border-line-soft last:border-b-0"
+                    data-testid="agent-token-row">
+                    <td class="h-[52px] px-4 py-2">
+                      <p
+                        class="truncate font-mono"
+                        :class="
+                          row.state === 'active'
+                            ? 'text-ink-strong'
+                            : 'text-ink-faint'
+                        "
+                        :title="row.token.name">
                         {{ row.token.name }}
-                      </span>
-                      <span
-                        class="rounded-control px-1.5 py-0.5 font-mono text-xs"
-                        :class="stateClass[row.state]">
+                      </p>
+                      <p
+                        class="truncate font-mono text-xs @3xl:hidden"
+                        :class="
+                          row.state === 'active'
+                            ? 'text-ink-muted'
+                            : 'text-ink-faint'
+                        "
+                        :title="row.scope">
+                        {{ row.scope }}
+                      </p>
+                    </td>
+                    <td class="px-3">
+                      <DbBadge :tone="stateTone[row.state]">
                         {{ row.state }}
-                      </span>
-                    </span>
-                  </td>
-                  <td class="px-4">
-                    <DbLevelBadge v-bind="levelMeter(row.token.level)" />
-                  </td>
-                  <td class="px-4 font-mono text-ink">{{ row.scope }}</td>
-                  <td class="px-4 text-ink-muted">{{ row.created }}</td>
-                  <td class="px-4 text-ink-muted">{{ row.expires }}</td>
-                  <td class="px-4 text-ink-muted">{{ row.lastUsed }}</td>
-                  <td class="px-2 text-right">
+                      </DbBadge>
+                    </td>
+                    <td :class="narrowHidden.can">
+                      <DbLevelBadge v-bind="levelMeter(row.token.level)" />
+                    </td>
+                    <td :class="narrowHidden.where">
+                      <p
+                        class="truncate font-mono"
+                        :class="
+                          row.state === 'active' ? 'text-ink' : 'text-ink-faint'
+                        "
+                        :title="row.scope">
+                        {{ row.scope }}
+                      </p>
+                    </td>
+                    <td
+                      class="whitespace-nowrap text-ink-muted"
+                      :class="narrowHidden.created">
+                      {{ row.created }}
+                    </td>
+                    <td
+                      class="whitespace-nowrap text-ink-muted"
+                      :class="narrowHidden.expires">
+                      {{ row.expires }}
+                    </td>
+                    <td
+                      class="truncate text-ink-muted"
+                      :class="narrowHidden.lastUsed">
+                      {{ row.lastUsed }}
+                    </td>
+                    <td class="px-2 text-right">
+                      <DbButton
+                        v-if="canManage && row.state === 'active'"
+                        variant="ghost"
+                        size="sm"
+                        @click="controller.revokeToken(row.token)">
+                        Revoke
+                      </DbButton>
+                    </td>
+                  </tr>
+                </template>
+                <tr
+                  v-if="historyRows.length > HISTORY_SHOWN"
+                  class="border-t border-line-soft">
+                  <td colspan="8" class="px-2 py-1.5">
                     <DbButton
-                      v-if="canManage && row.state === 'active'"
                       variant="ghost"
                       size="sm"
-                      @click="controller.revokeToken(row.token)">
-                      Revoke
+                      data-testid="agent-token-older"
+                      @click="showAllHistory = !showAllHistory">
+                      {{
+                        showAllHistory
+                          ? "Show fewer"
+                          : `Show ${olderCount} older`
+                      }}
                     </DbButton>
                   </td>
                 </tr>

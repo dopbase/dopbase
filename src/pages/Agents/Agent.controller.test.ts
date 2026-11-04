@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { freshPinia } from "~/tests/pinia";
-import { useAgentController } from "./Agent.controller";
+import { HISTORY_SHOWN, useAgentController } from "./Agent.controller";
 import * as accessApi from "~/services/access.api";
 import * as rolesApi from "~/services/roles.api";
 import * as tokensApi from "~/services/personal-tokens.api";
@@ -298,6 +298,65 @@ describe("useAgentController", () => {
         lastUsed: "just now",
       },
     ]);
+  });
+
+  it("puts the live token before newer revoked and expired ones", async () => {
+    const revoked = tokenFixture({
+      id: "pat_revoked",
+      createdAt: "2026-10-20T00:00:00Z",
+      revokedAt: "2026-10-21T00:00:00Z",
+    });
+    const expired = tokenFixture({
+      id: "pat_expired",
+      createdAt: "2026-10-10T00:00:00Z",
+      expiresAt: "2026-10-15T00:00:00Z",
+    });
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValue([
+      revoked,
+      expired,
+      tokenFixture(),
+    ]);
+    const controller = await mountAgent();
+
+    const ids = (rows: { token: { id: string } }[]) =>
+      rows.map((row) => row.token.id);
+    expect(ids(controller.tokenRows.value)).toEqual([
+      "pat_1",
+      "pat_revoked",
+      "pat_expired",
+    ]);
+    expect(ids(controller.liveRows.value)).toEqual(["pat_1"]);
+    expect(ids(controller.historyRows.value)).toEqual([
+      "pat_revoked",
+      "pat_expired",
+    ]);
+    expect(controller.olderCount.value).toBe(0);
+  });
+
+  it("shows the newest history tokens and keeps the rest behind Show older", async () => {
+    const history = Array.from({ length: HISTORY_SHOWN + 3 }, (_, i) =>
+      tokenFixture({
+        id: `pat_old_${i}`,
+        createdAt: `2026-09-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
+        revokedAt: "2026-10-01T00:00:00Z",
+      }),
+    );
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValue([
+      tokenFixture(),
+      ...history,
+    ]);
+    const controller = await mountAgent();
+
+    expect(controller.historyRows.value).toHaveLength(HISTORY_SHOWN + 3);
+    expect(controller.shownHistory.value).toHaveLength(HISTORY_SHOWN);
+    expect(controller.shownHistory.value[0]?.token.id).toBe(
+      `pat_old_${HISTORY_SHOWN + 2}`,
+    );
+    expect(controller.olderCount.value).toBe(3);
+
+    controller.showAllHistory.value = true;
+    expect(controller.shownHistory.value).toHaveLength(HISTORY_SHOWN + 3);
+    expect(controller.olderCount.value).toBe(0);
   });
 
   it("revokes a token and reloads the list", async () => {

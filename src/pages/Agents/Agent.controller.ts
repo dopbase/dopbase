@@ -34,6 +34,9 @@ const TAB_FOR_ROUTE = Object.fromEntries(
   Object.entries(TAB_ROUTES).map(([tab, route]) => [route, tab]),
 ) as Record<string, AgentTab>;
 
+/** History rows shown before "Show older". */
+export const HISTORY_SHOWN = 10;
+
 export interface AgentTokenRow {
   token: PersonalToken;
   state: TokenState;
@@ -215,18 +218,45 @@ export function useAgentController() {
   const current = computed(() =>
     tokens.value ? liveToken(tokens.value) : null,
   );
-  const tokenRows = computed<AgentTokenRow[]>(() =>
-    (tokens.value ?? []).map((token) => ({
-      token,
-      state: tokenState(token),
-      scope: token.scopeLabel || "Every project it reaches",
-      created: formatDate(token.createdAt),
-      expires: token.expiresAt ? formatDate(token.expiresAt) : "Never",
-      lastUsed: token.lastUsedAt
-        ? formatRelativeTime(token.lastUsedAt)
-        : "Never",
-    })),
+  /** Live tokens first, then the history; newest first within each. */
+  const tokenRows = computed<AgentTokenRow[]>(() => {
+    const rows = [...(tokens.value ?? [])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((token) => ({
+        token,
+        state: tokenState(token),
+        scope: token.scopeLabel || "Every project it reaches",
+        created: formatDate(token.createdAt),
+        expires: token.expiresAt ? formatDate(token.expiresAt) : "Never",
+        lastUsed: token.lastUsedAt
+          ? formatRelativeTime(token.lastUsedAt)
+          : "Never",
+      }));
+    return [
+      ...rows.filter((row) => row.state === "active"),
+      ...rows.filter((row) => row.state !== "active"),
+    ];
+  });
+  const liveRows = computed(() =>
+    tokenRows.value.filter((row) => row.state === "active"),
   );
+  /** Revoked and expired tokens: they no longer work, kept as a record. */
+  const historyRows = computed(() =>
+    tokenRows.value.filter((row) => row.state !== "active"),
+  );
+  const showAllHistory = ref(false);
+  const shownHistory = computed(() =>
+    showAllHistory.value
+      ? historyRows.value
+      : historyRows.value.slice(0, HISTORY_SHOWN),
+  );
+  /** History rows behind "Show older". */
+  const olderCount = computed(
+    () => historyRows.value.length - shownHistory.value.length,
+  );
+  watch(agentId, () => {
+    showAllHistory.value = false;
+  });
 
   async function reloadTokens(): Promise<void> {
     await invalidate.personalTokensChanged();
@@ -300,6 +330,11 @@ export function useAgentController() {
     reloadAccess,
     current,
     tokenRows,
+    liveRows,
+    historyRows,
+    shownHistory,
+    showAllHistory,
+    olderCount,
     tokensError,
     tokenOpen,
     createdToken,
