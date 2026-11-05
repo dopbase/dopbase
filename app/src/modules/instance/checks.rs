@@ -26,10 +26,6 @@ const BACKUP_STALE_DAYS: i64 = 7;
 const TOKEN_WARNING_DAYS: i64 = 7;
 /// A ping slower than this is reported.
 const SLOW_PING_MS: f64 = 500.0;
-/// Free space thresholds. Absolute, because a few percent of a large disk
-/// is still plenty for a SQLite file.
-const CRIT_FREE_BYTES: u64 = 1 << 30;
-const WARN_FREE_BYTES: u64 = 5 << 30;
 
 /// Audit actions that change a stored secret value.
 const SECRET_CHANGES: &str = "'secret.created','secret.updated','secret.deleted','secret.imported','secret.rolled_back','secret.copied','secret.bulk_copied'";
@@ -61,20 +57,11 @@ pub async fn run(
   let pool = state.db.pool();
   let (database_check, database) = database(state, now).await;
   let (key_check, master_key) = master_key(state, now);
-  let (disk_check, disk) = match disk(state, now) {
-    Ok(Some((check, health))) => (Some(check), Some(health)),
-    Ok(None) => (None, None),
-    Err(error) => (
-      Some(failed("disk.space", "free disk space", &error, now)),
-      None,
-    ),
-  };
+  let disk = disk_usage(state);
   let (audit_check, audit_log) = audit_chain(audit);
   let newest = newest_backup(state);
 
-  let mut checks = vec![database_check, key_check];
-  checks.extend(disk_check);
-  checks.push(audit_check);
+  let mut checks = vec![database_check, key_check, audit_check];
   checks.push(settle(
     "backup.age",
     "backup age",
@@ -103,13 +90,6 @@ pub async fn run(
   ));
   checks.push(public_url(state, now));
   checks.push(https(state, now));
-  checks.push(docs(state, now));
-  checks.push(settle(
-    "people.managers",
-    "who can manage the instance",
-    managers(pool, now).await,
-    now,
-  ));
   checks.extend(release.and_then(|release| version(release, now)));
   // Stable sort: most severe first, the order above within a severity.
   checks.sort_by_key(|check| check.status);
@@ -302,50 +282,44 @@ fn master_key(
   (result, health)
 }
 
-#[cfg(unix)]
-fn disk(
-  state: &AppState,
-  now: DateTime<Utc>,
-) -> Result<Option<(Check, DiskHealth)>> {
-  let stats = nix::sys::statvfs::statvfs(&state.config.data_dir)?;
-  let block = stats.fragment_size() as u64;
-  let free = stats.blocks_available() as u64 * block;
-  let total = stats.blocks() as u64 * block;
-  let detail = format!("{} free of {}.", format_bytes(free), format_bytes(total));
-  let result = if free < CRIT_FREE_BYTES {
-    check(
-      "disk.space",
-      CheckStatus::Crit,
-      "The data disk is almost full",
-      format!("{detail} The database stops accepting changes when it fills up."),
-      now,
-    )
-  } else if free < WARN_FREE_BYTES {
-    check(
-      "disk.space",
-      CheckStatus::Warn,
-      "The data disk is filling up",
-      format!("{detail} Free some space or move the data directory."),
-      now,
-    )
-  } else {
-    check("disk.space", CheckStatus::Ok, "Disk has room", detail, now)
-  }
-  .value(format!("{} free", format_bytes(free)));
-  let health = DiskHealth {
-    status: result.status,
-    free_bytes: free,
-    total_bytes: total,
+/// Space Dopbase takes: everything in the data directory, plus the database
+/// and its write-ahead log when they live somewhere else. `None` when the
+/// data directory can't be read.
+fn disk_usage(state: &AppState) -> Option<DiskHealth> {
+  let data_dir = &state.config.data_dir;
+  let mut used_bytes = match directory_size(data_dir) {
+    Ok(bytes) => bytes,
+    Err(error) => {
+      tracing::warn!(%error, "status couldn't size the data directory");
+      return None;
+    }
   };
-  Ok(Some((result, health)))
+  if let Ok(database) = crate::config::database_path(&state.config.database_url)
+    && !database.starts_with(data_dir)
+  {
+    let mut wal = database.clone().into_os_string();
+    wal.push("-wal");
+    for file in [database, wal.into()] {
+      used_bytes += std::fs::metadata(file).map_or(0, |meta| meta.len());
+    }
+  }
+  Some(DiskHealth { used_bytes })
 }
 
-#[cfg(not(unix))]
-fn disk(
-  _state: &AppState,
-  _now: DateTime<Utc>,
-) -> Result<Option<(Check, DiskHealth)>> {
-  Ok(None)
+/// Total size of the files under `dir`. Symlinks are not followed, so a
+/// link out of the data directory is never counted.
+fn directory_size(dir: &std::path::Path) -> std::io::Result<u64> {
+  let mut total = 0;
+  for entry in std::fs::read_dir(dir)? {
+    let entry = entry?;
+    let file_type = entry.file_type()?;
+    if file_type.is_dir() {
+      total += directory_size(&entry.path())?;
+    } else if file_type.is_file() {
+      total += entry.metadata()?.len();
+    }
+  }
+  Ok(total)
 }
 
 fn audit_chain(audit: &AuditCheck) -> (Check, AuditLogHealth) {
@@ -633,15 +607,7 @@ async fn audit_retention(
   now: DateTime<Utc>,
 ) -> Result<Check> {
   Ok(match state.config.audit_retention_days {
-    Some(days) => check(
-      "audit.retention",
-      CheckStatus::Ok,
-      "Audit log has a size limit",
-      format!("Records older than {days} days are archived and removed."),
-      now,
-    )
-    .value(format!("{days} {}", plural(days as i64, "day", "days"))),
-    None => {
+    0 => {
       let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_events")
         .fetch_one(state.db.pool())
         .await?;
@@ -650,7 +616,7 @@ async fn audit_retention(
         CheckStatus::Tip,
         "The audit log has no size limit",
         format!(
-          "It holds {} {} and keeps growing until you set audit_retention_days.",
+          "It holds {} {} and keeps growing because audit_retention_days is 0.",
           format_count(events as u64),
           plural(events, "event", "events")
         ),
@@ -658,6 +624,14 @@ async fn audit_retention(
       )
       .fix(CONFIG_DOCS)
     }
+    days => check(
+      "audit.retention",
+      CheckStatus::Ok,
+      "Audit log has a size limit",
+      format!("Records older than {days} days are archived and removed."),
+      now,
+    )
+    .value(format!("{days} {}", plural(days as i64, "day", "days"))),
   })
 }
 
@@ -750,68 +724,6 @@ fn https(
     now,
   )
   .fix(CONFIG_DOCS)
-}
-
-fn docs(
-  state: &AppState,
-  now: DateTime<Utc>,
-) -> Check {
-  if state.config.docs_enabled {
-    check(
-      "config.docs",
-      CheckStatus::Tip,
-      "API docs are on",
-      "Anyone who can reach the server can read the API reference. Turn it off if nobody needs it.",
-      now,
-    )
-    .value("docs = true")
-    .fix(CONFIG_DOCS)
-  } else {
-    check(
-      "config.docs",
-      CheckStatus::Ok,
-      "API docs are off",
-      "The API reference isn't served.",
-      now,
-    )
-    .value("docs = false")
-  }
-}
-
-async fn managers(
-  pool: &SqlitePool,
-  now: DateTime<Utc>,
-) -> Result<Check> {
-  // Root, plus active people whose role can manage accounts.
-  let admins: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM admins a JOIN roles r ON r.id = a.role_id
-      WHERE a.is_root = 0 AND a.status = 'active' AND r.sign_in = 'interactive'
-        AND EXISTS (SELECT 1 FROM role_capabilities c WHERE c.role_id = r.id AND c.capability = 'users.manage')",
-  )
-  .fetch_one(pool)
-  .await?;
-  Ok(if admins > 0 {
-    check(
-      "people.managers",
-      CheckStatus::Ok,
-      "More than one person can manage the instance",
-      "Someone else can recover access if root is locked out.",
-      now,
-    )
-    .value(format!(
-      "root + {admins} {}",
-      plural(admins, "admin", "admins")
-    ))
-  } else {
-    check(
-      "people.managers",
-      CheckStatus::Tip,
-      "Only root can manage this instance",
-      "If root loses access, nobody else can recover it. Give a second person the Admin role.",
-      now,
-    )
-    .fix("/users")
-  })
 }
 
 /// Only present when `update_check` is on. Nothing is reported until the

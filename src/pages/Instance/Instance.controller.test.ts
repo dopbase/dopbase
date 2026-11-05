@@ -87,11 +87,7 @@ const mockStatus: instanceApi.StatusResponse = {
   health: {
     database: { status: "ok", pingMs: 3.2, sizeBytes: 50_331_648 },
     masterKey: { status: "ok", file: "matches" },
-    disk: {
-      status: "ok",
-      freeBytes: 18 * 1024 ** 3,
-      totalBytes: 64 * 1024 ** 3,
-    },
+    disk: { usedBytes: Math.round(2.1 * 1024 ** 3) },
     auditLog: {
       status: "ok",
       events: 1284,
@@ -312,7 +308,7 @@ describe("useInstanceController", () => {
       c.healthCards.value.map(({ label, value, badge, detail }) => ({
         label,
         value,
-        badge: badge.text,
+        badge: badge?.text,
         detail,
       })),
     ).toEqual([
@@ -320,7 +316,7 @@ describe("useInstanceController", () => {
         label: "Database",
         value: "Healthy",
         badge: "ok",
-        detail: "3 ms to answer · 48 MB",
+        detail: "Latency under 5 ms · 48 MB",
       },
       {
         label: "Master key",
@@ -329,10 +325,10 @@ describe("useInstanceController", () => {
         detail: "Matches this database",
       },
       {
-        label: "Disk",
-        value: "18 GB free",
-        badge: "ok",
-        detail: "72% of the data disk used",
+        label: "Disk usage",
+        value: "2.1 GB",
+        badge: undefined,
+        detail: "Storage used",
       },
       {
         label: "Audit log",
@@ -341,6 +337,37 @@ describe("useInstanceController", () => {
         detail: expect.stringMatching(/^Chain checked /),
       },
     ]);
+  });
+
+  it("says Unknown when the data directory can't be read", async () => {
+    signInAs(["instance.view"]);
+    vi.mocked(instanceApi.fetchStatus).mockResolvedValue({
+      ...mockStatus,
+      health: { ...mockStatus.health!, disk: null },
+    });
+    const c = await mounted();
+
+    const disk = c.healthCards.value.find((card) => card.id === "disk");
+    expect(disk).toMatchObject({
+      value: "Unknown",
+      detail: "Couldn't read the data directory",
+    });
+    expect(disk?.badge).toBeUndefined();
+  });
+
+  it("gives the exact latency once the database takes 5 ms or more", async () => {
+    signInAs(["instance.view"]);
+    vi.mocked(instanceApi.fetchStatus).mockResolvedValue({
+      ...mockStatus,
+      health: {
+        ...mockStatus.health!,
+        database: { status: "warn", pingMs: 12.4, sizeBytes: 50_331_648 },
+      },
+    });
+    const c = await mounted();
+
+    const database = c.healthCards.value.find((card) => card.id === "database");
+    expect(database?.detail).toBe("Latency 12 ms · 48 MB");
   });
 
   it("sums up the last 24 hours", async () => {

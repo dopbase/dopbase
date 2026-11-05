@@ -39,7 +39,7 @@ export type Tone = "ok" | "warn" | "crit" | "neutral" | "accent";
 
 export interface FixAction {
   label: string;
-  icon: "archive" | "download" | "key" | "external" | "audit" | "users";
+  icon: "archive" | "download" | "key" | "external" | "audit";
   /** An Admin UI path, a documentation URL, or the root-only key download. */
   kind: "route" | "external" | "master-key";
   to: string;
@@ -49,7 +49,8 @@ export interface HealthCard {
   id: "database" | "masterKey" | "disk" | "auditLog";
   label: string;
   value: string;
-  badge: { tone: Tone; text: string };
+  /** Left out where the reading carries no status, as on Disk usage. */
+  badge?: { tone: Tone; text: string };
   detail: string;
 }
 
@@ -242,8 +243,8 @@ export function useInstanceController() {
     const ping =
       database.pingMs == null
         ? null
-        : database.pingMs < 1
-          ? "under 1 ms"
+        : database.pingMs < 5
+          ? "under 5 ms"
           : `${Math.round(database.pingMs)} ms`;
     const databaseCard: HealthCard = {
       id: "database",
@@ -261,7 +262,7 @@ export function useInstanceController() {
               : "ok",
       },
       detail: [
-        ping ? `${ping} to answer` : "Not answering",
+        ping ? `Latency ${ping}` : "Not answering",
         database.sizeBytes == null ? null : formatBytes(database.sizeBytes),
       ]
         .filter(Boolean)
@@ -290,28 +291,15 @@ export function useInstanceController() {
     const diskCard: HealthCard = disk
       ? {
           id: "disk",
-          label: "Disk",
-          value: `${formatBytes(disk.freeBytes)} free`,
-          badge: {
-            tone: SEVERITY_TONES[disk.status],
-            text:
-              disk.status === "crit"
-                ? "full"
-                : disk.status === "warn"
-                  ? "low"
-                  : "ok",
-          },
-          detail:
-            disk.totalBytes > 0
-              ? `${Math.round((1 - disk.freeBytes / disk.totalBytes) * 100)}% of the data disk used`
-              : "Disk size unknown",
+          label: "Disk usage",
+          value: formatBytes(disk.usedBytes),
+          detail: "Storage used",
         }
       : {
           id: "disk",
-          label: "Disk",
+          label: "Disk usage",
           value: "Unknown",
-          badge: { tone: "neutral", text: "n/a" },
-          detail: "Free space can't be read on this system",
+          detail: "Couldn't read the data directory",
         };
     const auditCard: HealthCard = {
       id: "auditLog",
@@ -480,7 +468,6 @@ export function useInstanceController() {
       "backup.offsite": { label: "Download latest", icon: "download" },
       "tokens.expiring": { label: "Review tokens", icon: "key" },
       "audit.chain": { label: "Open audit log", icon: "audit" },
-      "people.managers": { label: "Add an admin", icon: "users" },
     };
     return {
       ...(labels[check.id] ?? { label: "Open", icon: "external" }),

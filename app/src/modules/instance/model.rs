@@ -146,7 +146,7 @@ pub struct StatusSummary {
 pub struct HealthReport {
   pub database: DatabaseHealth,
   pub master_key: MasterKeyHealth,
-  /// `null` where free space cannot be read, such as on Windows.
+  /// `null` when the data directory can't be read.
   pub disk: Option<DiskHealth>,
   pub audit_log: AuditLogHealth,
 }
@@ -173,11 +173,9 @@ pub struct MasterKeyHealth {
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DiskHealth {
-  pub status: CheckStatus,
-  /// Space available to the server in the data directory, in bytes.
-  pub free_bytes: u64,
-  /// Size of the file system holding the data directory, in bytes.
-  pub total_bytes: u64,
+  /// Size of everything in the data directory, plus the database and its
+  /// write-ahead log when they live outside it, in bytes.
+  pub used_bytes: u64,
 }
 
 #[derive(Serialize, ToSchema)]

@@ -34,16 +34,16 @@
 
 # Days to keep audit records. Older records are moved to the
 # audit-archive directory in the data directory.
-# Accepts: 1 or more. Remove this line to keep records forever.
+# Accepts: 0 or more. 0 keeps records forever. Default: 365.
 # Environment: DOPBASE_AUDIT_RETENTION_DAYS
-audit_retention_days = 365
+# audit_retention_days = 365
 
 # Versions of each secret that keep their encrypted value and can be
 # rolled back to. Older versions keep only who changed them and when.
 # A lower value applies to a secret the next time it changes.
 # Accepts: 2 to 1000. Default: 20.
 # Environment: DOPBASE_SECRET_HISTORY_VERSIONS
-secret_history_versions = 20
+# secret_history_versions = 20
 
 # Reverse proxies allowed to report the client address. Audit records
 # store the connection's address unless it comes from one of these, in

@@ -21,6 +21,9 @@ pub const AUDIT_ARCHIVE_DIRECTORY_NAME: &str = "audit-archive";
 pub const AUDIT_RETENTION_INTERVAL: std::time::Duration =
   std::time::Duration::from_secs(24 * 60 * 60);
 
+/// Days audit records are kept when nothing sets `audit_retention_days`.
+pub const DEFAULT_AUDIT_RETENTION_DAYS: u64 = 365;
+
 pub const ENV_AUDIT_RETENTION_DAYS: &str = "DOPBASE_AUDIT_RETENTION_DAYS";
 pub const ENV_SECRET_HISTORY_VERSIONS: &str = "DOPBASE_SECRET_HISTORY_VERSIONS";
 

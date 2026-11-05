@@ -66,10 +66,11 @@ async fn status_reports_every_check_with_the_readings_behind_the_cards() {
     "audit.retention",
     "config.public_url",
     "config.https",
-    "config.docs",
-    "people.managers",
   ] {
     assert!(ids.contains(&id), "missing {id} in {ids:?}");
+  }
+  for id in ["disk.space", "config.docs", "people.managers"] {
+    assert!(!ids.contains(&id), "{id} should not be checked: {ids:?}");
   }
   // Most severe first.
   let rank = |status: &str| {
@@ -98,8 +99,16 @@ async fn status_reports_every_check_with_the_readings_behind_the_cards() {
   assert_eq!(data["health"]["masterKey"]["file"], "matches");
   assert_eq!(check(&data, "audit.chain")["status"], "ok");
   assert_eq!(data["health"]["auditLog"]["intact"], true);
-  // The test app turns the API docs on and keeps no audit retention.
-  assert_eq!(check(&data, "config.docs")["status"], "tip");
+  // The test app runs on the default retention of a year.
+  assert_eq!(check(&data, "audit.retention")["status"], "ok");
+  assert_eq!(check(&data, "audit.retention")["value"], "365 days");
+  // 0 keeps the log forever, which the check points out.
+  let mut forever = state.clone();
+  forever.config = std::sync::Arc::new(app::config::ServerConfig {
+    audit_retention_days: 0,
+    ..(*state.config).clone()
+  });
+  let data = status(&app::server::router(forever), &root).await;
   assert_eq!(check(&data, "audit.retention")["status"], "tip");
   assert!(
     check(&data, "audit.retention")["fixPath"]
@@ -107,21 +116,13 @@ async fn status_reports_every_check_with_the_readings_behind_the_cards() {
       .unwrap()
       .starts_with("https://")
   );
-  // Only root can manage the instance until an admin exists.
-  assert_eq!(check(&data, "people.managers")["status"], "tip");
-  with_role(&router, &root, "second@example.com", "rol_admin").await;
-  let data = status(&router, &root).await;
-  assert_eq!(check(&data, "people.managers")["status"], "ok");
-  assert_eq!(check(&data, "people.managers")["value"], "root + 1 admin");
-  if cfg!(unix) {
-    assert!(data["health"]["disk"]["totalBytes"].as_u64().unwrap() > 0);
-    assert!(
-      check(&data, "disk.space")["value"]
-        .as_str()
-        .unwrap()
-        .ends_with(" free")
-    );
-  }
+  // The data directory holds at least the database.
+  let disk = &data["health"]["disk"];
+  assert!(
+    disk["usedBytes"].as_u64().unwrap()
+      >= data["health"]["database"]["sizeBytes"].as_u64().unwrap()
+  );
+  assert!(disk.get("freeBytes").is_none() && disk.get("status").is_none());
   state.db.close().await;
 }
 

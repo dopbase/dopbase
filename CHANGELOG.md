@@ -87,6 +87,13 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- Audit records are kept for 365 days by default, and
+  `audit_retention_days = 0` keeps them forever. Leaving the setting out used
+  to keep everything, so an instance whose `server.toml` has no
+  `audit_retention_days` line starts archiving records older than a year to
+  `audit-archive/` after the upgrade. Set it to `0` to keep the whole log. New
+  instances apply retention from their first start instead of after a
+  restart.
 - The sidebar's **People & access** section is now **Access**, which fits
   members who only see AI agents as well as admins.
 - The role editor uses the full page width. Each section has its
@@ -210,6 +217,11 @@ All notable changes to Dopbase are documented in this file.
   allow list, so Dopbase has no email domain setting. To turn away people
   outside your organization, limit sign-in at the provider, for example with
   Google's **Internal** audience.
+- The Status page's **Disk** card is now **Disk usage**. It shows how much
+  space the data directory takes, with no warning level. Free space on a
+  container or VM disk describes the host, not Dopbase.
+- **Breaking:** `health.disk` in `GET /api/v1/status` returns `usedBytes`
+  instead of `status`, `freeBytes` and `totalBytes`.
 
 ### Removed
 
@@ -219,6 +231,9 @@ All notable changes to Dopbase are documented in this file.
   `GET /api/v1/status`. They were always `healthy` and `available`.
 - The project rail. Use the Projects tree instead.
 - The `/instance` page. It redirects to `/status`.
+- The `disk.space`, `config.docs` and `people.managers` status checks ("Disk
+  has room", "API docs are on/off" and "Only root can manage this
+  instance").
 
 ### Fixed
 

@@ -63,11 +63,7 @@ const base: instanceApi.StatusResponse = {
   health: {
     database: { status: "ok", pingMs: 3, sizeBytes: 50_331_648 },
     masterKey: { status: "ok", file: "matches" },
-    disk: {
-      status: "ok",
-      freeBytes: 18 * 1024 ** 3,
-      totalBytes: 64 * 1024 ** 3,
-    },
+    disk: { usedBytes: Math.round(2.1 * 1024 ** 3) },
     auditLog: {
       status: "ok",
       events: 1284,
