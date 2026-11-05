@@ -200,6 +200,10 @@ All notable changes to Dopbase are documented in this file.
 - An environment's **Tokens** tab drops the **Can** column, since every
   runner token only reads. The intro now says so, and **New runner token**
   still shows it.
+- The single sign-on docs explain who can sign in. The Users page is the
+  allow list, so Dopbase has no email domain setting. To turn away people
+  outside your organization, limit sign-in at the provider, for example with
+  Google's **Internal** audience.
 
 ### Removed
 
