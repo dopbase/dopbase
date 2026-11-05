@@ -12,8 +12,9 @@ use axum::{
 /// List users
 ///
 /// Return the accounts you may see, ordered by role and email: people with
-/// users.view, every AI agent with agents.view_all, and the agents you own
-/// with agents.view. Requires an Admin UI session.
+/// users.view, every AI agent with agents.view_all, the agents you own with
+/// agents.view, and with agents.manage the people who could own an agent.
+/// Requires an Admin UI session.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::COLLECTION,
@@ -22,7 +23,7 @@ use axum::{
   responses(
     (status = 200, description = "Users fetched", body = inline(HttpResponseFormat<Vec<UserResponse>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "An Admin UI session with users.view, agents.view, or agents.view_all is required", body = crate::http::ErrorBody),
+    (status = 403, description = "An Admin UI session with users.view or an agents capability is required", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn list(
@@ -93,7 +94,7 @@ pub async fn get(
 /// Create a user
 ///
 /// Add a person, which needs users.manage, or an AI agent, which needs
-/// agents.view or agents.manage and is owned by whoever creates it. Requires
+/// agents.view and is owned by whoever creates it. Requires
 /// an Admin UI session with recent authentication and the CSRF header.
 #[utoipa::path(
   post,
@@ -251,7 +252,8 @@ pub async fn disable(
 ///
 /// Let a disabled account sign in again. Its tokens that are still valid
 /// work again. Enabling an active account changes nothing. Same rights as
-/// disabling it.
+/// disabling it, except that an AI agent disabled by someone other than its
+/// owner needs agents.manage to enable.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::ENABLE,

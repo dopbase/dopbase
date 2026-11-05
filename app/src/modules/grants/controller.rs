@@ -14,9 +14,10 @@ use axum::{
 /// Give a user or group a level on all projects, one project, or one
 /// environment. A grant on a scope that already has one replaces its level.
 /// Granting on a project or its environments needs the project manager
-/// level on it; all projects is for root. The owner of an AI agent, with
-/// agents.view, may also give it a level on a project or environment they
-/// reach at that level themselves. Requires an Admin UI session with
+/// level on it; all projects is for root. A person needs users.view and an
+/// AI agent agents.manage. The owner of an AI agent, with agents.view, may
+/// also give it a level on a project or environment they reach at that
+/// level themselves. Requires an Admin UI session with
 /// recent authentication and the CSRF header.
 #[utoipa::path(
   put,

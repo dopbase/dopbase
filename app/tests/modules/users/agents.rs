@@ -42,12 +42,22 @@ async fn custom_role(
   name: &str,
   capabilities: &[&str],
 ) -> String {
+  custom_role_at(router, root, name, capabilities, "write").await
+}
+
+async fn custom_role_at(
+  router: &Router,
+  root: &Person,
+  name: &str,
+  capabilities: &[&str],
+  max_level: &str,
+) -> String {
   let (status, body) = send(
     router,
     "POST",
     "/api/v1/roles",
     root.browser(),
-    Some(json!({"name":name,"capabilities":capabilities,"maxLevel":"write"})),
+    Some(json!({"name":name,"capabilities":capabilities,"maxLevel":max_level})),
   )
   .await;
   assert_eq!(status, 201, "{body}");
@@ -520,6 +530,206 @@ async fn built_in_roles_hold_the_agent_capabilities_they_should() {
       .collect();
     held.sort();
     assert_eq!(held, expected, "{role}");
+  }
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn only_agents_manage_gives_someone_elses_agent_access() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let bot = agent(&router, &maya, "maya-bot").await;
+
+  // Both manage payments; one holds users.*, the other agents.manage.
+  let people_role = custom_role_at(
+    &router,
+    &root,
+    "People admin",
+    &["users.view", "users.manage"],
+    "project_manager",
+  )
+  .await;
+  let lead_role = custom_role_at(
+    &router,
+    &root,
+    "Agent lead",
+    &["tokens.personal", "agents.view_all", "agents.manage"],
+    "project_manager",
+  )
+  .await;
+  let people = with_role(&router, &root, "people@example.com", &people_role).await;
+  let lead = with_role(&router, &root, "lead@example.com", &lead_role).await;
+  for who in [&people, &lead] {
+    let (status, body) = grant(
+      &router,
+      &root,
+      ("user", &who.id),
+      ("project", Some("payments")),
+      "project_manager",
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+  }
+
+  // users.view doesn't reach the agent; agents.manage does.
+  let (status, body) = grant(
+    &router,
+    &people,
+    ("user", &bot),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert_eq!(status, 422, "{body}");
+  assert!(
+    body["error"]["GRANT_PRINCIPAL_INVALID"].is_string(),
+    "{body}"
+  );
+  let (status, body) = grant(
+    &router,
+    &lead,
+    ("user", &bot),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  // agents.manage doesn't reach people, and the people admin still does.
+  let (status, body) = grant(
+    &router,
+    &lead,
+    ("user", &maya.id),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert_eq!(status, 422, "{body}");
+  assert!(
+    body["error"]["GRANT_PRINCIPAL_INVALID"].is_string(),
+    "{body}"
+  );
+  let (status, body) = grant(
+    &router,
+    &people,
+    ("user", &maya.id),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn agents_manage_hands_agents_over_but_creates_none() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let other = person(&router, &root, "other@example.com", "member").await;
+  with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
+  let bot = agent(&router, &maya, "maya-bot").await;
+  let lead_role = custom_role(
+    &router,
+    &root,
+    "Agent lead",
+    &["tokens.personal", "agents.view_all", "agents.manage"],
+  )
+  .await;
+  let lead = with_role(&router, &root, "lead@example.com", &lead_role).await;
+
+  // Whoever creates an agent owns it, and owning one takes agents.view.
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    lead.browser(),
+    Some(json!({"email":"lead-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status, 403, "{body}");
+
+  // The lead sees the people who could own an agent, so the console can
+  // offer them, but not the ones who couldn't.
+  let seen = listed(&router, &lead).await;
+  for email in ["maya@example.com", "other@example.com", "maya-bot"] {
+    assert!(seen.contains(&email.to_owned()), "{email}: {seen:?}");
+  }
+  assert!(
+    !seen.contains(&"auditor@example.com".to_owned()),
+    "{seen:?}"
+  );
+  let (status, body) = send(
+    &router,
+    "PATCH",
+    &format!("/api/v1/users/{bot}"),
+    lead.browser(),
+    Some(json!({"ownerId":other.id})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["ownerEmail"], "other@example.com");
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn an_owner_doesnt_undo_a_disable_by_agents_manage() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  let bot = agent(&router, &maya, "maya-bot").await;
+  let item = format!("/api/v1/users/{bot}");
+  // Sam turns it off, and it stays off until agents.manage turns it on.
+  // Her own disable she undoes herself.
+  for (who, action, expected) in [
+    (&sam, "disable", 200),
+    (&maya, "enable", 403),
+    (&sam, "enable", 200),
+    (&maya, "disable", 200),
+    (&maya, "enable", 200),
+  ] {
+    let (status, body) = send(
+      &router,
+      "POST",
+      &format!("{item}/{action}"),
+      who.browser(),
+      None,
+    )
+    .await;
+    assert_eq!(status, expected, "{action}: {body}");
+  }
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn an_agent_owner_cant_probe_other_accounts() {
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  agent(&router, &maya, "maya-bot").await;
+
+  // Root, a person and a missing id answer alike, whatever she asks.
+  for id in [root.id.as_str(), sam.id.as_str(), "usr_missing"] {
+    let item = format!("/api/v1/users/{id}");
+    for (method, path, body) in [
+      (
+        "PATCH",
+        item.clone(),
+        Some(json!({"email":"x@example.com"})),
+      ),
+      ("POST", format!("{item}/disable"), None),
+      ("POST", format!("{item}/enable"), None),
+      ("DELETE", item.clone(), None),
+    ] {
+      let (status, response) = send(&router, method, &path, maya.browser(), body).await;
+      assert_eq!(status, 403, "{method} {path}: {response}");
+      assert!(
+        response["error"]["AUTHORIZATION_DENIED"].is_string(),
+        "{method} {path}: {response}"
+      );
+    }
   }
   state.db.close().await;
 }

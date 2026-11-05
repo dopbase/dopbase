@@ -4,7 +4,7 @@ use crate::{
   constants::tokens::GRANT_ID_PREFIX, modules::grants::model::GroupRef, services::token,
 };
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,(SELECT o.email FROM admins o WHERE o.id = a.owner_id) AS owner_email,COALESCE(r.sign_in = 'token_only', 0) AS agent,a.status,a.last_sign_in_at";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,(SELECT o.email FROM admins o WHERE o.id = a.owner_id) AS owner_email,COALESCE(r.sign_in = 'token_only', 0) AS agent,(a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'agents.view')))) AS can_own,a.status,a.last_sign_in_at";
 
 #[derive(sqlx::FromRow)]
 pub struct UserRow {
@@ -21,6 +21,8 @@ pub struct UserRow {
   pub owner_email: Option<String>,
   /// The account's role signs in with tokens only: an AI agent.
   pub agent: bool,
+  /// An active person who could own an AI agent, as [`can_own`] judges it.
+  pub can_own: bool,
   pub status: String,
   pub last_sign_in_at: Option<String>,
 }
@@ -89,16 +91,42 @@ pub async fn set_status(
   )
 }
 
-/// The email, root flag, role id, and whether the role signs in with tokens
-/// only, of an account.
+/// What changing an account needs to know about it.
+#[derive(sqlx::FromRow)]
+pub struct Account {
+  pub email: String,
+  pub is_root: bool,
+  pub role_id: Option<String>,
+  /// Its role signs in with tokens only: an AI agent.
+  pub agent: bool,
+  pub owner_id: Option<String>,
+  /// `active` or `disabled`.
+  pub status: String,
+}
+
 pub async fn account(
   pool: &SqlitePool,
   id: &str,
-) -> Result<Option<(String, bool, Option<String>, bool)>, sqlx::Error> {
-  sqlx::query_as("SELECT a.email, a.is_root = 1, a.role_id, COALESCE(r.sign_in = 'token_only', 0) FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id=?")
+) -> Result<Option<Account>, sqlx::Error> {
+  sqlx::query_as("SELECT a.email, a.is_root = 1 AS is_root, a.role_id, COALESCE(r.sign_in = 'token_only', 0) AS agent, a.owner_id, a.status FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id=?")
     .bind(id)
     .fetch_optional(pool)
     .await
+}
+
+/// Who disabled the account most recently, from the audit log. `None` when
+/// it was never disabled or the record has been pruned.
+pub async fn last_disabled_by(
+  pool: &SqlitePool,
+  id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+  let actor: Option<Option<String>> = sqlx::query_scalar(
+    "SELECT actor_id FROM audit_events WHERE action = 'user.disabled' AND resource_type = 'admin' AND resource_id = ? ORDER BY seq DESC LIMIT 1",
+  )
+  .bind(id)
+  .fetch_optional(pool)
+  .await?;
+  Ok(actor.flatten())
 }
 
 /// `Some(owner)` when `id` is an AI agent, `None` for a person or a
@@ -113,14 +141,6 @@ pub async fn agent(
   .bind(id)
   .fetch_optional(pool)
   .await
-}
-
-/// An AI agent's owner, or `None` for a person or a missing account.
-pub async fn agent_owner(
-  pool: &SqlitePool,
-  id: &str,
-) -> Result<Option<String>, sqlx::Error> {
-  Ok(agent(pool, id).await?.flatten())
 }
 
 pub struct NewUser<'a> {

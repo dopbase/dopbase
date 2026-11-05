@@ -91,25 +91,31 @@ async fn authorize_scope(
   }
 }
 
+/// What the grant's principal is when it is an AI agent: `Some(owner)`.
+/// Groups, people and missing accounts are `None`.
+async fn principal_agent(
+  state: &AppState,
+  principal_type: PrincipalType,
+  principal_id: &str,
+) -> Result<Option<Option<String>>, HttpError> {
+  if principal_type != PrincipalType::User {
+    return Ok(None);
+  }
+  Ok(users::repository::agent(state.db.pool(), principal_id).await?)
+}
+
 /// Whether the caller is giving or removing access for an AI agent they
 /// own, on one project or environment. Root's all-projects grants always go
 /// the usual way.
-async fn for_own_agent(
-  state: &AppState,
+fn for_own_agent(
   identity: &AuthIdentity,
   actor_id: &str,
-  principal_type: PrincipalType,
-  principal_id: &str,
+  agent: Option<&Option<String>>,
   scope_type: ScopeType,
-) -> Result<bool, HttpError> {
-  if principal_type != PrincipalType::User
-    || scope_type == ScopeType::All
-    || require_capability(identity, Capability::AgentsView).is_err()
-  {
-    return Ok(false);
-  }
-  let owner = users::repository::agent_owner(state.db.pool(), principal_id).await?;
-  Ok(owner.as_deref() == Some(actor_id))
+) -> bool {
+  scope_type != ScopeType::All
+    && agent.is_some_and(|owner| owner.as_deref() == Some(actor_id))
+    && require_capability(identity, Capability::AgentsView).is_ok()
 }
 
 /// Checks an owner may give their own agent `level` here: they must reach
@@ -172,8 +178,10 @@ fn principal_invalid() -> HttpError {
 }
 
 /// The principal's label, after checking a grant at `level` may be given
-/// to it. A caller grants only to groups and people they may list, as the
-/// Admin UI offers, so ids, root and role ceilings can't be probed.
+/// to it. A caller grants to groups and people they may list, to AI agents
+/// with agents.manage, and to their own agents, as the Admin UI offers, so
+/// ids, root and role ceilings can't be probed.
+#[allow(clippy::too_many_arguments)]
 async fn principal_label(
   conn: &mut sqlx::SqliteConnection,
   identity: &AuthIdentity,
@@ -181,6 +189,7 @@ async fn principal_label(
   principal_type: PrincipalType,
   principal_id: &str,
   level: Level,
+  agent: bool,
   own_agent: bool,
 ) -> Result<String, HttpError> {
   let can = |capability| require_capability(identity, capability).is_ok();
@@ -191,8 +200,19 @@ async fn principal_label(
     PrincipalType::Group => repository::group_name(conn, principal_id)
       .await?
       .ok_or_else(|| HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")),
-    // An owner gives access to their own agent without seeing people.
-    PrincipalType::User if !own_agent && !can(Capability::UsersView) => Err(principal_invalid()),
+    // People need users.view and AI agents agents.manage; users.view
+    // doesn't reach agents. An owner gives their own agent access without
+    // either. A missing account answers like a person.
+    PrincipalType::User
+      if !own_agent
+        && !can(if agent {
+          Capability::AgentsManage
+        } else {
+          Capability::UsersView
+        }) =>
+    {
+      Err(principal_invalid())
+    }
     PrincipalType::User => {
       // Root takes no grants, and a missing id gets the same answer.
       let (email, _, role_id) = repository::account(conn, principal_id)
@@ -228,15 +248,8 @@ pub async fn set(
   require_recent_browser_auth(identity)?;
   let (actor_id, actor_email) = require_browser(identity)?;
   validate_level(request.scope_type, request.level)?;
-  let own_agent = for_own_agent(
-    state,
-    identity,
-    actor_id,
-    request.principal_type,
-    &request.principal_id,
-    request.scope_type,
-  )
-  .await?;
+  let agent = principal_agent(state, request.principal_type, &request.principal_id).await?;
+  let own_agent = for_own_agent(identity, actor_id, agent.as_ref(), request.scope_type);
   let scope = if own_agent {
     authorize_own_agent_scope(
       state,
@@ -264,6 +277,7 @@ pub async fn set(
     request.principal_type,
     &request.principal_id,
     request.level,
+    agent.is_some(),
     own_agent,
   )
   .await?;
@@ -331,15 +345,8 @@ pub async fn delete(
     .await?
     .ok_or_else(not_found)?;
   drop(conn);
-  let own_agent = for_own_agent(
-    state,
-    identity,
-    actor_id,
-    grant.principal_type,
-    &grant.principal_id,
-    grant.scope_type,
-  )
-  .await?;
+  let agent = principal_agent(state, grant.principal_type, &grant.principal_id).await?;
+  let own_agent = for_own_agent(identity, actor_id, agent.as_ref(), grant.scope_type);
   // A grant on something the caller cannot see does not exist for them. An
   // owner takes access away from their own agent wherever they can see.
   let checked = if own_agent {
@@ -414,8 +421,9 @@ pub async fn project_access(
   })
 }
 
-/// Where an account's access comes from. Anyone can see their own; seeing
-/// someone else's needs the users.view capability.
+/// Where an account's access comes from. Anyone can see their own. A
+/// person's needs users.view; an AI agent's needs agents.view_all, or
+/// agents.view when the caller owns it.
 pub async fn user_access(
   state: &AppState,
   identity: &AuthIdentity,
