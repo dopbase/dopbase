@@ -12,7 +12,8 @@ use axum::{
 /// List personal tokens
 ///
 /// List an account's personal tokens. Use `me` for your own. Another
-/// account's tokens need users.view, unless you own that AI agent.
+/// person's tokens need users.view; an AI agent's need agents.view_all, or
+/// agents.view when you own it.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::TOKENS,
@@ -22,7 +23,7 @@ use axum::{
   responses(
     (status = 200, description = "Tokens fetched", body = inline(HttpResponseFormat<Vec<PersonalTokenResponse>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Tokens can't list tokens, or users.view is required", body = crate::http::ErrorBody),
+    (status = 403, description = "Tokens can't list tokens, or users.view, agents.view_all, or owning the agent is required", body = crate::http::ErrorBody),
     (status = 404, description = "The user was not found", body = crate::http::ErrorBody),
   ),
 )]
@@ -40,7 +41,8 @@ pub async fn list(
 /// Create a personal token
 ///
 /// Create a token for yourself (`me`), which needs tokens.personal, or for
-/// an AI agent account you own or manage. A token reaches at most what its
+/// an AI agent: one you own with agents.view, or anyone's with agents.manage
+/// when its access is within yours. A token reaches at most what its
 /// account reaches, within its own scope and level, and always expires.
 /// With `replaceExisting`, an AI agent's other valid tokens are revoked in
 /// the same step. Browser sessions need recent authentication and the CSRF
@@ -76,8 +78,9 @@ pub async fn create(
 
 /// Revoke a personal token
 ///
-/// Revoke your own token, a token of an AI agent you own, or anyone's with
-/// tokens.revoke_others when their access is within yours.
+/// Revoke your own token; an AI agent's when you own it (agents.view) or
+/// hold agents.manage; or a person's with tokens.revoke_others. Someone
+/// else's account must be within your access.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::TOKEN_REVOKE,

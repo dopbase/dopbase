@@ -13,7 +13,7 @@ use axum::{
 ///
 /// Return every role, built-in and custom, with its capabilities, level
 /// ceiling, token policy, member count, and whether the caller may give it
-/// to someone. Needs users.view or roles.manage.
+/// to someone. Needs users.view, roles.manage, or an agents capability.
 #[utoipa::path(
   get,
   path = crate::constants::api::roles::COLLECTION,
@@ -22,7 +22,7 @@ use axum::{
   responses(
     (status = 200, description = "Roles fetched", body = inline(HttpResponseFormat<Vec<RoleResponse>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "users.view or roles.manage is required", body = crate::http::ErrorBody),
+    (status = 403, description = "users.view, roles.manage, or an agents capability is required", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn list(

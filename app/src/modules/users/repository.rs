@@ -4,7 +4,7 @@ use crate::{
   constants::tokens::GRANT_ID_PREFIX, modules::grants::model::GroupRef, services::token,
 };
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,a.status,a.last_sign_in_at";
+const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,(SELECT o.email FROM admins o WHERE o.id = a.owner_id) AS owner_email,COALESCE(r.sign_in = 'token_only', 0) AS agent,a.status,a.last_sign_in_at";
 
 #[derive(sqlx::FromRow)]
 pub struct UserRow {
@@ -18,6 +18,9 @@ pub struct UserRow {
   pub has_password: bool,
   pub sso_linked: bool,
   pub owner_id: Option<String>,
+  pub owner_email: Option<String>,
+  /// The account's role signs in with tokens only: an AI agent.
+  pub agent: bool,
   pub status: String,
   pub last_sign_in_at: Option<String>,
 }
@@ -96,6 +99,28 @@ pub async fn account(
     .bind(id)
     .fetch_optional(pool)
     .await
+}
+
+/// `Some(owner)` when `id` is an AI agent, `None` for a person or a
+/// missing account.
+pub async fn agent(
+  pool: &SqlitePool,
+  id: &str,
+) -> Result<Option<Option<String>>, sqlx::Error> {
+  sqlx::query_scalar(
+    "SELECT a.owner_id FROM admins a JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND r.sign_in = 'token_only'",
+  )
+  .bind(id)
+  .fetch_optional(pool)
+  .await
+}
+
+/// An AI agent's owner, or `None` for a person or a missing account.
+pub async fn agent_owner(
+  pool: &SqlitePool,
+  id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+  Ok(agent(pool, id).await?.flatten())
 }
 
 pub struct NewUser<'a> {
@@ -234,14 +259,14 @@ pub async fn owned_count(
     .await
 }
 
-/// Whether `id` can own an AI agent: an active account that signs in and
-/// can see users, so the agent shows up for them.
+/// Whether `id` can own an AI agent: an active person whose role signs in
+/// and holds agents.view, so they can see and run it.
 pub async fn can_own(
   conn: &mut SqliteConnection,
   id: &str,
 ) -> Result<bool, sqlx::Error> {
   let found: Option<i64> = sqlx::query_scalar(
-    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'users.view')))",
+    "SELECT 1 FROM admins a LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ? AND a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'agents.view')))",
   )
   .bind(id)
   .fetch_optional(conn)

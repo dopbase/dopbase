@@ -10,7 +10,7 @@ use crate::{
   },
   http::HttpError,
   models::AuthIdentity,
-  modules::{common, environments, projects},
+  modules::{common, environments, projects, users},
   services::{
     authx::{self, Capability, Level},
     token,
@@ -91,6 +91,60 @@ async fn authorize_scope(
   }
 }
 
+/// Whether the caller is giving or removing access for an AI agent they
+/// own, on one project or environment. Root's all-projects grants always go
+/// the usual way.
+async fn for_own_agent(
+  state: &AppState,
+  identity: &AuthIdentity,
+  actor_id: &str,
+  principal_type: PrincipalType,
+  principal_id: &str,
+  scope_type: ScopeType,
+) -> Result<bool, HttpError> {
+  if principal_type != PrincipalType::User
+    || scope_type == ScopeType::All
+    || require_capability(identity, Capability::AgentsView).is_err()
+  {
+    return Ok(false);
+  }
+  let owner = users::repository::agent_owner(state.db.pool(), principal_id).await?;
+  Ok(owner.as_deref() == Some(actor_id))
+}
+
+/// Checks an owner may give their own agent `level` here: they must reach
+/// the project or environment at that level themselves, so an agent never
+/// gets more than its owner has. Protected environments count, because the
+/// owner's level on them already does. No access needs only sight of it.
+async fn authorize_own_agent_scope(
+  state: &AppState,
+  identity: &AuthIdentity,
+  scope_type: ScopeType,
+  scope: Option<&str>,
+  level: Level,
+) -> Result<Scope, HttpError> {
+  let needed = level.max(Level::Metadata);
+  match (scope_type, scope.filter(|value| !value.is_empty())) {
+    (ScopeType::Project, Some(reference)) => {
+      let project = projects::service::authorize(state, identity, reference, needed).await?;
+      Ok(Scope {
+        scope_id: project.id.clone(),
+        project_id: Some(project.id),
+        environment_id: None,
+      })
+    }
+    (ScopeType::Environment, Some(id)) => {
+      let environment = environments::service::authorize(state, identity, id, needed).await?;
+      Ok(Scope {
+        scope_id: environment.id.clone(),
+        project_id: Some(environment.project_id),
+        environment_id: Some(environment.id),
+      })
+    }
+    _ => authorize_scope(state, identity, scope_type, scope).await,
+  }
+}
+
 fn validate_level(
   scope_type: ScopeType,
   level: Level,
@@ -127,6 +181,7 @@ async fn principal_label(
   principal_type: PrincipalType,
   principal_id: &str,
   level: Level,
+  own_agent: bool,
 ) -> Result<String, HttpError> {
   let can = |capability| require_capability(identity, capability).is_ok();
   match principal_type {
@@ -136,7 +191,8 @@ async fn principal_label(
     PrincipalType::Group => repository::group_name(conn, principal_id)
       .await?
       .ok_or_else(|| HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")),
-    PrincipalType::User if !can(Capability::UsersView) => Err(principal_invalid()),
+    // An owner gives access to their own agent without seeing people.
+    PrincipalType::User if !own_agent && !can(Capability::UsersView) => Err(principal_invalid()),
     PrincipalType::User => {
       // Root takes no grants, and a missing id gets the same answer.
       let (email, _, role_id) = repository::account(conn, principal_id)
@@ -172,13 +228,33 @@ pub async fn set(
   require_recent_browser_auth(identity)?;
   let (actor_id, actor_email) = require_browser(identity)?;
   validate_level(request.scope_type, request.level)?;
-  let scope = authorize_scope(
+  let own_agent = for_own_agent(
     state,
     identity,
+    actor_id,
+    request.principal_type,
+    &request.principal_id,
     request.scope_type,
-    request.scope.as_deref(),
   )
   .await?;
+  let scope = if own_agent {
+    authorize_own_agent_scope(
+      state,
+      identity,
+      request.scope_type,
+      request.scope.as_deref(),
+      request.level,
+    )
+    .await?
+  } else {
+    authorize_scope(
+      state,
+      identity,
+      request.scope_type,
+      request.scope.as_deref(),
+    )
+    .await?
+  };
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let label = principal_label(
@@ -188,6 +264,7 @@ pub async fn set(
     request.principal_type,
     &request.principal_id,
     request.level,
+    own_agent,
   )
   .await?;
   let previous = repository::existing_level(
@@ -254,16 +331,36 @@ pub async fn delete(
     .await?
     .ok_or_else(not_found)?;
   drop(conn);
-  // A grant on something the caller cannot see does not exist for them.
-  let scope = authorize_scope(state, identity, grant.scope_type, Some(&grant.scope_id))
+  let own_agent = for_own_agent(
+    state,
+    identity,
+    actor_id,
+    grant.principal_type,
+    &grant.principal_id,
+    grant.scope_type,
+  )
+  .await?;
+  // A grant on something the caller cannot see does not exist for them. An
+  // owner takes access away from their own agent wherever they can see.
+  let checked = if own_agent {
+    authorize_own_agent_scope(
+      state,
+      identity,
+      grant.scope_type,
+      Some(&grant.scope_id),
+      Level::Metadata,
+    )
     .await
-    .map_err(|error| {
-      if error.status == StatusCode::NOT_FOUND {
-        not_found()
-      } else {
-        error
-      }
-    })?;
+  } else {
+    authorize_scope(state, identity, grant.scope_type, Some(&grant.scope_id)).await
+  };
+  let scope = checked.map_err(|error| {
+    if error.status == StatusCode::NOT_FOUND {
+      not_found()
+    } else {
+      error
+    }
+  })?;
   if grant.principal_type == PrincipalType::User && grant.principal_id == actor_id {
     return Err(self_grant());
   }
@@ -355,7 +452,19 @@ pub async fn user_access(
   };
   let id = if id == "me" { actor_id } else { id };
   if id != actor_id {
-    require_capability(identity, Capability::UsersView)?;
+    // An AI agent's access shows to its owner and to agents.view_all;
+    // a person's to users.view.
+    match users::repository::agent(state.db.pool(), id).await? {
+      Some(owner) if owner.as_deref() == Some(actor_id) => {
+        require_capability(identity, Capability::AgentsView)?;
+      }
+      Some(_) => {
+        require_capability(identity, Capability::AgentsViewAll)?;
+      }
+      None => {
+        require_capability(identity, Capability::UsersView)?;
+      }
+    }
   }
   let mut conn = state.db.pool().acquire().await?;
   let email: Option<String> = sqlx::query_scalar("SELECT email FROM admins WHERE id = ?")

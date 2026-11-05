@@ -405,7 +405,8 @@ async fn members_and_agents_cannot_create_projects() {
   )
   .await;
   assert_eq!(status, 403);
-  let (status, _, _) = call(
+  // A member lists only the AI agents they own, and no people.
+  let (status, listed, _) = call(
     &router,
     "GET",
     "/api/v1/users",
@@ -414,7 +415,8 @@ async fn members_and_agents_cannot_create_projects() {
     None,
   )
   .await;
-  assert_eq!(status, 403);
+  assert_eq!(status, 200);
+  assert_eq!(listed["data"], json!([]));
   let (status, agent, _) = call(
     &router,
     "POST",

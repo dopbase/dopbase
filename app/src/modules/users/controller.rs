@@ -11,8 +11,9 @@ use axum::{
 
 /// List users
 ///
-/// Return every administrator and member account ordered by role and email.
-/// Requires an authenticated administrator browser session.
+/// Return the accounts you may see, ordered by role and email: people with
+/// users.view, every AI agent with agents.view_all, and the agents you own
+/// with agents.view. Requires an Admin UI session.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::COLLECTION,
@@ -21,7 +22,7 @@ use axum::{
   responses(
     (status = 200, description = "Users fetched", body = inline(HttpResponseFormat<Vec<UserResponse>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Administrator browser session is required", body = crate::http::ErrorBody),
+    (status = 403, description = "An Admin UI session with users.view, agents.view, or agents.view_all is required", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn list(
@@ -91,9 +92,9 @@ pub async fn get(
 
 /// Create a user
 ///
-/// Provision a new administrator or member user account. Requires an
-/// authenticated administrator browser session with recent re-authentication
-/// and the CSRF header.
+/// Add a person, which needs users.manage, or an AI agent, which needs
+/// agents.view or agents.manage and is owned by whoever creates it. Requires
+/// an Admin UI session with recent authentication and the CSRF header.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::COLLECTION,
@@ -218,7 +219,8 @@ pub async fn unlink_sso(
 /// The account can't sign in, its sessions end, and its personal tokens and
 /// those of AI agents it owns are refused until it is enabled again.
 /// Disabling a disabled account changes nothing. Root and your own account
-/// can't be disabled. Requires users.manage from the Admin UI with recent
+/// can't be disabled. A person needs users.manage; an AI agent its owner
+/// with agents.view, or agents.manage. Requires the Admin UI with recent
 /// authentication and the CSRF header.
 #[utoipa::path(
   post,
@@ -229,7 +231,7 @@ pub async fn unlink_sso(
   responses(
     (status = 200, description = "User disabled", body = inline(HttpResponseFormat<UserResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "users.manage, CSRF, or recent authentication is required, the account is root or your own, or it has access you don't", body = crate::http::ErrorBody),
+    (status = 403, description = "users.manage (agents.view as the owner, or agents.manage, for an AI agent), CSRF, or recent authentication is required, the account is root or your own, or it has access you don't", body = crate::http::ErrorBody),
     (status = 404, description = "The user was not found", body = crate::http::ErrorBody),
   ),
 )]
@@ -259,7 +261,7 @@ pub async fn disable(
   responses(
     (status = 200, description = "User enabled", body = inline(HttpResponseFormat<UserResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "users.manage, CSRF, or recent authentication is required, the account is root or your own, or it has access you don't", body = crate::http::ErrorBody),
+    (status = 403, description = "users.manage (agents.view as the owner, or agents.manage, for an AI agent), CSRF, or recent authentication is required, the account is root or your own, or it has access you don't", body = crate::http::ErrorBody),
     (status = 404, description = "The user was not found", body = crate::http::ErrorBody),
   ),
 )]

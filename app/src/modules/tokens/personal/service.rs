@@ -77,6 +77,13 @@ async fn target<'a>(
   })
 }
 
+impl Target<'_> {
+  /// The account is an AI agent: its role signs in with tokens only.
+  fn is_agent(&self) -> bool {
+    self.holder.sign_in.as_deref() == Some("token_only")
+  }
+}
+
 fn invalid(
   code: &str,
   message: &str,
@@ -90,14 +97,24 @@ pub async fn list(
   id: &str,
 ) -> Result<Vec<PersonalTokenResponse>, HttpError> {
   let target = target(state, identity, id, Capability::UsersView).await?;
-  if target.relation == Relation::Other {
-    require_capability(identity, Capability::UsersView)?;
+  match target.relation {
+    Relation::Myself => {}
+    Relation::Owner => {
+      require_capability(identity, Capability::AgentsView)?;
+    }
+    Relation::Other if target.is_agent() => {
+      require_capability(identity, Capability::AgentsViewAll)?;
+    }
+    Relation::Other => {
+      require_capability(identity, Capability::UsersView)?;
+    }
   }
   Ok(repository::list(state.db.pool(), &target.id).await?)
 }
 
-/// Who may create the token: the account for itself, or the owner of an AI
-/// agent, or someone who manages people and reaches at least as far as it.
+/// Who may create the token: the account for itself, the owner of an AI
+/// agent while their role holds agents.view, or someone with agents.manage
+/// who reaches at least as far as the agent.
 async fn require_issuer(
   state: &AppState,
   identity: &AuthIdentity,
@@ -108,9 +125,20 @@ async fn require_issuer(
   }
   // Someone else's account says nothing about itself, root included, until
   // the caller is known to manage it.
-  if target.relation == Relation::Other {
-    require_capability(identity, Capability::UsersManage)?;
-    users::service::require_within(state, identity, &target.id).await?;
+  match target.relation {
+    Relation::Myself => {}
+    Relation::Owner => {
+      require_capability(identity, Capability::AgentsView)?;
+    }
+    Relation::Other => {
+      let needed = if target.is_agent() {
+        Capability::AgentsManage
+      } else {
+        Capability::UsersManage
+      };
+      require_capability(identity, needed)?;
+      users::service::require_within(state, identity, &target.id).await?;
+    }
   }
   if target.holder.is_root {
     return Err(HttpError::forbidden(
@@ -120,7 +148,7 @@ async fn require_issuer(
   }
   if target.relation == Relation::Myself {
     require_capability(identity, Capability::TokensPersonal)?;
-  } else if target.holder.sign_in.as_deref() != Some("token_only") {
+  } else if !target.is_agent() {
     return Err(HttpError::forbidden(
       "TOKEN_OWNER_INVALID",
       "People create their own tokens. You can create them for AI agents only.",
@@ -215,10 +243,8 @@ pub async fn create(
         "Only an AI agent's tokens can be replaced. Revoke your own tokens one by one.",
       ));
     }
-    // Replacing revokes, so it needs what revoking needs.
-    if target.relation == Relation::Other {
-      require_capability(identity, Capability::TokensRevokeOthers)?;
-    }
+    // Replacing revokes, which the agent's owner or agents.manage already
+    // allows; require_issuer has checked one of them.
   }
   let name = request.name.trim();
   if name.is_empty() || name.chars().count() > 64 {
@@ -363,9 +389,22 @@ pub async fn revoke(
 ) -> Result<PersonalTokenResponse, HttpError> {
   require_mutation(identity, headers)?;
   let target = target(state, identity, id, Capability::TokensRevokeOthers).await?;
-  if target.relation == Relation::Other {
-    require_capability(identity, Capability::TokensRevokeOthers)?;
-    users::service::require_within(state, identity, &target.id).await?;
+  match target.relation {
+    Relation::Myself => {}
+    Relation::Owner => {
+      require_capability(identity, Capability::AgentsView)?;
+    }
+    Relation::Other => {
+      // An agent's tokens are managed with the agent; a person's with
+      // tokens.revoke_others.
+      let needed = if target.is_agent() {
+        Capability::AgentsManage
+      } else {
+        Capability::TokensRevokeOthers
+      };
+      require_capability(identity, needed)?;
+      users::service::require_within(state, identity, &target.id).await?;
+    }
   }
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;

@@ -279,15 +279,16 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   let (status, _) = send(&router, "GET", "/api/v1/projects", As::Token(&bot), None).await;
   assert_eq!(status, 401);
 
-  // A member can't view users, so they couldn't see an agent they own;
-  // another admin can take it.
-  let member = person(&router, &root, "member@example.com", "member").await;
+  // An auditor can't create agents, so it can't own one; another admin
+  // can take it.
+  let auditor =
+    super::audit_scope::with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
   let (status, body) = send(
     &router,
     "PATCH",
     &format!("/api/v1/users/{agent}"),
     root.browser(),
-    Some(json!({"ownerId":member.id})),
+    Some(json!({"ownerId":auditor.id})),
   )
   .await;
   assert_eq!(status, 400, "{body}");

@@ -47,6 +47,8 @@ pub struct UserResponse {
   pub sso_linked: bool,
   /// The accountable person behind an AI agent account.
   pub owner_id: Option<String>,
+  /// The owner's email, so an agent's owner shows without listing people.
+  pub owner_email: Option<String>,
   /// `active` or `disabled`.
   pub status: UserStatus,
   /// ISO 8601 time of the last password, single sign-on, or CLI browser

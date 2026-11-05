@@ -91,6 +91,15 @@ pub enum Capability {
   TokensPersonal,
   #[serde(rename = "tokens.revoke_others")]
   TokensRevokeOthers,
+  /// Create AI agents, and see and run the ones you own.
+  #[serde(rename = "agents.view")]
+  AgentsView,
+  /// See every AI agent, not only your own.
+  #[serde(rename = "agents.view_all")]
+  AgentsViewAll,
+  /// Change, delete, or transfer anyone's AI agent within your own access.
+  #[serde(rename = "agents.manage")]
+  AgentsManage,
   #[serde(rename = "sso.manage")]
   SsoManage,
   #[serde(rename = "instance.view")]
@@ -104,7 +113,7 @@ pub enum Capability {
 }
 
 impl Capability {
-  pub const ALL: [Self; 18] = [
+  pub const ALL: [Self; 21] = [
     Self::UsersView,
     Self::UsersManage,
     Self::RolesManage,
@@ -118,6 +127,9 @@ impl Capability {
     Self::AccessReport,
     Self::TokensPersonal,
     Self::TokensRevokeOthers,
+    Self::AgentsView,
+    Self::AgentsViewAll,
+    Self::AgentsManage,
     Self::SsoManage,
     Self::InstanceView,
     Self::InstanceBackup,
@@ -150,6 +162,9 @@ impl Capability {
       Self::AccessReport => "access.report",
       Self::TokensPersonal => "tokens.personal",
       Self::TokensRevokeOthers => "tokens.revoke_others",
+      Self::AgentsView => "agents.view",
+      Self::AgentsViewAll => "agents.view_all",
+      Self::AgentsManage => "agents.manage",
       Self::SsoManage => "sso.manage",
       Self::InstanceView => "instance.view",
       Self::InstanceBackup => "instance.backup",
