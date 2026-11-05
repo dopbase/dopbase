@@ -181,8 +181,10 @@ async fn personal(
         output::print_success(&format!("Created personal token {name}."));
         output::print_fields(&[
           ("ID:", output::string(token, "id")),
+          // The level is a ceiling: the token never reaches more than the
+          // account does at the time it is used.
           (
-            "Reaches:",
+            "Up to:",
             format!(
               "{} on {}",
               output::string(token, "level"),
@@ -194,6 +196,9 @@ async fn personal(
         ]);
         output::print_warning(
           "Store this token now. Dopbase will not show it again. Use it as DOPBASE_TOKEN.",
+        );
+        output::print_info(
+          "The token never reaches more than you do. Run dopbase access with it to see what it reaches now.",
         );
       }
     }
