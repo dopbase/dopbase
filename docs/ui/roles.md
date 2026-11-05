@@ -52,8 +52,9 @@ you edit and shows:
 - **Holders can**: how many of the 14 capabilities the role holds, and which.
 - **Their tokens**: what personal tokens reach, what they can do, and how long
   they last.
-- **Who can give it**: root, plus each built-in role whose capabilities and
-  level cover this one. Only they can give it on Users.
+- **Who can give it**: root, plus each built-in role that holds
+  `users.manage` and whose capabilities and level cover this one. Only they
+  can give it on Users.
 - **Closest built-in**: the built-in role with the fewest differences, and
   what those differences are.
 
@@ -85,9 +86,9 @@ first.
 
 ## Who can give a role
 
-On **Users**, people can pick only the roles within their own: every
-capability of the role must be one they hold, and its level no deeper than
-theirs. Root can give any role.
+Giving a role takes `users.manage`. On **Users**, people can pick only the
+roles within their own: every capability of the role must be one they hold,
+and its level no deeper than theirs. Root can give any role.
 
 Role changes are recorded in the audit log as `role.created`, `role.updated`,
 and `role.deleted`.

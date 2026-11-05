@@ -81,12 +81,14 @@ or **Revoke token** in the list's **⋯** menu.
 
 **Transfer owner** needs `agents.manage`. It lists the people who can own the
 agent: root and anyone whose role has `agents.view`, so the new owner can see
-and run it. The agent keeps its
+and run it. You see these people even without `users.view`. The agent keeps its
 grants and token, but never reaches more than its new owner does. With no one
 else who could own it, as on a solo install with only root, the button and
 the menu item are hidden.
 
-**Disable agent** stops its token; its access and history stay. **Delete
+**Disable agent** stops its token; its access and history stay. If someone
+with `agents.manage` disabled it, its owner can't enable it again; only
+`agents.manage` can. **Delete
 agent** asks you to type its name, then removes it with its grants and tokens.
 Audit events stay.
 

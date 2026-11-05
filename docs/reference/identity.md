@@ -269,17 +269,21 @@ them:
 - **`agents.view`** lets you create agents. For agents you own, you can rename,
   disable, or delete them, create and revoke their tokens, and give them
   access. Admins and Members have it. An owner's role must keep it to run
-  their agents, and a new owner must have it.
+  their agents, and a new owner must have it. If someone with
+  `agents.manage` disables your agent, only `agents.manage` can enable it
+  again.
 - **`agents.view_all`** shows every agent. Admins and Auditors have it.
 - **`agents.manage`** changes, deletes, or transfers anyone's agent within
-  your own access. Admins have it.
+  your own access. You also see the people who could own an agent, so you can
+  pick a new owner without `users.view`. It doesn't create agents: whoever
+  creates one owns it, so that takes `agents.view`. Admins have it.
 
 An owner gives their own agent access without being a project manager, but
 only where they reach and at no more than their own level there. With Write on
 one project out of three, you can give your agent Names only, Read, or Write
 on that project and nothing on the other two. A protected environment your
-project grant doesn't reach is out too. Project managers still give any agent
-access on their projects.
+project grant doesn't reach is out too. Project managers with `agents.manage`
+give any agent access on their projects; `users.view` doesn't count.
 
 Agents and their tokens live on the [AI agents](/ui/ai-agents) page. A person
 who owns agents can't be deleted until the agents are deleted or given another
