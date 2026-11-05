@@ -406,6 +406,16 @@ describe("useAgentsController", () => {
     expect(controller.canAdd.value).toBe(true);
   });
 
+  it("hides Add from agents.manage without agents.view, since adding means owning", async () => {
+    signInAs(["tokens.personal", "agents.view_all", "agents.manage"], {
+      adminId: "usr_lead",
+      role: "member",
+    });
+    const controller = await mountAgents();
+
+    expect(controller.canAdd.value).toBe(false);
+  });
+
   it("hides Add from someone who can't create agents", async () => {
     signInAs(["tokens.personal", "agents.view_all"], {
       adminId: "usr_maya",

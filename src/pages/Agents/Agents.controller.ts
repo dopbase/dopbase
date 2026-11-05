@@ -135,7 +135,8 @@ export function useAgentsController() {
       ) ?? null,
   );
   const canAdd = computed(
-    () => auth.can("agents.view", "agents.manage") && agentRole.value !== null,
+    // Whoever adds an agent owns it, which takes agents.view.
+    () => auth.can("agents.view") && agentRole.value !== null,
   );
 
   /** Its owner while they may run agents, or anyone who manages agents. */

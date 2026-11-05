@@ -545,7 +545,7 @@ describe("useGiveAccessController from a project", () => {
   beforeEach(() => {
     route.name = "project-access-give";
     route.params = { projectRef: "payments" };
-    signInAs(["users.view", "groups.manage"]);
+    signInAs(["users.view", "groups.manage", "agents.manage"]);
     vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue({
       project: project({}),
       environments: [
@@ -575,6 +575,22 @@ describe("useGiveAccessController from a project", () => {
     ]);
     vi.mocked(accessApi.fetchGroups).mockResolvedValue([
       groupSummaryFixture({ memberCount: 1 }),
+    ]);
+  });
+
+  it("lists only what you may give access to: people with users.view, agents with agents.manage", async () => {
+    signInAs(["users.view", "groups.manage"]);
+    let page = await open();
+    expect(page.principals.value.map((choice) => choice.label)).toEqual([
+      "Backend",
+      "maya@example.com",
+      "reader@example.com",
+    ]);
+
+    signInAs(["agents.view_all", "agents.manage"]);
+    page = await open();
+    expect(page.principals.value.map((choice) => choice.label)).toEqual([
+      "review-bot",
     ]);
   });
 

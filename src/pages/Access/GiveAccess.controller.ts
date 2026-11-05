@@ -22,6 +22,7 @@ import { readQuery } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { environmentsQuery, projectsQuery } from "~/queries/projects";
 import { userQuery, usersQuery } from "~/queries/users";
+import type { User } from "~/services/users.api";
 import { pages } from "~/navigation/access-map";
 import type { Breadcrumb } from "~/navigation/breadcrumb";
 import { formatLevel, formatList } from "~/utils/format";
@@ -233,14 +234,26 @@ export function useGiveAccessController() {
   }
 
   /**
+   * Whether the server lets you give this account access: people with
+   * users.view, anyone's AI agent with agents.manage, and your own agents.
+   */
+  function grantable(user: User): boolean {
+    if (user.role !== "ai_agent") return auth.can("users.view");
+    return (
+      auth.can("agents.manage") ||
+      (auth.can("agents.view") && user.ownerId === auth.session?.adminId)
+    );
+  }
+
+  /**
    * Groups, people and AI agents to pick from. Each list needs its own
    * capability, so a project manager without them sees only what they may
-   * list. Root reaches every project already, and you can't give yourself
-   * access.
+   * give access to. Root reaches every project already, and you can't give
+   * yourself access.
    */
   async function loadPrincipals(): Promise<void> {
     const [users, groups] = await Promise.allSettled([
-      auth.can("users.view")
+      auth.can("users.view", "agents.view", "agents.manage")
         ? readQuery(cache, usersQuery)
         : Promise.resolve([]),
       auth.can("users.view", "groups.manage")
@@ -261,7 +274,10 @@ export function useGiveAccessController() {
         .sort(byName),
       ...(users.status === "fulfilled" ? users.value : [])
         .filter(
-          (user) => user.role !== "root" && user.id !== auth.session?.adminId,
+          (user) =>
+            user.role !== "root" &&
+            user.id !== auth.session?.adminId &&
+            grantable(user),
         )
         .map((user) => ({
           type: "user" as const,
