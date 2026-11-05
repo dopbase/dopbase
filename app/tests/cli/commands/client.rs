@@ -147,11 +147,21 @@ async fn status_reports_the_role_and_how_the_cli_signed_in() {
     .args(["client", "status"]);
   let agent = super::support::output(agent, None).await;
   let text = String::from_utf8_lossy(&agent.stdout);
-  assert!(text.contains("personal token (DOPBASE_TOKEN)"), "{text}");
+  // Agent tokens share the personal prefix; the owner gives them away.
+  assert!(text.contains("AI agent token (DOPBASE_TOKEN)"), "{text}");
   assert!(
     text.contains("AI agent (the token may reach less"),
     "{text}"
   );
+  assert!(text.contains("metadata-agent"), "{text}");
+  assert!(text.contains("Owner:"), "{text}");
+  let mut agent = fixture.command();
+  agent
+    .env("DOPBASE_TOKEN", token["plaintextToken"].as_str().unwrap())
+    .args(["--json", "client", "status"]);
+  let agent = super::support::success(&super::support::output(agent, None).await);
+  assert_eq!(agent["identity"], "ai_agent");
+  assert!(agent["owner"].is_string(), "{agent}");
   fixture.stop().await;
 }
 

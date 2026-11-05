@@ -84,6 +84,11 @@ pub struct GrantResponse {
   pub level: Level,
   pub granted_by: Option<String>,
   pub created_at: String,
+  /// On an AI agent's access report only: the most its owner reaches on
+  /// this scope, present when it is below `level`. The agent gets this
+  /// lower level, because it never reaches more than its owner.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub owner_level: Option<Level>,
 }
 
 /// Give a user or group a level on all projects, a project, or an
@@ -143,6 +148,9 @@ pub struct UserAccessResponse {
   pub email: String,
   /// The account's role. `Root` for root.
   pub role_name: String,
+  /// An AI agent's owner, whose own access caps the agent's grants.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub owner_email: Option<String>,
   /// The deepest level the account's role allows.
   pub max_level: Level,
   /// The limit of the personal token that asked, when one did.

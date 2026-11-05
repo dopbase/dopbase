@@ -81,6 +81,14 @@ one.
      Dopbase, and the app needs no review.
    - **External** for personal Gmail accounts or people from several
      organizations. Without Google Workspace, this is the only choice.
+
+   Dopbase doesn't check which Google domain an account belongs to. It signs
+   in only emails that have a Dopbase account, so the Users page is your
+   allow list. With **External**, a personal Google account set up with a work
+   address can link to that person's Dopbase account on its first sign-in. If
+   your company uses Google Workspace, choose **Internal**. See
+   [Who can sign in](./single-sign-on#who-can-sign-in).
+
 5. Enter a contact email, accept the user data policy, and select **Create**.
 
 An external app starts in testing. Dopbase asks only for `openid`, `email`, and

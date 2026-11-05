@@ -49,5 +49,9 @@ describe("DbAlert", () => {
     expect(mountAlert({ tone: "success" }, "Saved.").getAttribute("role")).toBe(
       "status",
     );
+    app?.unmount();
+    expect(mountAlert({ tone: "warn" }, "Careful.").getAttribute("role")).toBe(
+      "note",
+    );
   });
 });

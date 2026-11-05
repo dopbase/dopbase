@@ -15,16 +15,16 @@ An agent running on your own machine doesn't need an account: create a
 personal token with **Names only** from your account menu. Root has no
 personal tokens, so if root is your only account, add an agent.
 
-Open **AI agents** from the sidebar. Anyone with `users.view` can see the list.
-The table shows each agent's owner, its token (`active`, `expires in 3 days`
+Open **AI agents** from the sidebar. With `agents.view` you see the agents you
+own, and with `agents.view_all` you see every agent. The table shows each agent's owner, its token (`active`, `expires in 3 days`
 once it is a week from expiring, or `no token`), when the token expires, and
 when it was last used. Add an **Owner** chip to see one person's agents.
 
 ## Add an agent
 
 Choose **Add AI agent**, give it a name such as `review-bot`, and choose
-**Add agent**. Adding agents needs `users.manage`. You become its owner and
-land on its page. It starts with no access.
+**Add agent**. Adding agents needs `agents.view`, which Admins and Members
+have. You become its owner and land on its page. It starts with no access.
 
 ## An agent's page
 
@@ -34,11 +34,25 @@ gives it to someone else.
 
 - **Access** lists its grants, as on a person's page. **Give access** opens
   the page described in [Users](./users.md#giving-access). Levels above its
-  role are shown but can't be picked.
+  role are shown but can't be picked. As its owner you don't need to manage
+  the project: you can give your agent any project or environment you reach,
+  up to your own level there and at most Write.
 - **Tokens** lists its current token and the ones before it.
 - **Danger zone** disables or deletes the agent.
 
-Its owner, or anyone with `users.manage`, can change it.
+Its owner, or anyone with `agents.manage`, can change it. `users.manage` alone
+doesn't reach agents.
+
+## What an owner can give
+
+Say there are three projects and you have Write on `payments` only. On your
+agent's **Give access** page, `payments` is the only project listed, and you
+can give the agent Names only, Read, or Write there. The other two projects
+aren't offered. A protected environment your project grant doesn't reach
+isn't offered either.
+
+If your own access drops later, the agent drops with it on its next request,
+whatever its grant says.
 
 ## Create or replace its token
 
@@ -65,13 +79,18 @@ or **Revoke token** in the list's **⋯** menu.
 
 ## Transfer, disable, or delete
 
-**Transfer owner** lists the people who can own it: root and anyone whose role
-has `users.view`, so the new owner can see the agent. The agent keeps its
-grants and token, but never reaches more than its new owner does. With no one
+**Transfer owner** needs `agents.manage`. It lists the people who can own the
+agent: root and anyone whose role has `agents.view`, so the new owner can see
+and run it. You see these people even without `users.view`. The agent keeps its
+grants but never reaches more than its new owner does. Its tokens are revoked,
+so a copy the old owner kept stops working; the new owner creates a new one
+with **New token**. With no one
 else who could own it, as on a solo install with only root, the button and
 the menu item are hidden.
 
-**Disable agent** stops its token; its access and history stay. **Delete
+**Disable agent** stops its token; its access and history stay. If someone
+with `agents.manage` disabled it, its owner can't enable it again; only
+`agents.manage` can. **Delete
 agent** asks you to type its name, then removes it with its grants and tokens.
 Audit events stay.
 

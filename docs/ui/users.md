@@ -40,7 +40,10 @@ admins don't.
 
 1. Choose **Add user**.
 2. Enter their email and a temporary password. With single sign-on on, pick
-   **Single sign-on** instead and they sign in through the provider.
+   **Single sign-on** instead and they sign in through the provider with an
+   account that has the same verified email. Only the emails you add here can
+   sign in; see
+   [Who can sign in](/guide/single-sign-on#who-can-sign-in).
 3. Pick a role.
 4. Choose **Add user**, then share the sign-in details securely.
 

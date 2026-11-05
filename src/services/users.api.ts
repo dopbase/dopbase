@@ -13,6 +13,8 @@ export interface User {
   roleName?: string;
   /** The person who answers for an AI agent. */
   ownerId?: string | null;
+  /** That person's email, so it shows without listing people. */
+  ownerEmail?: string | null;
   createdAt: string;
   updatedAt: string;
   hasPassword: boolean;

@@ -16,7 +16,11 @@ import { useInvalidate } from "~/queries/invalidate";
 import { rolesQuery } from "~/queries/users";
 import { formatLevel } from "~/utils/format";
 import { PROJECT_LEVELS } from "~/utils/level";
-import { ROLE_CAPABILITIES } from "./Roles.controller";
+import { HIDDEN_CAPABILITIES, ROLE_CAPABILITIES } from "./Roles.controller";
+import { roleSummary } from "./role-summary";
+
+/** What a role keeps through the editor: what it lists, and what it hides. */
+const KEPT_CAPABILITIES = [...ROLE_CAPABILITIES, ...HIDDEN_CAPABILITIES];
 
 /** Levels a personal token may be given. */
 export const TOKEN_LEVELS: Level[] = ["metadata", "read"];
@@ -114,7 +118,7 @@ export function useRoleController() {
     maxLevel.value = from?.maxLevel ?? "read";
     capabilities.value = from
       ? from.capabilities.filter((capability) =>
-          ROLE_CAPABILITIES.includes(capability),
+          KEPT_CAPABILITIES.includes(capability),
         )
       : ["tokens.personal"];
     // New roles, duplicates included, sign in with password or single sign-on
@@ -170,7 +174,7 @@ export function useRoleController() {
     if (on) next.add(capability);
     else next.delete(capability);
     // Keep checklist order so the request reads the same each time.
-    capabilities.value = ROLE_CAPABILITIES.filter((item) => next.has(item));
+    capabilities.value = KEPT_CAPABILITIES.filter((item) => next.has(item));
   }
 
   /** What the request sends. Token settings only matter with tokens.personal. */
@@ -188,6 +192,15 @@ export function useRoleController() {
       ...(isNew.value ? { signIn: signIn.value } : {}),
     };
   });
+
+  /** What the role adds up to, for the Summary card. Follows the form. */
+  const summary = computed(() =>
+    roleSummary(
+      { ...settings.value, name: name.value, signIn: signIn.value },
+      roles.value ?? [],
+      roleId.value,
+    ),
+  );
 
   async function save(): Promise<boolean> {
     if (readOnly.value) return false;
@@ -245,6 +258,7 @@ export function useRoleController() {
     has,
     toggle,
     settings,
+    summary,
     saving,
     nameError,
     saveError,

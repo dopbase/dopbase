@@ -18,13 +18,15 @@ export const CAPABILITY_LABELS: Partial<Record<Capability, string>> = {
     "Add, change and remove people with no more access than theirs",
   "groups.manage": "Create groups and change their members",
   "projects.create": "Create projects",
-  "grants.manage": "Manage project access",
   "audit.read": "Read the audit log for their own projects",
   "audit.read_all": "Read the whole audit log",
   "audit.verify": "Check the audit log hasn't been changed",
   "access.report": "See who can reach any project",
   "tokens.personal": "Hold personal tokens",
   "tokens.revoke_others": "Revoke other people's personal tokens",
+  "agents.view": "Create AI agents and run the ones they own",
+  "agents.view_all": "See every AI agent",
+  "agents.manage": "Change, delete and hand over anyone's AI agent",
   "instance.view": "See instance status",
 };
 
@@ -37,7 +39,7 @@ export const CAPABILITY_GROUPS: {
     label: "People",
     capabilities: ["users.view", "users.manage", "groups.manage"],
   },
-  { label: "Projects", capabilities: ["projects.create", "grants.manage"] },
+  { label: "Projects", capabilities: ["projects.create"] },
   {
     label: "Audit",
     capabilities: [
@@ -51,6 +53,10 @@ export const CAPABILITY_GROUPS: {
     label: "Tokens",
     capabilities: ["tokens.personal", "tokens.revoke_others"],
   },
+  {
+    label: "AI agents",
+    capabilities: ["agents.view", "agents.view_all", "agents.manage"],
+  },
   { label: "Instance", capabilities: ["instance.view"] },
 ];
 
@@ -58,6 +64,13 @@ export const CAPABILITY_GROUPS: {
 export const ROLE_CAPABILITIES: Capability[] = CAPABILITY_GROUPS.flatMap(
   (group) => group.capabilities,
 );
+
+/**
+ * Capabilities a role may hold that the editor doesn't list. The server
+ * never checks grants.manage yet, so the checkbox would do nothing; a role
+ * that has it keeps it when saved.
+ */
+export const HIDDEN_CAPABILITIES: Capability[] = ["grants.manage"];
 
 export interface RoleRow {
   role: Role;
