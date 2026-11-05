@@ -17,6 +17,7 @@ import { rolesQuery } from "~/queries/users";
 import { formatLevel } from "~/utils/format";
 import { PROJECT_LEVELS } from "~/utils/level";
 import { HIDDEN_CAPABILITIES, ROLE_CAPABILITIES } from "./Roles.controller";
+import { roleSummary } from "./role-summary";
 
 /** What a role keeps through the editor: what it lists, and what it hides. */
 const KEPT_CAPABILITIES = [...ROLE_CAPABILITIES, ...HIDDEN_CAPABILITIES];
@@ -192,6 +193,15 @@ export function useRoleController() {
     };
   });
 
+  /** What the role adds up to, for the Summary card. Follows the form. */
+  const summary = computed(() =>
+    roleSummary(
+      { ...settings.value, name: name.value },
+      roles.value ?? [],
+      roleId.value,
+    ),
+  );
+
   async function save(): Promise<boolean> {
     if (readOnly.value) return false;
     nameError.value = settings.value.name ? null : "Enter a role name.";
@@ -248,6 +258,7 @@ export function useRoleController() {
     has,
     toggle,
     settings,
+    summary,
     saving,
     nameError,
     saveError,
