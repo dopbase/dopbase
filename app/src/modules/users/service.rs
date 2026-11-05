@@ -10,7 +10,7 @@ use crate::{
   },
   http::HttpError,
   models::{AdminRole, AuthIdentity},
-  modules::{common, grants, grants::model::GroupRef},
+  modules::{common, grants, grants::model::GroupRef, tokens},
   services::{
     authx::{self, Access, Capability, Catalog},
     token,
@@ -629,8 +629,31 @@ pub async fn update(
     }
     repository::set_owner(&mut tx, id, owner_id).await?;
   }
+  // The old owner may still hold the agent's tokens. A new owner starts
+  // with none, so nobody keeps acting through access they no longer own.
+  let revoked = match &request.owner_id {
+    Some(owner_id) if account_owner.as_deref() != Some(owner_id.as_str()) => {
+      tokens::personal::repository::revoke_all(&mut tx, id, &now).await?
+    }
+    _ => Vec::new(),
+  };
   repository::revoke_sessions(&mut tx, id, &now).await?;
   let (_, actor_email) = actor(identity);
+  for (token_id, name) in &revoked {
+    common::audit(
+      &mut tx,
+      identity.audit_actor_type(),
+      Some(actor_id),
+      Some(actor_email),
+      "personal_token.revoked",
+      None,
+      None,
+      Some("personal_token"),
+      Some(token_id),
+      serde_json::json!({"userId": id, "user": email, "name": name, "reason": "owner_changed"}),
+    )
+    .await?;
+  }
   common::audit(
     &mut tx,
     identity.audit_actor_type(),

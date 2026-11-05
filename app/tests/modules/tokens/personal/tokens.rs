@@ -325,6 +325,19 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   )
   .await;
   assert_eq!(status, 200);
+  // Changing hands revoked the old token; root's new one works with the
+  // owner gone.
+  let (status, _) = send(&router, "GET", &runtime(search), As::Token(&bot), None).await;
+  assert_eq!(status, 401);
+  let (status, body) = token(
+    &router,
+    &root,
+    &agent,
+    json!({"name":"root","level":"read"}),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let bot = plaintext(&body);
   let (status, _) = send(&router, "GET", &runtime(search), As::Token(&bot), None).await;
   assert_eq!(status, 200);
   state.db.close().await;

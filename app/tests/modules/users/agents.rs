@@ -659,6 +659,31 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
     !seen.contains(&"auditor@example.com".to_owned()),
     "{seen:?}"
   );
+  // Maya gave her agent a token before it changes hands.
+  let (status, body) = send(
+    &router,
+    "POST",
+    &format!("/api/v1/users/{bot}/tokens"),
+    maya.browser(),
+    Some(json!({"name":"ci","level":"read"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let token = body["data"]["plaintextToken"].as_str().unwrap().to_owned();
+  let me = "/api/v1/users/me/access";
+  // Naming the same owner again hands nothing over, so the token lives.
+  let (status, body) = send(
+    &router,
+    "PATCH",
+    &format!("/api/v1/users/{bot}"),
+    lead.browser(),
+    Some(json!({"ownerId":maya.id})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, _) = send(&router, "GET", me, As::Token(&token), None).await;
+  assert_eq!(status, 200);
+
   let (status, body) = send(
     &router,
     "PATCH",
@@ -669,6 +694,27 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
   .await;
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["ownerEmail"], "other@example.com");
+  // A new owner starts with no tokens, so Maya's copy stops working.
+  let (status, _) = send(&router, "GET", me, As::Token(&token), None).await;
+  assert_eq!(status, 401);
+  let (status, body) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/users/{bot}/tokens"),
+    other.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert!(body["data"][0]["revokedAt"].is_string(), "{body}");
+  let revoked: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM audit_events WHERE action = 'personal_token.revoked' AND actor_id = ? AND metadata LIKE '%owner_changed%'",
+  )
+  .bind(&lead.id)
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(revoked, 1);
   state.db.close().await;
 }
 
