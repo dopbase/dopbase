@@ -203,22 +203,42 @@ pub(crate) async fn show_status(
   let server = local_config::resolve(argument, data_dir)?;
   let credential = client::credential(&server)?;
   let connected = server_is_connected(&server).await;
-  let identity = credential_identity(&credential);
+  let mut identity = credential_identity(&credential);
   let role = if connected && has_account(identity) {
     Some(fetch_role(&server, &credential).await)
   } else {
     None
   };
   let role_name = match &role {
-    Some(RoleLookup::Found(name)) => Some(name.as_str()),
+    Some(RoleLookup::Found { name, .. }) => Some(name.as_str()),
     _ => None,
   };
-  let value = status_document(&server, &credential, connected, role_name);
+  // AI agent tokens now share the personal token prefix, so the server's
+  // answer is what tells an agent apart: only an agent has an owner.
+  let owner = match &role {
+    Some(RoleLookup::Found { owner, .. }) => owner.clone(),
+    _ => None,
+  };
+  if owner.is_some() && identity == "personal_token" {
+    identity = "ai_agent";
+  }
+  let mut value = status_document(&server, &credential, connected, role_name);
+  value["identity"] = json!(identity);
+  if let Some(owner) = &owner {
+    value["owner"] = json!(owner);
+  }
   if json_output {
     output::print_json(&value)?;
   } else {
+    let account = match &role {
+      Some(RoleLookup::Found { account, .. }) => account.as_deref(),
+      _ => None,
+    };
     let email = match (&credential.email, credential.source, identity) {
       (Some(email), _, _) => email.as_str(),
+      // An agent has a name, not an email; its name shows under Agent.
+      (None, _, "ai_agent") => "none",
+      (None, _, "personal_token") => account.unwrap_or("none"),
       (None, CredentialSource::EncryptedSession, "admin") => {
         "unknown (run dopbase login again to refresh)"
       }
@@ -233,7 +253,7 @@ pub(crate) async fn show_status(
     } else {
       "offline (cache)"
     };
-    output::print_fields(&[
+    let mut fields = vec![
       ("Config file:", server.config_path.display().to_string()),
       ("Server:", server.url.clone()),
       ("Server status:", server_status.into()),
@@ -244,14 +264,25 @@ pub(crate) async fn show_status(
       ),
       ("Role:", human_role(identity, connected, role.as_ref())),
       ("Email:", email.into()),
-      ("Environment:", environment),
-    ]);
+    ];
+    if let Some(owner) = &owner {
+      fields.push(("Agent:", account.unwrap_or("unknown").to_owned()));
+      fields.push(("Owner:", owner.clone()));
+    }
+    fields.push(("Environment:", environment));
+    output::print_fields(&fields);
   }
   Ok(())
 }
 
 enum RoleLookup {
-  Found(String),
+  /// The role name, the account's email (an AI agent's name), and an AI
+  /// agent's owner.
+  Found {
+    name: String,
+    account: Option<String>,
+    owner: Option<String>,
+  },
   SessionExpired,
   Unavailable,
 }
@@ -275,7 +306,14 @@ async fn fetch_role(
   let request = api.request(Method::GET, &path, None);
   match tokio::time::timeout(Duration::from_secs(3), request).await {
     Ok(Ok(data)) => match data.get("roleName").and_then(Value::as_str) {
-      Some(name) if !name.is_empty() => RoleLookup::Found(name.to_owned()),
+      Some(name) if !name.is_empty() => {
+        let text = |key: &str| data.get(key).and_then(Value::as_str).map(str::to_owned);
+        RoleLookup::Found {
+          name: name.to_owned(),
+          account: text("email"),
+          owner: text("ownerEmail"),
+        }
+      }
       _ => RoleLookup::Unavailable,
     },
     Ok(Err(error)) if client::is_authentication_error(&error) => RoleLookup::SessionExpired,
@@ -373,10 +411,10 @@ fn human_role(
   match (identity, role) {
     ("none", _) => "none".into(),
     ("runner", _) => "none (runner tokens act for one environment, not a person)".into(),
-    ("personal_token" | "ai_agent", Some(RoleLookup::Found(name))) => {
+    ("personal_token" | "ai_agent", Some(RoleLookup::Found { name, .. })) => {
       format!("{name} (the token may reach less; run dopbase access)")
     }
-    (_, Some(RoleLookup::Found(name))) => name.clone(),
+    (_, Some(RoleLookup::Found { name, .. })) => name.clone(),
     (_, Some(RoleLookup::SessionExpired)) => "unknown (run dopbase login again)".into(),
     _ if !connected => "unknown (server offline)".into(),
     _ => "unknown".into(),
