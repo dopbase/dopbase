@@ -8,7 +8,7 @@ Quickstart:
   dopbase login                            # authenticate with the active server
   dopbase init                             # create a project + environment from ./.env
   dopbase init myapp/dev --from .env       # create a project + environment from a secrets file
-  dopbase secret set myapp/dev API_KEY     # set secret as need it, can be done via web ui
+  dopbase secret set myapp/dev API_KEY     # prompts for the value, the web UI works too
   dopbase run myapp/dev -- node server.js  # run with secrets injected as env vars
 
 Common server options:
