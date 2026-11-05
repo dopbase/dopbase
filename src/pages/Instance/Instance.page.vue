@@ -125,7 +125,7 @@ function formatTime(iso: string): string {
     <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
       <PageHeader
         title="Status"
-        subtitle="Checks run every 30 seconds while this page is open.">
+        subtitle="Health and recent activity for this server, with anything that needs your attention at the top.">
         <template #actions>
           <DbButton
             :disabled="!status"
