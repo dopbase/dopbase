@@ -10,6 +10,11 @@ All notable changes to Dopbase are documented in this file.
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all
   three, Members get `agents.view`, and Auditors get `agents.view_all`.
+  Giving someone else's agent access takes `agents.manage` on top of project
+  manager. `agents.manage` lists the people who could own an agent, so it can
+  hand one over without `users.view`, but creating an agent takes
+  `agents.view`, because its creator owns it. An agent that `agents.manage`
+  disables stays off until `agents.manage` enables it again.
 - An agent's owner gives it access without being a project manager, only where
   they reach and up to their own level there. Accounts carry `ownerEmail`.
 - Roles and grants. A role holds capabilities and caps the access its grants
@@ -86,8 +91,9 @@ All notable changes to Dopbase are documented in this file.
   members who only see AI agents as well as admins.
 - The role editor uses the full page width. Each section has its
   explanation beside its fields, and a Summary before **Create role** shows how
-  far the role reaches, what holders can do, their tokens, who can give it and
-  the closest built-in role, with a warning for broad roles.
+  far the role reaches, what holders can do, their tokens, who can give it
+  (built-in roles with `users.manage` that cover it) and the closest built-in
+  role, with a warning for broad roles.
 - Members can create AI agents. `users.view` and `users.manage` no longer
   reach agents, `GET /api/v1/users` lists only the agents you may see, and a
   new owner needs `agents.view` instead of `users.view`.
