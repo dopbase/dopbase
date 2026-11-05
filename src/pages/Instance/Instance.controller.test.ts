@@ -316,7 +316,7 @@ describe("useInstanceController", () => {
         label: "Database",
         value: "Healthy",
         badge: "ok",
-        detail: "3 ms to answer · 48 MB",
+        detail: "Latency under 5 ms · 48 MB",
       },
       {
         label: "Master key",
@@ -328,7 +328,7 @@ describe("useInstanceController", () => {
         label: "Disk usage",
         value: "2.1 GB",
         badge: undefined,
-        detail: "Everything in the data directory",
+        detail: "Storage used",
       },
       {
         label: "Audit log",
@@ -353,6 +353,21 @@ describe("useInstanceController", () => {
       detail: "Couldn't read the data directory",
     });
     expect(disk?.badge).toBeUndefined();
+  });
+
+  it("gives the exact latency once the database takes 5 ms or more", async () => {
+    signInAs(["instance.view"]);
+    vi.mocked(instanceApi.fetchStatus).mockResolvedValue({
+      ...mockStatus,
+      health: {
+        ...mockStatus.health!,
+        database: { status: "warn", pingMs: 12.4, sizeBytes: 50_331_648 },
+      },
+    });
+    const c = await mounted();
+
+    const database = c.healthCards.value.find((card) => card.id === "database");
+    expect(database?.detail).toBe("Latency 12 ms · 48 MB");
   });
 
   it("sums up the last 24 hours", async () => {

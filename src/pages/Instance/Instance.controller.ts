@@ -243,8 +243,8 @@ export function useInstanceController() {
     const ping =
       database.pingMs == null
         ? null
-        : database.pingMs < 1
-          ? "under 1 ms"
+        : database.pingMs < 5
+          ? "under 5 ms"
           : `${Math.round(database.pingMs)} ms`;
     const databaseCard: HealthCard = {
       id: "database",
@@ -262,7 +262,7 @@ export function useInstanceController() {
               : "ok",
       },
       detail: [
-        ping ? `${ping} to answer` : "Not answering",
+        ping ? `Latency ${ping}` : "Not answering",
         database.sizeBytes == null ? null : formatBytes(database.sizeBytes),
       ]
         .filter(Boolean)
@@ -293,7 +293,7 @@ export function useInstanceController() {
           id: "disk",
           label: "Disk usage",
           value: formatBytes(disk.usedBytes),
-          detail: "Everything in the data directory",
+          detail: "Storage used",
         }
       : {
           id: "disk",
