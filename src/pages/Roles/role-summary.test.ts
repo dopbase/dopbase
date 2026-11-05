@@ -148,14 +148,28 @@ describe("roleSummary", () => {
     expect(summary.tokensDetail).toBe("No project data");
   });
 
-  it("lists every built-in role that covers it, root first", () => {
+  it("lists the built-in roles that cover it and manage people, root first", () => {
     const summary = roleSummary(
       draft({ capabilities: ["tokens.personal"], maxLevel: "metadata" }),
       ROLES,
     );
 
-    expect(summary.givers).toBe("Root, Admins, Members and Auditors");
+    // Members and Auditors cover it but can't give anyone a role.
+    expect(summary.givers).toBe("Root and Admins");
     expect(summary.giversDetail).toBe("Anyone whose role covers it");
+  });
+
+  it("lets anyone who runs agents give a token-only role", () => {
+    const summary = roleSummary(
+      draft({
+        capabilities: ["tokens.personal"],
+        maxLevel: "write",
+        signIn: "token_only",
+      }),
+      ROLES,
+    );
+
+    expect(summary.givers).toBe("Root, Admins and Members");
   });
 
   it("leaves it to root when no built-in role covers it", () => {

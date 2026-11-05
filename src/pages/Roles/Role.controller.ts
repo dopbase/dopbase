@@ -196,7 +196,7 @@ export function useRoleController() {
   /** What the role adds up to, for the Summary card. Follows the form. */
   const summary = computed(() =>
     roleSummary(
-      { ...settings.value, name: name.value },
+      { ...settings.value, name: name.value, signIn: signIn.value },
       roles.value ?? [],
       roleId.value,
     ),

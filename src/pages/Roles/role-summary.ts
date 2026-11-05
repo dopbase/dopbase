@@ -1,6 +1,6 @@
 import { LEVELS, reaches } from "~/services/access.api";
 import type { Capability, Level } from "~/services/access.api";
-import type { Role, TokenScope } from "~/services/roles.api";
+import type { Role, SignIn, TokenScope } from "~/services/roles.api";
 import { formatLevel, formatList } from "~/utils/format";
 import { ROLE_CAPABILITIES } from "./Roles.controller";
 
@@ -9,6 +9,8 @@ export interface RoleDraft {
   name: string;
   capabilities: Capability[];
   maxLevel: Level;
+  /** How holders sign in; people (`interactive`) when left out. */
+  signIn?: SignIn;
   /** Token settings, which a role without tokens.personal leaves out. */
   tokenScope?: TokenScope;
   tokenMaxLevel?: Level;
@@ -93,15 +95,30 @@ function plural(name: string): string {
 }
 
 /**
- * Whether holders of `giver` may hand out the draft: every capability is
- * one they hold and the draft reaches no deeper. Mirrors the server's
- * Access::includes.
+ * What giving a role takes besides covering it: users.manage to give it to
+ * people, agents.view (creating an agent) or agents.manage (changing one)
+ * for a token-only role.
+ */
+function givingCapabilities(draft: RoleDraft): Capability[] {
+  return draft.signIn === "token_only"
+    ? ["agents.view", "agents.manage"]
+    : ["users.manage"];
+}
+
+/**
+ * Whether holders of `giver` may hand out the draft: they hold what giving
+ * it takes, every capability is one they hold, and the draft reaches no
+ * deeper. Mirrors the server's Access::includes and the users endpoints.
  */
 function covers(giver: Role, draft: RoleDraft): boolean {
   return (
+    givingCapabilities(draft).some((capability) =>
+      giver.capabilities.includes(capability),
+    ) &&
     draft.capabilities.every((capability) =>
       giver.capabilities.includes(capability),
-    ) && reaches(giver.maxLevel, draft.maxLevel)
+    ) &&
+    reaches(giver.maxLevel, draft.maxLevel)
   );
 }
 
