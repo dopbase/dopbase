@@ -115,6 +115,38 @@ Users page first. When a provider does not verify emails, the person can sign
 in with their password and link single sign-on from the Account page. Do this
 before you require single sign-on, which turns that password off.
 
+### Who can sign in
+
+The Users page decides who can sign in. Dopbase has no sign-up page and sends
+no invitations. An administrator adds each person by email, and only those
+emails get through. Signing in at the provider never creates an account, so
+Dopbase has no setting to limit sign-in by email domain: the list of accounts
+is already narrower than any domain rule. A personal address such as
+`someone@gmail.com` works too, as long as an administrator added it.
+
+The provider still decides who can reach the Dopbase sign-in at all. To turn
+away everyone outside your organization before they get to Dopbase, set it up
+there:
+
+- Google: set the app's audience to **Internal**. See
+  [Sign in with Google](./sso-google#_2-set-up-google-auth-platform).
+- Microsoft Entra ID: the issuer URL with your tenant ID already limits sign-in
+  to your tenant.
+- Okta, Keycloak, and most other providers: assign the application only to the
+  users or groups who need Dopbase.
+
+This matters for the first sign-in, which links by email. Dopbase trusts the
+provider's word that the email belongs to the person. With Google's
+**External** audience, a personal Google account set up with a work address
+counts as verified, so it can link to the Dopbase account with that address if
+nothing is linked to it yet. If your company uses Google Workspace, choose
+**Internal** so only accounts your organization manages can link.
+
+Removing someone at the provider stops new sign-ins through it, but their
+Dopbase sessions and personal tokens keep working, and so does their password
+if they have one. When someone leaves, disable or delete their account on the
+Users page too.
+
 ### Microsoft Entra ID
 
 Entra does not send `email_verified`, and users in other tenants can set an
