@@ -495,6 +495,11 @@ pub async fn user_access(
     .fetch_one(&mut *conn)
     .await?;
   }
+  let mut grants = repository::for_user(state.db.pool(), id).await?;
+  let owner_email = match users::repository::agent(state.db.pool(), id).await? {
+    Some(owner_id) => cap_by_owner(&mut conn, owner_id.as_deref(), &mut grants).await?,
+    None => None,
+  };
   drop(conn);
   Ok(UserAccessResponse {
     user_id: id.to_owned(),
@@ -502,9 +507,60 @@ pub async fn user_access(
     role_name: access
       .as_ref()
       .map_or_else(String::new, |access| access.role_name.clone()),
+    owner_email,
     max_level: access.map_or(Level::None, |access| access.max_level),
     token,
     groups: repository::groups_of(state.db.pool(), id).await?,
-    grants: repository::for_user(state.db.pool(), id).await?,
+    grants,
   })
+}
+
+/// Marks each of an AI agent's grants that its owner doesn't back in full
+/// with the owner's own level there, and returns the owner's email. A
+/// missing or disabled owner backs nothing, the same as when the agent
+/// calls the API.
+async fn cap_by_owner(
+  conn: &mut sqlx::SqliteConnection,
+  owner_id: Option<&str>,
+  grants: &mut [GrantResponse],
+) -> Result<Option<String>, HttpError> {
+  let owner = match owner_id {
+    Some(owner_id) => match authx::load_access(conn, owner_id).await? {
+      Some(access) => Some(authx::account_data_access(conn, owner_id, &access).await?),
+      None => None,
+    },
+    None => None,
+  };
+  for grant in grants.iter_mut() {
+    let owner_level = match (&owner, grant.scope_type) {
+      (None, _) => Level::None,
+      (Some(owner), ScopeType::Project) => owner.project(&grant.project_id),
+      (Some(owner), ScopeType::Environment) => {
+        let protected: bool = sqlx::query_scalar("SELECT protected FROM environments WHERE id = ?")
+          .bind(&grant.scope_id)
+          .fetch_optional(&mut *conn)
+          .await?
+          .unwrap_or(false);
+        owner.environment(authx::EnvironmentTarget {
+          project_id: &grant.project_id,
+          environment_id: &grant.scope_id,
+          protected,
+        })
+      }
+      // Agents get no all-projects or audit grants.
+      (Some(_), _) => continue,
+    };
+    if owner_level < grant.level {
+      grant.owner_level = Some(owner_level);
+    }
+  }
+  let Some(owner_id) = owner_id else {
+    return Ok(None);
+  };
+  Ok(
+    sqlx::query_scalar("SELECT email FROM admins WHERE id = ?")
+      .bind(owner_id)
+      .fetch_optional(&mut *conn)
+      .await?,
+  )
 }

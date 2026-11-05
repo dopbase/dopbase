@@ -184,6 +184,11 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
   .await;
   assert_eq!(status, 200, "{access}");
   assert_eq!(access["data"]["grants"].as_array().unwrap().len(), 2);
+  // Maya backs both grants in full, so neither carries an owner level.
+  assert_eq!(access["data"]["ownerEmail"], "maya@example.com");
+  for grant in access["data"]["grants"].as_array().unwrap() {
+    assert!(grant.get("ownerLevel").is_none(), "{grant}");
+  }
   let (status, body) = send(
     &router,
     "POST",
@@ -234,6 +239,19 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
   )
   .await;
   assert_eq!(status, 403);
+  // The access report says so: each grant shows the owner's lower level.
+  let (status, capped) = send(
+    &router,
+    "GET",
+    &format!("/api/v1/users/{bot}/access"),
+    maya.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{capped}");
+  for grant in capped["data"]["grants"].as_array().unwrap() {
+    assert_eq!(grant["ownerLevel"], "metadata", "{grant}");
+  }
 
   // She renames, disables and enables it, revokes its token and takes its
   // access away, but can't hand it to someone else.
