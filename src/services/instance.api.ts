@@ -46,8 +46,8 @@ export interface HealthReport {
     /** How the key file compares with the key the server loaded. */
     file: "matches" | "changed" | "missing" | "unreadable";
   };
-  /** Null where free space can't be read. */
-  disk: { status: CheckStatus; freeBytes: number; totalBytes: number } | null;
+  /** Bytes in the data directory. Null when it can't be read. */
+  disk: { usedBytes: number } | null;
   auditLog: {
     status: CheckStatus;
     events: number | null;

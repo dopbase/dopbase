@@ -26,7 +26,6 @@ import {
   RefreshIcon,
   ServerIcon,
   ShieldIcon,
-  UsersIcon,
 } from "~/assets/icons";
 
 /**
@@ -79,7 +78,6 @@ const FIX_ICONS: Record<FixAction["icon"], unknown> = {
   key: KeyIcon,
   external: ExternalLinkIcon,
   audit: HistoryIcon,
-  users: UsersIcon,
 };
 
 const CARD_ICONS = {
@@ -242,7 +240,9 @@ function formatTime(iso: string): string {
                 <span class="text-lg font-semibold text-ink-strong">
                   {{ card.value }}
                 </span>
-                <DbBadge :tone="card.badge.tone">{{ card.badge.text }}</DbBadge>
+                <DbBadge v-if="card.badge" :tone="card.badge.tone">
+                  {{ card.badge.text }}
+                </DbBadge>
               </p>
               <p class="text-sm text-ink-muted">{{ card.detail }}</p>
             </div>
