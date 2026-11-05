@@ -135,32 +135,35 @@ Every account except root holds one role. A role is data, not code. It holds:
 
 These roles are built in and can't be changed:
 
-| Role     | Capabilities                                                                                                                                                                                 | Ceiling         | Personal tokens                                               |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------- |
-| Admin    | `users.view`, `users.manage`, `groups.manage`, `grants.manage`, `projects.create`, `audit.read`, `audit.verify`, `access.report`, `instance.view`, `tokens.personal`, `tokens.revoke_others` | project manager | Project data, up to write, 30 days by default, at most a year |
-| Member   | `tokens.personal`                                                                                                                                                                            | manage          | Project data, up to write, 30 days by default, at most a year |
-| Auditor  | `users.view`, `audit.read`, `audit.read_all`, `audit.verify`, `access.report`, `instance.view`, `tokens.personal`                                                                            | metadata        | The audit log only, 30 days by default, at most a year        |
-| AI agent | `tokens.personal`                                                                                                                                                                            | read            | Project data, up to read, 30 days by default, at most 90 days |
+| Role     | Capabilities                                                                                                                                                                                                                                    | Ceiling         | Personal tokens                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------- |
+| Admin    | `users.view`, `users.manage`, `groups.manage`, `grants.manage`, `projects.create`, `audit.read`, `audit.verify`, `access.report`, `instance.view`, `tokens.personal`, `tokens.revoke_others`, `agents.view`, `agents.view_all`, `agents.manage` | project manager | Project data, up to write, 30 days by default, at most a year  |
+| Member   | `tokens.personal`, `agents.view`                                                                                                                                                                                                                | manage          | Project data, up to write, 30 days by default, at most a year  |
+| Auditor  | `users.view`, `audit.read`, `audit.read_all`, `audit.verify`, `access.report`, `instance.view`, `tokens.personal`, `agents.view_all`                                                                                                            | metadata        | The audit log only, 30 days by default, at most a year         |
+| AI agent | `tokens.personal`                                                                                                                                                                                                                               | write           | Project data, up to write, 30 days by default, at most 90 days |
 
 Root creates custom roles on the [Roles](/ui/roles) page, for example a Viewer
 that reads values but never changes them, or a token-only role for CI bots.
 Changing a custom role changes what everyone holding it can do on their next
 request. A role someone holds can't be deleted.
 
-| Capability             | Lets holders                                                                           |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| `users.view`           | See people, groups, roles, and where someone's access comes from                       |
-| `users.manage`         | Add, change, and remove accounts, AI agents included, whose access is within their own |
-| `groups.manage`        | Create groups and change their members                                                 |
-| `grants.manage`        | Reserved. Giving access depends on the project manager level today                     |
-| `projects.create`      | Create projects. The creator becomes the new project's project manager                 |
-| `access.report`        | See who reaches any project they can see, without managing it                          |
-| `audit.read`           | Read audit events on settings and on the projects they reach                           |
-| `audit.read_all`       | Read every audit event                                                                 |
-| `audit.verify`         | Verify the audit log's hash chain                                                      |
-| `instance.view`        | See instance status                                                                    |
-| `tokens.personal`      | Hold personal tokens                                                                   |
-| `tokens.revoke_others` | Revoke other people's personal tokens when their access is within their own            |
+| Capability             | Lets holders                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `users.view`           | See people, groups, roles, and where someone's access comes from                                                   |
+| `users.manage`         | Add, change, and remove people whose access is within their own. Not AI agents                                     |
+| `groups.manage`        | Create groups and change their members                                                                             |
+| `grants.manage`        | Reserved and hidden in the role editor. Giving access depends on the project manager level today                   |
+| `projects.create`      | Create projects. The creator becomes the new project's project manager                                             |
+| `access.report`        | See who reaches any project they can see, without managing it                                                      |
+| `audit.read`           | Read audit events on settings and on the projects they reach                                                       |
+| `audit.read_all`       | Read every audit event                                                                                             |
+| `audit.verify`         | Verify the audit log's hash chain                                                                                  |
+| `instance.view`        | See instance status                                                                                                |
+| `tokens.personal`      | Hold personal tokens                                                                                               |
+| `tokens.revoke_others` | Revoke other people's personal tokens when their access is within their own                                        |
+| `agents.view`          | Create AI agents, then see and run the ones they own: rename, disable, delete, tokens, and access within their own |
+| `agents.view_all`      | See every AI agent, its owner, access, and tokens, without changing them                                           |
+| `agents.manage`        | Change, delete, or transfer anyone's AI agent and manage its tokens, within their own access                       |
 
 Root also holds `roles.manage`, `grants.all_projects`, `sso.manage`,
 `instance.backup`, `instance.reset`, and `password.breakglass`. No role can be
@@ -257,12 +260,30 @@ You can revoke your own tokens and those of AI agents you own. People with
 An AI agent is an account with the AI agent role, or another role that uses
 tokens only. It has a name instead of an email, no password, and an
 **owner**: the person who created it. It reaches only the projects granted to
-it, never more than its role's read ceiling, and never more than its owner
-reaches. A disabled owner disables the agent.
+it, never more than its role's ceiling (Write for the built-in role), and
+never more than its owner reaches. A disabled owner disables the agent.
 
-Owners, and people who manage accounts, create the agent's tokens on the
-[AI agents](/ui/ai-agents) page. A person who owns agents can't be deleted until the
-agents are deleted or given another owner. See
+AI agents have capabilities of their own. People capabilities don't reach
+them:
+
+- **`agents.view`** lets you create agents. For agents you own, you can rename,
+  disable, or delete them, create and revoke their tokens, and give them
+  access. Admins and Members have it. An owner's role must keep it to run
+  their agents, and a new owner must have it.
+- **`agents.view_all`** shows every agent. Admins and Auditors have it.
+- **`agents.manage`** changes, deletes, or transfers anyone's agent within
+  your own access. Admins have it.
+
+An owner gives their own agent access without being a project manager, but
+only where they reach and at no more than their own level there. With Write on
+one project out of three, you can give your agent Names only, Read, or Write
+on that project and nothing on the other two. A protected environment your
+project grant doesn't reach is out too. Project managers still give any agent
+access on their projects.
+
+Agents and their tokens live on the [AI agents](/ui/ai-agents) page. A person
+who owns agents can't be deleted until the agents are deleted or given another
+owner. See
 [AI agent access](/guide/ai-agent-access) for both ways to give an agent
 access: your own personal token, or a shared agent account.
 
