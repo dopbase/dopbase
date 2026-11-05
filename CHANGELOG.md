@@ -210,6 +210,11 @@ All notable changes to Dopbase are documented in this file.
   allow list, so Dopbase has no email domain setting. To turn away people
   outside your organization, limit sign-in at the provider, for example with
   Google's **Internal** audience.
+- The Status page's **Disk** card is now **Disk usage**. It shows how much
+  space the data directory takes, with no warning level. Free space on a
+  container or VM disk describes the host, not Dopbase.
+- **Breaking:** `health.disk` in `GET /api/v1/status` returns `usedBytes`
+  instead of `status`, `freeBytes` and `totalBytes`.
 
 ### Removed
 
@@ -219,6 +224,9 @@ All notable changes to Dopbase are documented in this file.
   `GET /api/v1/status`. They were always `healthy` and `available`.
 - The project rail. Use the Projects tree instead.
 - The `/instance` page. It redirects to `/status`.
+- The `disk.space`, `config.docs` and `people.managers` status checks ("Disk
+  has room", "API docs are on/off" and "Only root can manage this
+  instance").
 
 ### Fixed
 
