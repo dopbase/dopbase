@@ -74,7 +74,9 @@ Below the banner, four cards show the readings behind the checks:
 
 - **Database**: how long a query takes and how big the database is.
 - **Master key**: whether the key file still matches the key in use.
-- **Disk**: free space where the data lives.
+- **Disk usage**: how much space the data directory takes, including the
+  database, backups and keys. It has no warning level, so watch free space
+  on the host.
 - **Audit log**: whether the hash chain verified, and when. The chain is
   walked when you open the page, and the result is reused for up to 10
   minutes.

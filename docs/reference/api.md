@@ -333,7 +333,9 @@ Accounts holding `instance.view` also get:
 - `health`: the readings behind the Database, Master key, Disk, and Audit log
   cards. `masterKey.file` compares the key file on disk with the key the
   server loaded at startup (`matches`, `changed`, `missing`, or
-  `unreadable`). `disk` is `null` where free space can't be read.
+  `unreadable`). `disk.usedBytes` is the size of the data directory, plus the
+  database when it lives elsewhere. `disk` is `null` when the data directory
+  can't be read.
 - `activity`: the last 24 hours in hourly buckets: secret reads (with how
   many runner tokens, people and AI agents read), failed sign-ins, requests
   refused by the sign-in rate limits, and live browser and CLI sessions. The
