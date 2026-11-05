@@ -38,7 +38,7 @@ describe("visibleSections", () => {
 
     expect(sections.map((section) => section.label)).toEqual([
       "Workspace",
-      "People & access",
+      "Access",
       "Instance",
     ]);
     expect(sections.flatMap((s) => s.items.map((item) => item.name))).toEqual([
@@ -71,7 +71,7 @@ describe("visibleSections", () => {
 
   it("keeps only the pages the account can open", () => {
     const people = visibleSections(holding("users.view")).find(
-      (section) => section.label === "People & access",
+      (section) => section.label === "Access",
     );
 
     expect(people?.items.map((item) => item.name)).toEqual(["users", "groups"]);
@@ -79,7 +79,7 @@ describe("visibleSections", () => {
 
   it("shows a member who runs their own agents just AI agents", () => {
     const people = visibleSections(holding("agents.view")).find(
-      (section) => section.label === "People & access",
+      (section) => section.label === "Access",
     );
 
     expect(people?.items.map((item) => item.name)).toEqual(["agents"]);

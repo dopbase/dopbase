@@ -12,7 +12,7 @@ import type { User } from "~/services/users.api";
 import { useAuthStore } from "~/stores/auth.store";
 
 /**
- * Fixtures for the People & access pages: one instance with root, a lead
+ * Fixtures for the Access pages: one instance with root, a lead
  * (Admin), maya (Member), reader (custom Viewer) and review-bot (AI agent
  * owned by maya). Each builder takes overrides for the case at hand.
  */

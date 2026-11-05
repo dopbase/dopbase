@@ -38,7 +38,7 @@ export const sidebarSections: readonly {
   pages: readonly PageName[];
 }[] = [
   { label: "Workspace", pages: ["projects", "audit"] },
-  { label: "People & access", pages: ["users", "agents", "groups", "roles"] },
+  { label: "Access", pages: ["users", "agents", "groups", "roles"] },
   { label: "Instance", pages: ["status", "backups", "sso"] },
 ];
 
