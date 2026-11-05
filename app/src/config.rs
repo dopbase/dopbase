@@ -11,11 +11,11 @@ use url::{Host, Url};
 
 use crate::constants::config::{
   AUDIT_ARCHIVE_DIRECTORY_NAME, CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME,
-  DEFAULT_PORT, DEFAULT_SECRET_HISTORY_VERSIONS, ENV_AUDIT_RETENTION_DAYS, ENV_DATA_DIR, ENV_DOCS,
-  ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT, ENV_PUBLIC_URL, ENV_SECRET_HISTORY_VERSIONS,
-  ENV_SHUTDOWN_GRACE_SECONDS, ENV_TRUSTED_PROXIES, ENV_UPDATE_CHECK, ENV_WEB_UI,
-  MASTER_KEY_FILENAME, MAX_SECRET_HISTORY_VERSIONS, MIN_SECRET_HISTORY_VERSIONS,
-  SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
+  DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_PORT, DEFAULT_SECRET_HISTORY_VERSIONS,
+  ENV_AUDIT_RETENTION_DAYS, ENV_DATA_DIR, ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT,
+  ENV_PUBLIC_URL, ENV_SECRET_HISTORY_VERSIONS, ENV_SHUTDOWN_GRACE_SECONDS, ENV_TRUSTED_PROXIES,
+  ENV_UPDATE_CHECK, ENV_WEB_UI, MASTER_KEY_FILENAME, MAX_SECRET_HISTORY_VERSIONS,
+  MIN_SECRET_HISTORY_VERSIONS, SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -44,10 +44,9 @@ pub struct ServerConfig {
   pub database_url: String,
   pub shutdown_grace_seconds: u64,
   /// Days audit records are kept before they are archived and deleted.
-  /// Unset keeps them forever. New instances get a year through the
-  /// generated `server.toml`.
+  /// Defaults to a year; 0 keeps them forever.
   #[serde(skip)]
-  pub audit_retention_days: Option<u64>,
+  pub audit_retention_days: u64,
   /// Versions per secret that keep their encrypted value and can be rolled
   /// back to. Older versions keep their metadata only.
   #[serde(skip)]
@@ -188,7 +187,7 @@ impl ServerConfig {
       bind_address: DEFAULT_BIND_ADDRESS.into(),
       public_url: DEFAULT_PUBLIC_URL.into(),
       shutdown_grace_seconds: 10,
-      audit_retention_days: None,
+      audit_retention_days: DEFAULT_AUDIT_RETENTION_DAYS,
       secret_history_versions: DEFAULT_SECRET_HISTORY_VERSIONS,
       trusted_proxies: Vec::new(),
       docs_enabled: false,
@@ -283,7 +282,7 @@ impl ServerConfig {
       self.shutdown_grace_seconds = value;
     }
     if let Some(value) = file.audit_retention_days {
-      self.audit_retention_days = Some(value);
+      self.audit_retention_days = value;
     }
     if let Some(value) = file.secret_history_versions {
       self.secret_history_versions = value;
@@ -329,11 +328,9 @@ impl ServerConfig {
         .context("invalid DOPBASE_SHUTDOWN_GRACE_SECONDS")?;
     }
     if let Some(value) = environment.audit_retention_days {
-      self.audit_retention_days = Some(
-        value
-          .parse()
-          .context("invalid DOPBASE_AUDIT_RETENTION_DAYS")?,
-      );
+      self.audit_retention_days = value
+        .parse()
+        .context("invalid DOPBASE_AUDIT_RETENTION_DAYS")?;
     }
     if let Some(value) = environment.secret_history_versions {
       self.secret_history_versions = value
@@ -455,12 +452,13 @@ impl ServerConfig {
     })
   }
 
-  /// The audit retention policy, or `None` when records are kept forever.
+  /// The audit retention policy, or `None` when `audit_retention_days` is 0
+  /// and records are kept forever.
   pub fn audit_retention(&self) -> Option<crate::services::audit_chain::Retention> {
-    self.audit_retention_days.map(|keep_days| {
+    (self.audit_retention_days > 0).then(|| {
       crate::services::audit_chain::Retention::new(
         self.data_dir.join(AUDIT_ARCHIVE_DIRECTORY_NAME),
-        keep_days,
+        self.audit_retention_days,
       )
     })
   }
@@ -468,9 +466,6 @@ impl ServerConfig {
   pub fn validate(&self) -> Result<()> {
     if self.version != 1 {
       bail!("unsupported server configuration version {}", self.version);
-    }
-    if self.audit_retention_days == Some(0) {
-      bail!("audit_retention_days must be at least 1 day");
     }
     if !(MIN_SECRET_HISTORY_VERSIONS..=MAX_SECRET_HISTORY_VERSIONS)
       .contains(&self.secret_history_versions)

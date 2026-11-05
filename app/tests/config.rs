@@ -510,18 +510,9 @@ fn generated_references_load_defaults_and_uncommented_server_examples() {
     app::constants::config::CLIENT_CONFIG_FILENAME,
   ] {
     let contents = fs::read_to_string(data_dir.join(filename)).unwrap();
-    // Everything is a commented example except the audit retention and
-    // secret history that new instances start with.
+    // Everything is a commented example: new instances run on the defaults.
     let active = toml::from_str::<toml::Table>(&contents).unwrap();
-    if filename == SERVER_CONFIG_FILENAME {
-      assert_eq!(
-        active,
-        toml::from_str::<toml::Table>("audit_retention_days = 365\nsecret_history_versions = 20")
-          .unwrap()
-      );
-    } else {
-      assert!(active.is_empty());
-    }
+    assert!(active.is_empty(), "{filename}: {active:?}");
   }
   let client = app::cli::local_config::read(&data_dir.join("config.toml")).unwrap();
   assert_eq!(client.version, 1);
@@ -545,7 +536,7 @@ fn generated_references_load_defaults_and_uncommented_server_examples() {
     app::constants::config::DEFAULT_PUBLIC_URL
   );
   assert_eq!(reloaded.shutdown_grace_seconds, 10);
-  assert_eq!(reloaded.audit_retention_days, Some(365));
+  assert_eq!(reloaded.audit_retention_days, 365);
   assert_eq!(reloaded.secret_history_versions, 20);
   assert_eq!(
     reloaded
@@ -692,13 +683,22 @@ fn audit_retention_days_reads_from_file_and_environment() {
     ..Default::default()
   };
 
-  // Unset keeps the whole log.
-  assert_eq!(ServerConfig::default().audit_retention_days, None);
+  // Unset keeps a year, including on the first start before server.toml
+  // exists and for a server.toml from before retention had a default.
+  assert_eq!(ServerConfig::default().audit_retention_days, 365);
+  let first_start =
+    ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap();
+  assert_eq!(first_start.audit_retention_days, 365);
+  assert!(first_start.audit_retention().is_some());
+  fs::write(&config_path, "# My server\n").unwrap();
+  let without_line =
+    ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap();
+  assert_eq!(without_line.audit_retention_days, 365);
 
   fs::write(&config_path, "audit_retention_days = 90\n").unwrap();
   let from_file =
     ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap();
-  assert_eq!(from_file.audit_retention_days, Some(90));
+  assert_eq!(from_file.audit_retention_days, 90);
 
   // The environment variable wins over the file.
   let from_environment = ServerConfig::load_with_environment(
@@ -709,30 +709,24 @@ fn audit_retention_days_reads_from_file_and_environment() {
     },
   )
   .unwrap();
-  assert_eq!(from_environment.audit_retention_days, Some(30));
+  assert_eq!(from_environment.audit_retention_days, 30);
 
-  // A window of zero days would remove every record on the first write, so
-  // it is rejected as a misconfiguration rather than accepted as a policy.
+  // 0 keeps the whole log: no retention policy runs.
   fs::write(&config_path, "audit_retention_days = 0\n").unwrap();
-  let error =
-    ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap_err();
-  assert!(
-    format!("{error:#}").contains("audit_retention_days"),
-    "{error}"
-  );
+  let forever =
+    ServerConfig::load_with_environment(&overrides, EnvironmentOverrides::default()).unwrap();
+  assert_eq!(forever.audit_retention_days, 0);
+  assert!(forever.audit_retention().is_none());
   fs::write(&config_path, "audit_retention_days = 90\n").unwrap();
-  let error = ServerConfig::load_with_environment(
+  let forever = ServerConfig::load_with_environment(
     &overrides,
     EnvironmentOverrides {
       audit_retention_days: Some("0".into()),
       ..Default::default()
     },
   )
-  .unwrap_err();
-  assert!(
-    format!("{error:#}").contains("audit_retention_days"),
-    "{error}"
-  );
+  .unwrap();
+  assert!(forever.audit_retention().is_none());
   let error = ServerConfig::load_with_environment(
     &overrides,
     EnvironmentOverrides {

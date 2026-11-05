@@ -303,7 +303,7 @@ async fn audit_export_writes_a_private_file_and_needs_force_to_replace_it() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn audit_retention_archives_expired_records_and_verification_continues() {
-  let fixture = Fixture::with_config(|config| config.audit_retention_days = Some(30)).await;
+  let fixture = Fixture::with_config(|config| config.audit_retention_days = 30).await;
   fixture.environment().await;
 
   // The log went quiet past the retention window: every record written so

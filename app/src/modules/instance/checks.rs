@@ -607,15 +607,7 @@ async fn audit_retention(
   now: DateTime<Utc>,
 ) -> Result<Check> {
   Ok(match state.config.audit_retention_days {
-    Some(days) => check(
-      "audit.retention",
-      CheckStatus::Ok,
-      "Audit log has a size limit",
-      format!("Records older than {days} days are archived and removed."),
-      now,
-    )
-    .value(format!("{days} {}", plural(days as i64, "day", "days"))),
-    None => {
+    0 => {
       let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_events")
         .fetch_one(state.db.pool())
         .await?;
@@ -624,7 +616,7 @@ async fn audit_retention(
         CheckStatus::Tip,
         "The audit log has no size limit",
         format!(
-          "It holds {} {} and keeps growing until you set audit_retention_days.",
+          "It holds {} {} and keeps growing because audit_retention_days is 0.",
           format_count(events as u64),
           plural(events, "event", "events")
         ),
@@ -632,6 +624,14 @@ async fn audit_retention(
       )
       .fix(CONFIG_DOCS)
     }
+    days => check(
+      "audit.retention",
+      CheckStatus::Ok,
+      "Audit log has a size limit",
+      format!("Records older than {days} days are archived and removed."),
+      now,
+    )
+    .value(format!("{days} {}", plural(days as i64, "day", "days"))),
   })
 }
 

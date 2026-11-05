@@ -99,7 +99,16 @@ async fn status_reports_every_check_with_the_readings_behind_the_cards() {
   assert_eq!(data["health"]["masterKey"]["file"], "matches");
   assert_eq!(check(&data, "audit.chain")["status"], "ok");
   assert_eq!(data["health"]["auditLog"]["intact"], true);
-  // The test app keeps no audit retention.
+  // The test app runs on the default retention of a year.
+  assert_eq!(check(&data, "audit.retention")["status"], "ok");
+  assert_eq!(check(&data, "audit.retention")["value"], "365 days");
+  // 0 keeps the log forever, which the check points out.
+  let mut forever = state.clone();
+  forever.config = std::sync::Arc::new(app::config::ServerConfig {
+    audit_retention_days: 0,
+    ..(*state.config).clone()
+  });
+  let data = status(&app::server::router(forever), &root).await;
   assert_eq!(check(&data, "audit.retention")["status"], "tip");
   assert!(
     check(&data, "audit.retention")["fixPath"]
