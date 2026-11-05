@@ -16,6 +16,7 @@ import {
 import { environmentsQuery, projectsQuery } from "~/queries/projects";
 import { userIdentitiesQuery } from "~/queries/users";
 import { formatDateTime, formatRelativeTime } from "~/utils/format";
+import { eventOrigin } from "~/utils/audit";
 
 export const AUDIT_PAGE_SIZE = 25;
 
@@ -448,13 +449,7 @@ export function useAuditController() {
     return JSON.stringify(payload, null, 2);
   }
 
-  /** `203.0.113.24 · dopbase-cli 0.2.0`, or empty without an address. */
-  function origin(event: AuditEvent): string {
-    const client = event.metadata.client;
-    return [event.ipAddress, typeof client === "string" ? client : null]
-      .filter(Boolean)
-      .join(" · ");
-  }
+  const origin = eventOrigin;
 
   return {
     items,

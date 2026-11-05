@@ -279,6 +279,129 @@ describe("useGiveAccessController", () => {
     });
   });
 
+  describe("for your own AI agent", () => {
+    beforeEach(() => {
+      route.name = "agent-access-give";
+      route.params = { agentId: "usr_bot" };
+      signInAs(["tokens.personal", "agents.view"], {
+        adminId: "usr_maya",
+        role: "member",
+      });
+      vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(
+        accessFixture({
+          userId: "usr_bot",
+          email: "review-bot",
+          maxLevel: "write",
+          grants: [],
+        }),
+      );
+      vi.mocked(usersApi.fetchUser).mockResolvedValue({
+        ...reviewBot,
+        ownerId: "usr_maya",
+      });
+      // Maya has Write on payments and Read on search, and manages neither.
+      vi.mocked(projectsApi.listProjects).mockResolvedValue([
+        project({ level: "write" }),
+        project({ id: "prj_search", name: "search", level: "read" }),
+      ]);
+      vi.mocked(environmentsApi.listEnvironments).mockResolvedValue([
+        environment({ level: "write" }),
+        environment({ id: "env_qa", name: "qa", level: "read" }),
+        environment({
+          id: "env_search",
+          projectId: "prj_search",
+          projectName: "search",
+          name: "dev",
+          level: "read",
+        }),
+      ]);
+    });
+
+    it("offers every project you reach, not only ones you manage", async () => {
+      const page = await open();
+
+      expect(page.forOwnAgent.value).toBe(true);
+      expect(
+        page.manageable.value.map((choice) => choice.project.name),
+      ).toEqual(["payments", "search"]);
+    });
+
+    it("offers levels up to your own on the project", async () => {
+      const page = await open();
+      page.chooseProject("prj_pay");
+      await settle();
+
+      expect(
+        page.levels.value
+          .filter((choice) => !choice.disabled)
+          .map((choice) => choice.level),
+      ).toEqual(["metadata", "read", "write"]);
+
+      page.chooseProject("prj_search");
+      await settle();
+      expect(
+        page.levels.value
+          .filter((choice) => !choice.disabled)
+          .map((choice) => choice.level),
+      ).toEqual(["metadata", "read"]);
+    });
+
+    it("won't give more than your own level, and says so", async () => {
+      const page = await open();
+      page.chooseProject("prj_search");
+      page.level.value = "write";
+
+      expect(await page.submit()).toBe(false);
+      expect(page.error.value).toBe(
+        "You can give up to Read here, your own level.",
+      );
+      expect(accessApi.setGrant).not.toHaveBeenCalled();
+
+      page.level.value = "read";
+      expect(await page.submit()).toBe(true);
+      expect(accessApi.setGrant).toHaveBeenCalledWith({
+        principalType: "user",
+        principalId: "usr_bot",
+        scopeType: "project",
+        scope: "prj_search",
+        level: "read",
+      });
+    });
+
+    it("caps environments at the lowest level you hold among those chosen", async () => {
+      const page = await open();
+      page.chooseProject("prj_pay");
+      page.where.value = "environment";
+      page.toggleEnvironment("env_staging", true);
+      await settle();
+      expect(page.ownerCap.value).toBe("write");
+
+      page.toggleEnvironment("env_qa", true);
+      await settle();
+      expect(page.ownerCap.value).toBe("read");
+      expect(page.level.value).toBe("read");
+    });
+
+    it("keeps to projects you manage for an agent someone else owns", async () => {
+      vi.mocked(usersApi.fetchUser).mockResolvedValue({
+        ...reviewBot,
+        ownerId: "usr_lead",
+      });
+      const page = await open();
+
+      expect(page.forOwnAgent.value).toBe(false);
+      expect(page.manageable.value).toEqual([]);
+    });
+
+    it("keeps to projects you manage when your role can't run agents", async () => {
+      signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+      const page = await open();
+
+      expect(page.forOwnAgent.value).toBe(false);
+      expect(page.manageable.value).toEqual([]);
+    });
+  });
+
   it("starts from a level the role allows, and keeps to it across scopes", async () => {
     vi.mocked(accessApi.fetchUserAccess).mockResolvedValueOnce(
       accessFixture({ maxLevel: "metadata", grants: [] }),
@@ -348,6 +471,54 @@ describe("useGiveAccessController", () => {
     expect(page.loadError.value).toBe("Could not load their access.");
   });
 
+  it.each([
+    [
+      "user-access-give",
+      { userId: "usr_maya" },
+      ["Users", { name: "users" }],
+      [
+        "maya@example.com",
+        { name: "user-access", params: { userId: "usr_maya" } },
+      ],
+    ],
+    [
+      "agent-access-give",
+      { agentId: "usr_maya" },
+      ["AI agents", { name: "agents" }],
+      ["maya@example.com", { name: "agent", params: { agentId: "usr_maya" } }],
+    ],
+    [
+      "group-access-give",
+      { groupId: "grp_backend" },
+      ["Groups", { name: "groups" }],
+      ["Backend", { name: "group-access", params: { groupId: "grp_backend" } }],
+    ],
+  ] as const)(
+    "from %s, the breadcrumb starts at the list and links back",
+    async (name, params, [listLabel, listTo], [label, to]) => {
+      route.name = name;
+      route.params = { ...params };
+      vi.mocked(accessApi.fetchGroup).mockResolvedValueOnce(
+        groupDetailFixture(),
+      );
+      const page = await open();
+      expect(page.breadcrumbs.value).toEqual([
+        { label: listLabel, to: listTo },
+        { label, to },
+      ]);
+    },
+  );
+
+  it("keeps the breadcrumb to the list while their name loads", async () => {
+    vi.mocked(accessApi.fetchUserAccess).mockReturnValueOnce(
+      new Promise(() => {}),
+    );
+    const page = await open();
+    expect(page.breadcrumbs.value).toEqual([
+      { label: "Users", to: { name: "users" } },
+    ]);
+  });
+
   it("says how far it got when one grant is refused", async () => {
     vi.mocked(accessApi.setGrant)
       .mockResolvedValueOnce(grantFixture())
@@ -374,7 +545,7 @@ describe("useGiveAccessController from a project", () => {
   beforeEach(() => {
     route.name = "project-access-give";
     route.params = { projectRef: "payments" };
-    signInAs(["users.view", "groups.manage"]);
+    signInAs(["users.view", "groups.manage", "agents.manage"]);
     vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue({
       project: project({}),
       environments: [
@@ -404,6 +575,22 @@ describe("useGiveAccessController from a project", () => {
     ]);
     vi.mocked(accessApi.fetchGroups).mockResolvedValue([
       groupSummaryFixture({ memberCount: 1 }),
+    ]);
+  });
+
+  it("lists only what you may give access to: people with users.view, agents with agents.manage", async () => {
+    signInAs(["users.view", "groups.manage"]);
+    let page = await open();
+    expect(page.principals.value.map((choice) => choice.label)).toEqual([
+      "Backend",
+      "maya@example.com",
+      "reader@example.com",
+    ]);
+
+    signInAs(["agents.view_all", "agents.manage"]);
+    page = await open();
+    expect(page.principals.value.map((choice) => choice.label)).toEqual([
+      "review-bot",
     ]);
   });
 
@@ -512,6 +699,17 @@ describe("useGiveAccessController from a project", () => {
     expect(page.summary.value).toBe(
       "Everyone in Backend will be able to manage, and give others access to, all of payments.",
     );
+  });
+
+  it("starts the breadcrumb at Projects and links back to the Access tab", async () => {
+    const page = await open();
+    expect(page.breadcrumbs.value).toEqual([
+      { label: "Projects", to: { name: "projects" } },
+      {
+        label: "payments",
+        to: { name: "project-access", params: { projectRef: "payments" } },
+      },
+    ]);
   });
 
   it("says when the project's access won't load", async () => {

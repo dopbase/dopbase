@@ -30,8 +30,9 @@ const TAB_FOR_ROUTE = Object.fromEntries(
  *
  * The second tab depends on the role: Personal tokens, or Audit tokens
  * for roles whose tokens read the audit log. Root and roles without
- * personal tokens get the profile only. An address for the other tab
- * moves to the one this account has.
+ * personal tokens get the profile only; root's profile points at AI
+ * agents instead. An address for the other tab moves to the one this
+ * account has.
  *
  * Changing the password revokes every human session server-side. The
  * controller clears local session state and routes back to `/login`.
@@ -130,6 +131,8 @@ export function useAccountController() {
   const groups = computed<GroupRef[] | null>(
     () => ownAccessData.value?.groups ?? null,
   );
+  /** Root holds no personal tokens, so its profile points at AI agents. */
+  const showsAgentNote = computed(() => auth.isRoot);
   /** Group pages open for people who can see groups. */
   const canOpenGroups = computed(() => auth.can("users.view", "groups.manage"));
 
@@ -214,6 +217,7 @@ export function useAccountController() {
     subtitle,
     groups,
     canOpenGroups,
+    showsAgentNote,
     loadGroups,
     passwordOpen,
     openPassword,

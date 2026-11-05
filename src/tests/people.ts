@@ -12,7 +12,7 @@ import type { User } from "~/services/users.api";
 import { useAuthStore } from "~/stores/auth.store";
 
 /**
- * Fixtures for the People & access pages: one instance with root, a lead
+ * Fixtures for the Access pages: one instance with root, a lead
  * (Admin), maya (Member), reader (custom Viewer) and review-bot (AI agent
  * owned by maya). Each builder takes overrides for the case at hand.
  */
@@ -101,6 +101,9 @@ export const adminRole = roleFixture({
     "groups.manage",
     "projects.create",
     "tokens.personal",
+    "agents.view",
+    "agents.view_all",
+    "agents.manage",
   ],
   rank: 20,
 });
@@ -108,9 +111,10 @@ export const memberRole = roleFixture();
 export const agentRole = roleFixture({
   id: "rol_ai_agent",
   name: "AI agent",
-  maxLevel: "read",
+  maxLevel: "write",
   signIn: "token_only",
   requiresOwner: true,
+  tokenMaxLevel: "write",
   tokenMaxTtlDays: 90,
   rank: 50,
 });

@@ -14,7 +14,10 @@ use axum::{
 /// Give a user or group a level on all projects, one project, or one
 /// environment. A grant on a scope that already has one replaces its level.
 /// Granting on a project or its environments needs the project manager
-/// level on it; all projects is for root. Requires an Admin UI session with
+/// level on it; all projects is for root. A person needs users.view and an
+/// AI agent agents.manage. The owner of an AI agent, with agents.view, may
+/// also give it a level on a project or environment they reach at that
+/// level themselves. Requires an Admin UI session with
 /// recent authentication and the CSRF header.
 #[utoipa::path(
   put,
@@ -101,7 +104,8 @@ pub async fn project_access(
 /// User access
 ///
 /// List an account's groups and the grants that reach it, its own and its
-/// groups'. Anyone can read their own; another account's needs users.view.
+/// groups'. Anyone can read their own. A person's needs users.view; an AI
+/// agent's needs agents.view_all, or agents.view when you own it.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::ACCESS,
@@ -111,7 +115,7 @@ pub async fn project_access(
   responses(
     (status = 200, description = "User access fetched", body = inline(HttpResponseFormat<UserAccessResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "users.view is required for another account", body = crate::http::ErrorBody),
+    (status = 403, description = "users.view, agents.view_all, or owning the agent is required for another account", body = crate::http::ErrorBody),
     (status = 404, description = "The user was not found", body = crate::http::ErrorBody),
   ),
 )]

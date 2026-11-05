@@ -9,6 +9,15 @@ const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
+// Dates render in the browser's locale, and tests assert US-style text such
+// as "Nov 26, 2026". Node takes its default locale from LANG/LC_ALL when a
+// process starts, so set them here, before Vitest forks its workers, to make
+// test runs the same in every terminal.
+if (process.env.VITEST) {
+  process.env.LC_ALL = "en_US.UTF-8";
+  process.env.LANG = "en_US.UTF-8";
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   // The backend serves the UI root-mounted from ../dist (rust-embed), so

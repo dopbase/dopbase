@@ -15,6 +15,7 @@ import { formatDate } from "~/utils/format";
 import { mountController } from "~/tests/mount-controller";
 import {
   accessFixture,
+  adminRole,
   agentRole,
   grantFixture,
   lead,
@@ -83,7 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  signInAs(["users.view", "users.manage"]);
+  signInAs(["users.view", "agents.view", "agents.view_all", "agents.manage"]);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([
     maya,
     lead,
@@ -189,23 +190,27 @@ describe("useAgentsController", () => {
     expect(rowOf(controller, "usr_stray").owner).toBe("Unknown");
   });
 
-  it("shows how far an agent can reach from its role's highest level", async () => {
-    const controller = await mountAgents();
-
-    expect(rowOf(controller, "usr_bot").reach).toEqual({
-      label: "Read",
-      filled: 2,
-      strong: false,
-    });
-  });
-
-  it("still lists agents without a reach when the roles list fails", async () => {
+  it("still lists agents when the roles list fails", async () => {
     vi.mocked(rolesApi.fetchRoles).mockRejectedValue(new Error("down"));
     const controller = await mountAgents();
 
     expect(controller.loadError.value).toBeNull();
-    expect(rowOf(controller, "usr_bot").reach).toBeNull();
+    expect(rowOf(controller, "usr_bot").owner).toBe("maya@example.com");
     expect(controller.agentRole.value).toBeNull();
+  });
+
+  it("offers Transfer owner only when someone else could own the agent", async () => {
+    // Lead's role runs agents, so lead could take maya's bot; this
+    // member role doesn't, so nobody could take lead's.
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      memberRole,
+      adminRole,
+      agentRole,
+    ]);
+    const controller = await mountAgents();
+
+    expect(rowOf(controller, "usr_bot").canTransfer).toBe(true);
+    expect(rowOf(controller, "usr_deploy").canTransfer).toBe(false);
   });
 
   it("marks a token with months left as active", async () => {
@@ -271,18 +276,49 @@ describe("useAgentsController", () => {
     expect(rowOf(controller, "usr_deploy").status).toBe("active");
   });
 
-  it("lets someone with users.manage manage every agent", async () => {
+  it("lets someone with agents.manage manage every agent", async () => {
     const controller = await mountAgents();
 
     expect(controller.rows.value.every((row) => row.canManage)).toBe(true);
   });
 
-  it("lets an owner without users.manage manage only their own agent", async () => {
-    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  it("lets an owner with agents.view manage only their own agent", async () => {
+    signInAs(["tokens.personal", "agents.view"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
     const controller = await mountAgents();
 
     expect(rowOf(controller, "usr_bot").canManage).toBe(true);
     expect(rowOf(controller, "usr_deploy").canManage).toBe(false);
+    expect(rowOf(controller, "usr_bot").canTransfer).toBe(false);
+  });
+
+  it("lets nobody manage an agent with users.manage alone", async () => {
+    signInAs(["users.view", "users.manage"]);
+    const controller = await mountAgents();
+
+    expect(controller.rows.value.some((row) => row.canManage)).toBe(false);
+    expect(controller.canAdd.value).toBe(false);
+  });
+
+  it("lets agents.view_all see every agent but change none", async () => {
+    signInAs(["agents.view_all"], { adminId: "usr_reader", role: "member" });
+    const controller = await mountAgents();
+
+    expect(controller.rows.value).toHaveLength(2);
+    expect(controller.rows.value.some((row) => row.canManage)).toBe(false);
+    expect(controller.canAdd.value).toBe(false);
+  });
+
+  it("names the owner from the agent, without listing people", async () => {
+    signInAs(["agents.view_all"], { adminId: "usr_reader", role: "member" });
+    vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+      { ...deployBot, ownerEmail: "lead@example.com" },
+    ]);
+    const controller = await mountAgents();
+
+    expect(rowOf(controller, "usr_deploy").owner).toBe("lead@example.com");
   });
 
   it("links each row to the agent's audit activity", async () => {
@@ -359,12 +395,45 @@ describe("useAgentsController", () => {
     expect(controller.canAdd.value).toBe(false);
   });
 
-  it("hides Add from an owner without users.manage", async () => {
-    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  it("offers Add to a member with agents.view", async () => {
+    signInAs(["tokens.personal", "agents.view"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
     const controller = await mountAgents();
 
     expect(controller.agentRole.value?.id).toBe("rol_ai_agent");
+    expect(controller.canAdd.value).toBe(true);
+  });
+
+  it("hides Add from agents.manage without agents.view, since adding means owning", async () => {
+    signInAs(["tokens.personal", "agents.view_all", "agents.manage"], {
+      adminId: "usr_lead",
+      role: "member",
+    });
+    const controller = await mountAgents();
+
     expect(controller.canAdd.value).toBe(false);
+  });
+
+  it("hides Add from someone who can't create agents", async () => {
+    signInAs(["tokens.personal", "agents.view_all"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
+    const controller = await mountAgents();
+
+    expect(controller.canAdd.value).toBe(false);
+  });
+
+  it("points people at personal tokens, but not root, which has none", async () => {
+    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+    const member = await mountAgents();
+    expect(member.showsPersonalTokenHint.value).toBe(true);
+
+    signInAs([], { role: "root" });
+    const root = await mountAgents();
+    expect(root.showsPersonalTokenHint.value).toBe(false);
   });
 
   it("opens the new agent's page once it is added", async () => {
@@ -430,8 +499,11 @@ describe("useAgentsController", () => {
     ).toBeGreaterThan(listed);
   });
 
-  it("lets an owner without users.manage revoke their agent's token", async () => {
-    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  it("lets an owner with agents.view revoke their agent's token", async () => {
+    signInAs(["tokens.personal", "agents.view"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
     const controller = await mountAgents();
     controller.askRevoke(rowOf(controller, "usr_bot"));
     const listed = vi.mocked(tokensApi.listPersonalTokens).mock.calls.length;

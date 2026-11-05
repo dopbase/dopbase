@@ -38,6 +38,7 @@ impl GrantRow {
       level: Level::parse(&self.level)?,
       granted_by: self.granted_by,
       created_at: self.created_at,
+      owner_level: None,
     })
   }
 }

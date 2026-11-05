@@ -3,7 +3,6 @@ use app::cli::args::{
   RunArgs, SecretCommand, ServerCommand,
 };
 use app::cli::secret_format::{ExportFormat, SecretFormat};
-use app::constants::config::executable_environment_names;
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use std::process::Command as ProcessCommand;
 
@@ -505,26 +504,18 @@ fn top_level_help_lists_common_server_options() {
 }
 
 #[test]
-fn top_level_help_lists_every_executable_environment_variable() {
+fn top_level_help_keeps_to_the_quickstart_and_common_options() {
   let help = Cli::command().render_long_help().to_string();
-  assert!(help.contains("Environment variables:"), "{help}");
-  let environment_help = help
-    .split_once("Environment variables:")
-    .unwrap()
-    .1
-    .split_once("Run 'dopbase help <command>'")
-    .unwrap()
-    .0;
-  for name in executable_environment_names() {
-    assert!(
-      environment_help.contains(name),
-      "missing {name} from environment variable help:\n{help}"
-    );
-  }
+  assert!(help.contains("Quickstart:"), "{help}");
   assert!(
-    environment_help.contains("Bearer token for a machine runner or AI agent"),
+    help.contains(
+      "dopbase secret set myapp/dev API_KEY     # prompts for the value, the web UI works too"
+    ),
     "{help}"
   );
+  // Environment variables are documented in the guides, not in --help.
+  assert!(!help.contains("Environment variables:"), "{help}");
+  assert!(help.contains("Run 'dopbase help <command>'"), "{help}");
 }
 
 #[test]

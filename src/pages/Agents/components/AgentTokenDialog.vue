@@ -45,6 +45,7 @@ const dialog = useAgentTokenDialog(
 );
 const {
   name,
+  namePlaceholder,
   level,
   levels,
   where,
@@ -90,7 +91,7 @@ async function save(): Promise<void> {
         v-model="name"
         label="Name"
         name="tokenName"
-        placeholder="ci-deploy"
+        :placeholder="namePlaceholder"
         mono
         :error="nameError"
         hint="Name it after where it's used." />
@@ -106,6 +107,14 @@ async function save(): Promise<void> {
           :description="choice.hint"
           :disabled="choice.disabled"
           @select="level = choice.level" />
+        <p
+          v-if="level === 'write'"
+          class="text-xs text-ink-muted"
+          data-testid="agent-token-write-note">
+          <b>IMPORTANT</b>: Whoever holds this token can change secrets anywhere
+          this agent has Write. Protected environments stay out of reach unless
+          the agent is granted them directly.
+        </p>
       </div>
       <DbSelect
         v-model="where"

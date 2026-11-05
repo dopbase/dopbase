@@ -40,7 +40,10 @@ admins don't.
 
 1. Choose **Add user**.
 2. Enter their email and a temporary password. With single sign-on on, pick
-   **Single sign-on** instead and they sign in through the provider.
+   **Single sign-on** instead and they sign in through the provider with an
+   account that has the same verified email. Only the emails you add here can
+   sign in; see
+   [Who can sign in](/guide/single-sign-on#who-can-sign-in).
 3. Pick a role.
 4. Choose **Add user**, then share the sign-in details securely.
 
@@ -71,6 +74,19 @@ Choose someone's email to open their page. It has five tabs:
 - **Tokens**: the personal tokens they made, with what each can do, where, and
   when it was last used. People with `tokens.revoke_others` can revoke them.
 - **Danger zone**: unlink single sign-on, disable, or delete the account.
+
+Root's page has no tabs, because root reaches everything without grants, can't
+join a group, and has no personal tokens. The **Account** card shows root's
+email, account ID with a copy button, how it signs in, whether single sign-on
+is linked, and when it last signed in. Next to it, **Full access**
+explains why grants, groups and tokens don't apply, with a link to
+[AI agents](./ai-agents) for scripts and AI tools.
+
+If you can read the whole audit log, **Recent activity** lists root's five
+latest events: when, the action, what it touched (such as
+`maya@example.com · Read`), and the address it came from.
+**See all in Audit log** opens the log filtered to root. A link to one of
+root's old tabs opens this page.
 
 Choose **Edit** at the top to change their email, role, or password. Leave the
 password empty to keep it. Changing someone signs them out everywhere, and

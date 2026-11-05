@@ -6,6 +6,17 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- AI agents have their own capabilities. `agents.view` creates agents and
+  runs the ones you own, `agents.view_all` shows every agent, and
+  `agents.manage` changes, deletes, or transfers anyone's. Admins get all
+  three, Members get `agents.view`, and Auditors get `agents.view_all`.
+  Giving someone else's agent access takes `agents.manage` on top of project
+  manager. `agents.manage` lists the people who could own an agent, so it can
+  hand one over without `users.view`, but creating an agent takes
+  `agents.view`, because its creator owns it. An agent that `agents.manage`
+  disables stays off until `agents.manage` enables it again.
+- An agent's owner gives it access without being a project manager, only where
+  they reach and up to their own level there. Accounts carry `ownerEmail`.
 - Roles and grants. A role holds capabilities and caps the access its grants
   can give; Admin, Member, Auditor and AI agent are built in. A grant gives a
   user or group a level, from `metadata` to `project_manager`, on all
@@ -76,6 +87,18 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- The sidebar's **People & access** section is now **Access**, which fits
+  members who only see AI agents as well as admins.
+- The role editor uses the full page width. Each section has its
+  explanation beside its fields, and a Summary before **Create role** shows how
+  far the role reaches, what holders can do, their tokens, who can give it
+  (built-in roles with `users.manage` that cover it) and the closest built-in
+  role, with a warning for broad roles.
+- Members can create AI agents. `users.view` and `users.manage` no longer
+  reach agents, `GET /api/v1/users` lists only the agents you may see, and a
+  new owner needs `agents.view` instead of `users.view`.
+- The role editor no longer lists `grants.manage`, which Dopbase doesn't check
+  yet. A role that has it keeps it.
 - **Breaking:** Refused admin requests say `Your role does not allow this operation.`
   instead of `This operation requires an administrator.`
 - **Breaking:** `PATCH /api/v1/environments/{id}` returns
@@ -84,6 +107,31 @@ All notable changes to Dopbase are documented in this file.
   single hyphens; others get `TOKEN_NAME_INVALID`. Existing tokens keep theirs.
 - Service accounts are now AI agent accounts. The upgrade makes each one an
   agent owned by root with the same reach, and its `dpa_` tokens keep working.
+- The built-in AI agent role reaches up to Write, so an agent can set and
+  rotate secrets where it is granted Write. New agent tokens start on Read
+  instead of Names only.
+- Root's profile has a **Tokens** card that points to **AI agents**, since
+  root has no personal tokens. The **AI agents** page no longer tells root to
+  make one.
+- Root's page under **Users** drops its Access, Groups and Tokens tabs, which
+  were always empty or locked. It shows root's account (with its ID and single
+  sign-on link), a **Full access** card that explains why, and root's five
+  latest audit events with what each touched and the address it came from, to
+  people who can read the whole audit log. Links to the old tabs open the page.
+- New roles sign in with password or single sign-on. The **Signs in with**
+  choice is hidden on **New role** for now, and a duplicate of a token-only
+  role starts on password or single sign-on. Existing roles still show how
+  their holders sign in.
+- The **AI agents** list drops the **Reaches at most** column; an agent's page
+  still shows how far it reaches. **Transfer owner** is hidden when no one
+  else could own the agent.
+- An agent's **Tokens** tab shows state in its own **Status** column and puts
+  the live token first. Revoked and expired tokens follow, dimmed, and past
+  ten the older ones wait behind **Show older**. The tab now says why a new
+  token revokes the old one, and **New token** suggests a name from the
+  agent's, like `main-agent-token`.
+  Long names and places stay on one line and show in full on hover, and
+  columns drop as the table narrows instead of squeezing the name.
 - Lists show only the projects and environments your grants reach, and the
   rest return 404. The upgrade gives admins `project_manager` and members
   `write` on all projects; new members start with no access.
@@ -153,6 +201,15 @@ All notable changes to Dopbase are documented in this file.
 - The personal token code moved from `modules/personal_tokens` to
   `modules/tokens/personal`, next to runner tokens, and its tests moved to
   match. Routes, the API and behavior are unchanged.
+- The **Source** column on a user's, agent's or group's Access tab has an ⓘ
+  that says what **Direct** and **via** a group mean.
+- An environment's **Tokens** tab drops the **Can** column, since every
+  runner token only reads. The intro now says so, and **New runner token**
+  still shows it.
+- The single sign-on docs explain who can sign in. The Users page is the
+  allow list, so Dopbase has no email domain setting. To turn away people
+  outside your organization, limit sign-in at the provider, for example with
+  Google's **Internal** audience.
 
 ### Removed
 
@@ -175,9 +232,24 @@ All notable changes to Dopbase are documented in this file.
 - Moving quickly between users, agents or environments no longer shows the
   previous one's tokens, and **Load more** on **Activity** no longer adds
   events from the filters you just left.
+- The breadcrumb on **Give access** now starts at the list you came from, as in
+  **Projects** / payment / Give access, and each part links back.
+- `dopbase access` on an AI agent names its owner. Where the owner has less
+  access than a grant gives, it shows the level the agent really gets, with the
+  granted level in brackets. `GET /api/v1/users/{id}/access` adds `ownerEmail`
+  and, on each such grant, `ownerLevel`.
+- `dopbase status` calls an AI agent's token an AI agent token, not a personal
+  token, and shows the agent's name and owner.
+- `dopbase access --user` help says which capabilities it takes, and an agent
+  with no grants points to its owner instead of a project manager.
+- `dopbase token personal create` prints `Up to:` instead of `Reaches:`. The
+  token never reaches more than you do, so a write token on a project where
+  you have read still only reads.
 
 ### Security
 
+- Transferring an AI agent revokes its tokens, so a copy the old owner kept
+  stops working instead of reaching through the new owner's access.
 - A runner token gets the same 403 for an environment that doesn't exist as
   for one it can't reach, so its output can't be used to find environments.
 - `dopbase run` with a runner token prints only the key count and source, and

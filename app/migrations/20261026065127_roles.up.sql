@@ -50,7 +50,7 @@ INSERT INTO roles (
     1, 'metadata', 'interactive', 0, 'audit', 'metadata', 30, 365, 30,
     strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'), strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')),
   ('rol_ai_agent', 'AI agent', 'Signs in with tokens only and never exceeds its owner.',
-    1, 'read', 'token_only', 1, 'data', 'read', 30, 90, 40,
+    1, 'write', 'token_only', 1, 'data', 'write', 30, 90, 40,
     strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'), strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'));
 
 INSERT INTO role_capabilities (role_id, capability) VALUES
@@ -65,10 +65,15 @@ INSERT INTO role_capabilities (role_id, capability) VALUES
   ('rol_admin', 'access.report'),
   ('rol_admin', 'tokens.personal'),
   ('rol_admin', 'tokens.revoke_others'),
+  ('rol_admin', 'agents.view'),
+  ('rol_admin', 'agents.view_all'),
+  ('rol_admin', 'agents.manage'),
   ('rol_member', 'tokens.personal'),
+  ('rol_member', 'agents.view'),
   ('rol_auditor', 'users.view'),
   ('rol_auditor', 'audit.read'),
   ('rol_auditor', 'audit.verify'),
   ('rol_auditor', 'access.report'),
   ('rol_auditor', 'instance.view'),
+  ('rol_auditor', 'agents.view_all'),
   ('rol_ai_agent', 'tokens.personal');

@@ -121,6 +121,27 @@ pub async fn revoke(
   )
 }
 
+/// Revokes every token of the account that isn't revoked yet and returns
+/// each one as (id, name).
+pub async fn revoke_all(
+  conn: &mut SqliteConnection,
+  user_id: &str,
+  now: &str,
+) -> Result<Vec<(String, String)>, sqlx::Error> {
+  let tokens: Vec<(String, String)> = sqlx::query_as(
+    "SELECT id, name FROM personal_tokens WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at",
+  )
+  .bind(user_id)
+  .fetch_all(&mut *conn)
+  .await?;
+  sqlx::query("UPDATE personal_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+    .bind(now)
+    .bind(user_id)
+    .execute(&mut *conn)
+    .await?;
+  Ok(tokens)
+}
+
 /// The account's tokens other than `except` that are neither revoked nor
 /// expired at `now`, as (id, name).
 pub async fn live_except(

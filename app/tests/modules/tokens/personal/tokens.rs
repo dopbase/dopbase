@@ -279,15 +279,16 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   let (status, _) = send(&router, "GET", "/api/v1/projects", As::Token(&bot), None).await;
   assert_eq!(status, 401);
 
-  // A member can't view users, so they couldn't see an agent they own;
-  // another admin can take it.
-  let member = person(&router, &root, "member@example.com", "member").await;
+  // An auditor can't create agents, so it can't own one; another admin
+  // can take it.
+  let auditor =
+    super::audit_scope::with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
   let (status, body) = send(
     &router,
     "PATCH",
     &format!("/api/v1/users/{agent}"),
     root.browser(),
-    Some(json!({"ownerId":member.id})),
+    Some(json!({"ownerId":auditor.id})),
   )
   .await;
   assert_eq!(status, 400, "{body}");
@@ -324,8 +325,107 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   )
   .await;
   assert_eq!(status, 200);
+  // Changing hands revoked the old token; root's new one works with the
+  // owner gone.
+  let (status, _) = send(&router, "GET", &runtime(search), As::Token(&bot), None).await;
+  assert_eq!(status, 401);
+  let (status, body) = token(
+    &router,
+    &root,
+    &agent,
+    json!({"name":"root","level":"read"}),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let bot = plaintext(&body);
   let (status, _) = send(&router, "GET", &runtime(search), As::Token(&bot), None).await;
   assert_eq!(status, 200);
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn a_root_owned_ai_agent_writes_where_it_is_granted_write() {
+  let (_dir, state, router) = test_app().await;
+  let (root, env) = instance(&state, &router).await;
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    root.browser(),
+    Some(json!({"email":"solo-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  assert_eq!(body["data"]["ownerId"], root.id);
+  let agent = body["data"]["id"].as_str().unwrap().to_owned();
+  grant(
+    &router,
+    &root,
+    ("user", &agent),
+    ("project", Some("payments")),
+    "write",
+  )
+  .await;
+  let secret = |id: &str| format!("/api/v1/environments/{id}/secrets/FROM_AGENT");
+  let dev = &env["payments/dev"];
+
+  // A read token on a write grant still only reads.
+  let (status, body) = token(
+    &router,
+    &root,
+    &agent,
+    json!({"name":"reader","level":"read"}),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let reader = plaintext(&body);
+  let (status, _) = send(
+    &router,
+    "PUT",
+    &secret(dev),
+    As::Token(&reader),
+    Some(json!({"value":"nope"})),
+  )
+  .await;
+  assert_eq!(status, 403);
+
+  let (status, body) = token(
+    &router,
+    &root,
+    &agent,
+    json!({"name":"writer","level":"write","replaceExisting":true}),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let writer = plaintext(&body);
+  let (status, body) = send(
+    &router,
+    "PUT",
+    &secret(dev),
+    As::Token(&writer),
+    Some(json!({"value":"written-by-agent"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  // Once production is protected, the project grant stops short of it.
+  let (status, body) = send(
+    &router,
+    "PATCH",
+    &format!("/api/v1/environments/{}", env["payments/prod"]),
+    root.cli(),
+    Some(json!({"protected":true})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, _) = send(
+    &router,
+    "PUT",
+    &secret(&env["payments/prod"]),
+    As::Token(&writer),
+    Some(json!({"value":"nope"})),
+  )
+  .await;
+  assert_eq!(status, 404);
   state.db.close().await;
 }
 

@@ -9,13 +9,24 @@ import {
   DbBadge,
   DbButton,
   DbConfirmDialog,
+  DbCopyButton,
   DbLevelBadge,
   DbMenu,
   DbMenuItem,
   DbSkeleton,
   DbTabNav,
 } from "~/components/ui";
-import { PencilIcon, PlusIcon, UsersIcon, XIcon } from "~/assets/icons";
+import {
+  ActivityIcon,
+  BotIcon,
+  FolderIcon,
+  InfoIcon,
+  PencilIcon,
+  PlusIcon,
+  ShieldIcon,
+  UsersIcon,
+  XIcon,
+} from "~/assets/icons";
 import { formatLevel } from "~/utils/format";
 import { levelMeter } from "~/utils/level";
 import { SIGN_IN_LABELS, signInMethod } from "./people";
@@ -31,6 +42,7 @@ const {
   ssoEnabled,
   loadError,
   isRoot,
+  isYou,
   canManage,
   subtitle,
   created,
@@ -43,6 +55,11 @@ const {
   tokenRows,
   tokensError,
   canRevokeTokens,
+  canSeeActivity,
+  activity,
+  activityError,
+  auditLink,
+  lastSignIn,
   editOpen,
   actions,
 } = controller;
@@ -87,11 +104,241 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           </template>
         </PageHeader>
 
-        <DbTabNav :tabs="tabs" :active="activeTab" label="Account sections" />
+        <DbTabNav
+          v-if="tabs.length"
+          :tabs="tabs"
+          :active="activeTab"
+          label="Account sections" />
+
+        <!-- Root: one page, no tabs -->
+        <div
+          v-if="isRoot"
+          class="flex flex-col gap-4"
+          data-testid="root-overview">
+          <div class="grid gap-4 lg:grid-cols-2">
+            <section
+              :class="[card, 'flex flex-col']"
+              aria-labelledby="account-heading">
+              <h2
+                id="account-heading"
+                class="mb-3 text-[15px] font-semibold text-ink-strong">
+                Account
+              </h2>
+              <dl
+                class="grid grid-cols-[minmax(0,8rem)_1fr] items-center gap-x-4 gap-y-2.5 text-sm">
+                <dt class="text-ink-muted">Email</dt>
+                <dd class="font-mono text-ink-strong [overflow-wrap:anywhere]">
+                  {{ user.email }}
+                </dd>
+                <dt class="text-ink-muted">Account ID</dt>
+                <dd class="flex min-w-0 items-center gap-1.5">
+                  <span class="truncate font-mono text-ink">{{ user.id }}</span>
+                  <DbCopyButton
+                    :value="user.id"
+                    label="Copy account ID"
+                    icon-only />
+                </dd>
+                <dt class="text-ink-muted">Role</dt>
+                <dd><DbBadge tone="accent">Root</DbBadge></dd>
+                <dt class="text-ink-muted">Signs in with</dt>
+                <dd class="font-mono text-ink">
+                  {{ SIGN_IN_LABELS[signInMethod(user)] }}
+                  <span
+                    v-if="user.ssoLinked && user.hasPassword"
+                    class="text-ink-muted">
+                    + sso
+                  </span>
+                </dd>
+                <dt class="text-ink-muted">Single sign-on</dt>
+                <dd class="text-ink">
+                  {{
+                    !ssoEnabled
+                      ? "Not set up on this instance"
+                      : user.ssoLinked
+                        ? "Linked"
+                        : "Not linked yet"
+                  }}
+                </dd>
+                <dt class="text-ink-muted">Last sign-in</dt>
+                <dd class="text-ink">{{ lastSignIn }}</dd>
+                <dt class="text-ink-muted">Created</dt>
+                <dd class="text-ink">{{ created }}, during setup</dd>
+              </dl>
+              <div class="min-h-4 flex-1" aria-hidden="true" />
+              <p
+                class="flex items-start gap-2 rounded-control bg-raised/60 px-3 py-2.5 text-sm text-ink-muted">
+                <InfoIcon class="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Root is the account made during setup. Nobody can edit,
+                  disable or delete it.
+                  <RouterLink
+                    v-if="isYou"
+                    :to="{ name: 'account' }"
+                    class="font-medium text-accent-strong hover:underline">
+                    Change your password ›
+                  </RouterLink>
+                </span>
+              </p>
+            </section>
+
+            <section :class="card" aria-labelledby="full-access-heading">
+              <h2
+                id="full-access-heading"
+                class="mb-2 flex items-center gap-2 text-[15px] font-semibold text-ink-strong">
+                <ShieldIcon class="h-4 w-4 text-accent-strong" />
+                Full access
+              </h2>
+              <p class="text-sm text-ink">
+                Root reaches every project and environment, and every setting on
+                this instance. Grants, groups and roles don't apply to it, so
+                there's nothing to change here.
+              </p>
+              <ul class="mt-3 text-sm">
+                <li class="flex gap-3 border-t border-line-soft py-3">
+                  <FolderIcon class="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                  <div>
+                    <p class="font-medium text-ink-strong">Projects</p>
+                    <p class="text-ink-muted">
+                      All of them, protected environments included. No grant
+                      needed.
+                    </p>
+                  </div>
+                </li>
+                <li class="flex gap-3 border-t border-line-soft py-3">
+                  <UsersIcon class="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                  <div>
+                    <p class="font-medium text-ink-strong">Groups</p>
+                    <p class="text-ink-muted">
+                      Not needed. A group can't add to what root already has.
+                    </p>
+                  </div>
+                </li>
+                <li class="flex gap-3 border-t border-line-soft pt-3">
+                  <BotIcon class="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                  <div>
+                    <p class="font-medium text-ink-strong">Tokens</p>
+                    <p class="text-ink-muted">
+                      Root has no personal tokens. Scripts and AI tools use an
+                      AI agent.
+                    </p>
+                    <RouterLink
+                      :to="{ name: 'agents' }"
+                      class="mt-1 inline-block font-medium text-accent-strong hover:underline">
+                      Add an AI agent ›
+                    </RouterLink>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <section
+            v-if="canSeeActivity"
+            :class="card"
+            aria-labelledby="activity-heading"
+            data-testid="root-activity">
+            <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <h2
+                id="activity-heading"
+                class="flex items-center gap-2 text-[15px] font-semibold text-ink-strong">
+                <ActivityIcon class="h-4 w-4 text-ink-muted" />
+                Recent activity
+              </h2>
+              <RouterLink
+                :to="auditLink"
+                class="text-sm font-medium text-accent-strong hover:underline">
+                See all in Audit log ›
+              </RouterLink>
+            </div>
+            <DbAlert v-if="activityError" class="mt-2">
+              {{ activityError }}
+            </DbAlert>
+            <DbSkeleton
+              v-if="activity === null"
+              class="mt-2 h-24 w-full rounded-control" />
+            <p
+              v-else-if="activity.length === 0 && !activityError"
+              class="py-3 text-sm text-ink-muted">
+              Root hasn't done anything yet.
+            </p>
+            <template v-else>
+              <!-- Phones: one line per event. -->
+              <ul class="-mx-4 text-sm sm:hidden">
+                <li
+                  v-for="row in activity"
+                  :key="row.event.id"
+                  class="flex flex-col gap-1 border-t border-line-soft px-4 py-2.5">
+                  <span class="flex items-center justify-between gap-2">
+                    <DbBadge :tone="row.tone" class="truncate">
+                      {{ row.event.action }}
+                    </DbBadge>
+                    <span
+                      class="shrink-0 text-xs text-ink-muted"
+                      :title="row.at">
+                      {{ row.when }}
+                    </span>
+                  </span>
+                  <span
+                    v-if="row.detail"
+                    class="truncate font-mono text-xs text-ink">
+                    {{ row.detail }}
+                  </span>
+                </li>
+              </ul>
+              <div class="-mx-4 hidden overflow-x-auto sm:-mx-5 sm:block">
+                <table class="min-w-full text-left text-sm">
+                  <thead>
+                    <tr class="border-b border-line-soft">
+                      <th
+                        class="h-9 w-28 px-4 font-medium text-ink-muted sm:pl-5">
+                        Time
+                      </th>
+                      <th class="h-9 px-4 font-medium text-ink-muted">
+                        Action
+                      </th>
+                      <th class="h-9 px-4 font-medium text-ink-muted">
+                        Detail
+                      </th>
+                      <th
+                        class="hidden h-9 px-4 font-medium text-ink-muted sm:table-cell sm:pr-5">
+                        From
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in activity"
+                      :key="row.event.id"
+                      class="border-b border-line-soft last:border-b-0"
+                      data-testid="activity-row">
+                      <td
+                        class="h-11 whitespace-nowrap px-4 text-ink sm:pl-5"
+                        :title="row.at">
+                        {{ row.when }}
+                      </td>
+                      <td class="px-4">
+                        <DbBadge :tone="row.tone" class="whitespace-nowrap">
+                          {{ row.event.action }}
+                        </DbBadge>
+                      </td>
+                      <td class="px-4 font-mono text-ink">
+                        {{ row.detail || "—" }}
+                      </td>
+                      <td
+                        class="hidden whitespace-nowrap px-4 font-mono text-xs text-ink-muted sm:table-cell sm:pr-5">
+                        {{ row.origin || "—" }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </section>
+        </div>
 
         <!-- Overview -->
         <div
-          v-if="activeTab === 'overview'"
+          v-else-if="activeTab === 'overview'"
           class="grid gap-4 lg:grid-cols-2"
           data-testid="user-overview">
           <section :class="card" aria-labelledby="account-heading">

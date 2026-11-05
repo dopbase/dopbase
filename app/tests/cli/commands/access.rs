@@ -44,4 +44,17 @@ async fn access_shows_an_account_its_grants_and_a_token_its_limit() {
   assert_eq!(through_token["token"]["name"], "agent");
   assert_eq!(through_token["token"]["level"], "metadata");
   assert_eq!(through_token["token"]["scopeLabel"], "fixture");
+  assert!(through_token.get("ownerEmail").is_none(), "{through_token}");
+
+  // An AI agent's report names its owner.
+  let agent = fixture.agent_token().await;
+  let mut command = fixture.command();
+  command
+    .env("DOPBASE_TOKEN", agent["plaintextToken"].as_str().unwrap())
+    .arg("access");
+  let text = output(command, None).await;
+  assert!(text.status.success());
+  let text = String::from_utf8_lossy(&text.stdout);
+  assert!(text.contains("Owner:"), "{text}");
+  assert!(text.contains("names only"), "{text}");
 }

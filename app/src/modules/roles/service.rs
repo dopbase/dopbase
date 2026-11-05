@@ -103,7 +103,16 @@ pub async fn list(
 ) -> Result<Vec<RoleResponse>, HttpError> {
   require_person(identity)?;
   let access = caller(identity)?;
-  if !access.has(Capability::UsersView) && !access.has(Capability::RolesManage) {
+  // People who create AI agents read roles too, to pick the agent role and
+  // see who could own one.
+  let readers = [
+    Capability::UsersView,
+    Capability::RolesManage,
+    Capability::AgentsView,
+    Capability::AgentsViewAll,
+    Capability::AgentsManage,
+  ];
+  if !readers.iter().any(|capability| access.has(*capability)) {
     return Err(HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "Your role does not allow this operation.",

@@ -6,6 +6,29 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 
 /**
+ * Active people other than the agent's current owner who could own it:
+ * root, or a role with `agents.view`, so they can see and run it.
+ */
+export function transferCandidates(
+  people: User[],
+  roles: Role[],
+  agent: User | null,
+): User[] {
+  const runsAgents = new Set(
+    roles
+      .filter((role) => role.capabilities.includes("agents.view"))
+      .map((role) => role.id),
+  );
+  return people.filter(
+    (person) =>
+      person.role !== "ai_agent" &&
+      person.status !== "disabled" &&
+      person.id !== agent?.ownerId &&
+      (person.role === "root" || runsAgents.has(person.roleId ?? "")),
+  );
+}
+
+/**
  * Transfer owner: hand an AI agent to another person. The agent then never
  * reaches more than its new owner does.
  */
@@ -20,27 +43,10 @@ export function useTransferOwnerDialog(
   const saving = ref(false);
   const error = ref<string | null>(null);
 
-  /** Roles whose holders can see users, and so the agents they own. */
-  const seesUsers = computed(
-    () =>
-      new Set(
-        roles.value
-          .filter((role) => role.capabilities.includes("users.view"))
-          .map((role) => role.id),
-      ),
-  );
-
-  /** Active people other than the current owner who can see the agent. */
   const options = computed(() =>
-    people.value
-      .filter(
-        (person) =>
-          person.role !== "ai_agent" &&
-          person.status !== "disabled" &&
-          person.id !== agent.value?.ownerId &&
-          (person.role === "root" || seesUsers.value.has(person.roleId ?? "")),
-      )
-      .map((person) => ({ value: person.id, label: person.email })),
+    transferCandidates(people.value, roles.value, agent.value).map(
+      (person) => ({ value: person.id, label: person.email }),
+    ),
   );
 
   watch(

@@ -9,7 +9,7 @@ import { AlertTriangleIcon, CheckIcon, InfoIcon } from "~/assets/icons";
  */
 const props = withDefaults(
   defineProps<{
-    tone?: "error" | "info" | "success";
+    tone?: "error" | "info" | "success" | "warn";
     title?: string;
   }>(),
   { tone: "error", title: undefined },
@@ -33,6 +33,8 @@ const role = computed(() => {
       return "note";
     case "success":
       return "status";
+    case "warn":
+      return "note";
     default:
       return "alert";
   }
@@ -44,6 +46,8 @@ const toneClasses = computed(() => {
       return "border-accent/30 bg-accent-soft text-accent-strong";
     case "success":
       return "border-ok/30 bg-ok/10 text-ok";
+    case "warn":
+      return "border-warn/30 bg-warn/10 text-warn";
     default:
       return "border-crit/30 bg-crit/10 text-crit";
   }

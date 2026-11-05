@@ -357,7 +357,7 @@ async fn loads_access_from_the_built_in_roles() {
     .unwrap()
     .unwrap();
   assert_eq!(agent.sign_in, SignIn::TokenOnly);
-  assert_eq!(agent.max_level, Level::Read);
+  assert_eq!(agent.max_level, Level::Write);
 
   // An account whose role is gone authenticates but holds nothing.
   let orphan = authx::load_access(&mut conn, "usr_orphan")

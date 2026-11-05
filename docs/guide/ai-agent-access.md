@@ -33,7 +33,8 @@ covers tasks such as:
 
 Give **Read** only when the agent must run something with real values, such as
 integration tests, and only on the environment it needs. An AI agent account
-never goes past Read. For a deployed application, use an environment-scoped
+can go as far as Write, for an agent that sets or rotates secrets. Give Write
+only on the environment it changes. For a deployed application, use an environment-scoped
 [runner token](./run-an-application) instead.
 
 ::: warning Names are sensitive too
@@ -64,11 +65,13 @@ An AI agent account has a name instead of an email, no password, and an owner:
 the person who created it. It reaches only what it has been granted, and never
 more than its owner. Disabling the owner disables the agent.
 
-1. Open **Users** and choose **Add AI agent**. You become its owner.
-2. Open the project's **Access** page and give the agent **Names only**, on the
-   whole project or one environment.
-3. Back on **Users**, choose **Get token** beside the agent, pick what the token
-   can do and when it expires, and confirm it's you.
+1. Open **AI agents** and choose **Add AI agent**. You become its owner. This
+   needs `agents.view`, which Admins and Members have.
+2. On the agent's **Access** tab, choose **Give access** and give it **Names
+   only** on a project or environment. You can give your own agent anything
+   you reach, up to your own level there.
+3. On its **Tokens** tab, choose **New token**, pick what the token can do and
+   when it expires, and confirm it's you.
 4. Copy the token when it appears.
 
 Agent tokens last at most 90 days. Getting a new token revokes the agent's

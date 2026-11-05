@@ -18,7 +18,6 @@ import {
   DbConfirmDialog,
   DbEmptyState,
   DbFilterMenu,
-  DbLevelBadge,
   DbMenu,
   DbMenuItem,
   DbSearchField,
@@ -47,6 +46,7 @@ const {
   visibleRows,
   agentRole,
   canAdd,
+  showsPersonalTokenHint,
   addOpen,
   tokenFor,
   tokenGrants,
@@ -135,9 +135,6 @@ const tokenUsage = computed(() =>
               <tr class="border-b border-line-soft bg-raised/50">
                 <th class="h-11 px-4 font-medium text-ink-muted">Agent</th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Owner</th>
-                <th class="h-11 px-4 font-medium text-ink-muted">
-                  Reaches at most
-                </th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Token</th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Expires</th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Last used</th>
@@ -162,9 +159,6 @@ const tokenUsage = computed(() =>
                 </td>
                 <td class="px-4 font-mono text-ink">{{ row.owner }}</td>
                 <td class="px-4">
-                  <DbLevelBadge v-if="row.reach" v-bind="row.reach" />
-                </td>
-                <td class="px-4">
                   <span
                     class="rounded-control px-1.5 py-0.5 font-mono text-xs"
                     :class="statusClass[row.status]">
@@ -181,7 +175,9 @@ const tokenUsage = computed(() =>
                       <template #icon><KeyIcon class="h-4 w-4" /></template>
                       New token
                     </DbMenuItem>
-                    <DbMenuItem @select="transferring = row.agent">
+                    <DbMenuItem
+                      v-if="row.canTransfer"
+                      @select="transferring = row.agent">
                       <template #icon><UserIcon class="h-4 w-4" /></template>
                       Transfer owner
                     </DbMenuItem>
@@ -248,6 +244,7 @@ const tokenUsage = computed(() =>
         </ul>
 
         <p
+          v-if="showsPersonalTokenHint"
           class="flex items-start gap-2 rounded-card border border-line bg-panel px-4 py-3 text-sm text-ink-muted">
           <KeyIcon class="mt-0.5 h-4 w-4 shrink-0" />
           An agent on your own machine doesn't need an account. Create a

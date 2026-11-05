@@ -8,6 +8,7 @@ import {
   DbButton,
   DbCheckbox,
   DbConfirmDialog,
+  DbInfoTip,
   DbLevelBadge,
   DbMenu,
   DbMenuItem,
@@ -57,6 +58,7 @@ const panel = useAccessGrantsPanel(
 const {
   filter,
   rows,
+  sourceHint,
   visibleRows,
   overrides,
   editing,
@@ -132,7 +134,12 @@ const {
             <th class="h-11 px-4 font-medium text-ink-muted">
               Project / environment
             </th>
-            <th class="h-11 px-4 font-medium text-ink-muted">Source</th>
+            <th class="h-11 px-4 font-medium text-ink-muted">
+              <span class="inline-flex items-center gap-1.5">
+                Source
+                <DbInfoTip :text="sourceHint" label="About Source" />
+              </span>
+            </th>
             <th class="h-11 px-4 font-medium text-ink-muted">Level</th>
             <th class="h-11 w-12 px-2">
               <span class="sr-only">Actions</span>

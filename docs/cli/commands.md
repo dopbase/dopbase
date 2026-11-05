@@ -610,10 +610,16 @@ so you can check what an agent will reach before handing it over.
 | ---------------------------------------- | ----------------------------------------------- |
 | `dopbase access`                         | Show your access, or the token's                |
 | `dopbase access --project <PROJECT_REF>` | Show who reaches a project and its environments |
-| `dopbase access --user <USER_ID>`        | Show another account's access (`users.view`)    |
+| `dopbase access --user <USER_ID>`        | Show another account's access                   |
 
-`--project` needs project manager on the project, or `access.report`. Access
-is changed in the Admin UI, on a project's [Access](/ui/project-access) page.
+`--project` needs project manager on the project, or `access.report`.
+`--user` needs `users.view` for a person, and `agents.view_all` for an AI agent,
+or `agents.view` if the agent is yours. Access is changed in the Admin UI, on a
+project's [Access](/ui/project-access) page.
+
+An AI agent's report also names its owner. An agent never gets more than its
+owner, so where the owner has less, the level column shows what the agent
+really gets, with the granted level in brackets.
 
 ## Audit commands
 

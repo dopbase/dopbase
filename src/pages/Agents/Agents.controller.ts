@@ -18,9 +18,9 @@ import { useInvalidate } from "~/queries/invalidate";
 import { agentTokensQuery } from "~/queries/personal-tokens";
 import { rolesQuery, usersQuery } from "~/queries/users";
 import { formatDate, formatRelativeTime } from "~/utils/format";
-import { levelMeter, type LevelMeter } from "~/utils/level";
 import { isAgent, tokenState } from "~/pages/Users/people";
 import { useAccountActions } from "~/pages/Users/account-actions";
+import { transferCandidates } from "./components/TransferOwnerDialog.controller";
 
 /** Token state as the Token column shows it. */
 export type AgentTokenStatus = "active" | "expiring" | "none" | "unknown";
@@ -31,16 +31,16 @@ const EXPIRING_SOON_MS = 7 * 24 * 60 * 60 * 1000;
 export interface AgentRow {
   agent: User;
   owner: string;
-  /** The most its role lets it reach. */
-  reach: LevelMeter | null;
   token: PersonalToken | null;
   status: AgentTokenStatus;
   /** "active", "expires in 2 days", "no token". */
   statusLabel: string;
   expires: string;
   lastUsed: string;
-  /** You own it, or may manage users. */
+  /** You own it and may run your agents, or you manage every agent. */
   canManage: boolean;
+  /** You manage every agent and someone else could own this one. */
+  canTransfer: boolean;
   activity: RouteLocationRaw;
 }
 
@@ -135,8 +135,17 @@ export function useAgentsController() {
       ) ?? null,
   );
   const canAdd = computed(
-    () => auth.can("users.manage") && agentRole.value !== null,
+    // Whoever adds an agent owns it, which takes agents.view.
+    () => auth.can("agents.view") && agentRole.value !== null,
   );
+
+  /** Its owner while they may run agents, or anyone who manages agents. */
+  function canManageAgent(agent: User): boolean {
+    return (
+      auth.can("agents.manage") ||
+      (auth.can("agents.view") && agent.ownerId === auth.session?.adminId)
+    );
+  }
 
   const rows = computed<AgentRow[]>(() => {
     const now = Date.now();
@@ -162,14 +171,13 @@ export function useAgentsController() {
           statusLabel = "active";
         }
       }
-      const role = roles.value.find(
-        (candidate) => candidate.id === agent.roleId,
-      );
-      const owner = people.value.find((person) => person.id === agent.ownerId);
+      const owner =
+        agent.ownerEmail ??
+        people.value.find((person) => person.id === agent.ownerId)?.email;
+      const canManage = canManageAgent(agent);
       return {
         agent,
-        owner: owner?.email ?? (agent.ownerId ? "Unknown" : "No owner"),
-        reach: role ? levelMeter(role.maxLevel) : null,
+        owner: owner ?? (agent.ownerId ? "Unknown" : "No owner"),
         token,
         status,
         statusLabel,
@@ -177,8 +185,10 @@ export function useAgentsController() {
         lastUsed: token?.lastUsedAt
           ? formatRelativeTime(token.lastUsedAt)
           : "Never",
-        canManage:
-          auth.can("users.manage") || agent.ownerId === auth.session?.adminId,
+        canManage,
+        canTransfer:
+          auth.can("agents.manage") &&
+          transferCandidates(people.value, roles.value, agent).length > 0,
         activity: { name: "audit", query: { actor: agent.id } },
       };
     });
@@ -278,6 +288,11 @@ export function useAgentsController() {
 
   const actions = useAccountActions(() => invalidate.usersChanged());
 
+  /** Root holds no personal tokens, so the hint to make one is for others. */
+  const showsPersonalTokenHint = computed(
+    () => !auth.isRoot && auth.can("tokens.personal"),
+  );
+
   return {
     agents,
     people,
@@ -291,6 +306,7 @@ export function useAgentsController() {
     visibleRows,
     agentRole,
     canAdd,
+    showsPersonalTokenHint,
     addOpen,
     added,
     tokenFor,

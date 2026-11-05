@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { freshPinia } from "~/tests/pinia";
-import { useAgentController } from "./Agent.controller";
+import { HISTORY_SHOWN, useAgentController } from "./Agent.controller";
 import * as accessApi from "~/services/access.api";
 import * as rolesApi from "~/services/roles.api";
 import * as tokensApi from "~/services/personal-tokens.api";
@@ -10,6 +10,7 @@ import { formatDate } from "~/utils/format";
 import { mountController } from "~/tests/mount-controller";
 import {
   accessFixture,
+  adminRole,
   agentRole,
   lead,
   maya,
@@ -70,7 +71,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-31T00:00:00Z"));
   route.name = "agent";
   route.params = { agentId: "usr_bot" };
-  signInAs(["users.view", "users.manage"]);
+  signInAs(["users.view", "agents.view", "agents.view_all", "agents.manage"]);
   vi.mocked(usersApi.fetchUser).mockResolvedValue(reviewBot);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([maya, lead, reviewBot]);
   vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(botAccess);
@@ -101,7 +102,7 @@ describe("useAgentController", () => {
     expect(controller.agent.value).toEqual(reviewBot);
     expect(controller.access.value).toEqual(botAccess);
     expect(controller.role.value?.id).toBe("rol_ai_agent");
-    expect(controller.owner.value?.id).toBe("usr_maya");
+    expect(controller.ownerEmail.value).toBe("maya@example.com");
     expect(controller.people.value.map((person) => person.id)).toEqual([
       "usr_maya",
       "usr_lead",
@@ -199,16 +200,27 @@ describe("useAgentController", () => {
     ]);
   });
 
-  it("offers the Danger zone to the owner even without users.manage", async () => {
-    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  it("offers the Danger zone to an owner with agents.view", async () => {
+    signInAs(["tokens.personal", "agents.view"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
     const controller = await mountAgent();
 
     expect(controller.canManage.value).toBe(true);
+    expect(controller.canTransfer.value).toBe(false);
     expect(controller.tabs.value.map((tab) => tab.key)).toContain("danger");
   });
 
-  it("hides the Danger zone from someone who only views users", async () => {
-    signInAs(["users.view"]);
+  it("hides the Danger zone from an owner whose role can't run agents", async () => {
+    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+    const controller = await mountAgent();
+
+    expect(controller.canManage.value).toBe(false);
+  });
+
+  it("hides the Danger zone from someone who only sees every agent", async () => {
+    signInAs(["agents.view_all"]);
     const controller = await mountAgent();
 
     expect(controller.canManage.value).toBe(false);
@@ -216,6 +228,25 @@ describe("useAgentController", () => {
       "access",
       "tokens",
     ]);
+  });
+
+  it("hides Transfer owner when nobody else could own the agent", async () => {
+    // Maya owns it, and lead's role isn't listed as one that runs agents.
+    const controller = await mountAgent();
+
+    expect(controller.canManage.value).toBe(true);
+    expect(controller.canTransfer.value).toBe(false);
+  });
+
+  it("offers Transfer owner once someone else could own the agent", async () => {
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      memberRole,
+      adminRole,
+      agentRole,
+    ]);
+    const controller = await mountAgent();
+
+    expect(controller.canTransfer.value).toBe(true);
   });
 
   it("sums up the owner and how far the agent reaches under its name", async () => {
@@ -278,6 +309,65 @@ describe("useAgentController", () => {
         lastUsed: "just now",
       },
     ]);
+  });
+
+  it("puts the live token before newer revoked and expired ones", async () => {
+    const revoked = tokenFixture({
+      id: "pat_revoked",
+      createdAt: "2026-10-20T00:00:00Z",
+      revokedAt: "2026-10-21T00:00:00Z",
+    });
+    const expired = tokenFixture({
+      id: "pat_expired",
+      createdAt: "2026-10-10T00:00:00Z",
+      expiresAt: "2026-10-15T00:00:00Z",
+    });
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValue([
+      revoked,
+      expired,
+      tokenFixture(),
+    ]);
+    const controller = await mountAgent();
+
+    const ids = (rows: { token: { id: string } }[]) =>
+      rows.map((row) => row.token.id);
+    expect(ids(controller.tokenRows.value)).toEqual([
+      "pat_1",
+      "pat_revoked",
+      "pat_expired",
+    ]);
+    expect(ids(controller.liveRows.value)).toEqual(["pat_1"]);
+    expect(ids(controller.historyRows.value)).toEqual([
+      "pat_revoked",
+      "pat_expired",
+    ]);
+    expect(controller.olderCount.value).toBe(0);
+  });
+
+  it("shows the newest history tokens and keeps the rest behind Show older", async () => {
+    const history = Array.from({ length: HISTORY_SHOWN + 3 }, (_, i) =>
+      tokenFixture({
+        id: `pat_old_${i}`,
+        createdAt: `2026-09-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
+        revokedAt: "2026-10-01T00:00:00Z",
+      }),
+    );
+    vi.mocked(tokensApi.listPersonalTokens).mockResolvedValue([
+      tokenFixture(),
+      ...history,
+    ]);
+    const controller = await mountAgent();
+
+    expect(controller.historyRows.value).toHaveLength(HISTORY_SHOWN + 3);
+    expect(controller.shownHistory.value).toHaveLength(HISTORY_SHOWN);
+    expect(controller.shownHistory.value[0]?.token.id).toBe(
+      `pat_old_${HISTORY_SHOWN + 2}`,
+    );
+    expect(controller.olderCount.value).toBe(3);
+
+    controller.showAllHistory.value = true;
+    expect(controller.shownHistory.value).toHaveLength(HISTORY_SHOWN + 3);
+    expect(controller.olderCount.value).toBe(0);
   });
 
   it("revokes a token and reloads the list", async () => {
@@ -359,7 +449,7 @@ describe("useAgentController", () => {
     await controller.transferred();
 
     expect(controller.transferOpen.value).toBe(false);
-    expect(controller.owner.value?.id).toBe("usr_lead");
+    expect(controller.ownerEmail.value).toBe("lead@example.com");
   });
 
   it("goes back to the agents list after deleting the agent", async () => {

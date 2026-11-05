@@ -21,6 +21,7 @@ import { formatDate, formatLevel, formatRelativeTime } from "~/utils/format";
 import { isAgent, tokenState, type TokenState } from "~/pages/Users/people";
 import { useAccountActions } from "~/pages/Users/account-actions";
 import { liveToken } from "./Agents.controller";
+import { transferCandidates } from "./components/TransferOwnerDialog.controller";
 
 export type AgentTab = "access" | "tokens" | "danger";
 
@@ -32,6 +33,9 @@ const TAB_ROUTES: Record<AgentTab, string> = {
 const TAB_FOR_ROUTE = Object.fromEntries(
   Object.entries(TAB_ROUTES).map(([tab, route]) => [route, tab]),
 ) as Record<string, AgentTab>;
+
+/** History rows shown before "Show older". */
+export const HISTORY_SHOWN = 10;
 
 export interface AgentTokenRow {
   token: PersonalToken;
@@ -45,7 +49,8 @@ export interface AgentTokenRow {
 /**
  * One AI agent's page: Access (what it reaches, where it comes from),
  * Tokens (its one live token and the history) and the Danger zone. Its
- * owner, or anyone who manages users, may change it.
+ * owner, while their role runs agents, or anyone who manages agents may
+ * change it.
  */
 export function useAgentController() {
   const route = useRoute();
@@ -141,21 +146,34 @@ export function useAgentController() {
       roles.value.find((candidate) => candidate.id === agent.value?.roleId) ??
       null,
   );
-  const owner = computed(
+  /** The owner's email, from the agent itself or the people list. */
+  const ownerEmail = computed(
     () =>
-      people.value.find((person) => person.id === agent.value?.ownerId) ?? null,
+      agent.value?.ownerEmail ??
+      people.value.find((person) => person.id === agent.value?.ownerId)
+        ?.email ??
+      null,
   );
+  /** Its owner while they may run agents, or anyone who manages agents. */
   const canManage = computed(
     () =>
-      auth.can("users.manage") ||
-      (agent.value !== null && agent.value.ownerId === auth.session?.adminId),
+      auth.can("agents.manage") ||
+      (auth.can("agents.view") &&
+        agent.value !== null &&
+        agent.value.ownerId === auth.session?.adminId),
+  );
+  /** Transfer owner is for agents.manage, when someone else could take it. */
+  const canTransfer = computed(
+    () =>
+      auth.can("agents.manage") &&
+      transferCandidates(people.value, roles.value, agent.value).length > 0,
   );
 
   const subtitle = computed(() => {
     if (!agent.value) return "";
     const parts = [
-      owner.value
-        ? `Owned by ${owner.value.email}`
+      ownerEmail.value
+        ? `Owned by ${ownerEmail.value}`
         : agent.value.ownerId
           ? "Owner unknown"
           : "No owner",
@@ -189,7 +207,7 @@ export function useAgentController() {
 
   const accessSummary = computed(() => {
     if (!access.value || !agent.value) return "";
-    const ownerName = owner.value?.email ?? "its owner";
+    const ownerName = ownerEmail.value ?? "its owner";
     return `${agent.value.email} reaches at most ${formatLevel(access.value.maxLevel)}, and never more than ${ownerName} does.`;
   });
 
@@ -208,18 +226,45 @@ export function useAgentController() {
   const current = computed(() =>
     tokens.value ? liveToken(tokens.value) : null,
   );
-  const tokenRows = computed<AgentTokenRow[]>(() =>
-    (tokens.value ?? []).map((token) => ({
-      token,
-      state: tokenState(token),
-      scope: token.scopeLabel || "Every project it reaches",
-      created: formatDate(token.createdAt),
-      expires: token.expiresAt ? formatDate(token.expiresAt) : "Never",
-      lastUsed: token.lastUsedAt
-        ? formatRelativeTime(token.lastUsedAt)
-        : "Never",
-    })),
+  /** Live tokens first, then the history; newest first within each. */
+  const tokenRows = computed<AgentTokenRow[]>(() => {
+    const rows = [...(tokens.value ?? [])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((token) => ({
+        token,
+        state: tokenState(token),
+        scope: token.scopeLabel || "Every project it reaches",
+        created: formatDate(token.createdAt),
+        expires: token.expiresAt ? formatDate(token.expiresAt) : "Never",
+        lastUsed: token.lastUsedAt
+          ? formatRelativeTime(token.lastUsedAt)
+          : "Never",
+      }));
+    return [
+      ...rows.filter((row) => row.state === "active"),
+      ...rows.filter((row) => row.state !== "active"),
+    ];
+  });
+  const liveRows = computed(() =>
+    tokenRows.value.filter((row) => row.state === "active"),
   );
+  /** Revoked and expired tokens: they no longer work, kept as a record. */
+  const historyRows = computed(() =>
+    tokenRows.value.filter((row) => row.state !== "active"),
+  );
+  const showAllHistory = ref(false);
+  const shownHistory = computed(() =>
+    showAllHistory.value
+      ? historyRows.value
+      : historyRows.value.slice(0, HISTORY_SHOWN),
+  );
+  /** History rows behind "Show older". */
+  const olderCount = computed(
+    () => historyRows.value.length - shownHistory.value.length,
+  );
+  watch(agentId, () => {
+    showAllHistory.value = false;
+  });
 
   async function reloadTokens(): Promise<void> {
     await invalidate.personalTokensChanged();
@@ -281,17 +326,23 @@ export function useAgentController() {
     tokens,
     roles,
     role,
-    owner,
+    ownerEmail,
     people,
     loadError,
     load,
     canManage,
+    canTransfer,
     subtitle,
     principal,
     accessSummary,
     reloadAccess,
     current,
     tokenRows,
+    liveRows,
+    historyRows,
+    shownHistory,
+    showAllHistory,
+    olderCount,
     tokensError,
     tokenOpen,
     createdToken,

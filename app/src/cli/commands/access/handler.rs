@@ -97,15 +97,22 @@ pub(crate) async fn execute(
         level(&data["maxLevel"])
       ),
     ),
-    (
-      "Groups:",
-      if groups.is_empty() {
-        "none".into()
-      } else {
-        groups.join(", ")
-      },
-    ),
   ];
+  let owner = data
+    .get("ownerEmail")
+    .and_then(Value::as_str)
+    .map(str::to_owned);
+  if let Some(owner) = &owner {
+    fields.push(("Owner:", owner.clone()));
+  }
+  fields.push((
+    "Groups:",
+    if groups.is_empty() {
+      "none".into()
+    } else {
+      groups.join(", ")
+    },
+  ));
   if let Some(token) = data.get("token").filter(|token| !token.is_null()) {
     let scope = match token["scopeLabel"].as_str() {
       Some("") | None => "all projects".into(),
@@ -121,12 +128,26 @@ pub(crate) async fn execute(
     ));
   }
   output::print_fields(&fields);
-  let rows = output::array(&data["grants"])
+  let grants = output::array(&data["grants"]);
+  let capped = grants
+    .iter()
+    .filter(|grant| grant.get("ownerLevel").is_some())
+    .count();
+  let rows = grants
     .iter()
     .map(|grant| {
       vec![
         place(grant),
-        level(&grant["level"]),
+        // An agent gets no more than its owner, so show what it really
+        // gets and keep what was granted in brackets.
+        match grant.get("ownerLevel") {
+          Some(owner_level) => format!(
+            "{} (granted {})",
+            level(owner_level),
+            level(&grant["level"])
+          ),
+          None => level(&grant["level"]),
+        },
         if grant["principalType"] == "group" {
           format!("group {}", output::string(grant, "principalLabel"))
         } else {
@@ -135,11 +156,16 @@ pub(crate) async fn execute(
       ]
     })
     .collect::<Vec<_>>();
-  output::print_table(
-    &["WHERE", "LEVEL", "FROM"],
-    &rows,
-    "No grants. Ask a project manager to share a project.",
-    &format!("{} grant(s)", rows.len()),
-  );
+  let empty = match &owner {
+    Some(owner) => format!("No grants. Its owner, {owner}, can give it access."),
+    None => "No grants. Ask a project manager to share a project.".into(),
+  };
+  let mut summary = format!("{} grant(s)", rows.len());
+  if capped > 0 {
+    summary.push_str(&format!(
+      "\nThe owner has less access on {capped} of them. An agent never gets more than its owner, so it gets the first level shown, not the one in brackets."
+    ));
+  }
+  output::print_table(&["WHERE", "LEVEL", "FROM"], &rows, &empty, &summary);
   Ok(0)
 }

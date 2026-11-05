@@ -78,6 +78,29 @@ describe("useRoleController", () => {
     });
   });
 
+  it("sums up the role as the form changes", async () => {
+    const { controller } = mountController(useRoleController);
+    await settle();
+    expect(controller.summary.value.held).toBe(1);
+    expect(controller.summary.value.tokens).toBe("Read · 365 days");
+
+    controller.name.value = "Developer";
+    controller.maxLevel.value = "write";
+    controller.toggle("agents.view", true);
+    controller.toggle("users.manage", true);
+
+    expect(controller.summary.value.held).toBe(3);
+    expect(controller.summary.value.sentence).toBe(
+      "Developer reaches Write and holds 3 of 14 capabilities.",
+    );
+    expect(controller.summary.value.warnings[0]?.title).toBe(
+      "Holders can manage people",
+    );
+
+    controller.toggle("tokens.personal", false);
+    expect(controller.summary.value.tokens).toBe("None");
+  });
+
   it("creates the role and goes back to the list", async () => {
     const { controller } = mountController(useRoleController);
     await settle();
@@ -167,11 +190,11 @@ describe("useRoleController", () => {
     expect(controller.isNew.value).toBe(true);
   });
 
-  it("copies an agent role's sign-in so the duplicate stays token only", async () => {
+  it("starts a duplicate of an agent role on password or single sign-on", async () => {
     await at("role-new", {}, { from: "rol_ai_agent" });
     const { controller } = mountController(useRoleController);
     await settle();
-    expect(controller.signIn.value).toBe("token_only");
+    expect(controller.signIn.value).toBe("interactive");
     // 90 days is a choice; the role's lifetime stays as it was.
     expect(controller.tokenLifetime.value).toBe("90");
   });
@@ -210,6 +233,26 @@ describe("useRoleController", () => {
     expect(id).toBe("rol_viewer");
     expect(sent).toMatchObject({ name: "Viewer", maxLevel: "write" });
     expect(sent).not.toHaveProperty("signIn");
+  });
+
+  it("keeps grants.manage, which the editor hides, when saving", async () => {
+    await at("role", { roleId: "rol_viewer" });
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      roleFixture({
+        ...viewerRole,
+        capabilities: ["tokens.personal", "grants.manage"],
+      }),
+    ]);
+    const { controller } = mountController(useRoleController);
+    await settle();
+    controller.toggle("agents.view", true);
+    expect(await controller.save()).toBe(true);
+    const [, sent] = vi.mocked(rolesApi.updateRole).mock.calls[0]!;
+    expect(sent.capabilities).toEqual([
+      "tokens.personal",
+      "agents.view",
+      "grants.manage",
+    ]);
   });
 
   it("says when the role no longer exists", async () => {

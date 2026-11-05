@@ -21,6 +21,7 @@ import { levelMeter } from "~/utils/level";
 const controller = useGiveAccessController();
 const {
   kind,
+  forOwnAgent,
   principal,
   principals,
   visiblePrincipals,
@@ -43,19 +44,13 @@ const {
   planned,
   summary,
   protectedNote,
-  backTo,
+  parentLabel,
+  breadcrumbs,
   saving,
   error,
 } = controller;
 
 const fromProject = computed(() => kind.value === "project");
-
-/** The page you came from: the project, or the person, agent or group. */
-const parentLabel = computed(() =>
-  fromProject.value
-    ? (controller.projects.value?.[0]?.name ?? "")
-    : (principal.value?.label ?? ""),
-);
 
 const subtitle = computed(() => {
   if (fromProject.value)
@@ -102,7 +97,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
         <PageHeader
           title="Give access"
           :subtitle="subtitle"
-          :parent="{ label: parentLabel, to: backTo }" />
+          :trail="breadcrumbs" />
 
         <div
           v-if="manageable.length === 0"
@@ -111,7 +106,9 @@ const heading = "text-[15px] font-semibold text-ink-strong";
             {{
               fromProject
                 ? "You don't manage this project, so you can't give access to it. Ask one of its project managers."
-                : "You don't manage any project, so you can't give access here. Project managers give access to their own projects."
+                : forOwnAgent
+                  ? "You don't reach any project yet, so there's nothing to share with your agent. Ask a project manager for access first."
+                  : "You don't manage any project, so you can't give access here. Project managers give access to their own projects."
             }}
           </DbAlert>
           <DbButton size="sm" @click="controller.cancel">Back</DbButton>
@@ -163,7 +160,11 @@ const heading = "text-[15px] font-semibold text-ink-strong";
               :visible="visibleProjects"
               @update:model-value="controller.chooseProject" />
             <p class="mt-2 text-[13px] text-ink-faint">
-              Only projects you manage are listed.
+              {{
+                forOwnAgent
+                  ? "Your agent can get any project you reach, up to your own level there."
+                  : "Only projects you manage are listed."
+              }}
             </p>
           </section>
 

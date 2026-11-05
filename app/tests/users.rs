@@ -405,7 +405,8 @@ async fn members_and_agents_cannot_create_projects() {
   )
   .await;
   assert_eq!(status, 403);
-  let (status, _, _) = call(
+  // A member lists only the AI agents they own, and no people.
+  let (status, listed, _) = call(
     &router,
     "GET",
     "/api/v1/users",
@@ -414,7 +415,8 @@ async fn members_and_agents_cannot_create_projects() {
     None,
   )
   .await;
-  assert_eq!(status, 403);
+  assert_eq!(status, 200);
+  assert_eq!(listed["data"], json!([]));
   let (status, agent, _) = call(
     &router,
     "POST",
@@ -518,7 +520,7 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
     )
   };
 
-  // Agent tokens always expire, within 90 days, and reach at most read.
+  // Agent tokens always expire, within 90 days, and reach at most write.
   for (body, status) in [
     (
       json!({"name":"never","level":"metadata","expiresIn":"never"}),
@@ -528,7 +530,8 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
       json!({"name":"long","level":"metadata","expiresIn":"91d"}),
       422,
     ),
-    (json!({"name":"writer","level":"write"}), 422),
+    (json!({"name":"manager","level":"manage"}), 422),
+    (json!({"name":"writer","level":"write"}), 201),
     (
       json!({"name":"limit","level":"read","expiresIn":"90d"}),
       201,

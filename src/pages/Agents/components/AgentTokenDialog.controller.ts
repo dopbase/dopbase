@@ -12,7 +12,7 @@ import { ApiError } from "~/services/http.client";
 import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 import { tokenExpiresIn } from "~/utils/token-expiry";
-import { isValidSlug } from "~/utils/validation";
+import { isValidSlug, MAX_SLUG_LENGTH } from "~/utils/validation";
 
 /** Every preset; the role's longest lifetime trims the list. */
 const EXPIRY_PRESETS = [
@@ -33,6 +33,11 @@ export const AGENT_TOKEN_LEVELS: {
     hint: "List projects, environments and secret names. No values.",
   },
   { level: "read", label: "Read", hint: "Also read values, export and run." },
+  {
+    level: "write",
+    label: "Write",
+    hint: "Also change, import and roll back secrets.",
+  },
 ];
 
 /** Where a token may reach: everything the agent does, or one place. */
@@ -41,6 +46,23 @@ export interface TokenScopeOption {
   label: string;
   scopeType: "all" | "project" | "environment";
   scope?: string;
+}
+
+const TOKEN_SUFFIX = "-token";
+
+/**
+ * A suggested token name for an agent: its name plus "-token", made into a
+ * valid token name. Agent names may hold capitals, dots, underscores or a
+ * leading digit, which token names can't, so those become hyphens or drop.
+ */
+export function suggestedTokenName(agentName: string): string {
+  const base = agentName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, MAX_SLUG_LENGTH - TOKEN_SUFFIX.length)
+    .replace(/-+$/, "");
+  return `${base || "agent"}${TOKEN_SUFFIX}`;
 }
 
 /**
@@ -59,7 +81,12 @@ export function useAgentTokenDialog(
   const { runWithReauth } = useReauthentication();
 
   const name = ref("");
-  const level = ref<Level>("metadata");
+  const namePlaceholder = computed(() => suggestedTokenName(agent.value.email));
+  /** Read when the role allows it, so the default is never a disabled choice. */
+  const startLevel = (): Level =>
+    reaches(role.value?.tokenMaxLevel ?? "read", "read") ? "read" : "metadata";
+
+  const level = ref<Level>(startLevel());
   const where = ref("all");
   const expiry = ref("30d");
   const customDays = ref("");
@@ -114,7 +141,7 @@ export function useAgentTokenDialog(
     (isOpen) => {
       if (!isOpen) return;
       name.value = "";
-      level.value = "metadata";
+      level.value = startLevel();
       where.value = "all";
       expiry.value = maxDays.value >= 30 ? "30d" : "7d";
       customDays.value = "";
@@ -135,7 +162,7 @@ export function useAgentTokenDialog(
     error.value = null;
     const trimmed = name.value.trim();
     if (!trimmed) {
-      nameError.value = "Name the token after where it's used, like ci-deploy.";
+      nameError.value = `Name the token, like ${namePlaceholder.value}.`;
       return false;
     }
     if (!isValidSlug(trimmed)) {
@@ -188,6 +215,7 @@ export function useAgentTokenDialog(
 
   return {
     name,
+    namePlaceholder,
     level,
     levels,
     where,

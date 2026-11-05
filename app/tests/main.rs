@@ -1460,6 +1460,8 @@ mod sso_presets;
 mod tokens_names;
 #[path = "modules/tokens/personal/tokens.rs"]
 mod tokens_personal_tokens;
+#[path = "modules/users/agents.rs"]
+mod users_agents;
 #[path = "modules/users/lifecycle.rs"]
 mod users_lifecycle;
 

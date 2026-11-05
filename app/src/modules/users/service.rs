@@ -1,13 +1,16 @@
 use super::{
   model::*,
-  repository::{self, NewUser, UserRow},
+  repository::{self, Account, NewUser, UserRow},
 };
 use crate::{
+  constants::errors::AUTHORIZATION_DENIED,
   constants::errors::PASSWORD_REQUIRED,
-  extractors::{require_capability_browser, require_mutation, require_recent_browser_auth},
+  extractors::{
+    require_browser, require_capability_browser, require_mutation, require_recent_browser_auth,
+  },
   http::HttpError,
   models::{AdminRole, AuthIdentity},
-  modules::{common, grants, grants::model::GroupRef},
+  modules::{common, grants, grants::model::GroupRef, tokens},
   services::{
     authx::{self, Access, Capability, Catalog},
     token,
@@ -159,6 +162,127 @@ pub(crate) async fn require_within(
   Ok(())
 }
 
+/// Signed in to the Admin UI with at least one of `capabilities`. Used
+/// before an account is looked up, so someone who may do none of it learns
+/// nothing about the account.
+fn require_any_browser<'a>(
+  identity: &'a AuthIdentity,
+  capabilities: &[Capability],
+) -> Result<(&'a str, &'a Access), HttpError> {
+  require_browser(identity)?;
+  let (actor_id, access) = caller(identity)?;
+  if !capabilities
+    .iter()
+    .any(|capability| access.has(*capability))
+  {
+    return Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "Your role does not allow this operation.",
+    ));
+  }
+  Ok((actor_id, access))
+}
+
+/// What touching someone's account needs, before it is looked up: people
+/// are managed with users.manage, AI agents by their owner or agents.manage.
+const ACCOUNT_CHANGERS: [Capability; 3] = [
+  Capability::UsersManage,
+  Capability::AgentsView,
+  Capability::AgentsManage,
+];
+
+/// Who may change an AI agent: its owner while their role holds
+/// agents.view, or someone with agents.manage whose access covers it. An
+/// owner needs no more, because an agent never reaches past its owner.
+async fn require_agent_control(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  owner_id: Option<&str>,
+) -> Result<(), HttpError> {
+  let (actor_id, access) = caller(identity)?;
+  if access.has(Capability::AgentsView) && owner_id == Some(actor_id) {
+    return Ok(());
+  }
+  require_capability_browser(identity, Capability::AgentsManage)?;
+  require_within(state, identity, id).await
+}
+
+/// The account someone means to change. Without users.manage only AI
+/// agents can be theirs to change, so a person, root, and a missing id all
+/// get the same refusal and ids can't be probed.
+async fn changeable(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+) -> Result<Account, HttpError> {
+  let (_, access) = caller(identity)?;
+  let manages_people = access.has(Capability::UsersManage);
+  match repository::account(state.db.pool(), id).await? {
+    Some(account) if account.agent || manages_people => Ok(account),
+    _ if !manages_people => Err(HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "Your role does not allow this operation.",
+    )),
+    _ => Err(user_not_found()),
+  }
+}
+
+/// Deleting, disabling, or enabling an account: a person needs
+/// users.manage, an AI agent its owner or agents.manage. Either way the
+/// account must be within the caller's reach. An owner re-enables their
+/// agent only when they disabled it: one turned off with agents.manage
+/// stays off until agents.manage turns it back on.
+async fn require_account_change(
+  state: &AppState,
+  identity: &AuthIdentity,
+  id: &str,
+  account: &Account,
+  enabling: bool,
+) -> Result<(), HttpError> {
+  if !account.agent {
+    require_capability_browser(identity, Capability::UsersManage)?;
+    return require_within(state, identity, id).await;
+  }
+  let mut owner = account.owner_id.as_deref();
+  if enabling && account.status == "disabled" && owner.is_some() {
+    let disabled_by = repository::last_disabled_by(state.db.pool(), id).await?;
+    if disabled_by.as_deref() != owner {
+      owner = None;
+    }
+  }
+  require_agent_control(state, identity, id, owner).await
+}
+
+/// Whether the caller may see an account: people with users.view, every AI
+/// agent with agents.view_all, and the agents they own with agents.view.
+/// agents.manage also sees the people who could own an agent, so it can
+/// hand one over without seeing everyone.
+fn sees(
+  access: &Access,
+  actor_id: &str,
+  row: &UserRow,
+) -> bool {
+  if row.agent {
+    access.has(Capability::AgentsViewAll)
+      || (access.has(Capability::AgentsView) && row.owner_id.as_deref() == Some(actor_id))
+  } else {
+    access.has(Capability::UsersView) || (access.has(Capability::AgentsManage) && row.can_own)
+  }
+}
+
+/// What listing or reading accounts needs: any one of these.
+const ACCOUNT_VIEWERS: [Capability; 4] = [
+  Capability::UsersView,
+  Capability::AgentsView,
+  Capability::AgentsViewAll,
+  Capability::AgentsManage,
+];
+
+fn user_not_found() -> HttpError {
+  HttpError::not_found("USER_NOT_FOUND", "The user was not found.")
+}
+
 /// The all-projects grant a new or changed account starts with. Only root
 /// gives it, and only to admins; everyone else starts with no data access
 /// and gets grants per project.
@@ -192,6 +316,7 @@ fn user(
     has_password: row.has_password,
     sso_linked: row.sso_linked,
     owner_id: row.owner_id,
+    owner_email: row.owner_email,
   })
 }
 
@@ -210,7 +335,7 @@ pub async fn list(
   state: &AppState,
   identity: &AuthIdentity,
 ) -> Result<Vec<UserResponse>, HttpError> {
-  require_capability_browser(identity, Capability::UsersView)?;
+  let (actor_id, access) = require_any_browser(identity, &ACCOUNT_VIEWERS)?;
   let mut groups: HashMap<String, Vec<GroupRef>> = HashMap::new();
   for (user_id, group) in repository::memberships(state.db.pool()).await? {
     groups.entry(user_id).or_default().push(group);
@@ -218,6 +343,7 @@ pub async fn list(
   repository::list(state.db.pool())
     .await?
     .into_iter()
+    .filter(|row| sees(access, actor_id, row))
     .map(|row| {
       let mine = groups.remove(&row.id).unwrap_or_default();
       user(row, mine)
@@ -244,8 +370,14 @@ pub async fn get(
   identity: &AuthIdentity,
   id: &str,
 ) -> Result<UserResponse, HttpError> {
-  require_capability_browser(identity, Capability::UsersView)?;
-  fetch_user(state, id).await
+  let (actor_id, access) = require_any_browser(identity, &ACCOUNT_VIEWERS)?;
+  // An account the caller may not see doesn't exist for them.
+  let row = repository::find(state.db.pool(), id)
+    .await?
+    .filter(|row| sees(access, actor_id, row))
+    .ok_or_else(user_not_found)?;
+  let groups = grants::repository::groups_of(state.db.pool(), id).await?;
+  user(row, groups)
 }
 
 pub async fn create(
@@ -256,9 +388,20 @@ pub async fn create(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_capability_browser(identity, Capability::UsersManage)?;
+  require_any_browser(identity, &[Capability::UsersManage, Capability::AgentsView])?;
   let chosen = choose_role(state, request.role, request.role_id.as_deref()).await?;
   let agent = chosen.token_only;
+  // Whoever creates an AI agent owns it, so it takes agents.view, which an
+  // owner needs to run it; agents.manage alone doesn't. People are added
+  // with users.manage.
+  require_capability_browser(
+    identity,
+    if agent {
+      Capability::AgentsView
+    } else {
+      Capability::UsersManage
+    },
+  )?;
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -353,10 +496,16 @@ pub async fn update(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_capability_browser(identity, Capability::UsersManage)?;
-  let (old_email, is_root, old_role_id, agent) = repository::account(state.db.pool(), id)
-    .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
+  require_any_browser(identity, &ACCOUNT_CHANGERS)?;
+  let account = changeable(state, identity, id).await?;
+  let Account {
+    email: old_email,
+    is_root,
+    role_id: old_role_id,
+    agent,
+    owner_id: account_owner,
+    ..
+  } = account;
   let (actor_id, _) = actor(identity);
   let changes_role = request.role.is_some() || request.role_id.is_some();
   if is_root && id != actor_id {
@@ -383,6 +532,18 @@ pub async fn update(
       "Use the root password change flow to change the root password.",
     ));
   }
+  // Who may change it comes before what the request asks, so an account
+  // the caller can't change tells them nothing more.
+  if agent && (changes_role || request.owner_id.is_some()) {
+    // Handing an agent to someone else, or changing what it is, is for
+    // agents.manage, never only its owner.
+    require_capability_browser(identity, Capability::AgentsManage)?;
+    require_within(state, identity, id).await?;
+  } else if agent {
+    require_agent_control(state, identity, id, account_owner.as_deref()).await?;
+  } else if !is_root {
+    require_within(state, identity, id).await?;
+  }
   let new_role = if changes_role {
     Some(choose_role(state, request.role, request.role_id.as_deref()).await?)
   } else {
@@ -405,9 +566,6 @@ pub async fn update(
       "OWNER_INVALID",
       "Only AI agents have an owner.",
     ));
-  }
-  if !is_root {
-    require_within(state, identity, id).await?;
   }
   // Keeping the same role changes nothing.
   let new_role = new_role.filter(|role| old_role_id.as_deref() != Some(role.id.as_str()));
@@ -466,13 +624,36 @@ pub async fn update(
     if !repository::can_own(&mut tx, owner_id).await? {
       return Err(HttpError::bad_request(
         "OWNER_INVALID",
-        "The owner must be an active person who can see users.",
+        "The owner must be an active person who can create AI agents.",
       ));
     }
     repository::set_owner(&mut tx, id, owner_id).await?;
   }
+  // The old owner may still hold the agent's tokens. A new owner starts
+  // with none, so nobody keeps acting through access they no longer own.
+  let revoked = match &request.owner_id {
+    Some(owner_id) if account_owner.as_deref() != Some(owner_id.as_str()) => {
+      tokens::personal::repository::revoke_all(&mut tx, id, &now).await?
+    }
+    _ => Vec::new(),
+  };
   repository::revoke_sessions(&mut tx, id, &now).await?;
   let (_, actor_email) = actor(identity);
+  for (token_id, name) in &revoked {
+    common::audit(
+      &mut tx,
+      identity.audit_actor_type(),
+      Some(actor_id),
+      Some(actor_email),
+      "personal_token.revoked",
+      None,
+      None,
+      Some("personal_token"),
+      Some(token_id),
+      serde_json::json!({"userId": id, "user": email, "name": name, "reason": "owner_changed"}),
+    )
+    .await?;
+  }
   common::audit(
     &mut tx,
     identity.audit_actor_type(),
@@ -498,7 +679,7 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_capability_browser(identity, Capability::UsersManage)?;
+  require_any_browser(identity, &ACCOUNT_CHANGERS)?;
   let (actor_id, actor_email) = actor(identity);
   if id == actor_id {
     return Err(HttpError::forbidden(
@@ -506,16 +687,14 @@ pub async fn delete(
       "You cannot delete your own account.",
     ));
   }
-  let (_, is_root, _, _) = repository::account(state.db.pool(), id)
-    .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
-  if is_root {
+  let account = changeable(state, identity, id).await?;
+  if account.is_root {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",
       "The root administrator cannot be deleted.",
     ));
   }
-  require_within(state, identity, id).await?;
+  require_account_change(state, identity, id, &account, false).await?;
   if repository::owned_count(state.db.pool(), id).await? > 0 {
     return Err(HttpError::conflict(
       "OWNS_AI_AGENTS",
@@ -581,7 +760,7 @@ pub async fn set_status(
 ) -> Result<UserResponse, HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
-  require_capability_browser(identity, Capability::UsersManage)?;
+  require_any_browser(identity, &ACCOUNT_CHANGERS)?;
   let (actor_id, actor_email) = actor(identity);
   let disable = status == UserStatus::Disabled;
   if id == actor_id {
@@ -594,16 +773,15 @@ pub async fn set_status(
       },
     ));
   }
-  let (email, is_root, _, _) = repository::account(state.db.pool(), id)
-    .await?
-    .ok_or_else(|| HttpError::not_found("USER_NOT_FOUND", "The user was not found."))?;
-  if is_root {
+  let account = changeable(state, identity, id).await?;
+  if account.is_root {
     return Err(HttpError::forbidden(
       "ROOT_PROTECTED",
       "The root administrator cannot be modified.",
     ));
   }
-  require_within(state, identity, id).await?;
+  require_account_change(state, identity, id, &account, !disable).await?;
+  let email = account.email;
   let (value, action) = if disable {
     ("disabled", "user.disabled")
   } else {

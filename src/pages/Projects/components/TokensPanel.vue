@@ -7,7 +7,6 @@ import {
   DbConfirmDialog,
   DbEmptyState,
   DbInput,
-  DbLevelBadge,
   DbMenu,
   DbMenuItem,
   DbModal,
@@ -28,7 +27,6 @@ import {
   XIcon,
 } from "~/assets/icons";
 import { formatDate } from "~/utils/format";
-import { levelMeter } from "~/utils/level";
 import type { RunnerToken } from "~/services";
 import {
   MAX_TOKEN_EXPIRY_DAYS,
@@ -72,8 +70,6 @@ const {
   acknowledgeCreated,
 } = controller;
 
-/** Runner tokens can only read. The meter makes that plain. */
-const readMeter = levelMeter("read");
 const scope = computed(() => `${props.projectName} / ${props.environmentName}`);
 
 const showCreate = ref(false);
@@ -184,8 +180,9 @@ const expiresClass: Record<string, string> = {
 <template>
   <div class="flex flex-col gap-4">
     <p class="text-sm leading-[22px] text-ink-muted">
-      Runner tokens let a deployed app read one environment's values. For your
-      own scripts or an AI agent, use a personal token from your account menu.
+      Runner tokens let a deployed app read one environment's values. They
+      can't change values or reach other environments. For your own scripts
+      or an AI agent, use a personal token from your account menu.
     </p>
 
     <div class="flex flex-wrap items-center gap-2">
@@ -238,10 +235,6 @@ const expiresClass: Record<string, string> = {
           <tr class="border-b border-line-soft">
             <th class="h-11 px-4 font-medium text-ink-muted">Name</th>
             <th
-              class="hidden h-11 px-4 font-medium text-ink-muted sm:table-cell">
-              Can
-            </th>
-            <th
               class="hidden h-11 px-4 font-medium text-ink-muted md:table-cell">
               Last used
             </th>
@@ -251,7 +244,7 @@ const expiresClass: Record<string, string> = {
         </thead>
         <tbody>
           <tr v-if="rows.length === 0">
-            <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+            <td colspan="4" class="px-4 py-8 text-center text-ink-muted">
               No tokens match “{{ filter.trim() }}”.
             </td>
           </tr>
@@ -267,9 +260,6 @@ const expiresClass: Record<string, string> = {
                 :title="row.token.name">
                 {{ row.token.name }}
               </p>
-            </td>
-            <td class="hidden h-11 px-4 sm:table-cell">
-              <DbLevelBadge v-bind="readMeter" />
             </td>
             <td
               class="hidden h-11 whitespace-nowrap px-4 text-ink md:table-cell">

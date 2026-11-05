@@ -17,6 +17,7 @@ const {
   subtitle,
   groups,
   canOpenGroups,
+  showsAgentNote,
   passwordOpen,
   email,
   formattedRole,
@@ -124,6 +125,28 @@ const {
             data-testid="open-password"
             @click="controller.openPassword">
             {{ needsCurrentPassword ? "Change password" : "Set a password" }}
+          </DbButton>
+        </section>
+
+        <section
+          v-if="showsAgentNote"
+          class="flex flex-wrap items-center gap-3 rounded-card border border-line bg-panel px-5 py-4"
+          aria-labelledby="agent-tokens-heading"
+          data-testid="account-agent-note">
+          <div class="min-w-0 flex-1">
+            <h2
+              id="agent-tokens-heading"
+              class="text-[15px] font-semibold leading-[22px] text-ink-strong">
+              Tokens
+            </h2>
+            <p class="text-sm text-ink-muted">
+              Root has no personal tokens because it's the account you fall back
+              on. For a script or an AI tool, create an AI agent and give it a
+              token.
+            </p>
+          </div>
+          <DbButton @click="$router.push({ name: 'agents' })">
+            Go to AI agents
           </DbButton>
         </section>
       </template>
