@@ -234,9 +234,22 @@ All notable changes to Dopbase are documented in this file.
   events from the filters you just left.
 - The breadcrumb on **Give access** now starts at the list you came from, as in
   **Projects** / payment / Give access, and each part links back.
+- `dopbase access` on an AI agent names its owner. Where the owner has less
+  access than a grant gives, it shows the level the agent really gets, with the
+  granted level in brackets. `GET /api/v1/users/{id}/access` adds `ownerEmail`
+  and, on each such grant, `ownerLevel`.
+- `dopbase status` calls an AI agent's token an AI agent token, not a personal
+  token, and shows the agent's name and owner.
+- `dopbase access --user` help says which capabilities it takes, and an agent
+  with no grants points to its owner instead of a project manager.
+- `dopbase token personal create` prints `Up to:` instead of `Reaches:`. The
+  token never reaches more than you do, so a write token on a project where
+  you have read still only reads.
 
 ### Security
 
+- Transferring an AI agent revokes its tokens, so a copy the old owner kept
+  stops working instead of reaching through the new owner's access.
 - A runner token gets the same 403 for an environment that doesn't exist as
   for one it can't reach, so its output can't be used to find environments.
 - `dopbase run` with a runner token prints only the key count and source, and
