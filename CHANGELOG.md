@@ -87,6 +87,13 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- Audit records are kept for 365 days by default, and
+  `audit_retention_days = 0` keeps them forever. Leaving the setting out used
+  to keep everything, so an instance whose `server.toml` has no
+  `audit_retention_days` line starts archiving records older than a year to
+  `audit-archive/` after the upgrade. Set it to `0` to keep the whole log. New
+  instances apply retention from their first start instead of after a
+  restart.
 - The sidebar's **People & access** section is now **Access**, which fits
   members who only see AI agents as well as admins.
 - The role editor uses the full page width. Each section has its
