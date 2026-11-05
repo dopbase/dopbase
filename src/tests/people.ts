@@ -101,6 +101,9 @@ export const adminRole = roleFixture({
     "groups.manage",
     "projects.create",
     "tokens.personal",
+    "agents.view",
+    "agents.view_all",
+    "agents.manage",
   ],
   rank: 20,
 });

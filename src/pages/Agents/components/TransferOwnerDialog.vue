@@ -44,8 +44,8 @@ async function save(): Promise<void> {
         :options="options"
         :disabled="options.length === 0" />
       <DbAlert tone="info">
-        Only people who can view users can own an agent. It keeps its grants and
-        token, but never reaches more than its new owner does.
+        Only people who can create AI agents can own one. It keeps its grants
+        and token, but never reaches more than its new owner does.
       </DbAlert>
       <DbAlert v-if="error">{{ error }}</DbAlert>
     </form>

@@ -16,7 +16,10 @@ export const pages = {
   projects: { label: "Projects", capabilities: [] },
   audit: { label: "Audit log", capabilities: [] },
   users: { label: "Users", capabilities: ["users.view"] },
-  agents: { label: "AI agents", capabilities: ["users.view"] },
+  agents: {
+    label: "AI agents",
+    capabilities: ["agents.view", "agents.view_all"],
+  },
   groups: { label: "Groups", capabilities: ["users.view", "groups.manage"] },
   roles: { label: "Roles", capabilities: ["roles.manage"] },
   status: { label: "Status", capabilities: [] },

@@ -57,8 +57,17 @@ describe("capability checklist", () => {
       "Projects",
       "Audit",
       "Tokens",
+      "AI agents",
       "Instance",
     ]);
+  });
+
+  it("lists the agent capabilities and leaves grants.manage out", () => {
+    expect(
+      CAPABILITY_GROUPS.find((group) => group.label === "AI agents")
+        ?.capabilities,
+    ).toEqual(["agents.view", "agents.view_all", "agents.manage"]);
+    expect(ROLE_CAPABILITIES).not.toContain("grants.manage");
   });
 });
 
@@ -66,6 +75,13 @@ describe("toRoleRow", () => {
   it("counts only capabilities a role can hold", () => {
     const row = toRoleRow(
       roleFixture({ capabilities: ["tokens.personal", "roles.manage"] }),
+    );
+    expect(row.capabilityCount).toBe(1);
+  });
+
+  it("leaves the hidden grants.manage out of the count", () => {
+    const row = toRoleRow(
+      roleFixture({ capabilities: ["tokens.personal", "grants.manage"] }),
     );
     expect(row.capabilityCount).toBe(1);
   });

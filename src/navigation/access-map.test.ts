@@ -13,8 +13,10 @@ describe("canOpen", () => {
     ["status", [], true],
     ["users", [], false],
     ["users", ["users.view"], true],
-    ["agents", ["users.view"], true],
-    ["agents", ["groups.manage"], false],
+    ["agents", ["agents.view"], true],
+    ["agents", ["agents.view_all"], true],
+    ["agents", ["users.view"], false],
+    ["agents", ["agents.manage"], false],
     ["groups", ["groups.manage"], true],
     ["groups", ["users.view"], true],
     ["groups", ["users.manage"], false],
@@ -72,10 +74,14 @@ describe("visibleSections", () => {
       (section) => section.label === "People & access",
     );
 
-    expect(people?.items.map((item) => item.name)).toEqual([
-      "users",
-      "agents",
-      "groups",
-    ]);
+    expect(people?.items.map((item) => item.name)).toEqual(["users", "groups"]);
+  });
+
+  it("shows a member who runs their own agents just AI agents", () => {
+    const people = visibleSections(holding("agents.view")).find(
+      (section) => section.label === "People & access",
+    );
+
+    expect(people?.items.map((item) => item.name)).toEqual(["agents"]);
   });
 });

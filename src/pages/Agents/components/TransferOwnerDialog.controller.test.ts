@@ -50,7 +50,7 @@ async function openDialog(
 beforeEach(() => {
   freshPinia();
   vi.clearAllMocks();
-  signInAs(["users.manage"]);
+  signInAs(["agents.manage"]);
   vi.mocked(usersApi.updateUser).mockResolvedValue(reviewBot);
 });
 
@@ -64,7 +64,7 @@ describe("useTransferOwnerDialog", () => {
     ]);
   });
 
-  it("leaves out people who can't view users, since they couldn't see the agent", async () => {
+  it("leaves out people whose role can't run agents", async () => {
     const { dialog } = await openDialog(reviewBot, [maya, reader]);
 
     expect(dialog.options.value).toEqual([]);

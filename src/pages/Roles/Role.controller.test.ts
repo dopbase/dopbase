@@ -212,6 +212,26 @@ describe("useRoleController", () => {
     expect(sent).not.toHaveProperty("signIn");
   });
 
+  it("keeps grants.manage, which the editor hides, when saving", async () => {
+    await at("role", { roleId: "rol_viewer" });
+    vi.mocked(rolesApi.fetchRoles).mockResolvedValue([
+      roleFixture({
+        ...viewerRole,
+        capabilities: ["tokens.personal", "grants.manage"],
+      }),
+    ]);
+    const { controller } = mountController(useRoleController);
+    await settle();
+    controller.toggle("agents.view", true);
+    expect(await controller.save()).toBe(true);
+    const [, sent] = vi.mocked(rolesApi.updateRole).mock.calls[0]!;
+    expect(sent.capabilities).toEqual([
+      "tokens.personal",
+      "agents.view",
+      "grants.manage",
+    ]);
+  });
+
   it("says when the role no longer exists", async () => {
     await at("role", { roleId: "rol_gone" });
     const { controller } = mountController(useRoleController);

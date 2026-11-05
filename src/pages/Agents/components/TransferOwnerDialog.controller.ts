@@ -6,17 +6,17 @@ import { errorMessage } from "~/services/api-errors";
 import { useReauthentication } from "~/composable/reauthentication";
 
 /**
- * Active people other than the agent's current owner who can see it, and so
- * could own it: root, or a role with `users.view`.
+ * Active people other than the agent's current owner who could own it:
+ * root, or a role with `agents.view`, so they can see and run it.
  */
 export function transferCandidates(
   people: User[],
   roles: Role[],
   agent: User | null,
 ): User[] {
-  const seesUsers = new Set(
+  const runsAgents = new Set(
     roles
-      .filter((role) => role.capabilities.includes("users.view"))
+      .filter((role) => role.capabilities.includes("agents.view"))
       .map((role) => role.id),
   );
   return people.filter(
@@ -24,7 +24,7 @@ export function transferCandidates(
       person.role !== "ai_agent" &&
       person.status !== "disabled" &&
       person.id !== agent?.ownerId &&
-      (person.role === "root" || seesUsers.has(person.roleId ?? "")),
+      (person.role === "root" || runsAgents.has(person.roleId ?? "")),
   );
 }
 

@@ -71,7 +71,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-31T00:00:00Z"));
   route.name = "agent";
   route.params = { agentId: "usr_bot" };
-  signInAs(["users.view", "users.manage"]);
+  signInAs(["users.view", "agents.view", "agents.view_all", "agents.manage"]);
   vi.mocked(usersApi.fetchUser).mockResolvedValue(reviewBot);
   vi.mocked(usersApi.fetchUsers).mockResolvedValue([maya, lead, reviewBot]);
   vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(botAccess);
@@ -102,7 +102,7 @@ describe("useAgentController", () => {
     expect(controller.agent.value).toEqual(reviewBot);
     expect(controller.access.value).toEqual(botAccess);
     expect(controller.role.value?.id).toBe("rol_ai_agent");
-    expect(controller.owner.value?.id).toBe("usr_maya");
+    expect(controller.ownerEmail.value).toBe("maya@example.com");
     expect(controller.people.value.map((person) => person.id)).toEqual([
       "usr_maya",
       "usr_lead",
@@ -200,16 +200,27 @@ describe("useAgentController", () => {
     ]);
   });
 
-  it("offers the Danger zone to the owner even without users.manage", async () => {
-    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+  it("offers the Danger zone to an owner with agents.view", async () => {
+    signInAs(["tokens.personal", "agents.view"], {
+      adminId: "usr_maya",
+      role: "member",
+    });
     const controller = await mountAgent();
 
     expect(controller.canManage.value).toBe(true);
+    expect(controller.canTransfer.value).toBe(false);
     expect(controller.tabs.value.map((tab) => tab.key)).toContain("danger");
   });
 
-  it("hides the Danger zone from someone who only views users", async () => {
-    signInAs(["users.view"]);
+  it("hides the Danger zone from an owner whose role can't run agents", async () => {
+    signInAs(["tokens.personal"], { adminId: "usr_maya", role: "member" });
+    const controller = await mountAgent();
+
+    expect(controller.canManage.value).toBe(false);
+  });
+
+  it("hides the Danger zone from someone who only sees every agent", async () => {
+    signInAs(["agents.view_all"]);
     const controller = await mountAgent();
 
     expect(controller.canManage.value).toBe(false);
@@ -220,7 +231,7 @@ describe("useAgentController", () => {
   });
 
   it("hides Transfer owner when nobody else could own the agent", async () => {
-    // Maya owns it, and lead's role isn't listed as one that sees users.
+    // Maya owns it, and lead's role isn't listed as one that runs agents.
     const controller = await mountAgent();
 
     expect(controller.canManage.value).toBe(true);
@@ -438,7 +449,7 @@ describe("useAgentController", () => {
     await controller.transferred();
 
     expect(controller.transferOpen.value).toBe(false);
-    expect(controller.owner.value?.id).toBe("usr_lead");
+    expect(controller.ownerEmail.value).toBe("lead@example.com");
   });
 
   it("goes back to the agents list after deleting the agent", async () => {

@@ -37,9 +37,9 @@ export interface AgentRow {
   statusLabel: string;
   expires: string;
   lastUsed: string;
-  /** You own it, or may manage users. */
+  /** You own it and may run your agents, or you manage every agent. */
   canManage: boolean;
-  /** You manage it and someone else could own it. */
+  /** You manage every agent and someone else could own this one. */
   canTransfer: boolean;
   activity: RouteLocationRaw;
 }
@@ -135,8 +135,16 @@ export function useAgentsController() {
       ) ?? null,
   );
   const canAdd = computed(
-    () => auth.can("users.manage") && agentRole.value !== null,
+    () => auth.can("agents.view", "agents.manage") && agentRole.value !== null,
   );
+
+  /** Its owner while they may run agents, or anyone who manages agents. */
+  function canManageAgent(agent: User): boolean {
+    return (
+      auth.can("agents.manage") ||
+      (auth.can("agents.view") && agent.ownerId === auth.session?.adminId)
+    );
+  }
 
   const rows = computed<AgentRow[]>(() => {
     const now = Date.now();
@@ -162,12 +170,13 @@ export function useAgentsController() {
           statusLabel = "active";
         }
       }
-      const owner = people.value.find((person) => person.id === agent.ownerId);
-      const canManage =
-        auth.can("users.manage") || agent.ownerId === auth.session?.adminId;
+      const owner =
+        agent.ownerEmail ??
+        people.value.find((person) => person.id === agent.ownerId)?.email;
+      const canManage = canManageAgent(agent);
       return {
         agent,
-        owner: owner?.email ?? (agent.ownerId ? "Unknown" : "No owner"),
+        owner: owner ?? (agent.ownerId ? "Unknown" : "No owner"),
         token,
         status,
         statusLabel,
@@ -177,7 +186,7 @@ export function useAgentsController() {
           : "Never",
         canManage,
         canTransfer:
-          canManage &&
+          auth.can("agents.manage") &&
           transferCandidates(people.value, roles.value, agent).length > 0,
         activity: { name: "audit", query: { actor: agent.id } },
       };

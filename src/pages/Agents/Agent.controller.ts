@@ -49,7 +49,8 @@ export interface AgentTokenRow {
 /**
  * One AI agent's page: Access (what it reaches, where it comes from),
  * Tokens (its one live token and the history) and the Danger zone. Its
- * owner, or anyone who manages users, may change it.
+ * owner, while their role runs agents, or anyone who manages agents may
+ * change it.
  */
 export function useAgentController() {
   const route = useRoute();
@@ -145,27 +146,34 @@ export function useAgentController() {
       roles.value.find((candidate) => candidate.id === agent.value?.roleId) ??
       null,
   );
-  const owner = computed(
+  /** The owner's email, from the agent itself or the people list. */
+  const ownerEmail = computed(
     () =>
-      people.value.find((person) => person.id === agent.value?.ownerId) ?? null,
+      agent.value?.ownerEmail ??
+      people.value.find((person) => person.id === agent.value?.ownerId)
+        ?.email ??
+      null,
   );
+  /** Its owner while they may run agents, or anyone who manages agents. */
   const canManage = computed(
     () =>
-      auth.can("users.manage") ||
-      (agent.value !== null && agent.value.ownerId === auth.session?.adminId),
+      auth.can("agents.manage") ||
+      (auth.can("agents.view") &&
+        agent.value !== null &&
+        agent.value.ownerId === auth.session?.adminId),
   );
-  /** Transfer owner shows only when someone else could take the agent. */
+  /** Transfer owner is for agents.manage, when someone else could take it. */
   const canTransfer = computed(
     () =>
-      canManage.value &&
+      auth.can("agents.manage") &&
       transferCandidates(people.value, roles.value, agent.value).length > 0,
   );
 
   const subtitle = computed(() => {
     if (!agent.value) return "";
     const parts = [
-      owner.value
-        ? `Owned by ${owner.value.email}`
+      ownerEmail.value
+        ? `Owned by ${ownerEmail.value}`
         : agent.value.ownerId
           ? "Owner unknown"
           : "No owner",
@@ -199,7 +207,7 @@ export function useAgentController() {
 
   const accessSummary = computed(() => {
     if (!access.value || !agent.value) return "";
-    const ownerName = owner.value?.email ?? "its owner";
+    const ownerName = ownerEmail.value ?? "its owner";
     return `${agent.value.email} reaches at most ${formatLevel(access.value.maxLevel)}, and never more than ${ownerName} does.`;
   });
 
@@ -318,7 +326,7 @@ export function useAgentController() {
     tokens,
     roles,
     role,
-    owner,
+    ownerEmail,
     people,
     loadError,
     load,

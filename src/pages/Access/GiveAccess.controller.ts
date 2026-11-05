@@ -21,7 +21,7 @@ import {
 import { readQuery } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { environmentsQuery, projectsQuery } from "~/queries/projects";
-import { usersQuery } from "~/queries/users";
+import { userQuery, usersQuery } from "~/queries/users";
 import { pages } from "~/navigation/access-map";
 import type { Breadcrumb } from "~/navigation/breadcrumb";
 import { formatLevel, formatList } from "~/utils/format";
@@ -120,6 +120,20 @@ function memberCount(count: number): string {
   return `${count} ${count === 1 ? "member" : "members"}`;
 }
 
+/** The lower of two levels; an unknown one doesn't limit. */
+function lower(a: Level | undefined, b: Level | undefined): Level | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return LEVELS.indexOf(a) <= LEVELS.indexOf(b) ? a : b;
+}
+
+/** The higher of two levels; an unknown one counts as no access. */
+function higher(a: Level | undefined, b: Level | undefined): Level {
+  const left = a ?? "none";
+  const right = b ?? "none";
+  return LEVELS.indexOf(left) >= LEVELS.indexOf(right) ? left : right;
+}
+
 /**
  * Give access page. From a person's, AI agent's or group's Access tab you
  * pick a project you manage; from a project's Access tab you pick who.
@@ -127,7 +141,9 @@ function memberCount(count: number): string {
  * place becomes one grant; a grant they already hold there is replaced.
  *
  * The server checks it all again: you need Project manager on the project,
- * and nobody can be given more than their role allows.
+ * and nobody can be given more than their role allows. The owner of an AI
+ * agent is the exception: they give their own agent access anywhere they
+ * reach, up to their own level there.
  */
 export function useGiveAccessController() {
   const route = useRoute();
@@ -148,6 +164,8 @@ export function useGiveAccessController() {
   const projectRef = computed(() => String(route.params.projectRef ?? ""));
 
   const principal = ref<GrantPrincipal | null>(null);
+  /** The AI agent's owner, when the page is for an agent. */
+  const agentOwnerId = ref<string | null>(null);
   /**
    * Grants held directly, not through a group: the principal's own, or,
    * from a project, everyone's on it.
@@ -183,7 +201,13 @@ export function useGiveAccessController() {
       );
       return;
     }
-    const access = await readQuery(cache, userAccessQuery(id), { fresh });
+    const [access, account] = await Promise.all([
+      readQuery(cache, userAccessQuery(id), { fresh }),
+      kind.value === "agent"
+        ? readQuery(cache, userQuery(id), { fresh }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    agentOwnerId.value = account?.ownerId ?? null;
     principal.value = {
       type: "user",
       id,
@@ -368,11 +392,28 @@ export function useGiveAccessController() {
     );
   }
 
-  /** Projects you can give access in: the ones you manage. */
+  /**
+   * You own this AI agent and may run your agents, so you give it access
+   * wherever you reach, never above your own level there.
+   */
+  const forOwnAgent = computed(
+    () =>
+      kind.value === "agent" &&
+      auth.can("agents.view") &&
+      agentOwnerId.value !== null &&
+      agentOwnerId.value === auth.session?.adminId,
+  );
+
+  /**
+   * Projects you can give access in: the ones you manage, or for your own
+   * agent, every one you reach.
+   */
   const manageable = computed<ProjectChoice[]>(() =>
     (projects.value ?? [])
       .filter((project) =>
-        reaches(project.level ?? "project_manager", "project_manager"),
+        forOwnAgent.value
+          ? reaches(project.level ?? "project_manager", "metadata")
+          : reaches(project.level ?? "project_manager", "project_manager"),
       )
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((project) => ({
@@ -438,8 +479,32 @@ export function useGiveAccessController() {
     if (scope === "project" && level.value === "none") level.value = "metadata";
   });
 
+  /**
+   * For your own agent, the most you can give here: your level on the
+   * project, or on the environments chosen (the lowest of them binds).
+   */
+  const ownerCap = computed<Level | undefined>(() => {
+    if (!forOwnAgent.value) return undefined;
+    if (where.value === "project") return project.value?.level;
+    const inProject = environmentChoices.value.map(
+      (choice) => choice.environment,
+    );
+    const chosen = inProject.filter((environment) =>
+      environmentIds.value.includes(environment.id),
+    );
+    return chosen.length > 0
+      ? chosen.reduce<Level | undefined>(
+          (cap, environment) => lower(cap, environment.level ?? "none"),
+          undefined,
+        )
+      : inProject.reduce<Level>(
+          (cap, environment) => higher(cap, environment.level),
+          "none",
+        );
+  });
+
   const levels = computed(() =>
-    levelChoices(where.value, principal.value?.maxLevel),
+    levelChoices(where.value, lower(principal.value?.maxLevel, ownerCap.value)),
   );
 
   // Start from a level their role allows. Once their cap is known, or the
@@ -563,7 +628,13 @@ export function useGiveAccessController() {
       return false;
     }
     if (levels.value.find((choice) => choice.level === level.value)?.disabled) {
-      error.value = `Their role allows up to ${formatLevel(who.maxLevel ?? "none")}.`;
+      const yours = ownerCap.value;
+      error.value =
+        yours !== undefined &&
+        lower(who.maxLevel, yours) === yours &&
+        yours !== who.maxLevel
+          ? `You can give up to ${formatLevel(yours)} here, your own level.`
+          : `Their role allows up to ${formatLevel(who.maxLevel ?? "none")}.`;
       return false;
     }
     saving.value = true;
@@ -628,6 +699,8 @@ export function useGiveAccessController() {
 
   return {
     kind,
+    forOwnAgent,
+    ownerCap,
     principal,
     principals,
     visiblePrincipals,
