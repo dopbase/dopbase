@@ -82,6 +82,8 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- The sidebar's **People & access** section is now **Access**, which fits
+  members who only see AI agents as well as admins.
 - The role editor uses the full page width. Each section has its
   explanation beside its fields, and a Summary before **Create role** shows how
   far the role reaches, what holders can do, their tokens, who can give it and
