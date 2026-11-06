@@ -9,7 +9,9 @@ All notable changes to Dopbase are documented in this file.
 - `DOPBASE_SSO`, `DOPBASE_RBAC` and `DOPBASE_RBAC_ROLES` (`sso`, `rbac`,
   `rbac_roles` in `server.toml`) turn on single sign-on, people and group
   management, and custom roles. `GET /api/v1/auth/session` lists them in
-  `features`; a feature that's off answers `403` `FEATURE_DISABLED`.
+  `features`; a feature that's off answers `403` `FEATURE_DISABLED`. Without
+  RBAC, admins can still set someone a new password. Grants carry
+  `principalAgent`, which is true for an AI agent.
 - AI agents have their own capabilities. `agents.view` creates agents and
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all
