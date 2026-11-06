@@ -125,6 +125,13 @@ pub fn save(
   Ok(())
 }
 
+/// Whether a saved login is on disk, without decrypting it, so a damaged
+/// session still counts.
+pub fn is_saved(server: &ResolvedServer) -> Result<bool> {
+  let (session_path, key_path) = paths(server)?;
+  Ok(session_path.exists() || key_path.exists())
+}
+
 pub fn remove(server: &ResolvedServer) -> Result<bool> {
   let (session_path, key_path) = paths(server)?;
   let session_removed = remove_if_present(&session_path)?;

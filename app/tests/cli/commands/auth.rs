@@ -237,3 +237,148 @@ async fn browser_login_flags_conflict_with_token_and_password() {
     assert_eq!(result.status.code(), Some(2), "{arguments:?}");
   }
 }
+
+#[tokio::test]
+async fn login_and_logout_stop_while_dopbase_token_is_set() {
+  let directory = TempDir::new().unwrap();
+  let saved = "dbs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let environment = "dbs_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+  let mut cmd = command(directory.path());
+  cmd.args(["login", "--token"]);
+  success_exit(&output(cmd, Some(saved.as_bytes())).await);
+  let session_path = directory.path().join("session");
+  let key_path = directory.path().join("session-key");
+  let session_before = std::fs::read(&session_path).unwrap();
+  let key_before = std::fs::read(&key_path).unwrap();
+
+  // Logout refuses, names the way out, and keeps the saved login.
+  let mut cmd = command(directory.path());
+  cmd.env("DOPBASE_TOKEN", environment).arg("logout");
+  let result = output(cmd, None).await;
+  assert_eq!(result.status.code(), Some(1));
+  failure(
+    &result,
+    "DOPBASE_TOKEN is set, so Dopbase signs in with that token",
+  );
+  // The suggested command keeps the --data-dir this logout was given.
+  let hint = format!(
+    "env -u DOPBASE_TOKEN dopbase --data-dir {} logout",
+    directory.path().display()
+  );
+  failure(&result, &hint);
+  assert!(String::from_utf8_lossy(&result.stdout).is_empty());
+  assert_eq!(std::fs::read(&session_path).unwrap(), session_before);
+  assert_eq!(std::fs::read(&key_path).unwrap(), key_before);
+
+  // JSON mode carries the same message.
+  let mut cmd = command(directory.path());
+  cmd
+    .env("DOPBASE_TOKEN", environment)
+    .args(["--json", "logout"]);
+  let result = output(cmd, None).await;
+  let error: serde_json::Value = serde_json::from_slice(&result.stderr).unwrap();
+  assert_eq!(error["success"], false);
+  assert!(
+    error["error"]["CLI_ERROR"]
+      .as_str()
+      .unwrap()
+      .contains("Unset DOPBASE_TOKEN to stop using it")
+  );
+
+  // Login refuses before reading the piped token, in every mode.
+  for arguments in [
+    &["login", "--token"][..],
+    &["login"],
+    &["login", "--password"],
+    &["login", "--browser"],
+  ] {
+    let mut cmd = command(directory.path());
+    cmd.env("DOPBASE_TOKEN", environment).args(arguments);
+    let result = output(
+      cmd,
+      Some(b"dbs_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"),
+    )
+    .await;
+    assert_eq!(result.status.code(), Some(1), "{arguments:?}");
+    failure(
+      &result,
+      "DOPBASE_TOKEN is set, so Dopbase would ignore a saved login",
+    );
+    assert!(
+      !String::from_utf8_lossy(&result.stderr).contains("requires a terminal"),
+      "{arguments:?}"
+    );
+    assert_eq!(std::fs::read(&session_path).unwrap(), session_before);
+  }
+
+  // An empty token keeps the error every other command gives.
+  for arguments in [["logout"], ["login"]] {
+    let mut cmd = command(directory.path());
+    cmd.env("DOPBASE_TOKEN", "").args(arguments);
+    failure(&output(cmd, None).await, "DOPBASE_TOKEN is set but empty");
+  }
+  assert_eq!(std::fs::read(&session_path).unwrap(), session_before);
+
+  // --server is kept too, and quoted for the shell where needed.
+  let mut cmd = command(directory.path());
+  cmd
+    .env("DOPBASE_TOKEN", environment)
+    .args(["--server", "http://localhost:8840", "logout"]);
+  failure(
+    &output(cmd, None).await,
+    &format!(
+      "env -u DOPBASE_TOKEN dopbase --data-dir {} --server http://localhost:8840 logout",
+      directory.path().display()
+    ),
+  );
+  let spaced = TempDir::new().unwrap();
+  let spaced_dir = spaced.path().join("my data");
+  let mut cmd = command(&spaced_dir);
+  cmd.args(["login", "--token"]);
+  success_exit(&output(cmd, Some(saved.as_bytes())).await);
+  let mut cmd = command(&spaced_dir);
+  cmd.env("DOPBASE_TOKEN", environment).arg("logout");
+  failure(
+    &output(cmd, None).await,
+    &format!("--data-dir '{}' logout", spaced_dir.display()),
+  );
+
+  // Running the suggested command, token still set in the shell, removes
+  // the saved runner token.
+  let mut shell = std::process::Command::new("sh");
+  for name in app::constants::config::executable_environment_names() {
+    shell.env_remove(name);
+  }
+  let binary = std::path::Path::new(env!("CARGO_BIN_EXE_dopbase"));
+  shell
+    .env(
+      "PATH",
+      format!(
+        "{}:{}",
+        binary.parent().unwrap().display(),
+        std::env::var("PATH").unwrap_or_default()
+      ),
+    )
+    .env("NO_COLOR", "1")
+    .env("DOPBASE_TOKEN", environment)
+    .args(["-c", &hint]);
+  let result = output(shell, None).await;
+  success_exit(&result);
+  assert!(String::from_utf8_lossy(&result.stdout).contains("Logged out from"));
+  assert!(!session_path.exists() && !key_path.exists());
+
+  // With nothing saved there is no hint about removing a saved login.
+  let mut cmd = command(directory.path());
+  cmd.env("DOPBASE_TOKEN", environment).arg("logout");
+  let result = output(cmd, None).await;
+  failure(&result, "Unset DOPBASE_TOKEN to stop using it");
+  assert!(!String::from_utf8_lossy(&result.stderr).contains("env -u"));
+}
+
+fn success_exit(result: &std::process::Output) {
+  assert!(
+    result.status.success(),
+    "CLI failed: {}",
+    String::from_utf8_lossy(&result.stderr)
+  );
+}

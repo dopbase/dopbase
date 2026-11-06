@@ -1,6 +1,9 @@
 use clap::Args;
 
 pub(crate) const LOGIN_HELP: &str = "\
+Login stops while DOPBASE_TOKEN is set, because the token takes priority
+over a saved login. Unset it first.
+
 Examples:
   dopbase login
   dopbase login --browser
@@ -9,6 +12,9 @@ Examples:
   printf '%s' \"$TOKEN\" | dopbase login --token
 ";
 pub(crate) const LOGOUT_HELP: &str = "\
+Logout stops while DOPBASE_TOKEN is set, because the token keeps signing
+commands in. Unset it first.
+
 Examples:
   dopbase logout
 ";

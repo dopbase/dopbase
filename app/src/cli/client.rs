@@ -536,6 +536,19 @@ where
   })
 }
 
+/// Whether DOPBASE_TOKEN is in use. It takes priority over any saved login,
+/// so login and logout check it first. Empty and non-Unicode values fail the
+/// same way they do in `credential_from_sources`.
+#[doc(hidden)]
+pub fn environment_token_set(environment: Result<String, env::VarError>) -> Result<bool> {
+  match environment {
+    Ok(token) if token.is_empty() => bail!("DOPBASE_TOKEN is set but empty"),
+    Ok(_) => Ok(true),
+    Err(env::VarError::NotUnicode(_)) => bail!("DOPBASE_TOKEN contains invalid Unicode"),
+    Err(env::VarError::NotPresent) => Ok(false),
+  }
+}
+
 pub fn validate_runner_token(token: &str) -> Result<()> {
   use crate::constants::tokens::RUNNER_TOKEN_PREFIX;
 
