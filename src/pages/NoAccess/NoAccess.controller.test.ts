@@ -122,6 +122,17 @@ describe("useNoAccessController", () => {
     );
   });
 
+  it("blames only custom roles when people management is on", () => {
+    route.path = "/roles";
+    session.value = { role: "root", features: ["rbac"] };
+
+    const { description } = useNoAccessController();
+
+    expect(description.value).toBe(
+      "Custom roles are disabled on this server. Your server administrator can enable them by following the",
+    );
+  });
+
   it("links no docs when the role is what's missing", () => {
     const { docsUrl } = useNoAccessController();
 

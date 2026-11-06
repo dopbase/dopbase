@@ -15,8 +15,12 @@ const FEATURE_OFF: Record<Feature, string> = {
   sso: "This feature is disabled on this server. Your server administrator can enable it by following the",
   rbac: "Groups require people management, which is disabled on this server. Your server administrator can enable it by following the",
   "rbac.roles":
-    "Custom roles require people management. Your server administrator can enable them by following the",
+    "Custom roles are disabled on this server. Your server administrator can enable them by following the",
 };
+
+/** Custom roles while people management, which they need, is off too. */
+const ROLES_WITHOUT_RBAC =
+  "Custom roles require people management. Your server administrator can enable them by following the";
 
 /**
  * NoAccess controller. The router guard renders this screen at the address
@@ -49,6 +53,8 @@ export function useNoAccessController() {
   });
 
   const description = computed(() => {
+    if (offFeature.value === "rbac.roles" && !auth.hasFeature("rbac"))
+      return ROLES_WITHOUT_RBAC;
     if (offFeature.value) return FEATURE_OFF[offFeature.value];
     const role = auth.session
       ? auth.session.roleName || formatRole(auth.session.role)
