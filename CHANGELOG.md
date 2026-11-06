@@ -16,9 +16,10 @@ All notable changes to Dopbase are documented in this file.
   active people an instance holds while RBAC is on. Root, AI agents and
   disabled accounts don't count, and `0` or leaving it unset means no limit.
   At the limit, adding or enabling someone answers `409`
-  `USER_LIMIT_REACHED`. The session carries `maxUsers`, the Users page shows
-  the active user count, and once the limit is full the console turns off
-  **Add user** and **Turn account back on**. The Status page warns too.
+  `USER_LIMIT_REACHED`. The session carries `maxUsers` and each user carries
+  `countsTowardLimit`, the Users page shows the active user count, and once
+  the limit is full the console turns off **Add user** and **Turn account
+  back on**. The Status page warns too.
 - AI agents have their own capabilities. `agents.view` creates agents and
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all
