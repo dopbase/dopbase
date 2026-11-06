@@ -67,10 +67,10 @@ const signInClass: Record<SignInMethod, string> = {
             class="inline-flex items-center gap-1 text-sm text-ink-muted"
             data-testid="user-limit">
             <span class="font-mono">{{ limit.used }} of {{ limit.max }}</span>
-            people
+            active {{ limit.max === 1 ? "user" : "users" }}
             <DbInfoTip
-              label="About the people limit"
-              text="Set by DOPBASE_RBAC_MAX_USERS on the server. Only active people count. Root and AI agents don't." />
+              label="About the user limit"
+              text="Maximum active users allowed on this instance. Root, AI agents, and disabled accounts do not count." />
           </span>
           <DbButton
             variant="primary"
@@ -86,12 +86,12 @@ const signInClass: Record<SignInMethod, string> = {
       <DbAlert
         v-if="canManagePeople && limit?.full"
         tone="warn"
-        title="Every spot is taken"
+        title="User limit reached"
         data-testid="user-limit-full">
-        This server allows {{ limit.max }} active
-        {{ limit.max === 1 ? "person" : "people" }}. To add someone or turn an
-        account back on, disable or delete someone first, or raise
-        <code class="font-mono">DOPBASE_RBAC_MAX_USERS</code>.
+        This instance allows up to {{ limit.max }} active
+        {{ limit.max === 1 ? "user" : "users" }}. To add or enable a user,
+        disable or delete an active user, or ask your instance administrator to
+        increase the limit.
       </DbAlert>
 
       <div class="flex flex-wrap items-center gap-2">
