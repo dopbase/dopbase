@@ -142,7 +142,7 @@ pub enum Command {
   /// Authenticate with the active server.
   #[command(after_help = auth::LOGIN_HELP)]
   Login(LoginArgs),
-  /// Remove the saved credential for the active server.
+  /// End the saved login for the active server and remove it.
   #[command(after_help = auth::LOGOUT_HELP)]
   Logout,
   /// Alias for `dopbase client status`.

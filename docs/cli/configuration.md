@@ -118,7 +118,10 @@ IP addresses, and the client does not follow redirects.
 
 Only one saved connection is active in v{{version}}. Logging in again, with a human
 account or runner token, replaces the saved credential. `dopbase logout`
-removes the active credential but leaves the selected server unchanged.
+ends a saved login on the server, removes the active credential, and leaves
+the selected server unchanged. Both `login` and `logout` stop while
+`DOPBASE_TOKEN` is set, because the variable takes priority over anything
+saved here.
 
 On macOS and Linux, the data directory is mode `0700` and both session files
 are mode `0600`. Separating the key protects a copied `session` file by itself,

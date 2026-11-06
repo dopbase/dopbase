@@ -42,8 +42,10 @@ normalized server that issued it. A token issued by one server is not reused on
 another.
 
 If the encrypted session is missing or damaged, run `dopbase logout` and then
-`dopbase login` to create a new `session` and `session-key`. For externally
-managed automation, provide a scoped token through `DOPBASE_TOKEN`.
+`dopbase login` to create a new `session` and `session-key`. Unset
+`DOPBASE_TOKEN` first if it is set: both commands stop while it is, because
+the variable takes priority over a saved login. For externally managed
+automation, provide a scoped token through `DOPBASE_TOKEN`.
 
 If status shows an unknown email for an encrypted session created by an older
 CLI, run `dopbase login` again to refresh the cached identity.

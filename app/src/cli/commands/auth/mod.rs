@@ -3,4 +3,4 @@ mod handler;
 
 pub use args::LoginArgs;
 pub(crate) use args::{LOGIN_HELP, LOGOUT_HELP};
-pub(super) use handler::{login, logout};
+pub(super) use handler::{LogoutFlags, login, logout};
