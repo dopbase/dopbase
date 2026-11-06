@@ -69,6 +69,26 @@
 # Environment: DOPBASE_UPDATE_CHECK
 # update_check = false
 
+# Let people sign in with an OpenID Connect provider such as Google or
+# Keycloak. While this is off, accounts that only sign in with single
+# sign-on can't sign in; root can always use its password.
+# Accepts: true or false. Default: false.
+# Environment: DOPBASE_SSO
+# sso = false
+
+# Let admins add and change people, groups and the access they're given.
+# While this is off, existing accounts keep their role and access, and AI
+# agents work as usual.
+# Accepts: true or false. Default: false.
+# Environment: DOPBASE_RBAC
+# rbac = false
+
+# Let root create and edit custom roles. Needs rbac = true too.
+# While this is off, people who already hold a custom role keep it.
+# Accepts: true or false. Default: false.
+# Environment: DOPBASE_RBAC_ROLES
+# rbac_roles = false
+
 # Master encryption key settings.
 # Uncomment the table header before enabling settings below.
 # [master_key]

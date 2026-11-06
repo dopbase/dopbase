@@ -475,6 +475,9 @@ async fn serve_instance(
   if let Some(warning) = state.config.public_url_warning() {
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
+  if let Some(warning) = state.config.features_warning() {
+    anstream::eprintln!("{}\n", startup_warning(&warning));
+  }
   if let Some(setup) = setup_token.as_deref() {
     eprintln!(
       "{}",
