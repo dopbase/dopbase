@@ -643,23 +643,24 @@ async fn audit_retention(
   })
 }
 
-/// How full the people limit is. A full limit warns, because nobody can be
+/// How full the user limit is. A full limit warns, because nobody can be
 /// added or enabled until someone leaves.
 async fn user_limit(
   pool: &SqlitePool,
   max: u32,
   now: DateTime<Utc>,
 ) -> Result<Check> {
+  let message = crate::modules::users::service::user_limit_message(max);
   let used = crate::modules::users::repository::active_people(pool).await?;
   let max = i64::from(max);
-  let value = format!("{used} of {max}");
+  let users = plural(max, "active user", "active users");
   let result = if used > max {
     check(
       "users.limit",
       CheckStatus::Warn,
-      "More people than the limit allows",
+      "User limit exceeded",
       format!(
-        "{used} people are active but DOPBASE_RBAC_MAX_USERS is {max}. Everyone keeps access, but nobody can be added or enabled until fewer than {max} are active."
+        "{used} active users exceeds the configured limit of {max}. Existing users keep access. To add or enable a user, reduce the active user count below the limit or ask your instance administrator to increase it."
       ),
       now,
     )
@@ -667,26 +668,22 @@ async fn user_limit(
     check(
       "users.limit",
       CheckStatus::Warn,
-      "The people limit is full",
-      format!(
-        "All {max} spots are taken, so nobody can be added or enabled. Disable or delete someone, or raise DOPBASE_RBAC_MAX_USERS."
-      ),
+      "User limit reached",
+      message,
       now,
     )
   } else {
-    let left = max - used;
     check(
       "users.limit",
       CheckStatus::Ok,
-      "There's room for more people",
+      "Active users within limit",
       format!(
-        "{left} of {max} {} left. Root and AI agents don't count.",
-        plural(left, "spot", "spots")
+        "{used} of {max} {users}. Root, AI agents, and disabled accounts do not count."
       ),
       now,
     )
   }
-  .value(value);
+  .value(format!("{used} of {max}"));
   Ok(if used >= max {
     result.fix("/users")
   } else {

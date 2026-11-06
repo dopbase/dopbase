@@ -47,7 +47,7 @@ async fn set_status(
   .await
 }
 
-/// Asserts a request was refused because the people limit is full.
+/// Asserts a request was refused because the user limit is full.
 fn limit_reached(
   status: u16,
   body: &Value,
@@ -55,7 +55,8 @@ fn limit_reached(
   assert_eq!(status, 409, "{body}");
   let message = body["error"]["USER_LIMIT_REACHED"].as_str();
   assert!(
-    message.is_some_and(|message| message.contains("DOPBASE_RBAC_MAX_USERS")),
+    message.is_some_and(|message| message.starts_with("This instance allows up to")
+      && !message.contains("DOPBASE_RBAC_MAX_USERS")),
     "{body}"
   );
 }
@@ -100,6 +101,7 @@ async fn the_people_limit_counts_active_people_only() {
   let member = person(&two, &root, "member@example.com", "member").await;
   let check = user_limit_check(&two, &root).await.unwrap();
   assert_eq!(check["status"], "ok", "{check}");
+  assert_eq!(check["title"], "Active users within limit");
   assert_eq!(check["value"], "1 of 2");
   let (status, body) = add(&two, &root, "auditor@example.com", "auditor").await;
   assert_eq!(status, 201, "{body}");
@@ -121,6 +123,7 @@ async fn the_people_limit_counts_active_people_only() {
   assert_eq!(status, 201, "{body}");
   let check = user_limit_check(&two, &root).await.unwrap();
   assert_eq!(check["status"], "warn", "{check}");
+  assert_eq!(check["title"], "User limit reached");
   assert_eq!(check["value"], "2 of 2");
   assert_eq!(check["fixPath"], "/users");
 
@@ -169,6 +172,7 @@ async fn the_people_limit_counts_active_people_only() {
   limit_reached(status, &body);
   let check = user_limit_check(&one, &root).await.unwrap();
   assert_eq!(check["status"], "warn", "{check}");
+  assert_eq!(check["title"], "User limit exceeded");
   assert_eq!(check["value"], "2 of 1");
 
   // The limit needs RBAC, like adding people does.

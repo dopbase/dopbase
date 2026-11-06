@@ -3,7 +3,6 @@ use super::{
   repository::{self, Account, NewUser, UserRow},
 };
 use crate::{
-  constants::config::ENV_RBAC_MAX_USERS,
   constants::errors::AUTHORIZATION_DENIED,
   constants::errors::PASSWORD_REQUIRED,
   constants::errors::USER_LIMIT_REACHED,
@@ -284,16 +283,19 @@ const ACCOUNT_VIEWERS: [Capability; 4] = [
   Capability::AgentsManage,
 ];
 
-/// Refused when the instance already holds as many active people as
-/// `DOPBASE_RBAC_MAX_USERS` allows.
-fn user_limit_reached(max: u32) -> HttpError {
-  let people = if max == 1 { "person" } else { "people" };
-  HttpError::conflict(
-    USER_LIMIT_REACHED,
-    &format!(
-      "This server allows {max} active {people}, and that's how many it has. Disable or delete someone first, or raise {ENV_RBAC_MAX_USERS}."
-    ),
+/// What to do once the instance holds as many active users as the limit
+/// allows. The Status check reuses it.
+pub(crate) fn user_limit_message(max: u32) -> String {
+  let users = if max == 1 { "user" } else { "users" };
+  format!(
+    "This instance allows up to {max} active {users}. To add or enable a user, disable or delete an active user, or ask your instance administrator to increase the limit."
   )
+}
+
+/// Refused when the instance already holds as many active users as the
+/// limit allows.
+fn user_limit_reached(max: u32) -> HttpError {
+  HttpError::conflict(USER_LIMIT_REACHED, &user_limit_message(max))
 }
 
 /// Refuse early, before slower work like hashing a password, when the
