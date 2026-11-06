@@ -10,6 +10,10 @@ project data their grants can ever reach. Which projects they reach still
 comes from grants. Root opens **Roles** from the sidebar; anyone else who
 follows a link to it sees a page saying they need `roles.manage`.
 
+Custom roles need both `DOPBASE_RBAC=true` and `DOPBASE_RBAC_ROLES=true` on
+the server. Without them the page leaves the sidebar, role pickers offer only
+the built-in roles, and people who already hold a custom role keep it.
+
 The table lists each role with a `built-in` or `custom` tag, the deepest level
 it reaches, how many capabilities it holds, how holders sign in, and how many
 accounts hold it.

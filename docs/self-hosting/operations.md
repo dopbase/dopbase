@@ -37,6 +37,42 @@ are part of the database, so backups and restores carry them, and they grow
 the database by roughly the size of each stored value. Expired versions keep
 only metadata.
 
+## Optional features
+
+Three features are off until you turn them on in `server.toml` or with an
+environment variable. Restart the server after changing them.
+
+| Setting      | Environment variable | What it turns on                                                        |
+| ------------ | -------------------- | ----------------------------------------------------------------------- |
+| `sso`        | `DOPBASE_SSO`        | [Single sign-on](/guide/single-sign-on) with an OpenID Connect provider |
+| `rbac`       | `DOPBASE_RBAC`       | Adding and editing people, groups, and the access they're given         |
+| `rbac_roles` | `DOPBASE_RBAC_ROLES` | Custom roles. Needs `rbac` as well                                      |
+
+```toml
+sso = true
+rbac = true
+rbac_roles = true
+```
+
+Turning a feature off deletes nothing, and turning it back on brings
+everything back as it was. While a feature is off, its pages leave the
+console and its API routes answer `403` `FEATURE_DISABLED` for every account,
+root included.
+
+With `sso` off, the login page shows only the password form, and a provider
+set to "required" no longer blocks passwords. Accounts that have no password
+can't sign in until it's back on. Root can always use its password.
+
+With `rbac` off, everyone keeps their role and their access, but nobody adds
+people, edits them, changes groups, or gives people and groups access. AI
+agents work as usual, and admins can still disable, enable, and delete
+accounts.
+
+With `rbac_roles` off, nobody creates, edits, or deletes custom roles, or gives
+one to anyone. People who already hold a custom role keep it. Setting
+`rbac_roles` without `rbac` leaves custom roles off, and the server prints a
+warning when it starts.
+
 ## Monitoring
 
 Monitor service availability, database health, disk space, backup completion, authentication failures, and abnormal audit activity. Monitoring output must not contain request bodies or secret values.
@@ -48,6 +84,12 @@ Application logs may include timestamps, operation names, request identifiers, s
 ## Upgrades
 
 Back up the database and master key before an upgrade. Review the [release notes](https://github.com/dopbase/dopbase/releases) for migration and compatibility information before replacing the executable.
+
+Since 0.2.0, single sign-on and people management are off by default. If an
+older server used them, set `DOPBASE_SSO=true` and `DOPBASE_RBAC=true` (or
+`sso = true` and `rbac = true` in `server.toml`) before you upgrade, or people
+who sign in only through single sign-on are locked out. See
+[optional features](#optional-features).
 
 The server runs database migrations when it starts, and there is no automatic downgrade. A database opened by 0.1.10 cannot be used by 0.1.9, so to go back you restore the backup you made before the upgrade.
 

@@ -11,6 +11,12 @@ disabling, and removing accounts needs `users.manage`, and happens in the
 Admin UI only. There is no CLI command for it. Bots and CI jobs have their own
 page, [AI agents](./ai-agents).
 
+Adding and editing people needs `DOPBASE_RBAC=true` on the server. Without
+it, the page lists everyone and admins can still disable, enable, and delete
+accounts, but there's no **Add user**, no **Edit**, and the Access and Groups
+tabs are read-only. See
+[optional features](/self-hosting/operations#optional-features).
+
 The table shows each person's role, their groups, how they sign in, and when
 they last signed in. Filter by email, or add a **Role** or **Status** chip to
 narrow the list to one role, or to active, disabled, or single sign-on
