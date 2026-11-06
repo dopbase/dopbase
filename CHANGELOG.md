@@ -17,7 +17,7 @@ All notable changes to Dopbase are documented in this file.
   disabled accounts don't count, and `0` or leaving it unset means no limit.
   At the limit, adding or enabling someone answers `409`
   `USER_LIMIT_REACHED`. The session carries `maxUsers`, the Users page shows
-  how many spots are taken, and the Status page warns when the limit is full.
+  the active user count, and the Status page warns when the limit is full.
 - AI agents have their own capabilities. `agents.view` creates agents and
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all

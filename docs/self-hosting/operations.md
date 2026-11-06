@@ -87,8 +87,8 @@ rbac_max_users = 5
 ```
 
 Once the limit is full, adding someone or turning a disabled account back on
-answers `409` `USER_LIMIT_REACHED`. The Users page shows how many spots are
-taken and turns off **Add user**. Disabling or deleting someone frees a spot.
+answers `409` `USER_LIMIT_REACHED`. The Users page shows the count, such as
+`3 of 5 active users`, and turns off **Add user**. Disabling or deleting someone frees a spot.
 If you lower the limit below the number of active people, everyone keeps
 their access, and nobody new can be added until enough people leave. The
 Status page shows how full the limit is. Setting it without `rbac` does
