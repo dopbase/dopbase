@@ -298,8 +298,8 @@ fn user_limit_reached(max: u32) -> HttpError {
   HttpError::conflict(USER_LIMIT_REACHED, &user_limit_message(max))
 }
 
-/// Refuse early, before slower work like hashing a password, when the
-/// people limit is already reached. The write checks again.
+/// Refuse with a clear error when the people limit is already reached. The
+/// write checks again, so racing requests can't pass it.
 async fn require_room(
   state: &AppState,
   limit: Option<u32>,
@@ -450,7 +450,6 @@ pub async fn create(
   } else {
     state.config.features.user_limit()
   };
-  require_room(state, limit).await?;
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -491,6 +490,8 @@ pub async fn create(
   let now = Utc::now().to_rfc3339();
   let (actor_id, actor_email) = actor(identity);
   require_assignable(state, identity, &chosen.id).await?;
+  // After validation, so a bad request still hears what's wrong with it.
+  require_room(state, limit).await?;
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,

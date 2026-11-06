@@ -109,6 +109,10 @@ async fn the_people_limit_counts_active_people_only() {
   // Full: nobody else is added, but AI agents still are.
   let (status, body) = add(&two, &root, "third@example.com", "admin").await;
   limit_reached(status, &body);
+  // A request that is wrong anyway says so first.
+  let (status, body) = add(&two, &root, "not-an-email", "member").await;
+  assert_eq!(status, 422, "{body}");
+  assert!(body["error"]["EMAIL_INVALID"].is_string(), "{body}");
   // Enabling someone who is already active changes nothing, full or not.
   let (status, body) = set_status(&two, &root, &member.id, "enable").await;
   assert_eq!(status, 200, "{body}");
