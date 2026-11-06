@@ -370,6 +370,37 @@ describe("useUsersController", () => {
     });
   });
 
+  describe("with a people limit", () => {
+    async function mountWithLimit(maxUsers: number | null) {
+      signInAs(["users.view", "users.manage"]);
+      useAuthStore().session!.maxUsers = maxUsers;
+      const { controller } = mountController(useUsersController);
+      await settle();
+      return controller;
+    }
+
+    it("adds people while there's room", async () => {
+      const c = await mountWithLimit(5);
+      // lead, maya and reader; root and the AI agent don't count.
+      expect(c.limit.value).toEqual({ used: 3, max: 5, full: false });
+      expect(c.canAdd.value).toBe(true);
+    });
+
+    it("stops adding once every spot is taken", async () => {
+      const c = await mountWithLimit(3);
+      expect(c.limit.value?.full).toBe(true);
+      expect(c.canAdd.value).toBe(false);
+      // Offboarding still works, so someone can make room.
+      expect(rowFor(c, "usr_maya").actions).toEqual(["disable", "delete"]);
+    });
+
+    it("shows no count when the server has no limit", async () => {
+      const c = await mountWithLimit(null);
+      expect(c.limit.value).toBeNull();
+      expect(c.canAdd.value).toBe(true);
+    });
+  });
+
   describe("without RBAC", () => {
     it("adds nobody, but keeps passwords and offboarding", async () => {
       signInAs(["users.view", "users.manage"]);

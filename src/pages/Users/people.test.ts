@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAgent, roleOf, signInMethod, tokenState } from "./people";
+import { isAgent, roleOf, signInMethod, tokenState, userLimit } from "./people";
 import {
   maya,
   memberRole,
@@ -18,6 +18,30 @@ describe("isAgent", () => {
     expect(isAgent(reviewBot)).toBe(true);
     expect(isAgent(maya)).toBe(false);
     expect(isAgent(root)).toBe(false);
+  });
+});
+
+describe("userLimit", () => {
+  const people = [root, maya, reader, reviewBot];
+
+  it("is null when the server sets no limit", () => {
+    expect(userLimit(people, null)).toBeNull();
+    expect(userLimit(people, undefined)).toBeNull();
+    expect(userLimit(people, 0)).toBeNull();
+  });
+
+  it("counts active people, never root or AI agents", () => {
+    const gone = userFixture({ id: "usr_gone", status: "disabled" });
+    expect(userLimit([...people, gone], 5)).toEqual({
+      used: 2,
+      max: 5,
+      full: false,
+    });
+  });
+
+  it("is full once every spot is taken, or more", () => {
+    expect(userLimit(people, 2)?.full).toBe(true);
+    expect(userLimit(people, 1)).toEqual({ used: 2, max: 1, full: true });
   });
 });
 

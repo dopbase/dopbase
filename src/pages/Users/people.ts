@@ -10,6 +10,31 @@ export function isAgent(user: User): boolean {
   return user.role === "ai_agent";
 }
 
+/** How full the people limit is. */
+export interface UserLimit {
+  used: number;
+  max: number;
+  full: boolean;
+}
+
+/**
+ * How many spots under the server's people limit are taken. Only active
+ * people count: root and AI agents never do. Null when there is no limit.
+ */
+export function userLimit(
+  accounts: readonly User[],
+  max: number | null | undefined,
+): UserLimit | null {
+  if (!max) return null;
+  const used = accounts.filter(
+    (account) =>
+      account.role !== "root" &&
+      !isAgent(account) &&
+      account.status === "active",
+  ).length;
+  return { used, max, full: used >= max };
+}
+
 export function signInMethod(user: User): SignInMethod {
   if (user.status === "disabled") return "disabled";
   if (user.ssoLinked && !user.hasPassword) return "sso";

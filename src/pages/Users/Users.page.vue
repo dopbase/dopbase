@@ -12,6 +12,7 @@ import {
   DbButton,
   DbConfirmDialog,
   DbFilterMenu,
+  DbInfoTip,
   DbMenu,
   DbMenuItem,
   DbSearchField,
@@ -33,6 +34,8 @@ const {
   ssoEnabled,
   loadError,
   canManagePeople,
+  limit,
+  canAdd,
   filter,
   roleFilter,
   statusFilter,
@@ -59,15 +62,37 @@ const signInClass: Record<SignInMethod, string> = {
         title="Users"
         subtitle="People who sign in to this instance. Bots and CI live under AI agents.">
         <template v-if="canManagePeople" #actions>
+          <span
+            v-if="limit"
+            class="inline-flex items-center gap-1 text-sm text-ink-muted"
+            data-testid="user-limit">
+            <span class="font-mono">{{ limit.used }} of {{ limit.max }}</span>
+            people
+            <DbInfoTip
+              label="About the people limit"
+              text="Set by DOPBASE_RBAC_MAX_USERS on the server. Only active people count. Root and AI agents don't." />
+          </span>
           <DbButton
             variant="primary"
             data-testid="add-user"
+            :disabled="!canAdd"
             @click="controller.openAdd">
             <PlusIcon class="h-4 w-4" />
             Add user
           </DbButton>
         </template>
       </PageHeader>
+
+      <DbAlert
+        v-if="canManagePeople && limit?.full"
+        tone="warn"
+        title="Every spot is taken"
+        data-testid="user-limit-full">
+        This server allows {{ limit.max }} active
+        {{ limit.max === 1 ? "person" : "people" }}. To add someone or turn an
+        account back on, disable or delete someone first, or raise
+        <code class="font-mono">DOPBASE_RBAC_MAX_USERS</code>.
+      </DbAlert>
 
       <div class="flex flex-wrap items-center gap-2">
         <DbSearchField

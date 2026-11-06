@@ -40,6 +40,11 @@ export interface SessionResponse {
   capabilities?: Capability[];
   /** Features the server has on. */
   features?: Feature[];
+  /**
+   * The most active people the server allows, not counting root and AI
+   * agents. Null when there is no limit.
+   */
+  maxUsers?: number | null;
   /** The deepest level any grant can give the account. */
   maxLevel?: Level;
   /** What the role's personal tokens are for. */
