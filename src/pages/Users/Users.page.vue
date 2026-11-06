@@ -205,11 +205,9 @@ const signInClass: Record<SignInMethod, string> = {
                 <td class="px-4 text-ink-muted">{{ row.lastSignIn }}</td>
                 <td class="px-2 text-right">
                   <DbMenu
-                    v-if="row.canEdit || row.actions.length > 0"
+                    v-if="row.canEdit"
                     :label="`Actions for ${row.user.email}`">
-                    <DbMenuItem
-                      v-if="row.canEdit"
-                      @select="controller.openEdit(row.user)">
+                    <DbMenuItem @select="controller.openEdit(row.user)">
                       <template #icon><PencilIcon class="h-4 w-4" /></template>
                       {{
                         canManagePeople ? "Edit role and email" : "Set password"
@@ -244,12 +242,8 @@ const signInClass: Record<SignInMethod, string> = {
                       <template #icon><LockIcon class="h-4 w-4" /></template>
                       Turn account back on
                     </DbMenuItem>
-                    <div
-                      v-if="row.actions.includes('delete')"
-                      class="my-0.5 h-px bg-line-soft"
-                      role="separator" />
+                    <div class="my-0.5 h-px bg-line-soft" role="separator" />
                     <DbMenuItem
-                      v-if="row.actions.includes('delete')"
                       tone="danger"
                       @select="actions.ask('delete', row.user)">
                       <template #icon><TrashIcon class="h-4 w-4" /></template>
