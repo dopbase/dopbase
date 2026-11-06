@@ -18,20 +18,16 @@ export interface UserLimit {
 }
 
 /**
- * How many spots under the server's people limit are taken. Only active
- * people count: root and AI agents never do. Null when there is no limit.
+ * How many spots under the server's people limit are taken, counting the
+ * accounts the server marks: active people, never root or AI agents. Null
+ * when there is no limit.
  */
 export function userLimit(
   accounts: readonly User[],
   max: number | null | undefined,
 ): UserLimit | null {
   if (!max) return null;
-  const used = accounts.filter(
-    (account) =>
-      account.role !== "root" &&
-      !isAgent(account) &&
-      account.status === "active",
-  ).length;
+  const used = accounts.filter((account) => account.countsTowardLimit).length;
   return { used, max, full: used >= max };
 }
 

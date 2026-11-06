@@ -30,9 +30,11 @@ describe("userLimit", () => {
     expect(userLimit(people, 0)).toBeNull();
   });
 
-  it("counts active people, never root or AI agents", () => {
+  it("counts the accounts the server marks: active people only", () => {
     const gone = userFixture({ id: "usr_gone", status: "disabled" });
-    expect(userLimit([...people, gone], 5)).toEqual({
+    // The server's mark wins over anything the console could work out.
+    const unmarked = userFixture({ id: "usr_other", countsTowardLimit: false });
+    expect(userLimit([...people, gone, unmarked], 5)).toEqual({
       used: 2,
       max: 5,
       full: false,
