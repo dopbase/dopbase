@@ -89,6 +89,12 @@
 # Environment: DOPBASE_RBAC_ROLES
 # rbac_roles = false
 
+# Cap how many active people the instance holds. Root, AI agents and
+# disabled accounts don't count. Needs rbac = true too.
+# Accepts: a whole number; 0 means no limit. Default: 0.
+# Environment: DOPBASE_RBAC_MAX_USERS
+# rbac_max_users = 0
+
 # Master encryption key settings.
 # Uncomment the table header before enabling settings below.
 # [master_key]
