@@ -97,7 +97,9 @@ describe("useNoAccessController", () => {
       "This feature is disabled on this server. Your server administrator can enable it by following the",
     );
     expect(description.value).not.toContain("DOPBASE_");
-    expect(docsUrl.value).toBe("https://docs.dopbase.com");
+    expect(docsUrl.value).toBe(
+      "https://docs.dopbase.com/self-hosting/operations#optional-features",
+    );
   });
 
   it("says groups come with people management", () => {

@@ -3,9 +3,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
 import { isPageName, pageFeature, pages } from "~/navigation/access-map";
 import type { Feature } from "~/services/access.api";
+import { FEATURES_DOCS_URL } from "~/utils/docs";
 import { formatRole } from "~/utils/format";
-
-export const DOCS_URL = "https://docs.dopbase.com";
 
 /**
  * Why a page is off, said without naming settings: the page links to the
@@ -71,7 +70,7 @@ export function useNoAccessController() {
   });
 
   /** Set while the page's feature is off, for the "how" link. */
-  const docsUrl = computed(() => (offFeature.value ? DOCS_URL : null));
+  const docsUrl = computed(() => (offFeature.value ? FEATURES_DOCS_URL : null));
 
   return { title, description, docsUrl };
 }
