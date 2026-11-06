@@ -800,4 +800,26 @@ async fn without_rbac_only_ai_agents_take_new_access() {
   )
   .await;
   assert!(status < 300, "{status} {body}");
+
+  // A grant the caller can't see stays not found, RBAC or not.
+  let other = person(&router, &root, "other@example.com", "member").await;
+  let (status, body) = grant(
+    &router,
+    &root,
+    ("user", &other.id),
+    ("project", Some("search")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+  let hidden = body["data"]["id"].as_str().unwrap().to_owned();
+  let (status, body) = send(
+    &off,
+    "DELETE",
+    &format!("/api/v1/grants/{hidden}"),
+    member.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 404, "{body}");
 }

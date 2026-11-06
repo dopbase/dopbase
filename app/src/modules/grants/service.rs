@@ -352,9 +352,6 @@ pub async fn delete(
     .ok_or_else(not_found)?;
   drop(conn);
   let agent = principal_agent(state, grant.principal_type, &grant.principal_id).await?;
-  if agent.is_none() {
-    state.config.features.require(Feature::Rbac)?;
-  }
   let own_agent = for_own_agent(identity, actor_id, agent.as_ref(), grant.scope_type);
   // A grant on something the caller cannot see does not exist for them. An
   // owner takes access away from their own agent wherever they can see.
@@ -377,6 +374,11 @@ pub async fn delete(
       error
     }
   })?;
+  // Without RBAC only AI agents lose access. Checked once the caller can
+  // see the grant, so the answer says nothing about grants they can't.
+  if agent.is_none() {
+    state.config.features.require(Feature::Rbac)?;
+  }
   if grant.principal_type == PrincipalType::User && grant.principal_id == actor_id {
     return Err(self_grant());
   }
