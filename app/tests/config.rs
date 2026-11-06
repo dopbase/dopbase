@@ -970,15 +970,17 @@ fn rbac_roles_without_rbac_starts_with_a_warning_and_stays_off() {
 #[test]
 fn disabled_features_block_their_capabilities() {
   use app::services::authx::Capability;
-  assert!(Features::all().blocked_capabilities().is_empty());
-  let off = Features::default().blocked_capabilities();
-  for capability in [
+  let gated = [
     Capability::SsoManage,
     Capability::GroupsManage,
     Capability::GrantsManage,
     Capability::RolesManage,
-  ] {
-    assert!(off.contains(&capability), "{capability:?}");
+  ];
+  let all = Features::all();
+  assert!(!gated.iter().any(|capability| all.blocks(*capability)));
+  let off = Features::default();
+  for capability in gated {
+    assert!(off.blocks(capability), "{capability:?}");
   }
   // Offboarding and AI agents never depend on a feature.
   for capability in [
@@ -987,16 +989,16 @@ fn disabled_features_block_their_capabilities() {
     Capability::AgentsView,
     Capability::AgentsManage,
   ] {
-    assert!(!off.contains(&capability), "{capability:?}");
+    assert!(!off.blocks(capability), "{capability:?}");
   }
   let roles_off = Features {
     sso: true,
     rbac: true,
     rbac_roles: false,
-  }
-  .blocked_capabilities();
-  assert_eq!(
-    roles_off.into_iter().collect::<Vec<_>>(),
-    [Capability::RolesManage]
-  );
+  };
+  let blocked: Vec<_> = gated
+    .into_iter()
+    .filter(|capability| roles_off.blocks(*capability))
+    .collect();
+  assert_eq!(blocked, [Capability::RolesManage]);
 }

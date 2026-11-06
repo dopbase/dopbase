@@ -63,10 +63,12 @@ fn validate_description(value: &str) -> Result<String, HttpError> {
 }
 
 /// Seeing groups needs users.view or groups.manage, from the Admin UI.
+/// Groups stay visible while RBAC is off, so a role's groups.manage still
+/// counts here.
 fn require_view(identity: &AuthIdentity) -> Result<(), HttpError> {
   require_browser(identity)?;
   match identity {
-    AuthIdentity::Admin { access, .. } if access.has(Capability::GroupsManage) => Ok(()),
+    AuthIdentity::Admin { access, .. } if access.holds(Capability::GroupsManage) => Ok(()),
     _ => require_capability(identity, Capability::UsersView).map(|_| ()),
   }
 }

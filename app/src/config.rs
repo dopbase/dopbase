@@ -468,10 +468,12 @@ impl ServerConfig {
 
   /// Set when custom roles are asked for without RBAC, which they need.
   pub fn features_warning(&self) -> Option<String> {
+    use crate::services::features::Feature;
     self.features.rbac_roles_ignored().then(|| {
+      let (roles, rbac) = (Feature::RbacRoles.setting(), Feature::Rbac.setting());
       format!(
-        "{ENV_RBAC_ROLES} is on but {ENV_RBAC} is off, so custom roles stay off.\n\
-         Set {ENV_RBAC}=true to use them."
+        "{roles} is on but {rbac} is off, so custom roles stay off.\n\
+         Set {rbac}=true to use them."
       )
     })
   }

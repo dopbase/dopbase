@@ -798,7 +798,7 @@ async fn finish_callback(
     "link" => {
       let mut conn = state.db.pool().acquire().await?;
       let access = match flow.admin_id.as_deref() {
-        Some(admin_id) => authx::load_access(&mut conn, admin_id).await?,
+        Some(admin_id) => authx::load_access(&mut conn, admin_id, &state.config.features).await?,
         None => None,
       };
       // Whoever manages single sign-on tested it, so send them back there.
@@ -915,9 +915,10 @@ fn audit_actor(role: &str) -> &'static str {
 async fn signs_in(
   conn: &mut sqlx::SqliteConnection,
   admin_id: &str,
+  features: &crate::services::features::Features,
 ) -> Result<bool, sqlx::Error> {
   Ok(
-    authx::load_access(conn, admin_id)
+    authx::load_access(conn, admin_id, features)
       .await?
       .is_some_and(|access| access.sign_in == SignIn::Interactive),
   )
@@ -944,7 +945,7 @@ async fn login_identity(
     Some((admin_id, _)) => {
       // A disabled or token-only account has no session, even with a stale
       // link.
-      if !signs_in(&mut tx, &admin_id).await? {
+      if !signs_in(&mut tx, &admin_id, &state.config.features).await? {
         return Err(Failure::new(Target::Login, "account_not_found"));
       }
       repository::touch_identity(&mut tx, &verified.issuer, &verified.subject, &now_text).await?;
@@ -970,11 +971,11 @@ async fn login_identity(
       let (admin_id, _) = account.ok_or_else(|| failure("account_not_found"))?;
       // Root links by hand, so the provider can never take over the
       // break-glass account. Accounts that never sign in don't link.
-      let access = authx::load_access(&mut tx, &admin_id).await?;
+      let access = authx::load_access(&mut tx, &admin_id, &state.config.features).await?;
       if access.as_ref().is_some_and(|access| access.is_root) {
         return Err(failure("root_not_linked"));
       }
-      if !signs_in(&mut tx, &admin_id).await? {
+      if !signs_in(&mut tx, &admin_id, &state.config.features).await? {
         return Err(failure("account_not_found"));
       }
       let inserted = repository::insert_identity(
@@ -1103,7 +1104,7 @@ async fn link_identity(
   }
   // A link by whoever manages single sign-on is the test sign-in that
   // verifies the provider.
-  let manages_sso = authx::load_access(&mut tx, admin_id)
+  let manages_sso = authx::load_access(&mut tx, admin_id, &state.config.features)
     .await?
     .is_some_and(|access| access.has(Capability::SsoManage));
   if manages_sso && repository::mark_verified(&mut tx, &row.id, &now).await? {

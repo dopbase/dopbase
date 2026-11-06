@@ -6,8 +6,6 @@
 //! included, and its routes answer `FEATURE_DISABLED`. Turning a feature off
 //! never deletes data, so turning it back on restores everything.
 
-use std::collections::BTreeSet;
-
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -50,11 +48,9 @@ impl Feature {
   fn capabilities(self) -> &'static [Capability] {
     match self {
       Self::Sso => &[Capability::SsoManage],
-      Self::Rbac => &[
-        Capability::GroupsManage,
-        Capability::GrantsManage,
-        Capability::RolesManage,
-      ],
+      // roles.manage sits under RBAC roles alone: they are off whenever
+      // RBAC is.
+      Self::Rbac => &[Capability::GroupsManage, Capability::GrantsManage],
       Self::RbacRoles => &[Capability::RolesManage],
     }
   }
@@ -103,13 +99,15 @@ impl Features {
     self.rbac_roles && !self.rbac
   }
 
-  /// Capabilities no account holds while their feature is off.
-  pub fn blocked_capabilities(&self) -> BTreeSet<Capability> {
+  /// Whether `capability` belongs to a feature that's off, so no account
+  /// holds it.
+  pub fn blocks(
+    &self,
+    capability: Capability,
+  ) -> bool {
     Feature::ALL
       .into_iter()
-      .filter(|feature| !self.enabled(*feature))
-      .flat_map(|feature| feature.capabilities().iter().copied())
-      .collect()
+      .any(|feature| !self.enabled(feature) && feature.capabilities().contains(&capability))
   }
 
   /// Refuse the request when `feature` is off.
@@ -126,18 +124,17 @@ impl Features {
 
 /// The error a disabled feature answers with.
 pub fn disabled(feature: Feature) -> HttpError {
+  let setting = feature.setting();
   let message = match feature {
-    Feature::Sso => format!(
-      "Single sign-on is off on this server. Set {}=true to turn it on.",
-      ENV_SSO
-    ),
-    Feature::Rbac => format!(
-      "Managing people and groups is off on this server. Set {}=true to turn it on.",
-      ENV_RBAC
-    ),
+    Feature::Sso => {
+      format!("Single sign-on is off on this server. Set {setting}=true to turn it on.")
+    }
+    Feature::Rbac => {
+      format!("Managing people and groups is off on this server. Set {setting}=true to turn it on.")
+    }
     Feature::RbacRoles => format!(
-      "Custom roles are off on this server. Set {}=true and {}=true to turn them on.",
-      ENV_RBAC, ENV_RBAC_ROLES
+      "Custom roles are off on this server. Set {}=true and {setting}=true to turn them on.",
+      Feature::Rbac.setting()
     ),
   };
   HttpError::forbidden(FEATURE_DISABLED, &message)

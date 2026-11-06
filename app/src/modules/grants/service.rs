@@ -194,10 +194,11 @@ async fn principal_label(
   own_agent: bool,
 ) -> Result<String, HttpError> {
   let can = |capability| require_capability(identity, capability).is_ok();
+  // Seeing a group needs groups.manage held by the role, even while RBAC
+  // is off, or users.view.
+  let sees_groups = matches!(identity, AuthIdentity::Admin { access, .. } if access.holds(Capability::GroupsManage));
   match principal_type {
-    PrincipalType::Group if !can(Capability::GroupsManage) && !can(Capability::UsersView) => {
-      Err(principal_invalid())
-    }
+    PrincipalType::Group if !sees_groups && !can(Capability::UsersView) => Err(principal_invalid()),
     PrincipalType::Group => repository::group_name(conn, principal_id)
       .await?
       .ok_or_else(|| HttpError::not_found("GROUP_NOT_FOUND", "The group was not found.")),
@@ -493,7 +494,7 @@ pub async fn user_access(
       "The user was not found.",
     ));
   };
-  let access = authx::load_access(&mut conn, id).await?;
+  let access = authx::load_access(&mut conn, id, &state.config.features).await?;
   let mut token = token;
   if let Some(token) = token.as_mut() {
     token.scope_label = sqlx::query_scalar(
@@ -505,7 +506,15 @@ pub async fn user_access(
   }
   let mut grants = repository::for_user(state.db.pool(), id).await?;
   let owner_email = match users::repository::agent(state.db.pool(), id).await? {
-    Some(owner_id) => cap_by_owner(&mut conn, owner_id.as_deref(), &mut grants).await?,
+    Some(owner_id) => {
+      cap_by_owner(
+        &mut conn,
+        &state.config.features,
+        owner_id.as_deref(),
+        &mut grants,
+      )
+      .await?
+    }
     None => None,
   };
   drop(conn);
@@ -529,11 +538,12 @@ pub async fn user_access(
 /// calls the API.
 async fn cap_by_owner(
   conn: &mut sqlx::SqliteConnection,
+  features: &crate::services::features::Features,
   owner_id: Option<&str>,
   grants: &mut [GrantResponse],
 ) -> Result<Option<String>, HttpError> {
   let owner = match owner_id {
-    Some(owner_id) => match authx::load_access(conn, owner_id).await? {
+    Some(owner_id) => match authx::load_access(conn, owner_id, features).await? {
       Some(access) => Some(authx::account_data_access(conn, owner_id, &access).await?),
       None => None,
     },

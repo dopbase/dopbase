@@ -123,13 +123,12 @@ impl FromRequestParts<AppState> for AuthIdentity {
                 .bind(now.to_rfc3339()).bind(next_idle.to_rfc3339()).bind(&session.session_id)
                 .execute(state.db.pool()).await.map_err(HttpError::from)?;
       let mut conn = state.db.pool().acquire().await.map_err(HttpError::from)?;
-      let access = authx::load_access(&mut conn, &session.admin_id)
+      let access = authx::load_access(&mut conn, &session.admin_id, &state.config.features)
         .await
         .map_err(HttpError::from)?
         .ok_or_else(|| {
           HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.")
         })?;
-      let access = access.restrict(&state.config.features);
       if access.sign_in == authx::SignIn::TokenOnly {
         return Err(HttpError::unauthorized(
           AUTHENTICATION_INVALID,
@@ -160,13 +159,12 @@ impl FromRequestParts<AppState> for AuthIdentity {
     if let Some(token) = personal {
       let mut conn = state.db.pool().acquire().await.map_err(HttpError::from)?;
       let disabled = || HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.");
-      let access = authx::load_access(&mut conn, &token.admin_id)
+      let access = authx::load_access(&mut conn, &token.admin_id, &state.config.features)
         .await
         .map_err(HttpError::from)?
         .ok_or_else(disabled)?;
-      let access = access.restrict(&state.config.features);
       if let Some(owner_id) = &token.owner_id
-        && authx::load_access(&mut conn, owner_id)
+        && authx::load_access(&mut conn, owner_id, &state.config.features)
           .await
           .map_err(HttpError::from)?
           .is_none()

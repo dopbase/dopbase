@@ -101,7 +101,7 @@ pub async fn login(
   let role = AdminRole::parse(&role_value).ok_or_else(HttpError::internal)?;
   // The password was right, so saying why it is refused leaks nothing.
   let mut conn = state.db.pool().acquire().await?;
-  let access = authx::load_access(&mut conn, &admin_id)
+  let access = authx::load_access(&mut conn, &admin_id, &state.config.features)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled."))?;
   drop(conn);

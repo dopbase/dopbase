@@ -340,10 +340,25 @@ async fn without_rbac_groups_stay_but_nobody_changes_them() {
     let (status, response) = send(&off, method, path, root.browser(), body).await;
     feature_disabled(status, &response, "DOPBASE_RBAC=true");
   }
-  // The group is still there, and back on it changes again.
-  let (status, body) = send(&off, "GET", "/api/v1/groups", root.browser(), None).await;
-  assert_eq!(status, 200, "{body}");
-  assert_eq!(body["data"][0]["name"], "Backend", "{body}");
+  // The group is still there, and back on it changes again. A role that
+  // sees groups through groups.manage alone still lists them.
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/roles",
+    root.browser(),
+    Some(json!({"name":"Group keeper","capabilities":["groups.manage"],"maxLevel":"read"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let keeper_role = body["data"]["id"].as_str().unwrap().to_owned();
+  let keeper =
+    super::audit_scope::with_role(&router, &root, "keeper@example.com", &keeper_role).await;
+  for by in [&root, &keeper] {
+    let (status, body) = send(&off, "GET", "/api/v1/groups", by.browser(), None).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["data"][0]["name"], "Backend", "{body}");
+  }
   let (status, body) = send(&router, "PUT", &member_path, root.browser(), None).await;
   assert_eq!(status, 200, "{body}");
 }
