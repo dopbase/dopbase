@@ -50,7 +50,10 @@ async fn login_token_saves_encrypted_credentials_and_logout_removes_them() {
   for _ in 0..2 {
     let mut cmd = command(directory.path());
     cmd.args(["--json", "logout"]);
-    assert_eq!(success(&output(cmd, None).await)["authentication"], "none");
+    let logged_out = success(&output(cmd, None).await);
+    assert_eq!(logged_out["authentication"], "none");
+    // A runner token has no session to end; it is revoked in the Admin UI.
+    assert_eq!(logged_out["server_session"], "not_applicable");
     assert!(!directory.path().join("session").exists());
     assert!(!directory.path().join("session-key").exists());
   }
@@ -344,7 +347,7 @@ async fn login_and_logout_stop_while_dopbase_token_is_set() {
   );
 
   // Running the suggested command, token still set in the shell, removes
-  // the saved runner token.
+  // the saved runner token and says how to revoke it.
   let mut shell = std::process::Command::new("sh");
   for name in app::constants::config::executable_environment_names() {
     shell.env_remove(name);
@@ -365,6 +368,11 @@ async fn login_and_logout_stop_while_dopbase_token_is_set() {
   let result = output(shell, None).await;
   success_exit(&result);
   assert!(String::from_utf8_lossy(&result.stdout).contains("Logged out from"));
+  assert!(
+    String::from_utf8_lossy(&result.stderr).contains("Revoke it with dopbase token revoke"),
+    "{}",
+    String::from_utf8_lossy(&result.stderr)
+  );
   assert!(!session_path.exists() && !key_path.exists());
 
   // With nothing saved there is no hint about removing a saved login.
@@ -380,5 +388,155 @@ fn success_exit(result: &std::process::Output) {
     result.status.success(),
     "CLI failed: {}",
     String::from_utf8_lossy(&result.stderr)
+  );
+}
+
+async fn session_status(
+  url: &str,
+  token: &str,
+) -> reqwest::StatusCode {
+  reqwest::Client::new()
+    .get(format!("{url}/api/v1/auth/session"))
+    .bearer_auth(token)
+    .send()
+    .await
+    .unwrap()
+    .status()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn logout_ends_the_cli_session_on_the_server() {
+  use super::support::Fixture;
+  let fixture = Fixture::new().await;
+  assert_eq!(
+    session_status(&fixture.url, &fixture.token).await,
+    reqwest::StatusCode::OK
+  );
+  let result = fixture.run(&["logout"]).await;
+  success_exit(&result);
+  assert!(
+    String::from_utf8_lossy(&result.stdout).contains("and ended the session on the server"),
+    "{}",
+    String::from_utf8_lossy(&result.stdout)
+  );
+  assert_eq!(
+    session_status(&fixture.url, &fixture.token).await,
+    reqwest::StatusCode::UNAUTHORIZED
+  );
+  assert!(!fixture.client_dir.join("session").exists());
+  assert!(!fixture.client_dir.join("session-key").exists());
+  let audited: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action = 'logout.succeeded'")
+      .fetch_one(fixture.state.db.pool())
+      .await
+      .unwrap();
+  assert_eq!(audited, 1);
+
+  // Nothing saved any more, so there is nothing to end.
+  assert_eq!(
+    fixture.json(&["logout"]).await["server_session"],
+    "not_applicable"
+  );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn logout_reports_a_session_the_server_already_ended() {
+  use super::support::Fixture;
+  let fixture = Fixture::new().await;
+  reqwest::Client::new()
+    .post(format!("{}/api/v1/auth/logout", fixture.url))
+    .bearer_auth(&fixture.token)
+    .send()
+    .await
+    .unwrap()
+    .error_for_status()
+    .unwrap();
+  let data = fixture.json(&["logout"]).await;
+  assert_eq!(data["server_session"], "already_ended");
+  assert_eq!(data["authentication"], "none");
+  assert!(!fixture.client_dir.join("session").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn logout_deletes_the_files_when_the_server_cannot_confirm() {
+  // A port nothing listens on.
+  let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let url = format!("http://{}", listener.local_addr().unwrap());
+  drop(listener);
+  let directory = TempDir::new().unwrap();
+  let resolved = ResolvedServer {
+    url: url.clone(),
+    source: ServerSource::Argument,
+    config_path: directory.path().join("config.toml"),
+    config: ClientConfig::default(),
+  };
+  let cli_session = "dbc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+  session::save(&resolved, cli_session, Some("admin@example.com")).unwrap();
+  let mut cmd = command(directory.path());
+  cmd.args(["--server", &url, "logout"]);
+  let result = output(cmd, None).await;
+  success_exit(&result);
+  let stderr = String::from_utf8_lossy(&result.stderr);
+  assert!(
+    stderr.contains("Couldn't end the session on the server")
+      && stderr.contains("It stays valid there until it expires"),
+    "{stderr}"
+  );
+  assert!(String::from_utf8_lossy(&result.stdout).contains("Logged out from"));
+  assert!(!session::is_saved(&resolved).unwrap());
+
+  session::save(&resolved, cli_session, None).unwrap();
+  let mut cmd = command(directory.path());
+  cmd.args(["--json", "--server", &url, "logout"]);
+  assert_eq!(
+    success(&output(cmd, None).await)["server_session"],
+    "not_reached"
+  );
+
+  // A damaged session can't be ended, but logout still clears it.
+  std::fs::write(directory.path().join("session"), b"damaged").unwrap();
+  let mut cmd = command(directory.path());
+  cmd.args(["--server", &url, "logout"]);
+  let result = output(cmd, None).await;
+  success_exit(&result);
+  assert!(String::from_utf8_lossy(&result.stderr).contains("the saved login could not be read"));
+  assert!(!session::is_saved(&resolved).unwrap());
+
+  // JSON tells a damaged login apart from a server that didn't answer.
+  std::fs::write(directory.path().join("session"), b"damaged").unwrap();
+  let mut cmd = command(directory.path());
+  cmd.args(["--json", "--server", &url, "logout"]);
+  assert_eq!(
+    success(&output(cmd, None).await)["server_session"],
+    "unreadable"
+  );
+  assert!(!session::is_saved(&resolved).unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn logout_ends_a_saved_login_on_the_server_that_issued_it() {
+  use super::support::Fixture;
+  let fixture = Fixture::new().await;
+  // Another server, which must never receive the saved token.
+  let other = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  other.set_nonblocking(true).unwrap();
+  let other_url = format!("http://{}", other.local_addr().unwrap());
+
+  let mut cmd = command(&fixture.client_dir);
+  cmd.args(["--json", "--server", &other_url, "logout"]);
+  let data = success(&output(cmd, None).await);
+  assert_eq!(data["server_session"], "revoked");
+  assert_eq!(data["server_url"], other_url);
+  assert_eq!(data["session_server_url"], fixture.url);
+  assert_eq!(
+    session_status(&fixture.url, &fixture.token).await,
+    reqwest::StatusCode::UNAUTHORIZED
+  );
+  assert!(!fixture.client_dir.join("session").exists());
+  assert_eq!(
+    other.accept().unwrap_err().kind(),
+    std::io::ErrorKind::WouldBlock,
+    "the other server received a request"
   );
 }

@@ -35,7 +35,20 @@ pub struct StoredSession {
   pub email: Option<String>,
 }
 
+/// A saved login and the server that issued it.
+pub struct SavedLogin {
+  pub server_url: String,
+  pub session: StoredSession,
+}
+
+/// The saved login for `server`. A login saved for another server is not
+/// returned, so its token is never sent anywhere else.
 pub fn load(server: &ResolvedServer) -> Result<Option<StoredSession>> {
+  Ok(load_any(server)?.and_then(|saved| (saved.server_url == server.url).then_some(saved.session)))
+}
+
+/// The saved login in this data directory, whichever server issued it.
+pub fn load_any(server: &ResolvedServer) -> Result<Option<SavedLogin>> {
   let (session_path, key_path) = paths(server)?;
   if !session_path.exists() {
     return Ok(None);
@@ -79,9 +92,12 @@ pub fn load(server: &ResolvedServer) -> Result<Option<StoredSession>> {
   if payload.token.is_empty() {
     bail!("saved Dopbase session is invalid. Run dopbase logout and dopbase login");
   }
-  Ok((payload.server_url == server.url).then_some(StoredSession {
-    token: payload.token,
-    email: payload.email,
+  Ok(Some(SavedLogin {
+    server_url: payload.server_url,
+    session: StoredSession {
+      token: payload.token,
+      email: payload.email,
+    },
   }))
 }
 

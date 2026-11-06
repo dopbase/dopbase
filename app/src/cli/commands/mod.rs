@@ -78,7 +78,7 @@ pub async fn execute(cli: Cli) -> Result<i32> {
         server: server_argument.as_deref(),
         data_dir: data_dir.as_deref(),
       };
-      auth::logout(&server, flags, json_output)
+      auth::logout(&server, flags, json_output).await
     }
     Command::Admin { command } => {
       if server_argument.is_some() {
