@@ -28,7 +28,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase client connect <server-url>`  | Validate and save another server    |
 | `dopbase client connect local`         | Return to the implicit local server |
 | `dopbase login`                        | Sign in or save a runner token      |
-| `dopbase logout`                       | Remove the active saved credential  |
+| `dopbase logout`                       | End and remove the saved login      |
 | `dopbase client status`                | Show safe effective client settings |
 | `dopbase status`                       | Alias for `dopbase client status`   |
 | `dopbase access`                       | Show what you or a token can reach  |
@@ -142,6 +142,26 @@ CI systems and deployment platforms should inject `DOPBASE_TOKEN` from their
 secret store. Authentication uses `DOPBASE_TOKEN`, then the encrypted credential
 saved by `login`. A saved credential is used only when it matches the resolved
 server. An invalid environment credential never falls back to the saved one.
+
+`dopbase login` and `dopbase logout` stop with exit code 1 while
+`DOPBASE_TOKEN` is set. The token takes priority over a saved login, so a new
+login would be ignored and a logout would leave you signed in. Unset the
+variable first. To remove a saved login while keeping the variable for other
+commands, run `env -u DOPBASE_TOKEN dopbase logout`. The error message prints
+that command with any `--data-dir` or `--server` you passed, so you can copy
+it as is.
+
+`dopbase logout` ends a saved login on the server before it deletes the local
+files, so a copy of the session token stops working. If the server can't be
+reached, the files are still deleted and a warning says the session stays
+valid until it expires. A saved runner token is only removed from this machine;
+revoke it with `dopbase token revoke` or in the Admin UI. With `--json`,
+`server_session` is `revoked`, `already_ended`, `not_reached` (the server
+didn't answer), `unreadable` (the saved login was damaged) or
+`not_applicable`. When `--server` or
+`DOPBASE_URL` points somewhere other than the server that issued the saved
+login, logout ends it on the issuing server and never sends its token to the
+other one. The JSON then also has `session_server_url`.
 
 `dopbase client status` displays the config path, resolved server and its source,
 authentication source, locally identified credential type, login email, and
