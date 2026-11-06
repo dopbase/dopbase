@@ -849,13 +849,18 @@ pub async fn set_status(
     ("active", "user.enabled")
   };
   // Enabling a person takes a spot under the people limit; AI agents and
-  // disabling never do.
-  let limit = if disable || account.agent || account.status != "disabled" {
+  // disabling never do. The write always carries the limit, since the
+  // status read above may already be out of date.
+  let limit = if disable || account.agent {
     None
   } else {
     state.config.features.user_limit()
   };
-  require_room(state, limit).await?;
+  // Asking for the status the account already has changes nothing, so only
+  // a disabled account is refused early.
+  if account.status == "disabled" {
+    require_room(state, limit).await?;
+  }
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
   let changed = repository::set_status(&mut tx, id, value, limit, &now).await?;
