@@ -173,6 +173,8 @@ describe("auth store", () => {
       sessionKind: "browser",
       recentAuthentication: false,
       role: "admin",
+      // No people limit unless the server sends one.
+      maxUsers: null,
       lastLoginAt: null,
     });
   });
@@ -240,11 +242,13 @@ describe("auth store features", () => {
     vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
       ...browserSessionInfo(),
       features: ["sso"],
+      maxUsers: 5,
     });
     const store = useAuthStore();
     await store.fetchSession();
     expect(store.session?.features).toEqual(["sso"]);
     expect(store.hasFeature("rbac.roles")).toBe(false);
+    expect(store.session?.maxUsers).toBe(5);
   });
 });
 

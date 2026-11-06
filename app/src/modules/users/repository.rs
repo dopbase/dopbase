@@ -70,25 +70,53 @@ pub async fn memberships(pool: &SqlitePool) -> Result<Vec<(String, GroupRef)>, s
   )
 }
 
-/// Sets `status` and returns false when the account already had it. Root
-/// is never disabled.
+/// Active people, the accounts a people limit counts: not root, and not AI
+/// agents.
+const ACTIVE_PEOPLE: &str = "SELECT COUNT(*) FROM admins p LEFT JOIN roles pr ON pr.id = p.role_id WHERE p.is_root = 0 AND p.status = 'active' AND COALESCE(pr.sign_in = 'token_only', 0) = 0";
+
+pub async fn active_people(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+  sqlx::query_scalar(ACTIVE_PEOPLE).fetch_one(pool).await
+}
+
+/// Sets `status` and returns false when the account already had it, or
+/// when `limit` is set and that many people are already active. Root is
+/// never disabled.
 pub async fn set_status(
   conn: &mut SqliteConnection,
   id: &str,
   status: &str,
+  limit: Option<u32>,
   now: &str,
 ) -> Result<bool, sqlx::Error> {
+  // The count sits in the same statement as the write, so two requests at
+  // once can't both take the last spot.
+  let query = format!(
+    "UPDATE admins SET status=?,updated_at=? WHERE id=? AND is_root=0 AND status<>? AND (? IS NULL OR ({ACTIVE_PEOPLE}) < ?)"
+  );
   Ok(
-    sqlx::query("UPDATE admins SET status=?,updated_at=? WHERE id=? AND is_root=0 AND status<>?")
+    sqlx::query(&query)
       .bind(status)
       .bind(now)
       .bind(id)
       .bind(status)
+      .bind(limit)
+      .bind(limit)
       .execute(conn)
       .await?
       .rows_affected()
       == 1,
   )
+}
+
+/// `active` or `disabled`, or `None` when the account doesn't exist.
+pub async fn status(
+  conn: &mut SqliteConnection,
+  id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+  sqlx::query_scalar("SELECT status FROM admins WHERE id=?")
+    .bind(id)
+    .fetch_optional(conn)
+    .await
 }
 
 /// What changing an account needs to know about it.
@@ -153,28 +181,41 @@ pub struct NewUser<'a> {
   pub owner_id: Option<&'a str>,
   pub created_by: &'a str,
   pub now: &'a str,
+  /// The people limit to respect, for a person. `None` for AI agents and
+  /// when there is no limit.
+  pub limit: Option<u32>,
 }
 
-/// Fails with a unique violation when the email is taken.
+/// Returns false, adding nobody, when `user.limit` is set and that many
+/// people are already active. Fails with a unique violation when the email
+/// is taken.
 pub async fn insert(
   conn: &mut SqliteConnection,
   user: NewUser<'_>,
-) -> Result<(), sqlx::Error> {
-  sqlx::query(
-    "INSERT INTO admins(id,email,password_hash,role,role_id,owner_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+) -> Result<bool, sqlx::Error> {
+  // The count sits in the same statement as the write, so two requests at
+  // once can't both take the last spot.
+  let query = format!(
+    "INSERT INTO admins(id,email,password_hash,role,role_id,owner_id,created_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ? IS NULL OR ({ACTIVE_PEOPLE}) < ?"
+  );
+  Ok(
+    sqlx::query(&query)
+      .bind(user.id)
+      .bind(user.email)
+      .bind(user.password_hash)
+      .bind(user.role)
+      .bind(user.role_id)
+      .bind(user.owner_id)
+      .bind(user.created_by)
+      .bind(user.now)
+      .bind(user.now)
+      .bind(user.limit)
+      .bind(user.limit)
+      .execute(conn)
+      .await?
+      .rows_affected()
+      == 1,
   )
-  .bind(user.id)
-  .bind(user.email)
-  .bind(user.password_hash)
-  .bind(user.role)
-  .bind(user.role_id)
-  .bind(user.owner_id)
-  .bind(user.created_by)
-  .bind(user.now)
-  .bind(user.now)
-  .execute(conn)
-  .await?;
-  Ok(())
 }
 
 /// Leaves the password unchanged when `password_hash` is `None`, and the

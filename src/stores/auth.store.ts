@@ -23,6 +23,8 @@ export interface AdminSession {
   capabilities?: Capability[];
   /** Features the server has on. Unknown (undefined) until fetched. */
   features?: Feature[];
+  /** The most active people allowed, root and AI agents not counted. */
+  maxUsers?: number | null;
   maxLevel?: Level;
   tokenScope?: "none" | "data" | "audit";
   lastLoginAt?: string | null;
@@ -229,6 +231,7 @@ export const useAuthStore = defineStore("auth", () => {
       roleName: response.roleName,
       capabilities: response.capabilities,
       features: response.features,
+      maxUsers: response.maxUsers ?? null,
       maxLevel: response.maxLevel,
       tokenScope: response.tokenScope,
       lastLoginAt: response.lastLoginAt ?? null,

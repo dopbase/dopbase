@@ -8,7 +8,7 @@ import { LockIcon } from "~/assets/icons";
  * NoAccess — shown at the address of a page the viewer's role can't open,
  * so a shared link explains what's missing instead of landing on Projects.
  */
-const { title, description } = useNoAccessController();
+const { title, description, docsUrl } = useNoAccessController();
 </script>
 
 <template>
@@ -20,6 +20,17 @@ const { title, description } = useNoAccessController();
         :title="title"
         :description="description"
         data-testid="no-access">
+        <template v-if="docsUrl" #description>
+          {{ description }}
+          <a
+            :href="docsUrl"
+            target="_blank"
+            rel="noopener"
+            class="text-accent-strong hover:underline"
+            data-testid="no-access-docs"
+            >docs</a
+          >.
+        </template>
         <template #icon>
           <LockIcon class="h-[18px] w-[18px]" />
         </template>

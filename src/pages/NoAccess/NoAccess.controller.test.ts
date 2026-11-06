@@ -86,26 +86,58 @@ describe("useNoAccessController", () => {
     );
   });
 
-  it("says which setting turns a page on when the server has it off", () => {
+  it("points to the docs, not a setting, when the server has a page off", () => {
     route.path = "/sso";
     session.value = { role: "root", features: ["rbac"] };
 
-    const { title, description } = useNoAccessController();
+    const { title, description, docsUrl } = useNoAccessController();
 
     expect(title.value).toBe("Single sign-on is turned off");
     expect(description.value).toBe(
-      "This server doesn't use it. To turn it on, set DOPBASE_SSO=true, then restart Dopbase.",
+      "This feature is disabled on this server. Your server administrator can enable it by following the",
+    );
+    expect(description.value).not.toContain("DOPBASE_");
+    expect(docsUrl.value).toBe(
+      "https://docs.dopbase.com/self-hosting/operations#optional-features",
     );
   });
 
-  it("names both settings custom roles need", () => {
+  it("says groups come with people management", () => {
+    route.path = "/groups";
+    session.value = { role: "root", features: ["sso"] };
+
+    const { description } = useNoAccessController();
+
+    expect(description.value).toBe(
+      "Groups require people management, which is disabled on this server. Your server administrator can enable it by following the",
+    );
+  });
+
+  it("says custom roles need people management too", () => {
     route.path = "/roles";
     session.value = { role: "root", features: ["sso"] };
 
     const { description } = useNoAccessController();
 
-    expect(description.value).toContain(
-      "DOPBASE_RBAC=true and DOPBASE_RBAC_ROLES=true",
+    expect(description.value).toBe(
+      "Custom roles require people management. Your server administrator can enable them by following the",
     );
+  });
+
+  it("blames only custom roles when people management is on", () => {
+    route.path = "/roles";
+    session.value = { role: "root", features: ["rbac"] };
+
+    const { description } = useNoAccessController();
+
+    expect(description.value).toBe(
+      "Custom roles are disabled on this server. Your server administrator can enable them by following the",
+    );
+  });
+
+  it("links no docs when the role is what's missing", () => {
+    const { docsUrl } = useNoAccessController();
+
+    expect(docsUrl.value).toBeNull();
   });
 });

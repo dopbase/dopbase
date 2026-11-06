@@ -35,6 +35,7 @@ import {
   tokenState,
   type TokenState,
 } from "./people";
+import { useUserLimit } from "./user-limit";
 
 export type { TokenState };
 import { useAccountActions } from "./account-actions";
@@ -198,6 +199,18 @@ export function useUserController() {
    * sets a password, and the Danger zone stays.
    */
   const rbac = computed(() => auth.hasFeature("rbac"));
+  const limit = useUserLimit();
+  /**
+   * A disabled person can't be turned back on while the people limit is
+   * full; the server refuses too. AI agents don't count toward it.
+   */
+  const enableBlocked = computed(
+    () =>
+      !!user.value &&
+      user.value.status === "disabled" &&
+      !isAgent(user.value) &&
+      (limit.value?.full ?? false),
+  );
 
   const subtitle = computed(() => {
     const account = user.value;
@@ -422,6 +435,7 @@ export function useUserController() {
     isYou,
     canManage,
     rbac,
+    enableBlocked,
     subtitle,
     created,
     accessSummary,

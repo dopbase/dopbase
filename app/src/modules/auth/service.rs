@@ -258,6 +258,7 @@ pub async fn session(
   {
     let mut response = session_summary(identity)?;
     response.features = state.config.features.list();
+    response.max_users = state.config.features.user_limit();
     response.has_password = common::has_password(
       &repository::password_hash(state.db.pool(), admin_id)
         .await?
@@ -298,6 +299,7 @@ fn session_summary(identity: &AuthIdentity) -> Result<SessionResponse, HttpError
       role_name: access.role_name.clone(),
       capabilities: access.capabilities().collect(),
       features: Vec::new(),
+      max_users: None,
       max_level: access.max_level,
       token_scope: "none".into(),
       session_kind: *kind,

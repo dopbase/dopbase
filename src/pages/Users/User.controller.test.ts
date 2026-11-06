@@ -12,6 +12,7 @@ import * as projectsApi from "~/services/projects.api";
 import * as environmentsApi from "~/services/environments.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
+import { useAuthStore } from "~/stores/auth.store";
 import {
   accessFixture,
   groupDetailFixture,
@@ -196,6 +197,37 @@ describe("useUserController", () => {
       await settle();
 
       expect(c.user.value?.id).toBe("usr_sam");
+    });
+  });
+
+  describe("with a people limit", () => {
+    /** A disabled person, with `active` other people holding spots. */
+    async function openDisabled(active: number) {
+      const person = userFixture({ status: "disabled" });
+      vi.mocked(usersApi.fetchUser).mockResolvedValue(person);
+      vi.mocked(usersApi.fetchUsers).mockResolvedValue([
+        root,
+        reviewBot,
+        person,
+        ...Array.from({ length: active }, (_, index) =>
+          userFixture({ id: `usr_p${index}`, email: `p${index}@example.com` }),
+        ),
+      ]);
+      signInAs(MANAGER, { adminId: "usr_lead" });
+      useAuthStore().session!.maxUsers = 2;
+      const { controller } = mountController(useUserController);
+      await settle();
+      return controller;
+    }
+
+    it("won't turn a person back on while every spot is taken", async () => {
+      const c = await openDisabled(2);
+      expect(c.enableBlocked.value).toBe(true);
+    });
+
+    it("turns them back on while there's room", async () => {
+      const c = await openDisabled(1);
+      expect(c.enableBlocked.value).toBe(false);
     });
   });
 

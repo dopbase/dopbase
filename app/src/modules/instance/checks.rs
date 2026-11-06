@@ -88,6 +88,14 @@ pub async fn run(
     audit_retention(state, now).await,
     now,
   ));
+  if let Some(max) = state.config.features.user_limit() {
+    checks.push(settle(
+      "users.limit",
+      "the people limit",
+      user_limit(pool, max, now).await,
+      now,
+    ));
+  }
   checks.push(public_url(state, now));
   checks.push(https(state, now));
   checks.extend(release.and_then(|release| version(release, now)));
@@ -632,6 +640,54 @@ async fn audit_retention(
       now,
     )
     .value(format!("{days} {}", plural(days as i64, "day", "days"))),
+  })
+}
+
+/// How full the user limit is. A full limit warns, because nobody can be
+/// added or enabled until someone leaves.
+async fn user_limit(
+  pool: &SqlitePool,
+  max: u32,
+  now: DateTime<Utc>,
+) -> Result<Check> {
+  let message = crate::modules::users::service::user_limit_message(max);
+  let used = crate::modules::users::repository::active_people(pool).await?;
+  let max = i64::from(max);
+  let users = plural(max, "active user", "active users");
+  let result = if used > max {
+    check(
+      "users.limit",
+      CheckStatus::Warn,
+      "User limit exceeded",
+      format!(
+        "This instance has {used} active users, above its limit of {max}. Existing users keep access. To add or enable a user, disable or delete enough active users to get below the limit, or ask your instance administrator to increase the limit."
+      ),
+      now,
+    )
+  } else if used == max {
+    check(
+      "users.limit",
+      CheckStatus::Warn,
+      "User limit reached",
+      message,
+      now,
+    )
+  } else {
+    check(
+      "users.limit",
+      CheckStatus::Ok,
+      "Active users within limit",
+      format!(
+        "{used} of {max} {users}. Root, AI agents, and disabled accounts do not count."
+      ),
+      now,
+    )
+  }
+  .value(format!("{used} of {max}"));
+  Ok(if used >= max {
+    result.fix("/users")
+  } else {
+    result
   })
 }
 

@@ -2,7 +2,8 @@
 /**
  * DbEmptyState — centered placeholder for empty lists and workspaces,
  * with an icon area and an actions slot. Pass `art` instead of `icon`
- * for a full illustration.
+ * for a full illustration, and fill the `description` slot when the text
+ * needs a link.
  */
 defineProps<{
   title: string;
@@ -25,8 +26,10 @@ defineProps<{
       class="text-base font-semibold text-ink-strong [overflow-wrap:anywhere]">
       {{ title }}
     </h3>
-    <p v-if="description" class="max-w-md text-sm text-ink-muted">
-      {{ description }}
+    <p
+      v-if="description || $slots.description"
+      class="max-w-md text-sm text-ink-muted">
+      <slot name="description">{{ description }}</slot>
     </p>
     <div v-if="$slots.actions" class="mt-1 flex items-center gap-2">
       <slot name="actions" />

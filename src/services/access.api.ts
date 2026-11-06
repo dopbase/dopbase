@@ -53,13 +53,6 @@ export type Capability =
  */
 export type Feature = "sso" | "rbac" | "rbac.roles";
 
-/** What to set on the server to turn a feature on. */
-export const FEATURE_SETTINGS: Record<Feature, string> = {
-  sso: "DOPBASE_SSO=true",
-  rbac: "DOPBASE_RBAC=true",
-  "rbac.roles": "DOPBASE_RBAC=true and DOPBASE_RBAC_ROLES=true",
-};
-
 export type PrincipalType = "user" | "group";
 /** `audit` is for audit tokens only, never a grant. */
 export type ScopeType = "all" | "project" | "environment" | "audit";

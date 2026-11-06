@@ -63,6 +63,9 @@ pub struct Features {
   pub rbac: bool,
   /// Counts only while `rbac` is on.
   pub rbac_roles: bool,
+  /// The most active people the instance holds, root and AI agents not
+  /// counted. 0 means no limit. Counts only while `rbac` is on.
+  pub max_users: u32,
 }
 
 impl Features {
@@ -72,6 +75,7 @@ impl Features {
       sso: true,
       rbac: true,
       rbac_roles: true,
+      max_users: 0,
     }
   }
 
@@ -97,6 +101,16 @@ impl Features {
   /// True when custom roles are asked for without RBAC, so they stay off.
   pub fn rbac_roles_ignored(&self) -> bool {
     self.rbac_roles && !self.rbac
+  }
+
+  /// The people limit in force, if any.
+  pub fn user_limit(&self) -> Option<u32> {
+    (self.rbac && self.max_users > 0).then_some(self.max_users)
+  }
+
+  /// True when a people limit is set without RBAC, so it does nothing.
+  pub fn max_users_ignored(&self) -> bool {
+    self.max_users > 0 && !self.rbac
   }
 
   /// Whether `capability` belongs to a feature that's off, so no account

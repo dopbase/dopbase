@@ -5,6 +5,7 @@ use super::{
 use crate::{
   constants::errors::AUTHORIZATION_DENIED,
   constants::errors::PASSWORD_REQUIRED,
+  constants::errors::USER_LIMIT_REACHED,
   extractors::{
     require_browser, require_capability_browser, require_mutation, require_recent_browser_auth,
   },
@@ -282,6 +283,35 @@ const ACCOUNT_VIEWERS: [Capability; 4] = [
   Capability::AgentsManage,
 ];
 
+/// What to do once the instance holds as many active users as the limit
+/// allows. The Status check reuses it.
+pub(crate) fn user_limit_message(max: u32) -> String {
+  let users = if max == 1 { "user" } else { "users" };
+  format!(
+    "This instance allows up to {max} active {users}. To add or enable a user, disable or delete an active user, or ask your instance administrator to increase the limit."
+  )
+}
+
+/// Refused when the instance already holds as many active users as the
+/// limit allows.
+fn user_limit_reached(max: u32) -> HttpError {
+  HttpError::conflict(USER_LIMIT_REACHED, &user_limit_message(max))
+}
+
+/// Refuse with a clear error when the people limit is already reached. The
+/// write checks again, so racing requests can't pass it.
+async fn require_room(
+  state: &AppState,
+  limit: Option<u32>,
+) -> Result<(), HttpError> {
+  if let Some(max) = limit
+    && repository::active_people(state.db.pool()).await? >= i64::from(max)
+  {
+    return Err(user_limit_reached(max));
+  }
+  Ok(())
+}
+
 fn user_not_found() -> HttpError {
   HttpError::not_found("USER_NOT_FOUND", "The user was not found.")
 }
@@ -414,6 +444,12 @@ pub async fn create(
   if !agent {
     state.config.features.require(Feature::Rbac)?;
   }
+  // Only people count toward the limit, never AI agents.
+  let limit = if agent {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -454,6 +490,8 @@ pub async fn create(
   let now = Utc::now().to_rfc3339();
   let (actor_id, actor_email) = actor(identity);
   require_assignable(state, identity, &chosen.id).await?;
+  // After validation, so a bad request still hears what's wrong with it.
+  require_room(state, limit).await?;
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,
@@ -467,17 +505,20 @@ pub async fn create(
       owner_id: agent.then_some(actor_id),
       created_by: actor_id,
       now: &now,
+      limit,
     },
   )
   .await;
-  if let Err(error) = inserted {
-    if error.to_string().contains("UNIQUE") {
+  match inserted {
+    Ok(true) => {}
+    Ok(false) => return Err(user_limit_reached(limit.unwrap_or_default())),
+    Err(error) if error.to_string().contains("UNIQUE") => {
       return Err(HttpError::conflict(
         "EMAIL_ALREADY_EXISTS",
         "An account with this email already exists.",
       ));
     }
-    return Err(error.into());
+    Err(error) => return Err(error.into()),
   }
   if let Some(level) = starting_grant(identity, &chosen.id) {
     repository::set_all_projects_grant(&mut tx, &id, Some(level), actor_id, &now).await?;
@@ -808,9 +849,31 @@ pub async fn set_status(
   } else {
     ("active", "user.enabled")
   };
+  // Enabling a person takes a spot under the people limit; AI agents and
+  // disabling never do. The write always carries the limit, since the
+  // status read above may already be out of date.
+  let limit = if disable || account.agent {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
+  // Asking for the status the account already has changes nothing, so only
+  // a disabled account is refused early.
+  if account.status == "disabled" {
+    require_room(state, limit).await?;
+  }
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  if repository::set_status(&mut tx, id, value, &now).await? {
+  let changed = repository::set_status(&mut tx, id, value, limit, &now).await?;
+  // Someone else may have enabled the account in the meantime; otherwise
+  // the limit stopped it.
+  if !changed
+    && let Some(max) = limit
+    && repository::status(&mut tx, id).await?.as_deref() == Some("disabled")
+  {
+    return Err(user_limit_reached(max));
+  }
+  if changed {
     if disable {
       repository::revoke_sessions(&mut tx, id, &now).await?;
       repository::cancel_device_approvals(&mut tx, id, &now).await?;

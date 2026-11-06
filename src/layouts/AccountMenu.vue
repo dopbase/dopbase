@@ -8,6 +8,7 @@ import {
   UserIcon,
 } from "~/assets/icons";
 import { DbSpinner } from "~/components/ui";
+import { DOCS_URL } from "~/utils/docs";
 
 /**
  * AccountMenu — the sidebar footer. Shows the signed-in email and role
@@ -24,8 +25,6 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ logout: [] }>();
-
-const DOCS_URL = "https://docs.dopbase.com";
 
 const menuId = useId();
 const open = ref(false);

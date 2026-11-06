@@ -12,6 +12,7 @@ import {
   DbButton,
   DbConfirmDialog,
   DbFilterMenu,
+  DbInfoTip,
   DbMenu,
   DbMenuItem,
   DbSearchField,
@@ -33,6 +34,8 @@ const {
   ssoEnabled,
   loadError,
   canManagePeople,
+  limit,
+  canAdd,
   filter,
   roleFilter,
   statusFilter,
@@ -59,15 +62,37 @@ const signInClass: Record<SignInMethod, string> = {
         title="Users"
         subtitle="People who sign in to this instance. Bots and CI live under AI agents.">
         <template v-if="canManagePeople" #actions>
+          <span
+            v-if="limit"
+            class="inline-flex items-center gap-1 text-sm text-ink-muted"
+            data-testid="user-limit">
+            <span class="font-mono">{{ limit.used }} of {{ limit.max }}</span>
+            active {{ limit.max === 1 ? "user" : "users" }}
+            <DbInfoTip
+              label="About the user limit"
+              text="Maximum active users allowed on this instance. Root, AI agents, and disabled accounts do not count." />
+          </span>
           <DbButton
             variant="primary"
             data-testid="add-user"
+            :disabled="!canAdd"
             @click="controller.openAdd">
             <PlusIcon class="h-4 w-4" />
             Add user
           </DbButton>
         </template>
       </PageHeader>
+
+      <DbAlert
+        v-if="canManagePeople && limit?.full"
+        tone="warn"
+        title="User limit reached"
+        data-testid="user-limit-full">
+        This instance allows up to {{ limit.max }} active
+        {{ limit.max === 1 ? "user" : "users" }}. To add or enable a user,
+        disable or delete an active user, or ask your instance administrator to
+        increase the limit.
+      </DbAlert>
 
       <div class="flex flex-wrap items-center gap-2">
         <DbSearchField
@@ -214,6 +239,7 @@ const signInClass: Record<SignInMethod, string> = {
                     </DbMenuItem>
                     <DbMenuItem
                       v-if="row.actions.includes('enable')"
+                      :disabled="limit?.full"
                       @select="actions.ask('enable', row.user)">
                       <template #icon><LockIcon class="h-4 w-4" /></template>
                       Turn account back on
