@@ -232,6 +232,8 @@ streams the filtered list as JSON lines.
 
 User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
 last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
+`countsTowardLimit` is true for the accounts the user limit counts, which are
+active people other than root. AI agents never count.
 `GET /api/v1/users/{id}` returns one account. `GET /api/v1/users/identities`
 returns only each account's `id` and `email`, ordered by email, for screens
 that just need to name people. It needs the same `users.view` capability and

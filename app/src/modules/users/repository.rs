@@ -4,7 +4,28 @@ use crate::{
   constants::tokens::GRANT_ID_PREFIX, modules::grants::model::GroupRef, services::token,
 };
 
-const USER_COLUMNS: &str = "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,(SELECT o.email FROM admins o WHERE o.id = a.owner_id) AS owner_email,COALESCE(r.sign_in = 'token_only', 0) AS agent,(a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'agents.view')))) AS can_own,a.status,a.last_sign_in_at";
+/// Whether an account takes a spot under the people limit: an active
+/// person, never root or an AI agent. `$a` aliases `admins` and `$r` its
+/// LEFT JOINed `roles`, so the count and the users list share one rule.
+macro_rules! counts_toward_limit {
+  ($a:literal, $r:literal) => {
+    concat!(
+      "(",
+      $a,
+      ".is_root = 0 AND ",
+      $a,
+      ".status = 'active' AND COALESCE(",
+      $r,
+      ".sign_in = 'token_only', 0) = 0)"
+    )
+  };
+}
+
+const USER_COLUMNS: &str = concat!(
+  "a.id,a.email,a.role,a.role_id,CASE WHEN a.is_root = 1 THEN 'Root' ELSE COALESCE(r.name, '') END AS role_name,a.created_at,a.updated_at,a.password_hash<>'' AS has_password,EXISTS(SELECT 1 FROM admin_identities i WHERE i.admin_id=a.id) AS sso_linked,a.owner_id,(SELECT o.email FROM admins o WHERE o.id = a.owner_id) AS owner_email,COALESCE(r.sign_in = 'token_only', 0) AS agent,(a.status = 'active' AND (a.is_root = 1 OR (r.sign_in = 'interactive' AND EXISTS(SELECT 1 FROM role_capabilities c WHERE c.role_id = a.role_id AND c.capability = 'agents.view')))) AS can_own,a.status,a.last_sign_in_at,",
+  counts_toward_limit!("a", "r"),
+  " AS counts_toward_limit"
+);
 
 #[derive(sqlx::FromRow)]
 pub struct UserRow {
@@ -25,6 +46,8 @@ pub struct UserRow {
   pub can_own: bool,
   pub status: String,
   pub last_sign_in_at: Option<String>,
+  /// Takes a spot under the people limit.
+  pub counts_toward_limit: bool,
 }
 
 /// Root first, then by role rank, each by email.
@@ -72,7 +95,10 @@ pub async fn memberships(pool: &SqlitePool) -> Result<Vec<(String, GroupRef)>, s
 
 /// Active people, the accounts a people limit counts: not root, and not AI
 /// agents.
-const ACTIVE_PEOPLE: &str = "SELECT COUNT(*) FROM admins p LEFT JOIN roles pr ON pr.id = p.role_id WHERE p.is_root = 0 AND p.status = 'active' AND COALESCE(pr.sign_in = 'token_only', 0) = 0";
+const ACTIVE_PEOPLE: &str = concat!(
+  "SELECT COUNT(*) FROM admins p LEFT JOIN roles pr ON pr.id = p.role_id WHERE ",
+  counts_toward_limit!("p", "pr")
+);
 
 pub async fn active_people(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
   sqlx::query_scalar(ACTIVE_PEOPLE).fetch_one(pool).await

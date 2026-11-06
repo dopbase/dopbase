@@ -350,6 +350,7 @@ fn user(
     sso_linked: row.sso_linked,
     owner_id: row.owner_id,
     owner_email: row.owner_email,
+    counts_toward_limit: row.counts_toward_limit,
   })
 }
 

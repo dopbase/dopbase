@@ -152,6 +152,35 @@ async fn the_people_limit_counts_active_people_only() {
   .await;
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["status"], "disabled");
+  // The users list marks the same accounts the limit counts, so the
+  // console doesn't have to guess.
+  let (status, body) = send(&two, "GET", "/api/v1/users", root.browser(), None).await;
+  assert_eq!(status, 200, "{body}");
+  let counted: std::collections::BTreeMap<&str, bool> = body["data"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|user| {
+      let name = if user["role"] == "root" {
+        "root"
+      } else {
+        user["email"].as_str().unwrap()
+      };
+      (name, user["countsTowardLimit"].as_bool().unwrap())
+    })
+    .collect();
+  assert_eq!(
+    counted,
+    std::collections::BTreeMap::from([
+      ("auditor@example.com", true),
+      ("backup-bot", false),
+      ("deploy-bot", false),
+      ("member@example.com", false),
+      ("newcomer@example.com", true),
+      ("root", false),
+    ]),
+    "{body}"
+  );
   let (status, body) = send(
     &two,
     "DELETE",
