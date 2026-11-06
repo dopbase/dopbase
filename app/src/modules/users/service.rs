@@ -556,9 +556,10 @@ pub async fn update(
   } else if !is_root {
     require_within(state, identity, id).await?;
   }
-  // Without RBAC people keep their account as it is; their own sign-in
-  // details and AI agents still change.
-  if !agent && id != actor_id {
+  // Without RBAC people keep their email and role. Their own details, a new
+  // password someone sets for them, and AI agents still change, so nobody
+  // is locked out for good.
+  if !agent && id != actor_id && (changes_role || request.email.is_some()) {
     state.config.features.require(Feature::Rbac)?;
   }
   let new_role = if changes_role {

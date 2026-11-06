@@ -41,6 +41,7 @@ const {
   roleId,
   roleChoices,
   canChooseSso,
+  passwordOnly,
   note,
   saving,
   formError,
@@ -52,9 +53,12 @@ const signInOptions = [
   { value: "sso", label: "Single sign-on" },
 ] as const;
 
-const title = computed(() =>
-  props.editing ? `Edit ${props.editing.email}` : "Add user",
-);
+const title = computed(() => {
+  if (!props.editing) return "Add user";
+  return passwordOnly.value
+    ? `Set a password for ${props.editing.email}`
+    : `Edit ${props.editing.email}`;
+});
 
 async function save(): Promise<void> {
   const saved = await dialog.submit();
@@ -71,6 +75,7 @@ async function save(): Promise<void> {
       data-testid="user-dialog"
       @submit.prevent="save">
       <DbInput
+        v-if="!passwordOnly"
         v-model="email"
         label="Email"
         name="email"
@@ -97,15 +102,21 @@ async function save(): Promise<void> {
         autocomplete="new-password"
         :error="errors.password"
         :hint="
-          editing
-            ? 'Leave empty to keep their password. Setting one signs them out everywhere.'
-            : 'Share it securely. They can change it on their account page.'
+          passwordOnly
+            ? 'Setting one signs them out everywhere. Share it securely.'
+            : editing
+              ? 'Leave empty to keep their password. Setting one signs them out everywhere.'
+              : 'Share it securely. They can change it on their account page.'
         " />
       <p v-else class="text-[13px] text-ink-muted">
         They sign in through your identity provider and have no password here.
       </p>
 
-      <div class="flex flex-col gap-1.5" role="radiogroup" aria-label="Role">
+      <div
+        v-if="!passwordOnly"
+        class="flex flex-col gap-1.5"
+        role="radiogroup"
+        aria-label="Role">
         <p class="text-sm font-medium text-ink-muted">Role</p>
         <DbRadioCard
           v-for="choice in roleChoices"
@@ -133,7 +144,7 @@ async function save(): Promise<void> {
         form="user-dialog"
         :loading="saving"
         data-testid="user-dialog-submit">
-        {{ editing ? "Save" : "Add user" }}
+        {{ passwordOnly ? "Set password" : editing ? "Save" : "Add user" }}
       </DbButton>
     </template>
   </DbModal>

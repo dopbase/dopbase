@@ -186,7 +186,9 @@ const signInClass: Record<SignInMethod, string> = {
                       v-if="row.canEdit"
                       @select="controller.openEdit(row.user)">
                       <template #icon><PencilIcon class="h-4 w-4" /></template>
-                      Edit role and email
+                      {{
+                        canManagePeople ? "Edit role and email" : "Set password"
+                      }}
                     </DbMenuItem>
                     <DbMenuItem
                       @select="

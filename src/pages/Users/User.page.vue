@@ -44,7 +44,6 @@ const {
   isRoot,
   isYou,
   canManage,
-  canEdit,
   rbac,
   subtitle,
   created,
@@ -98,10 +97,10 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
               Disabled
             </DbBadge>
           </template>
-          <template v-if="canEdit" #actions>
+          <template v-if="canManage" #actions>
             <DbButton data-testid="edit-user" @click="editOpen = true">
               <PencilIcon class="h-4 w-4" />
-              Edit
+              {{ rbac ? "Edit" : "Set password" }}
             </DbButton>
           </template>
         </PageHeader>

@@ -531,6 +531,26 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
   assert!(!capabilities.contains(&json!("groups.manage")), "{session}");
   assert!(capabilities.contains(&json!("users.manage")), "{session}");
 
+  // An admin still sets someone a new password, so nobody is locked out.
+  let (status, body) = send(
+    &off,
+    "PATCH",
+    &format!("/api/v1/users/{}", member.id),
+    admin.browser(),
+    Some(json!({"password":"battery-staple-456"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, _, _) = call(
+    &off,
+    "POST",
+    "/api/v1/auth/login",
+    None,
+    Some(json!({"email":"member@example.com","password":"battery-staple-456","sessionKind":"cli"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+
   // AI agents and offboarding keep working.
   let (status, body) = send(
     &off,

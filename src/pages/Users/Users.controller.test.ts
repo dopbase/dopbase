@@ -371,7 +371,7 @@ describe("useUsersController", () => {
   });
 
   describe("without RBAC", () => {
-    it("adds and edits nobody, but keeps offboarding", async () => {
+    it("adds nobody, but keeps passwords and offboarding", async () => {
       signInAs(["users.view", "users.manage"]);
       useAuthStore().session!.features = ["sso"];
       const { controller: c } = mountController(useUsersController);
@@ -379,7 +379,8 @@ describe("useUsersController", () => {
       expect(c.canManage.value).toBe(true);
       expect(c.canManagePeople.value).toBe(false);
       const row = rowFor(c, "usr_maya");
-      expect(row.canEdit).toBe(false);
+      // Edit only sets a password while RBAC is off.
+      expect(row.canEdit).toBe(true);
       expect(row.actions).toEqual(["disable", "delete"]);
     });
   });

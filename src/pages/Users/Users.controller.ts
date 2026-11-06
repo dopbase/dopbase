@@ -70,8 +70,9 @@ export function useUsersController() {
 
   const canManage = computed(() => auth.can("users.manage"));
   /**
-   * Adding and editing people needs RBAC on the server. Without it, admins
-   * still disable, enable, delete and unlink accounts.
+   * Adding people and changing their email or role needs RBAC on the
+   * server. Without it, admins still set passwords, disable, enable, delete
+   * and unlink accounts.
    */
   const canManagePeople = computed(
     () => canManage.value && auth.hasFeature("rbac"),
@@ -109,7 +110,7 @@ export function useUsersController() {
           ? formatRelativeTime(user.lastSignInAt)
           : "Never",
         actions,
-        canEdit: !fixed && canManagePeople.value,
+        canEdit: !fixed,
       };
     }),
   );

@@ -90,11 +90,11 @@ disabled feature takes away, for root too: `sso.manage` without `sso`,
 A request for a feature that's off is refused with `403` `FEATURE_DISABLED`.
 The message names the setting that turns it on.
 
-| Feature      | Refused while it's off                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sso`        | Every `/api/v1/sso/*` and `/api/v1/auth/sso/*` route. `GET /api/v1/auth/methods` returns `"sso": null` and `"passwordForm": true`.                                    |
-| `rbac`       | Creating or changing a person, group changes, and giving or removing access for a person or group. AI agents and disabling, enabling or deleting accounts still work. |
-| `rbac.roles` | Creating, changing or deleting a custom role, and giving one to an account.                                                                                           |
+| Feature      | Refused while it's off                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sso`        | Every `/api/v1/sso/*` and `/api/v1/auth/sso/*` route. `GET /api/v1/auth/methods` returns `"sso": null` and `"passwordForm": true`.                                                                                        |
+| `rbac`       | Creating a person, changing someone else's email or role, group changes, and giving or removing access for a person or group. AI agents, setting a new password, and disabling, enabling or deleting accounts still work. |
+| `rbac.roles` | Creating, changing or deleting a custom role, and giving one to an account.                                                                                                                                               |
 
 ## Import authentication
 

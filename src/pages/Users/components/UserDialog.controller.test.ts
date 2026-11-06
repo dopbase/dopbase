@@ -361,6 +361,32 @@ describe("useUserDialog", () => {
     });
   });
 
+  describe("with RBAC off", () => {
+    it("only sets a new password, leaving email and role alone", async () => {
+      useAuthStore().session = {
+        adminId: "usr_lead",
+        email: "lead@example.com",
+        sessionKind: "browser",
+        recentAuthentication: true,
+        role: "admin",
+        capabilities: ["users.manage"],
+        features: ["sso"],
+      };
+      const { dialog } = await openDialog({ editing: maya });
+      expect(dialog.passwordOnly.value).toBe(true);
+      expect(dialog.note.value).toBe("");
+      dialog.email.value = "renamed@example.com";
+      dialog.roleId.value = "rol_admin";
+      expect(await dialog.submit()).toBeNull();
+      expect(dialog.errors.value.password).toBe("Enter a new password.");
+      dialog.password.value = PASSWORD;
+      expect(await dialog.submit()).not.toBeNull();
+      expect(usersApi.updateUser).toHaveBeenCalledWith(maya.id, {
+        password: PASSWORD,
+      });
+    });
+  });
+
   describe("with custom roles off", () => {
     it("offers only built-in roles, and keeps the custom one a person holds", async () => {
       useAuthStore().session = {

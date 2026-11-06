@@ -307,7 +307,6 @@ pub async fn set_owner(
   Ok(())
 }
 
-/// A role's id and whether its holders sign in with tokens only.
 /// Whether a role signs in with tokens only, and whether it is built in.
 pub async fn role_sign_in(
   pool: &SqlitePool,

@@ -64,9 +64,9 @@ set to "required" no longer blocks passwords. Accounts that have no password
 can't sign in until it's back on. Root can always use its password.
 
 With `rbac` off, everyone keeps their role and their access, but nobody adds
-people, edits them, changes groups, or gives people and groups access. AI
-agents work as usual, and admins can still disable, enable, and delete
-accounts.
+people, changes their email or role, changes groups, or gives people and
+groups access. AI agents work as usual. Admins can still set someone a new
+password, and disable, enable, and delete accounts.
 
 With `rbac_roles` off, nobody creates, edits, or deletes custom roles, or gives
 one to anyone. People who already hold a custom role keep it. Setting
