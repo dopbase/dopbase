@@ -234,6 +234,19 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
   )
   .await;
   feature_disabled(status, &body, "DOPBASE_RBAC_ROLES=true");
+  // Someone who may not add people hears that first, not how the server is
+  // set up.
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = send(
+    &off,
+    "POST",
+    "/api/v1/users",
+    member.browser(),
+    Some(json!({"email":"third@example.com","password":"correct-horse-123","roleId":viewer})),
+  )
+  .await;
+  assert_eq!(status, 403, "{body}");
+  assert!(body["error"]["AUTHORIZATION_DENIED"].is_string(), "{body}");
   let (status, body) = send(
     &off,
     "POST",

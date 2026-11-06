@@ -423,11 +423,6 @@ pub async fn create(
   require_recent_browser_auth(identity)?;
   require_any_browser(identity, &[Capability::UsersManage, Capability::AgentsView])?;
   let chosen = choose_role(state, request.role, request.role_id.as_deref()).await?;
-  // People who already hold a custom role keep it, but nobody new gets one
-  // while custom roles are off.
-  if !chosen.builtin {
-    state.config.features.require(Feature::RbacRoles)?;
-  }
   let agent = chosen.token_only;
   // Whoever creates an AI agent owns it, so it takes agents.view, which an
   // owner needs to run it; agents.manage alone doesn't. People are added
@@ -440,9 +435,16 @@ pub async fn create(
       Capability::UsersManage
     },
   )?;
+  // The feature checks come after the caller's own, so someone who may not
+  // add this account hears nothing about how the server is set up.
   // Without RBAC nobody adds people; AI agents still work.
   if !agent {
     state.config.features.require(Feature::Rbac)?;
+  }
+  // People who already hold a custom role keep it, but nobody new gets one
+  // while custom roles are off.
+  if !chosen.builtin {
+    state.config.features.require(Feature::RbacRoles)?;
   }
   // Only people count toward the limit, never AI agents.
   let limit = if agent {
