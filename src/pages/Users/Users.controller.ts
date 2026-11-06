@@ -69,6 +69,13 @@ export function useUsersController() {
   const statusFilter = ref<string | null>(null);
 
   const canManage = computed(() => auth.can("users.manage"));
+  /**
+   * Adding and editing people needs RBAC on the server. Without it, admins
+   * still disable, enable, delete and unlink accounts.
+   */
+  const canManagePeople = computed(
+    () => canManage.value && auth.hasFeature("rbac"),
+  );
 
   /** Tries again after a failed load. */
   async function load(): Promise<void> {
@@ -102,7 +109,7 @@ export function useUsersController() {
           ? formatRelativeTime(user.lastSignInAt)
           : "Never",
         actions,
-        canEdit: !fixed,
+        canEdit: !fixed && canManagePeople.value,
       };
     }),
   );
@@ -163,6 +170,7 @@ export function useUsersController() {
     loadError,
     load,
     canManage,
+    canManagePeople,
     filter,
     roleFilter,
     statusFilter,

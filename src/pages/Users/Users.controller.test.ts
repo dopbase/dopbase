@@ -6,6 +6,7 @@ import * as rolesApi from "~/services/roles.api";
 import * as authApi from "~/services/auth.api";
 import { ApiError } from "~/services/http.client";
 import { mountController } from "~/tests/mount-controller";
+import { useAuthStore } from "~/stores/auth.store";
 import {
   adminRole,
   lead,
@@ -366,6 +367,20 @@ describe("useUsersController", () => {
       expect(c.dialogOpen.value).toBe(false);
       expect(push).not.toHaveBeenCalled();
       expect(usersApi.fetchUsers).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("without RBAC", () => {
+    it("adds and edits nobody, but keeps offboarding", async () => {
+      signInAs(["users.view", "users.manage"]);
+      useAuthStore().session!.features = ["sso"];
+      const { controller: c } = mountController(useUsersController);
+      await settle();
+      expect(c.canManage.value).toBe(true);
+      expect(c.canManagePeople.value).toBe(false);
+      const row = rowFor(c, "usr_maya");
+      expect(row.canEdit).toBe(false);
+      expect(row.actions).toEqual(["disable", "delete"]);
     });
   });
 });

@@ -21,6 +21,8 @@ const props = defineProps<{
   /** The ones that match `filter`. */
   visible: PrincipalChoice[];
   modelValue: string;
+  /** Only AI agents can be picked, because the server has RBAC off. */
+  agentsOnly?: boolean;
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [key: string] }>();
@@ -79,7 +81,11 @@ function pick(key: string): void {
           </span>
         </span>
         <span v-else class="flex-1 text-sm text-ink-faint">
-          Choose a person, AI agent or group
+          {{
+            agentsOnly
+              ? "Choose an AI agent"
+              : "Choose a person, AI agent or group"
+          }}
         </span>
         <ChevronDownIcon class="h-4 w-4 shrink-0 text-ink-faint" />
       </button>
@@ -87,7 +93,11 @@ function pick(key: string): void {
     <div v-if="choices.length > 6" class="p-1 pb-1.5">
       <DbSearchField
         v-model="filter"
-        placeholder="Search people, AI agents and groups"
+        :placeholder="
+          agentsOnly
+            ? 'Search AI agents'
+            : 'Search people, AI agents and groups'
+        "
         data-testid="principal-search" />
     </div>
     <template v-for="section in sections" :key="section.key">

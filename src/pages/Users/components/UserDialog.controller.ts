@@ -1,4 +1,5 @@
 import { computed, ref, watch, type Ref } from "vue";
+import { useAuthStore } from "~/stores/auth.store";
 import { ApiError } from "~/services/http.client";
 import { createUser, updateUser } from "~/services/users.api";
 import type { User } from "~/services/users.api";
@@ -36,6 +37,7 @@ export function useUserDialog(
   ssoEnabled: Ref<boolean>,
 ) {
   const { runWithReauth } = useReauthentication();
+  const auth = useAuthStore();
 
   const email = ref("");
   const signIn = ref<SignInChoice>("password");
@@ -48,6 +50,13 @@ export function useUserDialog(
   const roleChoices = computed<RoleChoice[]>(() =>
     roles.value
       .filter((role) => role.signIn === "interactive")
+      // With custom roles off nobody new gets one; a holder keeps theirs.
+      .filter(
+        (role) =>
+          role.builtin ||
+          auth.hasFeature("rbac.roles") ||
+          role.id === editing.value?.roleId,
+      )
       .map((role) => ({
         id: role.id,
         name: role.name,

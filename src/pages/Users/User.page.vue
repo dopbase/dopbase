@@ -44,6 +44,8 @@ const {
   isRoot,
   isYou,
   canManage,
+  canEdit,
+  rbac,
   subtitle,
   created,
   accessSummary,
@@ -96,7 +98,7 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
               Disabled
             </DbBadge>
           </template>
-          <template v-if="canManage" #actions>
+          <template v-if="canEdit" #actions>
             <DbButton data-testid="edit-user" @click="editOpen = true">
               <PencilIcon class="h-4 w-4" />
               Edit
@@ -411,7 +413,7 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
           :grants="access.grants"
           :give-to="{ name: 'user-access-give', params: { userId: user.id } }"
           :summary="accessSummary"
-          :read-only="isRoot"
+          :read-only="isRoot || !rbac"
           @changed="controller.reloadAccess" />
 
         <!-- Groups -->

@@ -32,7 +32,7 @@ const {
   roles,
   ssoEnabled,
   loadError,
-  canManage,
+  canManagePeople,
   filter,
   roleFilter,
   statusFilter,
@@ -58,7 +58,7 @@ const signInClass: Record<SignInMethod, string> = {
       <PageHeader
         title="Users"
         subtitle="People who sign in to this instance. Bots and CI live under AI agents.">
-        <template v-if="canManage" #actions>
+        <template v-if="canManagePeople" #actions>
           <DbButton
             variant="primary"
             data-testid="add-user"
@@ -180,9 +180,11 @@ const signInClass: Record<SignInMethod, string> = {
                 <td class="px-4 text-ink-muted">{{ row.lastSignIn }}</td>
                 <td class="px-2 text-right">
                   <DbMenu
-                    v-if="row.canEdit"
+                    v-if="row.canEdit || row.actions.length > 0"
                     :label="`Actions for ${row.user.email}`">
-                    <DbMenuItem @select="controller.openEdit(row.user)">
+                    <DbMenuItem
+                      v-if="row.canEdit"
+                      @select="controller.openEdit(row.user)">
                       <template #icon><PencilIcon class="h-4 w-4" /></template>
                       Edit role and email
                     </DbMenuItem>
@@ -214,8 +216,12 @@ const signInClass: Record<SignInMethod, string> = {
                       <template #icon><LockIcon class="h-4 w-4" /></template>
                       Turn account back on
                     </DbMenuItem>
-                    <div class="my-0.5 h-px bg-line-soft" role="separator" />
+                    <div
+                      v-if="row.actions.includes('delete')"
+                      class="my-0.5 h-px bg-line-soft"
+                      role="separator" />
                     <DbMenuItem
+                      v-if="row.actions.includes('delete')"
                       tone="danger"
                       @select="actions.ask('delete', row.user)">
                       <template #icon><TrashIcon class="h-4 w-4" /></template>

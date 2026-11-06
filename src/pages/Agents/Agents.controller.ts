@@ -131,7 +131,10 @@ export function useAgentsController() {
   const agentRole = computed(
     () =>
       roles.value.find(
-        (role) => role.signIn === "token_only" && role.assignable,
+        (role) =>
+          role.signIn === "token_only" &&
+          role.assignable &&
+          (role.builtin || auth.hasFeature("rbac.roles")),
       ) ?? null,
   );
   const canAdd = computed(

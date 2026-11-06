@@ -1,13 +1,15 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "~/stores/auth.store";
-import { isPageName, pages } from "~/navigation/access-map";
+import { isPageName, pageFeature, pages } from "~/navigation/access-map";
+import { FEATURE_SETTINGS } from "~/services/access.api";
 import { formatRole } from "~/utils/format";
 
 /**
  * NoAccess controller. The router guard renders this screen at the address
  * the viewer asked for, so resolving that address again names the page
- * they can't open and the capabilities it needs.
+ * they can't open and the capabilities it needs. A page whose feature the
+ * server has off says which setting turns it on instead.
  */
 export function useNoAccessController() {
   const route = useRoute();
@@ -19,13 +21,24 @@ export function useNoAccessController() {
     return isPageName(name) ? pages[name] : null;
   });
 
-  const title = computed(() =>
-    page.value
+  /** The feature the page needs, when the server has it off. */
+  const offFeature = computed(() => {
+    const feature = pageFeature(router.resolve(route.path).name);
+    return feature && !auth.hasFeature(feature) ? feature : null;
+  });
+
+  const title = computed(() => {
+    if (offFeature.value && page.value)
+      return `${page.value.label} is turned off`;
+    return page.value
       ? `You don't have access to ${page.value.label}`
-      : "You don't have access to this page",
-  );
+      : "You don't have access to this page";
+  });
 
   const description = computed(() => {
+    if (offFeature.value) {
+      return `This server doesn't use it. To turn it on, set ${FEATURE_SETTINGS[offFeature.value]}, then restart Dopbase.`;
+    }
     const role = auth.session
       ? auth.session.roleName || formatRole(auth.session.role)
       : "";

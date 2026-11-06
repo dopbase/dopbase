@@ -155,7 +155,7 @@ async function confirmRemove(): Promise<void> {
               </td>
               <td class="h-12 px-2 text-right">
                 <DbMenu
-                  v-if="canManage"
+                  v-if="row.editable"
                   :label="`Actions for ${row.grant.principalLabel}`">
                   <DbMenuItem @select="controller.openChange(row.grant)">
                     <template #icon>

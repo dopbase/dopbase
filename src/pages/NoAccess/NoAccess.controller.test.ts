@@ -9,6 +9,7 @@ const { route, session } = await vi.hoisted(async () => {
       value: { role: "member", roleName: "Member" } as {
         role: string;
         roleName?: string;
+        features?: string[];
       } | null,
     },
   };
@@ -17,6 +18,8 @@ const { route, session } = await vi.hoisted(async () => {
 const routeNames: Record<string, string> = {
   "/backups": "backups",
   "/groups": "groups",
+  "/roles": "roles",
+  "/sso": "sso",
   "/projects/p/billing/access": "project-access",
 };
 
@@ -32,6 +35,9 @@ vi.mock("~/stores/auth.store", () => ({
     get session() {
       return session.value;
     },
+    hasFeature: (feature: string) =>
+      session.value?.features === undefined ||
+      session.value.features.includes(feature),
   }),
 }));
 
@@ -77,6 +83,29 @@ describe("useNoAccessController", () => {
     expect(title.value).toBe("You don't have access to this page");
     expect(description.value).toBe(
       "Your role doesn't include this page. Ask root if you need it.",
+    );
+  });
+
+  it("says which setting turns a page on when the server has it off", () => {
+    route.path = "/sso";
+    session.value = { role: "root", features: ["rbac"] };
+
+    const { title, description } = useNoAccessController();
+
+    expect(title.value).toBe("Single sign-on is turned off");
+    expect(description.value).toBe(
+      "This server doesn't use it. To turn it on, set DOPBASE_SSO=true, then restart Dopbase.",
+    );
+  });
+
+  it("names both settings custom roles need", () => {
+    route.path = "/roles";
+    session.value = { role: "root", features: ["sso"] };
+
+    const { description } = useNoAccessController();
+
+    expect(description.value).toContain(
+      "DOPBASE_RBAC=true and DOPBASE_RBAC_ROLES=true",
     );
   });
 });

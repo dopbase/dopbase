@@ -212,6 +212,42 @@ describe("auth store", () => {
   });
 });
 
+describe("auth store features", () => {
+  it("lets root do everything until the session says what is off", () => {
+    const store = useAuthStore();
+    store.session = {
+      adminId: "usr_root",
+      email: "root@example.com",
+      sessionKind: "browser",
+      recentAuthentication: true,
+      role: "root",
+    };
+    expect(store.can("sso.manage")).toBe(true);
+    expect(store.hasFeature("sso")).toBe(true);
+
+    store.session = {
+      ...store.session,
+      capabilities: ["users.manage", "users.view"],
+      features: ["rbac"],
+    };
+    expect(store.can("sso.manage")).toBe(false);
+    expect(store.can("users.manage")).toBe(true);
+    expect(store.hasFeature("sso")).toBe(false);
+    expect(store.hasFeature("rbac")).toBe(true);
+  });
+
+  it("fetchSession keeps the features the server has on", async () => {
+    vi.mocked(authApi.fetchSession).mockResolvedValueOnce({
+      ...browserSessionInfo(),
+      features: ["sso"],
+    });
+    const store = useAuthStore();
+    await store.fetchSession();
+    expect(store.session?.features).toEqual(["sso"]);
+    expect(store.hasFeature("rbac.roles")).toBe(false);
+  });
+});
+
 describe("auth store and the query cache", () => {
   function errorResponse(status: number, error: Record<string, string>) {
     return new Response(JSON.stringify({ success: false, error }), {

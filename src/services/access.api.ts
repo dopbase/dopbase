@@ -47,6 +47,19 @@ export type Capability =
   | "instance.reset"
   | "password.breakglass";
 
+/**
+ * A part of Dopbase the server can turn off. The session lists the ones
+ * that are on.
+ */
+export type Feature = "sso" | "rbac" | "rbac.roles";
+
+/** What to set on the server to turn a feature on. */
+export const FEATURE_SETTINGS: Record<Feature, string> = {
+  sso: "DOPBASE_SSO=true",
+  rbac: "DOPBASE_RBAC=true",
+  "rbac.roles": "DOPBASE_RBAC=true and DOPBASE_RBAC_ROLES=true",
+};
+
 export type PrincipalType = "user" | "group";
 /** `audit` is for audit tokens only, never a grant. */
 export type ScopeType = "all" | "project" | "environment" | "audit";

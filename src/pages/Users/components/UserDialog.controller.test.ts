@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { freshPinia } from "~/tests/pinia";
+import { useAuthStore } from "~/stores/auth.store";
 import { nextTick, ref } from "vue";
 import { useUserDialog } from "./UserDialog.controller";
 import * as usersApi from "~/services/users.api";
@@ -357,6 +358,30 @@ describe("useUserDialog", () => {
       expect(await dialog.submit()).toBeNull();
       expect(dialog.formError.value).toBe("The account could not be saved.");
       expect(dialog.saving.value).toBe(false);
+    });
+  });
+
+  describe("with custom roles off", () => {
+    it("offers only built-in roles, and keeps the custom one a person holds", async () => {
+      useAuthStore().session = {
+        adminId: "usr_lead",
+        email: "lead@example.com",
+        sessionKind: "browser",
+        recentAuthentication: true,
+        role: "admin",
+        capabilities: ["users.manage"],
+        features: ["sso", "rbac"],
+      };
+      const { dialog } = await openDialog();
+      expect(dialog.roleChoices.value.map((choice) => choice.id)).toEqual([
+        "rol_admin",
+        "rol_member",
+      ]);
+      const holder = { ...maya, roleId: "rol_viewer" };
+      const { dialog: editing } = await openDialog({ editing: holder });
+      expect(editing.roleChoices.value.map((choice) => choice.id)).toContain(
+        "rol_viewer",
+      );
     });
   });
 });

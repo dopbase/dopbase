@@ -3,7 +3,7 @@ import { defineStore } from "pinia";
 import { bootstrapAdmin, fetchBootstrapStatus } from "~/services/bootstrap.api";
 import * as authApi from "~/services/auth.api";
 import type { AccountRole, SessionKind } from "~/services/auth.api";
-import type { Capability, Level } from "~/services/access.api";
+import type { Capability, Feature, Level } from "~/services/access.api";
 import {
   onSessionExpired,
   onUnauthorized,
@@ -21,6 +21,8 @@ export interface AdminSession {
   roleName?: string;
   /** Unknown (undefined or empty) until the session is fetched. */
   capabilities?: Capability[];
+  /** Features the server has on. Unknown (undefined) until fetched. */
+  features?: Feature[];
   maxLevel?: Level;
   tokenScope?: "none" | "data" | "audit";
   lastLoginAt?: string | null;
@@ -102,12 +104,24 @@ export const useAuthStore = defineStore("auth", () => {
     () => session.value?.role === "root" || session.value?.role === "admin",
   );
 
-  /** Whether the account holds any of `capabilities`. Root holds them all. */
+  /**
+   * Whether the account holds any of `capabilities`. Root holds them all
+   * until the session says otherwise: a feature the server has off takes
+   * its capabilities from root too.
+   */
   function can(...capabilities: Capability[]): boolean {
-    if (isRoot.value) return true;
-    return capabilities.some((capability) =>
-      session.value?.capabilities?.includes(capability),
-    );
+    const held = session.value?.capabilities;
+    if (isRoot.value && !held?.length) return true;
+    return capabilities.some((capability) => held?.includes(capability));
+  }
+
+  /**
+   * Whether the server has `feature` on. Unknown counts as on, so nothing
+   * flickers away before the session loads; the server refuses either way.
+   */
+  function hasFeature(feature: Feature): boolean {
+    const features = session.value?.features;
+    return features === undefined || features.includes(feature);
   }
 
   function setCsrf(token: string | null): void {
@@ -214,6 +228,7 @@ export const useAuthStore = defineStore("auth", () => {
       role: response.role ?? "admin",
       roleName: response.roleName,
       capabilities: response.capabilities,
+      features: response.features,
       maxLevel: response.maxLevel,
       tokenScope: response.tokenScope,
       lastLoginAt: response.lastLoginAt ?? null,
@@ -281,6 +296,7 @@ export const useAuthStore = defineStore("auth", () => {
     isRoot,
     isAdmin,
     can,
+    hasFeature,
     setCsrf,
     loadBootstrapStatus,
     completeSso,

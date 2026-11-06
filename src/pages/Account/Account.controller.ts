@@ -133,8 +133,12 @@ export function useAccountController() {
   );
   /** Root holds no personal tokens, so its profile points at AI agents. */
   const showsAgentNote = computed(() => auth.isRoot);
-  /** Group pages open for people who can see groups. */
-  const canOpenGroups = computed(() => auth.can("users.view", "groups.manage"));
+  /** Group pages open for people who can see groups, while RBAC is on. */
+  const canOpenGroups = computed(
+    () => auth.can("users.view", "groups.manage") && auth.hasFeature("rbac"),
+  );
+  /** The single sign-on card shows only while the server has it on. */
+  const ssoOn = computed(() => auth.hasFeature("sso"));
 
   async function loadGroups(): Promise<void> {
     await ownAccess.refetch();
@@ -217,6 +221,7 @@ export function useAccountController() {
     subtitle,
     groups,
     canOpenGroups,
+    ssoOn,
     showsAgentNote,
     loadGroups,
     passwordOpen,

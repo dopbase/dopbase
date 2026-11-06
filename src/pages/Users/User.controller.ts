@@ -193,6 +193,9 @@ export function useUserController() {
   const canManage = computed(
     () => auth.can("users.manage") && !isRoot.value && !isYou.value,
   );
+  /** Editing them, or their grants, needs RBAC; the Danger zone doesn't. */
+  const rbac = computed(() => auth.hasFeature("rbac"));
+  const canEdit = computed(() => canManage.value && rbac.value);
 
   const subtitle = computed(() => {
     const account = user.value;
@@ -416,6 +419,8 @@ export function useUserController() {
     isRoot,
     isYou,
     canManage,
+    canEdit,
+    rbac,
     subtitle,
     created,
     accessSummary,
