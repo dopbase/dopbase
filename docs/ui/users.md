@@ -18,6 +18,13 @@ someone a new password and disable, enable, or delete accounts. There's no
 are read-only. See
 [optional features](/self-hosting/operations#optional-features).
 
+When the server sets a [people limit](/self-hosting/operations#people-limit),
+the page shows how many spots are taken next to **Add user**, such as `3 of 5
+people`. Only active people count. Root and AI agents don't. Once every spot
+is taken, **Add user** turns off and the page says so. Disable or delete
+someone to make room, or ask whoever runs the server to raise
+`DOPBASE_RBAC_MAX_USERS`.
+
 The table shows each person's role, their groups, how they sign in, and when
 they last signed in. Filter by email, or add a **Role** or **Status** chip to
 narrow the list to one role, or to active, disabled, or single sign-on

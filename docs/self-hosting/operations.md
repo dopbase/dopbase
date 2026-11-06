@@ -73,6 +73,27 @@ one to anyone. People who already hold a custom role keep it. Setting
 `rbac_roles` without `rbac` leaves custom roles off, and the server prints a
 warning when it starts.
 
+### People limit
+
+`rbac_max_users`, or `DOPBASE_RBAC_MAX_USERS`, caps how many active people the
+instance holds while `rbac` is on. Root and AI agents don't count, and neither
+do disabled accounts. Leave it out or set it to `0` for no limit, the same way
+`audit_retention_days = 0` keeps the audit log forever. Any other value has to
+be a whole number, or the server won't start.
+
+```toml
+rbac = true
+rbac_max_users = 5
+```
+
+Once the limit is full, adding someone or turning a disabled account back on
+answers `409` `USER_LIMIT_REACHED`. The Users page shows how many spots are
+taken and turns off **Add user**. Disabling or deleting someone frees a spot.
+If you lower the limit below the number of active people, everyone keeps
+their access, and nobody new can be added until enough people leave. The
+Status page shows how full the limit is. Setting it without `rbac` does
+nothing, and the server prints a warning when it starts.
+
 ## Monitoring
 
 Monitor service availability, database health, disk space, backup completion, authentication failures, and abnormal audit activity. Monitoring output must not contain request bodies or secret values.
