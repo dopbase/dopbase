@@ -21,7 +21,7 @@ pub mod sso;
 pub mod tokens;
 pub mod users;
 
-pub fn routes() -> Router<AppState> {
+pub fn routes(state: &AppState) -> Router<AppState> {
   Router::new()
     .merge(health::routes())
     .merge(bootstrap::routes())
@@ -35,7 +35,7 @@ pub fn routes() -> Router<AppState> {
     .merge(instance::routes())
     .merge(backups::routes())
     .merge(users::routes())
-    .merge(sso::routes())
+    .merge(sso::routes(state))
     .merge(grants::routes())
     .merge(groups::routes())
     .merge(tokens::personal::routes())

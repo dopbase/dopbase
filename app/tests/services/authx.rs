@@ -491,3 +491,36 @@ async fn rejects_grants_the_schema_does_not_allow() {
     );
   }
 }
+
+#[test]
+fn disabled_features_bind_root_and_do_not_count_between_roles() {
+  use app::services::features::Features;
+  let off = Features::default();
+  let root = Access::root().restrict(&off);
+  assert!(!root.has(Capability::SsoManage));
+  assert!(!root.has(Capability::GroupsManage));
+  assert!(!root.has(Capability::RolesManage));
+  assert!(root.has(Capability::UsersManage));
+  assert!(root.has(Capability::InstanceBackup));
+  assert!(!root.capabilities().any(|c| c == Capability::SsoManage));
+
+  // An admin whose groups.manage is off still includes another admin who
+  // holds it on paper, so offboarding works without RBAC.
+  let admin = |id: &str| {
+    Access::role(
+      id,
+      "Admin",
+      [Capability::UsersManage, Capability::GroupsManage],
+      Level::ProjectManager,
+      SignIn::Interactive,
+    )
+  };
+  let caller = admin("a").restrict(&off);
+  assert!(!caller.has(Capability::GroupsManage));
+  assert!(caller.includes(&admin("b")));
+  assert!(
+    admin("a")
+      .restrict(&Features::all())
+      .has(Capability::GroupsManage)
+  );
+}

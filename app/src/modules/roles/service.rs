@@ -12,6 +12,7 @@ use crate::{
   modules::common,
   services::{
     authx::{Access, Capability, Level, SignIn},
+    features::Feature,
     token,
   },
   state::AppState,
@@ -267,11 +268,13 @@ impl Settings {
 }
 
 fn require_root_change(
+  state: &AppState,
   identity: &AuthIdentity,
   headers: &HeaderMap,
 ) -> Result<(String, String), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
+  state.config.features.require(Feature::RbacRoles)?;
   let (id, email) = require_capability_browser(identity, Capability::RolesManage)?;
   Ok((id.to_owned(), email.to_owned()))
 }
@@ -295,7 +298,7 @@ pub async fn create(
   headers: &HeaderMap,
   request: CreateRoleRequest,
 ) -> Result<RoleResponse, HttpError> {
-  let (actor_id, actor_email) = require_root_change(identity, headers)?;
+  let (actor_id, actor_email) = require_root_change(state, identity, headers)?;
   let tokens = request.capabilities.contains(&Capability::TokensPersonal);
   let settings = Settings {
     name: request.name,
@@ -354,7 +357,7 @@ pub async fn update(
   id: &str,
   request: UpdateRoleRequest,
 ) -> Result<RoleResponse, HttpError> {
-  let (actor_id, actor_email) = require_root_change(identity, headers)?;
+  let (actor_id, actor_email) = require_root_change(state, identity, headers)?;
   let current = fetch(state, identity, id).await?;
   if current.builtin {
     return Err(builtin());
@@ -409,7 +412,7 @@ pub async fn delete(
   headers: &HeaderMap,
   id: &str,
 ) -> Result<(), HttpError> {
-  let (actor_id, actor_email) = require_root_change(identity, headers)?;
+  let (actor_id, actor_email) = require_root_change(state, identity, headers)?;
   let current = fetch(state, identity, id).await?;
   if current.builtin {
     return Err(builtin());

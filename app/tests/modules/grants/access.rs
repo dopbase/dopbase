@@ -738,3 +738,66 @@ async fn a_project_manager_grants_only_to_people_and_groups_they_can_list() {
   }
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn without_rbac_only_ai_agents_take_new_access() {
+  use app::services::features::Features;
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = grant(
+    &router,
+    &root,
+    ("user", &member.id),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+  let existing = body["data"]["id"].as_str().unwrap().to_owned();
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    root.browser(),
+    Some(json!({"email":"deploy-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let agent = body["data"]["id"].as_str().unwrap().to_owned();
+
+  let off = with_features(
+    &state,
+    Features {
+      rbac: false,
+      ..Features::all()
+    },
+  );
+  let (status, body) = grant(
+    &off,
+    &root,
+    ("user", &member.id),
+    ("project", Some("search")),
+    "read",
+  )
+  .await;
+  feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  let (status, body) = send(
+    &off,
+    "DELETE",
+    &format!("/api/v1/grants/{existing}"),
+    root.browser(),
+    None,
+  )
+  .await;
+  feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  let (status, body) = grant(
+    &off,
+    &root,
+    ("user", &agent),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+}

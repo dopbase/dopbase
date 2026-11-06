@@ -44,6 +44,7 @@ use crate::{
     authx::{self, Capability, SignIn},
     client_ip,
     crypto::sso_client_secret_aad,
+    features::Feature,
     oidc::{self, Freshness, ProviderSettings, VerifiedIdentity},
     token,
   },
@@ -75,6 +76,11 @@ pub struct SsoPolicy {
 }
 
 pub async fn policy(state: &AppState) -> Result<SsoPolicy, sqlx::Error> {
+  // With the feature off a stored provider changes nothing: no button, and
+  // "required" no longer blocks password sign-in.
+  if !state.config.features.enabled(Feature::Sso) {
+    return Ok(SsoPolicy::default());
+  }
   Ok(match repository::enabled_policy(state.db.pool()).await? {
     Some((name, require_sso, hide_password_form)) => SsoPolicy {
       enabled_name: Some(name),
@@ -91,6 +97,9 @@ pub async fn confirmation_name(
   state: &AppState,
   admin_id: &str,
 ) -> Result<Option<String>, sqlx::Error> {
+  if !state.config.features.enabled(Feature::Sso) {
+    return Ok(None);
+  }
   repository::confirmation_name(state.db.pool(), admin_id).await
 }
 

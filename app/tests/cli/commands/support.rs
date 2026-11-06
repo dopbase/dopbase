@@ -137,6 +137,7 @@ impl Fixture {
         provider: "file".into(),
         path: data_dir.join("master.key"),
       },
+      features: app::services::features::Features::all(),
       ..ServerConfig::default()
     };
     configure(&mut config);

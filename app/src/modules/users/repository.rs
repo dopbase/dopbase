@@ -308,11 +308,12 @@ pub async fn set_owner(
 }
 
 /// A role's id and whether its holders sign in with tokens only.
+/// Whether a role signs in with tokens only, and whether it is built in.
 pub async fn role_sign_in(
   pool: &SqlitePool,
   role_id: &str,
-) -> Result<Option<bool>, sqlx::Error> {
-  sqlx::query_scalar("SELECT sign_in = 'token_only' FROM roles WHERE id=?")
+) -> Result<Option<(bool, bool)>, sqlx::Error> {
+  sqlx::query_as("SELECT sign_in = 'token_only', builtin = 1 FROM roles WHERE id=?")
     .bind(role_id)
     .fetch_optional(pool)
     .await

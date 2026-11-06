@@ -13,6 +13,7 @@ use crate::{
   modules::{common, grants, grants::model::GroupRef, tokens},
   services::{
     authx::{self, Access, Capability, Catalog},
+    features::Feature,
     token,
   },
   state::AppState,
@@ -37,6 +38,7 @@ struct ChosenRole {
   legacy: AdminRole,
   /// Holders sign in with personal tokens only, like AI agents.
   token_only: bool,
+  builtin: bool,
 }
 
 async fn choose_role(
@@ -56,7 +58,7 @@ async fn choose_role(
     (None, AdminRole::Member) => "rol_member",
     (None, AdminRole::AiAgent) => "rol_ai_agent",
   };
-  let token_only = repository::role_sign_in(state.db.pool(), id)
+  let (token_only, builtin) = repository::role_sign_in(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::bad_request("ROLE_INVALID", "The role was not found."))?;
   let legacy = match id {
@@ -68,6 +70,7 @@ async fn choose_role(
     id: id.to_owned(),
     legacy,
     token_only,
+    builtin,
   })
 }
 
@@ -390,6 +393,11 @@ pub async fn create(
   require_recent_browser_auth(identity)?;
   require_any_browser(identity, &[Capability::UsersManage, Capability::AgentsView])?;
   let chosen = choose_role(state, request.role, request.role_id.as_deref()).await?;
+  // People who already hold a custom role keep it, but nobody new gets one
+  // while custom roles are off.
+  if !chosen.builtin {
+    state.config.features.require(Feature::RbacRoles)?;
+  }
   let agent = chosen.token_only;
   // Whoever creates an AI agent owns it, so it takes agents.view, which an
   // owner needs to run it; agents.manage alone doesn't. People are added
@@ -402,6 +410,10 @@ pub async fn create(
       Capability::UsersManage
     },
   )?;
+  // Without RBAC nobody adds people; AI agents still work.
+  if !agent {
+    state.config.features.require(Feature::Rbac)?;
+  }
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -544,6 +556,11 @@ pub async fn update(
   } else if !is_root {
     require_within(state, identity, id).await?;
   }
+  // Without RBAC people keep their account as it is; their own sign-in
+  // details and AI agents still change.
+  if !agent && id != actor_id {
+    state.config.features.require(Feature::Rbac)?;
+  }
   let new_role = if changes_role {
     Some(choose_role(state, request.role, request.role_id.as_deref()).await?)
   } else {
@@ -569,6 +586,9 @@ pub async fn update(
   }
   // Keeping the same role changes nothing.
   let new_role = new_role.filter(|role| old_role_id.as_deref() != Some(role.id.as_str()));
+  if new_role.as_ref().is_some_and(|role| !role.builtin) {
+    state.config.features.require(Feature::RbacRoles)?;
+  }
   if let Some(role) = &new_role {
     require_assignable(state, identity, &role.id).await?;
   }

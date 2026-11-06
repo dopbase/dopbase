@@ -129,6 +129,7 @@ impl FromRequestParts<AppState> for AuthIdentity {
         .ok_or_else(|| {
           HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled.")
         })?;
+      let access = access.restrict(&state.config.features);
       if access.sign_in == authx::SignIn::TokenOnly {
         return Err(HttpError::unauthorized(
           AUTHENTICATION_INVALID,
@@ -163,6 +164,7 @@ impl FromRequestParts<AppState> for AuthIdentity {
         .await
         .map_err(HttpError::from)?
         .ok_or_else(disabled)?;
+      let access = access.restrict(&state.config.features);
       if let Some(owner_id) = &token.owner_id
         && authx::load_access(&mut conn, owner_id)
           .await

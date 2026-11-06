@@ -21,6 +21,7 @@ async fn test_app() -> (TempDir, app::state::AppState, Router) {
       path: directory.path().join("master.key"),
     },
     docs_enabled: true,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();
@@ -509,6 +510,7 @@ async fn bootstrap_restore_lifecycle() {
       path: key_path,
     },
     docs_enabled: true,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state2 = server::build_setup_state(config2).await.unwrap();
@@ -706,6 +708,7 @@ async fn bootstrap_restore_with_different_master_key() {
       path: server2_key_path.clone(),
     },
     docs_enabled: true,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state2 = server::build_setup_state(config2).await.unwrap();

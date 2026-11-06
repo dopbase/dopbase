@@ -201,6 +201,9 @@ pub struct Access {
   /// The deepest level any grant can give this account.
   pub max_level: Level,
   pub sign_in: SignIn,
+  /// Capabilities nobody holds on this server because their feature is
+  /// off. They bind root too.
+  blocked: BTreeSet<Capability>,
 }
 
 impl Access {
@@ -212,6 +215,7 @@ impl Access {
       capabilities: Capability::ALL.into_iter().collect(),
       max_level: Level::ProjectManager,
       sign_in: SignIn::Interactive,
+      blocked: BTreeSet::new(),
     }
   }
 
@@ -234,6 +238,7 @@ impl Access {
         .collect(),
       max_level,
       sign_in,
+      blocked: BTreeSet::new(),
     }
   }
 
@@ -247,18 +252,34 @@ impl Access {
       capabilities: BTreeSet::new(),
       max_level: Level::None,
       sign_in: SignIn::Interactive,
+      blocked: BTreeSet::new(),
     }
+  }
+
+  /// Take away the capabilities of features this server has turned off.
+  pub fn restrict(
+    mut self,
+    features: &crate::services::features::Features,
+  ) -> Self {
+    self.blocked = features.blocked_capabilities();
+    self
   }
 
   pub fn has(
     &self,
     capability: Capability,
   ) -> bool {
-    self.is_root || self.capabilities.contains(&capability)
+    !self.blocked.contains(&capability) && (self.is_root || self.capabilities.contains(&capability))
   }
 
+  /// What the account holds on this server, less the capabilities of
+  /// disabled features.
   pub fn capabilities(&self) -> impl Iterator<Item = Capability> + '_ {
-    self.capabilities.iter().copied()
+    self
+      .capabilities
+      .iter()
+      .copied()
+      .filter(|capability| !self.blocked.contains(capability))
   }
 
   /// Whether this access holds every capability of `other` and a ceiling at
@@ -267,9 +288,13 @@ impl Access {
     &self,
     other: &Self,
   ) -> bool {
+    // A capability nobody holds on this server doesn't count.
     self.is_root
       || (!other.is_root
-        && other.capabilities().all(|capability| self.has(capability))
+        && other
+          .capabilities()
+          .filter(|capability| !self.blocked.contains(capability))
+          .all(|capability| self.has(capability))
         && other.max_level <= self.max_level)
   }
 }

@@ -10,7 +10,8 @@ pub mod model;
 pub mod presets;
 mod repository;
 pub mod service;
-pub fn routes() -> Router<AppState> {
+/// Every route here answers `FEATURE_DISABLED` while `DOPBASE_SSO` is off.
+pub fn routes(state: &AppState) -> Router<AppState> {
   Router::new()
     .route(
       crate::constants::api::sso::PROVIDER,
@@ -54,4 +55,8 @@ pub fn routes() -> Router<AppState> {
       crate::constants::api::auth::SSO_REAUTH,
       post(controller::reauth),
     )
+    .route_layer(axum::middleware::from_fn_with_state(
+      state.clone(),
+      crate::middlewares::features::sso,
+    ))
 }
