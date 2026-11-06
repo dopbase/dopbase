@@ -242,6 +242,13 @@ All notable changes to Dopbase are documented in this file.
   container or VM disk describes the host, not Dopbase.
 - **Breaking:** `health.disk` in `GET /api/v1/status` returns `usedBytes`
   instead of `status`, `freeBytes` and `totalBytes`.
+- **Breaking:** `dopbase login` and `dopbase logout` stop with exit code 1
+  while `DOPBASE_TOKEN` is set, because the token takes priority over any
+  saved login. Before, logout printed "Logged out" and you stayed signed in
+  through the token, and login saved a session that was never used. Neither
+  command touches the saved login in that case. A CI job that runs
+  `dopbase logout` as cleanup with the token set now fails: drop that step, or
+  run `env -u DOPBASE_TOKEN dopbase logout` if the job also saved a login.
 
 ### Removed
 
@@ -294,6 +301,10 @@ All notable changes to Dopbase are documented in this file.
 - A failed backup re-key returns `The backup could not be re-keyed with this master key.`
   The cause, which could name environment IDs and secret keys, goes to the server log.
 - The CLI no longer prints the password of a server address it rejects.
+- `dopbase logout` ends the CLI session on the server before it deletes the
+  saved login, so a copied session token stops working. Before, the session
+  stayed valid until it expired. `--json` reports the result in
+  `server_session`.
 
 ## 0.1.10 - 2026-10-26
 
