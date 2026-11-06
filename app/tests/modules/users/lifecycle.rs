@@ -550,6 +550,18 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
   )
   .await;
   assert_eq!(status, 200);
+  // Sending their current email and role along with it changes neither, so
+  // it passes too.
+  let (status, body) = send(
+    &off,
+    "PATCH",
+    &format!("/api/v1/users/{}", member.id),
+    admin.browser(),
+    Some(json!({"email":"Member@Example.com","role":"member","password":"another-horse-789"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["email"], "member@example.com", "{body}");
 
   // AI agents and offboarding keep working.
   let (status, body) = send(

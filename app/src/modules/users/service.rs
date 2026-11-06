@@ -597,12 +597,6 @@ pub async fn update(
   } else if !is_root {
     require_within(state, identity, id).await?;
   }
-  // Without RBAC people keep their email and role. Their own details, a new
-  // password someone sets for them, and AI agents still change, so nobody
-  // is locked out for good.
-  if !agent && id != actor_id && (changes_role || request.email.is_some()) {
-    state.config.features.require(Feature::Rbac)?;
-  }
   let new_role = if changes_role {
     Some(choose_role(state, request.role, request.role_id.as_deref()).await?)
   } else {
@@ -628,17 +622,24 @@ pub async fn update(
   }
   // Keeping the same role changes nothing.
   let new_role = new_role.filter(|role| old_role_id.as_deref() != Some(role.id.as_str()));
+  let email = match request.email {
+    Some(value) if agent => validate_agent_name(&value)?,
+    Some(value) => common::validate_email(&value)?,
+    None => old_email.clone(),
+  };
+  // Without RBAC people keep their email and role. Their own details, a new
+  // password someone sets for them, and AI agents still change, so nobody
+  // is locked out for good. Repeating the current email or role changes
+  // neither, so it passes.
+  if !agent && id != actor_id && (new_role.is_some() || email != old_email) {
+    state.config.features.require(Feature::Rbac)?;
+  }
   if new_role.as_ref().is_some_and(|role| !role.builtin) {
     state.config.features.require(Feature::RbacRoles)?;
   }
   if let Some(role) = &new_role {
     require_assignable(state, identity, &role.id).await?;
   }
-  let email = match request.email {
-    Some(value) if agent => validate_agent_name(&value)?,
-    Some(value) => common::validate_email(&value)?,
-    None => old_email,
-  };
   let password_hash = if let Some(password) = request.password {
     common::validate_password(&password)?;
     Some(common::hash_password_async(password).await?)
