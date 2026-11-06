@@ -13,6 +13,10 @@ who already have a Dopbase account; it never creates one.
 
 ## Before you start
 
+Single sign-on is off until the server starts with `DOPBASE_SSO=true`, or
+`sso = true` in `server.toml`. See
+[optional features](/self-hosting/operations#optional-features).
+
 Only the root account can configure single sign-on, and the server needs an
 HTTPS public URL.
 
@@ -235,6 +239,9 @@ they can sign in and link from the Account page.
 **Turn off** keeps the settings and linked identities, and everyone signs in
 with a password. **Remove provider**, in its own card at the bottom of the
 page, deletes the provider and every linked identity.
+
+Turning off `DOPBASE_SSO` on the server has the same effect as **Turn off**:
+the settings stay, and they come back when you turn it on again.
 
 Accounts without a password cannot sign in while single sign-on is off or
 removed. The settings page shows how many there are; set them a password on the

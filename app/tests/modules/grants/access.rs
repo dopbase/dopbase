@@ -738,3 +738,135 @@ async fn a_project_manager_grants_only_to_people_and_groups_they_can_list() {
   }
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn without_rbac_only_ai_agents_take_new_access() {
+  use app::services::features::Features;
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = grant(
+    &router,
+    &root,
+    ("user", &member.id),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+  let existing = body["data"]["id"].as_str().unwrap().to_owned();
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/users",
+    root.browser(),
+    Some(json!({"email":"deploy-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let agent = body["data"]["id"].as_str().unwrap().to_owned();
+
+  let off = with_features(
+    &state,
+    Features {
+      rbac: false,
+      ..Features::all()
+    },
+  );
+  let (status, body) = grant(
+    &off,
+    &root,
+    ("user", &member.id),
+    ("project", Some("search")),
+    "read",
+  )
+  .await;
+  feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  let (status, body) = send(
+    &off,
+    "DELETE",
+    &format!("/api/v1/grants/{existing}"),
+    root.browser(),
+    None,
+  )
+  .await;
+  feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  let (status, body) = grant(
+    &off,
+    &root,
+    ("user", &agent),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+
+  // Someone who can't grant here gets the same answer for a person and an
+  // AI agent, so the refusal doesn't tell agents apart.
+  let bystander = person(&router, &root, "bystander@example.com", "member").await;
+  let mut refusals = Vec::new();
+  for id in [&bystander.id, &agent] {
+    refusals.push(
+      grant(
+        &off,
+        &member,
+        ("user", id),
+        ("project", Some("payments")),
+        "read",
+      )
+      .await,
+    );
+  }
+  assert_eq!(refusals[0], refusals[1], "{refusals:?}");
+  assert!(refusals[0].0 >= 400, "{refusals:?}");
+  assert!(
+    refusals[0].1["error"]["FEATURE_DISABLED"].is_null(),
+    "{refusals:?}"
+  );
+
+  // Project Access tells AI agents from people without guessing.
+  let (status, body) = send(
+    &off,
+    "GET",
+    "/api/v1/projects/payments/access",
+    root.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let agent_flags: std::collections::BTreeMap<String, bool> = body["data"]["grants"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|grant| {
+      (
+        grant["principalId"].as_str().unwrap().to_owned(),
+        grant["principalAgent"].as_bool().unwrap(),
+      )
+    })
+    .collect();
+  assert_eq!(agent_flags.get(&member.id), Some(&false), "{body}");
+  assert_eq!(agent_flags.get(&agent), Some(&true), "{body}");
+
+  // A grant the caller can't see stays not found, RBAC or not.
+  let other = person(&router, &root, "other@example.com", "member").await;
+  let (status, body) = grant(
+    &router,
+    &root,
+    ("user", &other.id),
+    ("project", Some("search")),
+    "read",
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+  let hidden = body["data"]["id"].as_str().unwrap().to_owned();
+  let (status, body) = send(
+    &off,
+    "DELETE",
+    &format!("/api/v1/grants/{hidden}"),
+    member.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 404, "{body}");
+}

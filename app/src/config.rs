@@ -13,9 +13,10 @@ use crate::constants::config::{
   AUDIT_ARCHIVE_DIRECTORY_NAME, CLIENT_CONFIG_FILENAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME,
   DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_PORT, DEFAULT_SECRET_HISTORY_VERSIONS,
   ENV_AUDIT_RETENTION_DAYS, ENV_DATA_DIR, ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT,
-  ENV_PUBLIC_URL, ENV_SECRET_HISTORY_VERSIONS, ENV_SHUTDOWN_GRACE_SECONDS, ENV_TRUSTED_PROXIES,
-  ENV_UPDATE_CHECK, ENV_WEB_UI, MASTER_KEY_FILENAME, MAX_SECRET_HISTORY_VERSIONS,
-  MIN_SECRET_HISTORY_VERSIONS, SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
+  ENV_PUBLIC_URL, ENV_RBAC, ENV_RBAC_MAX_USERS, ENV_RBAC_ROLES, ENV_SECRET_HISTORY_VERSIONS,
+  ENV_SHUTDOWN_GRACE_SECONDS, ENV_SSO, ENV_TRUSTED_PROXIES, ENV_UPDATE_CHECK, ENV_WEB_UI,
+  MASTER_KEY_FILENAME, MAX_SECRET_HISTORY_VERSIONS, MIN_SECRET_HISTORY_VERSIONS,
+  SERVER_CONFIG_FILENAME, SERVER_HOST_PLACEHOLDER,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 
@@ -65,6 +66,10 @@ pub struct ServerConfig {
   /// asked to.
   #[serde(skip)]
   pub update_check: bool,
+  /// Single sign-on, people and group management, custom roles, and how
+  /// many people RBAC allows. All off by default.
+  #[serde(skip)]
+  pub features: crate::services::features::Features,
   /// True when this process runs as a supervised background server and must
   /// manage the PID file.
   #[serde(skip)]
@@ -112,6 +117,10 @@ struct ServerConfigFile {
   docs: Option<bool>,
   web_ui: Option<bool>,
   update_check: Option<bool>,
+  sso: Option<bool>,
+  rbac: Option<bool>,
+  rbac_roles: Option<bool>,
+  rbac_max_users: Option<u32>,
   master_key: Option<MasterKeyConfigFile>,
 }
 
@@ -136,6 +145,10 @@ pub struct EnvironmentOverrides {
   pub docs: Option<String>,
   pub web_ui: Option<String>,
   pub update_check: Option<String>,
+  pub sso: Option<String>,
+  pub rbac: Option<String>,
+  pub rbac_roles: Option<String>,
+  pub rbac_max_users: Option<String>,
   pub master_key_path: Option<PathBuf>,
 }
 
@@ -153,6 +166,10 @@ impl EnvironmentOverrides {
       docs: env::var(ENV_DOCS).ok(),
       web_ui: env::var(ENV_WEB_UI).ok(),
       update_check: env::var(ENV_UPDATE_CHECK).ok(),
+      sso: env::var(ENV_SSO).ok(),
+      rbac: env::var(ENV_RBAC).ok(),
+      rbac_roles: env::var(ENV_RBAC_ROLES).ok(),
+      rbac_max_users: env::var(ENV_RBAC_MAX_USERS).ok(),
       master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
     }
   }
@@ -193,6 +210,7 @@ impl ServerConfig {
       docs_enabled: false,
       web_ui_enabled: true,
       update_check: false,
+      features: crate::services::features::Features::default(),
       daemonized: false,
       daemon_launch: None,
       public_url_source: PublicUrlSource::LoopbackDefault,
@@ -303,6 +321,18 @@ impl ServerConfig {
     if let Some(value) = file.update_check {
       self.update_check = value;
     }
+    if let Some(value) = file.sso {
+      self.features.sso = value;
+    }
+    if let Some(value) = file.rbac {
+      self.features.rbac = value;
+    }
+    if let Some(value) = file.rbac_roles {
+      self.features.rbac_roles = value;
+    }
+    if let Some(value) = file.rbac_max_users {
+      self.features.max_users = value;
+    }
     if let Some(master_key) = file.master_key {
       if let Some(value) = master_key.provider {
         self.master_key.provider = value;
@@ -349,6 +379,20 @@ impl ServerConfig {
     }
     if let Some(value) = environment.update_check {
       self.update_check = value.parse().context("invalid DOPBASE_UPDATE_CHECK")?;
+    }
+    if let Some(value) = environment.sso {
+      self.features.sso = value.parse().context("invalid DOPBASE_SSO")?;
+    }
+    if let Some(value) = environment.rbac {
+      self.features.rbac = value.parse().context("invalid DOPBASE_RBAC")?;
+    }
+    if let Some(value) = environment.rbac_roles {
+      self.features.rbac_roles = value.parse().context("invalid DOPBASE_RBAC_ROLES")?;
+    }
+    if let Some(value) = environment.rbac_max_users {
+      self.features.max_users = value
+        .parse()
+        .context("invalid DOPBASE_RBAC_MAX_USERS, use 0 for no limit")?;
     }
     if let Some(value) = environment.master_key_path {
       self.master_key.path = value;
@@ -431,6 +475,28 @@ impl ServerConfig {
     self.public_url = public_url;
     self.public_url_source = source;
     Ok(())
+  }
+
+  /// Set when custom roles or a people limit are asked for without RBAC,
+  /// which they need.
+  pub fn features_warning(&self) -> Option<String> {
+    use crate::services::features::Feature;
+    let rbac = Feature::Rbac.setting();
+    let mut warnings = Vec::new();
+    if self.features.rbac_roles_ignored() {
+      let roles = Feature::RbacRoles.setting();
+      warnings.push(format!(
+        "{roles} is on but {rbac} is off, so custom roles stay off.\n\
+         Set {rbac}=true to use them."
+      ));
+    }
+    if self.features.max_users_ignored() {
+      warnings.push(format!(
+        "{ENV_RBAC_MAX_USERS} is set but {rbac} is off, so it does nothing.\n\
+         Nobody can add people without {rbac}=true."
+      ));
+    }
+    (!warnings.is_empty()).then(|| warnings.join("\n\n"))
   }
 
   pub fn public_url_warning(&self) -> Option<String> {

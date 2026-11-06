@@ -464,3 +464,127 @@ async fn user_identities_carry_only_id_and_email() {
   assert_eq!(status, 403);
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
+  use app::services::features::Features;
+  let (_dir, state, router) = test_app().await;
+  let (root, env) = instance(&state, &router).await;
+  let admin = person(&router, &root, "lead@example.com", "admin").await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  grant(
+    &router,
+    &root,
+    ("user", &member.id),
+    ("project", Some("payments")),
+    "read",
+  )
+  .await;
+  let off = with_features(
+    &state,
+    Features {
+      rbac: false,
+      ..Features::all()
+    },
+  );
+
+  // Nobody adds or changes people, root included.
+  for by in [&root, &admin] {
+    let (status, body) = send(
+      &off,
+      "POST",
+      "/api/v1/users",
+      by.browser(),
+      Some(json!({"email":"new@example.com","password":"correct-horse-123","role":"member"})),
+    )
+    .await;
+    feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  }
+  for change in [
+    json!({"role":"admin"}),
+    json!({"email":"renamed@example.com"}),
+  ] {
+    let (status, body) = send(
+      &off,
+      "PATCH",
+      &format!("/api/v1/users/{}", member.id),
+      admin.browser(),
+      Some(change),
+    )
+    .await;
+    feature_disabled(status, &body, "DOPBASE_RBAC=true");
+  }
+
+  // Existing people keep signing in with their role and grants.
+  assert_eq!(password_login(&off, "member@example.com").await, 200);
+  let runtime = format!(
+    "/api/v1/environments/{}/secrets/runtime",
+    env["payments/dev"]
+  );
+  let (status, body) = send(&off, "GET", &runtime, member.cli(), None).await;
+  assert_eq!(status, 200, "{body}");
+  let (status, session) = send(&off, "GET", "/api/v1/auth/session", admin.browser(), None).await;
+  assert_eq!(status, 200, "{session}");
+  assert_eq!(session["data"]["roleName"], "Admin");
+  assert_eq!(session["data"]["features"], json!(["sso"]));
+  let capabilities = session["data"]["capabilities"].as_array().unwrap();
+  assert!(!capabilities.contains(&json!("groups.manage")), "{session}");
+  assert!(capabilities.contains(&json!("users.manage")), "{session}");
+
+  // An admin still sets someone a new password, so nobody is locked out.
+  let (status, body) = send(
+    &off,
+    "PATCH",
+    &format!("/api/v1/users/{}", member.id),
+    admin.browser(),
+    Some(json!({"password":"battery-staple-456"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, _, _) = call(
+    &off,
+    "POST",
+    "/api/v1/auth/login",
+    None,
+    Some(json!({"email":"member@example.com","password":"battery-staple-456","sessionKind":"cli"})),
+  )
+  .await;
+  assert_eq!(status, 200);
+  // Sending their current email and role along with it changes neither, so
+  // it passes too.
+  let (status, body) = send(
+    &off,
+    "PATCH",
+    &format!("/api/v1/users/{}", member.id),
+    admin.browser(),
+    Some(json!({"email":"Member@Example.com","role":"member","password":"another-horse-789"})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["email"], "member@example.com", "{body}");
+
+  // AI agents and offboarding keep working.
+  let (status, body) = send(
+    &off,
+    "POST",
+    "/api/v1/users",
+    admin.browser(),
+    Some(json!({"email":"deploy-bot","role":"ai_agent"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let (status, body) = set_status(&off, &admin, &member.id, "disable").await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(password_login(&off, "member@example.com").await, 401);
+  let (status, body) = set_status(&off, &admin, &member.id, "enable").await;
+  assert_eq!(status, 200, "{body}");
+  let (status, body) = send(
+    &off,
+    "DELETE",
+    &format!("/api/v1/users/{}", member.id),
+    admin.browser(),
+    None,
+  )
+  .await;
+  assert!(status < 300, "{status} {body}");
+}

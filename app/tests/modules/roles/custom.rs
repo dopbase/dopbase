@@ -183,3 +183,107 @@ async fn root_shapes_custom_roles_that_others_give_within_their_own() {
   assert_eq!(status, 422, "{body}");
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
+  use app::services::features::Features;
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/roles",
+    root.browser(),
+    Some(json!({"name":"Viewer","capabilities":["tokens.personal"],"maxLevel":"read"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let viewer = body["data"]["id"].as_str().unwrap().to_owned();
+  let reader = with_role(&router, &lead, "reader@example.com", &viewer).await;
+
+  let off = with_features(
+    &state,
+    Features {
+      rbac_roles: false,
+      ..Features::all()
+    },
+  );
+  for (method, path, body) in [
+    (
+      "POST",
+      "/api/v1/roles".to_owned(),
+      Some(json!({"name":"Writer","maxLevel":"write"})),
+    ),
+    (
+      "PATCH",
+      format!("/api/v1/roles/{viewer}"),
+      Some(json!({"maxLevel":"metadata"})),
+    ),
+    ("DELETE", format!("/api/v1/roles/{viewer}"), None),
+  ] {
+    let (status, response) = send(&off, method, &path, root.browser(), body).await;
+    feature_disabled(status, &response, "DOPBASE_RBAC_ROLES=true");
+  }
+  let (status, body) = send(
+    &off,
+    "POST",
+    "/api/v1/users",
+    lead.browser(),
+    Some(json!({"email":"second@example.com","password":"correct-horse-123","roleId":viewer})),
+  )
+  .await;
+  feature_disabled(status, &body, "DOPBASE_RBAC_ROLES=true");
+  // Someone who may not add people hears that first, not how the server is
+  // set up.
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = send(
+    &off,
+    "POST",
+    "/api/v1/users",
+    member.browser(),
+    Some(json!({"email":"third@example.com","password":"correct-horse-123","roleId":viewer})),
+  )
+  .await;
+  assert_eq!(status, 403, "{body}");
+  assert!(body["error"]["AUTHORIZATION_DENIED"].is_string(), "{body}");
+  let (status, body) = send(
+    &off,
+    "POST",
+    "/api/v1/users",
+    lead.browser(),
+    Some(json!({"email":"second@example.com","password":"correct-horse-123","role":"member"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+
+  // The holder keeps the role, and the rest of their account still changes.
+  let (_, session) = send(&off, "GET", "/api/v1/auth/session", reader.browser(), None).await;
+  assert_eq!(session["data"]["roleName"], "Viewer", "{session}");
+  let (status, body) = send(
+    &off,
+    "PATCH",
+    &format!("/api/v1/users/{}", reader.id),
+    lead.browser(),
+    Some(json!({"email":"reader2@example.com","roleId":viewer})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let (status, roles) = send(&off, "GET", "/api/v1/roles", lead.browser(), None).await;
+  assert_eq!(status, 200, "{roles}");
+  assert!(
+    roles["data"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .any(|role| role["id"] == viewer.as_str())
+  );
+  let (_, session) = send(&off, "GET", "/api/v1/auth/session", root.browser(), None).await;
+  assert_eq!(session["data"]["features"], json!(["sso", "rbac"]));
+  assert!(
+    !session["data"]["capabilities"]
+      .as_array()
+      .unwrap()
+      .contains(&json!("roles.manage"))
+  );
+}

@@ -35,6 +35,7 @@ import {
   tokenState,
   type TokenState,
 } from "./people";
+import { useUserLimit } from "./user-limit";
 
 export type { TokenState };
 import { useAccountActions } from "./account-actions";
@@ -192,6 +193,23 @@ export function useUserController() {
   const isYou = computed(() => user.value?.id === auth.session?.adminId);
   const canManage = computed(
     () => auth.can("users.manage") && !isRoot.value && !isYou.value,
+  );
+  /**
+   * Changing their email, role or grants needs RBAC. Without it, Edit only
+   * sets a password, and the Danger zone stays.
+   */
+  const rbac = computed(() => auth.hasFeature("rbac"));
+  const limit = useUserLimit();
+  /**
+   * A disabled person can't be turned back on while the people limit is
+   * full; the server refuses too. AI agents don't count toward it.
+   */
+  const enableBlocked = computed(
+    () =>
+      !!user.value &&
+      user.value.status === "disabled" &&
+      !isAgent(user.value) &&
+      (limit.value?.full ?? false),
   );
 
   const subtitle = computed(() => {
@@ -416,6 +434,8 @@ export function useUserController() {
     isRoot,
     isYou,
     canManage,
+    rbac,
+    enableBlocked,
     subtitle,
     created,
     accessSummary,

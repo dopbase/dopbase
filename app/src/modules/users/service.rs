@@ -5,6 +5,7 @@ use super::{
 use crate::{
   constants::errors::AUTHORIZATION_DENIED,
   constants::errors::PASSWORD_REQUIRED,
+  constants::errors::USER_LIMIT_REACHED,
   extractors::{
     require_browser, require_capability_browser, require_mutation, require_recent_browser_auth,
   },
@@ -13,6 +14,7 @@ use crate::{
   modules::{common, grants, grants::model::GroupRef, tokens},
   services::{
     authx::{self, Access, Capability, Catalog},
+    features::Feature,
     token,
   },
   state::AppState,
@@ -37,6 +39,7 @@ struct ChosenRole {
   legacy: AdminRole,
   /// Holders sign in with personal tokens only, like AI agents.
   token_only: bool,
+  builtin: bool,
 }
 
 async fn choose_role(
@@ -56,7 +59,7 @@ async fn choose_role(
     (None, AdminRole::Member) => "rol_member",
     (None, AdminRole::AiAgent) => "rol_ai_agent",
   };
-  let token_only = repository::role_sign_in(state.db.pool(), id)
+  let (token_only, builtin) = repository::role_sign_in(state.db.pool(), id)
     .await?
     .ok_or_else(|| HttpError::bad_request("ROLE_INVALID", "The role was not found."))?;
   let legacy = match id {
@@ -68,6 +71,7 @@ async fn choose_role(
     id: id.to_owned(),
     legacy,
     token_only,
+    builtin,
   })
 }
 
@@ -279,6 +283,35 @@ const ACCOUNT_VIEWERS: [Capability; 4] = [
   Capability::AgentsManage,
 ];
 
+/// What to do once the instance holds as many active users as the limit
+/// allows. The Status check reuses it.
+pub(crate) fn user_limit_message(max: u32) -> String {
+  let users = if max == 1 { "user" } else { "users" };
+  format!(
+    "This instance allows up to {max} active {users}. To add or enable a user, disable or delete an active user, or ask your instance administrator to increase the limit."
+  )
+}
+
+/// Refused when the instance already holds as many active users as the
+/// limit allows.
+fn user_limit_reached(max: u32) -> HttpError {
+  HttpError::conflict(USER_LIMIT_REACHED, &user_limit_message(max))
+}
+
+/// Refuse with a clear error when the people limit is already reached. The
+/// write checks again, so racing requests can't pass it.
+async fn require_room(
+  state: &AppState,
+  limit: Option<u32>,
+) -> Result<(), HttpError> {
+  if let Some(max) = limit
+    && repository::active_people(state.db.pool()).await? >= i64::from(max)
+  {
+    return Err(user_limit_reached(max));
+  }
+  Ok(())
+}
+
 fn user_not_found() -> HttpError {
   HttpError::not_found("USER_NOT_FOUND", "The user was not found.")
 }
@@ -317,6 +350,7 @@ fn user(
     sso_linked: row.sso_linked,
     owner_id: row.owner_id,
     owner_email: row.owner_email,
+    counts_toward_limit: row.counts_toward_limit,
   })
 }
 
@@ -402,6 +436,23 @@ pub async fn create(
       Capability::UsersManage
     },
   )?;
+  // The feature checks come after the caller's own, so someone who may not
+  // add this account hears nothing about how the server is set up.
+  // Without RBAC nobody adds people; AI agents still work.
+  if !agent {
+    state.config.features.require(Feature::Rbac)?;
+  }
+  // People who already hold a custom role keep it, but nobody new gets one
+  // while custom roles are off.
+  if !chosen.builtin {
+    state.config.features.require(Feature::RbacRoles)?;
+  }
+  // Only people count toward the limit, never AI agents.
+  let limit = if agent {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -442,6 +493,8 @@ pub async fn create(
   let now = Utc::now().to_rfc3339();
   let (actor_id, actor_email) = actor(identity);
   require_assignable(state, identity, &chosen.id).await?;
+  // After validation, so a bad request still hears what's wrong with it.
+  require_room(state, limit).await?;
   let mut tx = state.db.pool().begin().await?;
   let inserted = repository::insert(
     &mut tx,
@@ -455,17 +508,20 @@ pub async fn create(
       owner_id: agent.then_some(actor_id),
       created_by: actor_id,
       now: &now,
+      limit,
     },
   )
   .await;
-  if let Err(error) = inserted {
-    if error.to_string().contains("UNIQUE") {
+  match inserted {
+    Ok(true) => {}
+    Ok(false) => return Err(user_limit_reached(limit.unwrap_or_default())),
+    Err(error) if error.to_string().contains("UNIQUE") => {
       return Err(HttpError::conflict(
         "EMAIL_ALREADY_EXISTS",
         "An account with this email already exists.",
       ));
     }
-    return Err(error.into());
+    Err(error) => return Err(error.into()),
   }
   if let Some(level) = starting_grant(identity, &chosen.id) {
     repository::set_all_projects_grant(&mut tx, &id, Some(level), actor_id, &now).await?;
@@ -569,14 +625,24 @@ pub async fn update(
   }
   // Keeping the same role changes nothing.
   let new_role = new_role.filter(|role| old_role_id.as_deref() != Some(role.id.as_str()));
-  if let Some(role) = &new_role {
-    require_assignable(state, identity, &role.id).await?;
-  }
   let email = match request.email {
     Some(value) if agent => validate_agent_name(&value)?,
     Some(value) => common::validate_email(&value)?,
-    None => old_email,
+    None => old_email.clone(),
   };
+  // Without RBAC people keep their email and role. Their own details, a new
+  // password someone sets for them, and AI agents still change, so nobody
+  // is locked out for good. Repeating the current email or role changes
+  // neither, so it passes.
+  if !agent && id != actor_id && (new_role.is_some() || email != old_email) {
+    state.config.features.require(Feature::Rbac)?;
+  }
+  if new_role.as_ref().is_some_and(|role| !role.builtin) {
+    state.config.features.require(Feature::RbacRoles)?;
+  }
+  if let Some(role) = &new_role {
+    require_assignable(state, identity, &role.id).await?;
+  }
   let password_hash = if let Some(password) = request.password {
     common::validate_password(&password)?;
     Some(common::hash_password_async(password).await?)
@@ -787,9 +853,31 @@ pub async fn set_status(
   } else {
     ("active", "user.enabled")
   };
+  // Enabling a person takes a spot under the people limit; AI agents and
+  // disabling never do. The write always carries the limit, since the
+  // status read above may already be out of date.
+  let limit = if disable || account.agent {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
+  // Asking for the status the account already has changes nothing, so only
+  // a disabled account is refused early.
+  if account.status == "disabled" {
+    require_room(state, limit).await?;
+  }
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  if repository::set_status(&mut tx, id, value, &now).await? {
+  let changed = repository::set_status(&mut tx, id, value, limit, &now).await?;
+  // Someone else may have enabled the account in the meantime; otherwise
+  // the limit stopped it.
+  if !changed
+    && let Some(max) = limit
+    && repository::status(&mut tx, id).await?.as_deref() == Some("disabled")
+  {
+    return Err(user_limit_reached(max));
+  }
+  if changed {
     if disable {
       repository::revoke_sessions(&mut tx, id, &now).await?;
       repository::cancel_device_approvals(&mut tx, id, &now).await?;

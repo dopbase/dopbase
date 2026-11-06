@@ -17,6 +17,7 @@ async fn fixture() -> (TempDir, app::state::AppState, Router) {
       provider: "file".into(),
       path: dir.path().join("master.key"),
     },
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();

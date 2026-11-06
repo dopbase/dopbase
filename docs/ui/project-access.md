@@ -10,6 +10,10 @@ managers change that. Open it from the project page, or from the project's
 **⋯** menu on Projects. Project managers see and change it; people with
 `access.report`, such as auditors, can read it.
 
+Without `DOPBASE_RBAC=true` on the server, project managers can only give,
+change, or remove access for AI agents. Grants people and groups already have
+stay as they are.
+
 ## Who has access
 
 The table lists every grant on the project and on each of its environments,

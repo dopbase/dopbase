@@ -79,6 +79,23 @@ correlation is returned in the `X-Request-Id` header. Errors never include
 request bodies, plaintext secrets, tokens, key material, SQL, or filesystem
 details.
 
+## Optional features
+
+`GET /api/v1/auth/session` returns `features`, the features the server has on:
+`sso`, `rbac`, and `rbac.roles`. Its `capabilities` leave out any capability a
+disabled feature takes away, for root too: `sso.manage` without `sso`,
+`groups.manage`, `grants.manage` and `roles.manage` without `rbac`, and
+`roles.manage` without `rbac.roles`.
+
+A request for a feature that's off is refused with `403` `FEATURE_DISABLED`.
+The message names the setting that turns it on.
+
+| Feature      | Refused while it's off                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sso`        | Every `/api/v1/sso/*` and `/api/v1/auth/sso/*` route. `GET /api/v1/auth/methods` returns `"sso": null` and `"passwordForm": true`.                                                                                        |
+| `rbac`       | Creating a person, changing someone else's email or role, group changes, and giving or removing access for a person or group. AI agents, setting a new password, and disabling, enabling or deleting accounts still work. |
+| `rbac.roles` | Creating, changing or deleting a custom role, and giving one to an account.                                                                                                                                               |
+
 ## Import authentication
 
 `POST /api/v1/environments/{id}/secrets/import` requires a human project
@@ -215,6 +232,8 @@ streams the filtered list as JSON lines.
 
 User responses include `status` (`active` or `disabled`), `lastSignInAt` (the
 last interactive sign-in, or `null`), and `groups`, each with `id` and `name`.
+`countsTowardLimit` is true for the accounts the user limit counts, which are
+active people other than root. AI agents never count.
 `GET /api/v1/users/{id}` returns one account. `GET /api/v1/users/identities`
 returns only each account's `id` and `email`, ordered by email, for screens
 that just need to name people. It needs the same `users.view` capability and

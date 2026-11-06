@@ -576,6 +576,7 @@ async fn app_with_update_check(
       path: directory.path().join("master.key"),
     },
     update_check: enabled,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();
@@ -697,6 +698,7 @@ async fn app_with_public_url(
     },
     public_url: public_url.into(),
     public_url_source: source,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();

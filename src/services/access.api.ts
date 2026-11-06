@@ -47,6 +47,12 @@ export type Capability =
   | "instance.reset"
   | "password.breakglass";
 
+/**
+ * A part of Dopbase the server can turn off. The session lists the ones
+ * that are on.
+ */
+export type Feature = "sso" | "rbac" | "rbac.roles";
+
 export type PrincipalType = "user" | "group";
 /** `audit` is for audit tokens only, never a grant. */
 export type ScopeType = "all" | "project" | "environment" | "audit";
@@ -57,6 +63,8 @@ export interface Grant {
   principalId: string;
   /** The user's email or the group's name. */
   principalLabel: string;
+  /** True when the principal is an AI agent. */
+  principalAgent: boolean;
   scopeType: ScopeType;
   scopeId: string;
   /** `project` or `project/environment`. Empty for all projects. */

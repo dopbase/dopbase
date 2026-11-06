@@ -26,7 +26,7 @@ export function useDashboardLayoutController() {
   const roleName = computed(() =>
     auth.session ? auth.session.roleName || formatRole(auth.session.role) : "",
   );
-  const sections = computed(() => visibleSections(auth.can));
+  const sections = computed(() => visibleSections(auth.can, auth.hasFeature));
   // Every page in the map lives at `/<name>`, so the first path segment
   // names the sidebar item to highlight.
   const activePage = computed<PageName | null>(() => {

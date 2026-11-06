@@ -20,7 +20,7 @@ import { useAuthStore } from "~/stores/auth.store";
 const AT = "2026-10-01T00:00:00Z";
 
 export function userFixture(overrides: Partial<User> = {}): User {
-  return {
+  const user: Omit<User, "countsTowardLimit"> & Partial<User> = {
     id: "usr_maya",
     email: "maya@example.com",
     role: "member",
@@ -35,6 +35,14 @@ export function userFixture(overrides: Partial<User> = {}): User {
     lastSignInAt: null,
     groups: [],
     ...overrides,
+  };
+  // Mirrors the server: active people count, root and AI agents never do.
+  return {
+    countsTowardLimit:
+      user.role !== "root" &&
+      user.role !== "ai_agent" &&
+      user.status === "active",
+    ...user,
   };
 }
 
@@ -132,6 +140,7 @@ export function grantFixture(overrides: Partial<Grant> = {}): Grant {
     principalType: "user",
     principalId: "usr_maya",
     principalLabel: "maya@example.com",
+    principalAgent: false,
     scopeType: "project",
     scopeId: "prj_pay",
     scopeLabel: "payments",

@@ -153,7 +153,7 @@ async fn build_instance_state(
 
 pub fn router(state: AppState) -> Router {
   let request_id = HeaderName::from_static("x-request-id");
-  let mut router = Router::new().merge(modules::routes());
+  let mut router = Router::new().merge(modules::routes(&state));
   if state.config.docs_enabled {
     let mut openapi = modules::openapi();
     openapi.info.title = "Dopbase API".to_string();
@@ -473,6 +473,9 @@ async fn serve_instance(
     )
   );
   if let Some(warning) = state.config.public_url_warning() {
+    anstream::eprintln!("{}\n", startup_warning(&warning));
+  }
+  if let Some(warning) = state.config.features_warning() {
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
   if let Some(setup) = setup_token.as_deref() {

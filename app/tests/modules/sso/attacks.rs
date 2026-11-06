@@ -710,6 +710,7 @@ async fn sign_in_cookies_are_secure_behind_https() {
       path: directory.path().join("master.key"),
     },
     public_url: "https://dopbase.example.test".into(),
+    features: app::services::features::Features::all(),
     ..app::config::ServerConfig::default()
   };
   let state = app::server::build_setup_state(config).await.unwrap();

@@ -6,6 +6,20 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `DOPBASE_SSO`, `DOPBASE_RBAC` and `DOPBASE_RBAC_ROLES` (`sso`, `rbac`,
+  `rbac_roles` in `server.toml`) turn on single sign-on, people and group
+  management, and custom roles. `GET /api/v1/auth/session` lists them in
+  `features`; a feature that's off answers `403` `FEATURE_DISABLED`. Without
+  RBAC, admins can still set someone a new password. Grants carry
+  `principalAgent`, which is true for an AI agent.
+- `DOPBASE_RBAC_MAX_USERS` (`rbac_max_users` in `server.toml`) caps how many
+  active people an instance holds while RBAC is on. Root, AI agents and
+  disabled accounts don't count, and `0` or leaving it unset means no limit.
+  At the limit, adding or enabling someone answers `409`
+  `USER_LIMIT_REACHED`. The session carries `maxUsers` and each user carries
+  `countsTowardLimit`, the Users page shows the active user count, and once
+  the limit is full the console turns off **Add user** and **Turn account
+  back on**. The Status page warns too.
 - AI agents have their own capabilities. `agents.view` creates agents and
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all
@@ -87,6 +101,9 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- **Breaking:** Single sign-on and people management are off by default. If
+  you use them, set `DOPBASE_SSO=true` and `DOPBASE_RBAC=true` before
+  upgrading, or accounts that only sign in with single sign-on are locked out.
 - Audit records are kept for 365 days by default, and
   `audit_retention_days = 0` keeps them forever. Leaving the setting out used
   to keep everything, so an instance whose `server.toml` has no
@@ -96,6 +113,9 @@ All notable changes to Dopbase are documented in this file.
   restart.
 - The sidebar's **People & access** section is now **Access**, which fits
   members who only see AI agents as well as admins.
+- Opening Single sign-on, Groups or Roles while the server has that feature
+  off says what it needs and that a server administrator can turn it on, with
+  a **docs** link to optional features instead of the setting to change.
 - The role editor uses the full page width. Each section has its
   explanation beside its fields, and a Summary before **Create role** shows how
   far the role reaches, what holders can do, their tokens, who can give it

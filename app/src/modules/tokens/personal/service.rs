@@ -156,7 +156,7 @@ async fn require_issuer(
   }
   // The account's role must allow tokens at all, and it must be active.
   let mut conn = state.db.pool().acquire().await?;
-  let holds = authx::load_access(&mut conn, &target.id)
+  let holds = authx::load_access(&mut conn, &target.id, &state.config.features)
     .await?
     .is_some_and(|access| access.has(Capability::TokensPersonal));
   if !holds {

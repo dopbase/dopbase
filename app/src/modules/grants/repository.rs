@@ -4,6 +4,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT: &str = "SELECT g.id, g.principal_type, g.principal_id, \
   COALESCE(CASE g.principal_type WHEN 'user' THEN (SELECT email FROM admins WHERE id = g.principal_id) ELSE (SELECT name FROM groups WHERE id = g.principal_id) END, '') AS principal_label, \
+  (g.principal_type = 'user' AND EXISTS (SELECT 1 FROM admins a JOIN roles r ON r.id = a.role_id WHERE a.id = g.principal_id AND r.sign_in = 'token_only')) AS principal_agent, \
   g.scope_type, g.scope_id, \
   COALESCE(CASE g.scope_type WHEN 'all' THEN '' WHEN 'project' THEN (SELECT name FROM projects WHERE id = g.scope_id) ELSE (SELECT p.name || '/' || e.name FROM environments e JOIN projects p ON p.id = e.project_id WHERE e.id = g.scope_id) END, '') AS scope_label, \
   COALESCE(CASE g.scope_type WHEN 'all' THEN '' WHEN 'project' THEN g.scope_id ELSE (SELECT project_id FROM environments WHERE id = g.scope_id) END, '') AS project_id, \
@@ -15,6 +16,7 @@ struct GrantRow {
   principal_type: String,
   principal_id: String,
   principal_label: String,
+  principal_agent: bool,
   scope_type: String,
   scope_id: String,
   scope_label: String,
@@ -31,6 +33,7 @@ impl GrantRow {
       principal_type: PrincipalType::parse(&self.principal_type)?,
       principal_id: self.principal_id,
       principal_label: self.principal_label,
+      principal_agent: self.principal_agent,
       scope_type: ScopeType::parse(&self.scope_type)?,
       scope_id: self.scope_id,
       scope_label: self.scope_label,

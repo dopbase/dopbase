@@ -38,6 +38,10 @@ pub const ENV_DATA_DIR: &str = "DOPBASE_DATA_DIR";
 pub const ENV_DOCS: &str = "DOPBASE_DOCS";
 pub const ENV_WEB_UI: &str = "DOPBASE_WEB_UI";
 pub const ENV_UPDATE_CHECK: &str = "DOPBASE_UPDATE_CHECK";
+pub const ENV_SSO: &str = "DOPBASE_SSO";
+pub const ENV_RBAC: &str = "DOPBASE_RBAC";
+pub const ENV_RBAC_ROLES: &str = "DOPBASE_RBAC_ROLES";
+pub const ENV_RBAC_MAX_USERS: &str = "DOPBASE_RBAC_MAX_USERS";
 pub const ENV_HOST: &str = "DOPBASE_HOST";
 pub const ENV_MASTER_KEY_PATH: &str = "DOPBASE_MASTER_KEY_PATH";
 pub const ENV_PORT: &str = "DOPBASE_PORT";
@@ -89,7 +93,7 @@ pub const RUN_SENSITIVE_NAMES: [&str; 5] = [
 ];
 
 /// Every environment variable read by the Dopbase executable.
-pub const fn executable_environment_names() -> [&'static str; 16] {
+pub const fn executable_environment_names() -> [&'static str; 20] {
   [
     ENV_TOKEN,
     ENV_SERVER_URL,
@@ -107,13 +111,17 @@ pub const fn executable_environment_names() -> [&'static str; 16] {
     ENV_AUDIT_RETENTION_DAYS,
     ENV_SECRET_HISTORY_VERSIONS,
     ENV_TRUSTED_PROXIES,
+    ENV_SSO,
+    ENV_RBAC,
+    ENV_RBAC_ROLES,
+    ENV_RBAC_MAX_USERS,
   ]
 }
 
 /// Every `DOPBASE_*` environment variable the server configuration reads.
 /// The background server strips these from its child process so the daemon
 /// resolves its configuration from the captured launch inputs.
-pub const fn daemon_environment_names() -> [&'static str; 13] {
+pub const fn daemon_environment_names() -> [&'static str; 17] {
   [
     ENV_DATA_DIR,
     ENV_DOCS,
@@ -128,5 +136,9 @@ pub const fn daemon_environment_names() -> [&'static str; 13] {
     ENV_AUDIT_RETENTION_DAYS,
     ENV_SECRET_HISTORY_VERSIONS,
     ENV_TRUSTED_PROXIES,
+    ENV_SSO,
+    ENV_RBAC,
+    ENV_RBAC_ROLES,
+    ENV_RBAC_MAX_USERS,
   ]
 }

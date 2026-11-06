@@ -8,6 +8,7 @@ import { useReauthentication } from "~/composable/reauthentication";
 import { projectAccessQuery, userAccessQuery } from "~/queries/access";
 import { loadFailure, onlyWhen, readQuery } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
+import { useAuthStore } from "~/stores/auth.store";
 import {
   levelMeter,
   type GrantPrincipal,
@@ -17,6 +18,8 @@ import {
 export interface AccessRow {
   grant: Grant;
   isGroup: boolean;
+  /** Whether you can change or remove it here. */
+  editable: boolean;
   /** "Whole project", or the environment's name. */
   where: string;
   whereProtected: boolean;
@@ -35,6 +38,7 @@ export function useAccessPanelController() {
   const { runWithReauth } = useReauthentication();
   const cache = useQueryCache();
   const invalidate = useInvalidate();
+  const auth = useAuthStore();
 
   const projectRef = computed(() =>
     typeof route.params.projectRef === "string" ? route.params.projectRef : "",
@@ -60,6 +64,7 @@ export function useAccessPanelController() {
   const canManage = computed(
     () => access.value?.project.level === "project_manager",
   );
+  const rbac = computed(() => auth.hasFeature("rbac"));
   const filter = ref("");
 
   /** Where Give access goes: the shared page, with this project fixed. */
@@ -91,6 +96,8 @@ export function useAccessPanelController() {
         return {
           grant,
           isGroup: grant.principalType === "group",
+          // Without RBAC only AI agents' access changes.
+          editable: canManage.value && (rbac.value || grant.principalAgent),
           where:
             grant.scopeType === "project"
               ? "Whole project"

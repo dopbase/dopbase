@@ -16,6 +16,10 @@ can see it. The table shows each group's members, the projects it reaches, and
 who created it. Creating, renaming, and deleting groups, and changing their
 members or access, needs `groups.manage`, which admins have.
 
+Groups need `DOPBASE_RBAC=true` on the server. Without it the page leaves the
+sidebar, and existing groups keep their members and access until it's back
+on.
+
 ## Create a group
 
 Choose **New group**, give it a name such as `Backend` and, if you like, a

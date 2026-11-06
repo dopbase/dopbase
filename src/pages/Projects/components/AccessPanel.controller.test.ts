@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useQuery } from "@pinia/colada";
 import { freshPinia } from "~/tests/pinia";
+import { useAuthStore } from "~/stores/auth.store";
 import { keys } from "~/queries/keys";
 import { useAccessPanelController } from "./AccessPanel.controller";
 import * as accessApi from "~/services/access.api";
@@ -24,6 +25,7 @@ const grant = (overrides: Partial<accessApi.Grant>): accessApi.Grant => ({
   principalType: "user",
   principalId: "usr_member",
   principalLabel: "member@example.com",
+  principalAgent: false,
   scopeType: "project",
   scopeId: "prj_pay",
   scopeLabel: "payments",
@@ -194,5 +196,44 @@ describe("useAccessPanelController", () => {
     expect(controller.actionError.value).toBe(
       "You can't change your own access.",
     );
+  });
+
+  it("without RBAC lets you change only AI agents' access", async () => {
+    useAuthStore().session = {
+      adminId: "usr_lead",
+      email: "lead@example.com",
+      sessionKind: "browser",
+      recentAuthentication: true,
+      role: "admin",
+      capabilities: [],
+      features: [],
+    };
+    vi.mocked(accessApi.fetchProjectAccess).mockResolvedValue({
+      ...access,
+      grants: [
+        grant({ id: "grt_person" }),
+        grant({
+          id: "grt_group",
+          principalType: "group",
+          principalLabel: "Backend",
+        }),
+        grant({
+          id: "grt_agent",
+          principalId: "usr_bot",
+          principalLabel: "deploy-bot",
+          principalAgent: true,
+        }),
+      ],
+    });
+    const { controller } = mountController(useAccessPanelController);
+    await settle();
+    const editable = Object.fromEntries(
+      controller.rows.value.map((row) => [row.grant.id, row.editable]),
+    );
+    expect(editable).toEqual({
+      grt_person: false,
+      grt_group: false,
+      grt_agent: true,
+    });
   });
 });

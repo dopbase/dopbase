@@ -949,6 +949,7 @@ async fn single_sign_on_needs_an_https_public_url() {
       path: directory.path().join("master.key"),
     },
     public_url: "http://dopbase.example.test".into(),
+    features: app::services::features::Features::all(),
     ..app::config::ServerConfig::default()
   };
   let state = app::server::build_setup_state(config).await.unwrap();
@@ -1137,4 +1138,95 @@ async fn switching_providers_relinks_people_by_verified_email() {
       .await
       .unwrap();
   assert_eq!(subjects, ["keycloak-root-subject", "keycloak-subject"]);
+}
+
+#[tokio::test]
+async fn turning_sso_off_hides_it_and_brings_password_sign_in_back() {
+  use app::services::features::Features;
+  let fixture = sso_fixture().await;
+  let root = (&fixture.root_cookie, fixture.root_csrf.as_str());
+  let (status, body, _) = send(
+    &fixture.router,
+    "PUT",
+    "/api/v1/sso/provider/required",
+    &[root.0],
+    Some(root.1),
+    Some(json!({"required":true})),
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let member_login = json!({
+    "email":"member@example.com","password":"correct-horse-456","sessionKind":"cli"
+  });
+  let (status, _, _) = call(
+    &fixture.router,
+    "POST",
+    "/api/v1/auth/login",
+    None,
+    Some(member_login.clone()),
+  )
+  .await;
+  assert_eq!(status, 403, "required single sign-on blocks the password");
+
+  let off = with_features(
+    &fixture.state,
+    Features {
+      sso: false,
+      ..Features::all()
+    },
+  );
+  // The login page offers the password form and no provider button.
+  let (status, methods, _) = send(&off, "GET", "/api/v1/auth/methods", &[], None, None).await;
+  assert_eq!(status, 200);
+  assert_eq!(methods["data"]["sso"], Value::Null);
+  assert_eq!(methods["data"]["password"], true);
+  assert_eq!(methods["data"]["passwordForm"], true);
+  // A stored "required" no longer blocks password sign-in.
+  let (status, body, _) = call(&off, "POST", "/api/v1/auth/login", None, Some(member_login)).await;
+  assert_eq!(status, 200, "{body}");
+
+  // Every single sign-on route answers the same way, root included.
+  for (method, path) in [
+    ("GET", "/api/v1/auth/sso/start"),
+    ("GET", "/api/v1/sso/provider"),
+    ("PUT", "/api/v1/sso/provider/enabled"),
+    ("GET", "/api/v1/auth/sso/identity"),
+  ] {
+    let (status, body, _) = send(
+      &off,
+      method,
+      path,
+      &[root.0],
+      Some(root.1),
+      Some(json!({"enabled":false})),
+    )
+    .await;
+    assert_eq!(status, 403, "{method} {path}: {body}");
+    let message = body["error"]["FEATURE_DISABLED"].as_str();
+    assert!(
+      message.is_some_and(|message| message.contains("DOPBASE_SSO=true")),
+      "{method} {path}: {body}"
+    );
+  }
+  let (status, session, _) = send(&off, "GET", "/api/v1/auth/session", &[root.0], None, None).await;
+  assert_eq!(status, 200, "{session}");
+  assert_eq!(session["data"]["features"], json!(["rbac", "rbac.roles"]));
+  assert_eq!(session["data"]["ssoConfirmation"], Value::Null);
+  let capabilities = session["data"]["capabilities"].as_array().unwrap();
+  assert!(!capabilities.contains(&json!("sso.manage")), "{session}");
+  assert!(capabilities.contains(&json!("users.manage")), "{session}");
+
+  // Nothing was lost: turned back on, the provider is still set up.
+  let (status, body, _) = send(
+    &fixture.router,
+    "GET",
+    "/api/v1/sso/provider",
+    &[root.0],
+    None,
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  assert_eq!(body["data"]["provider"]["enabled"], true);
+  assert_eq!(body["data"]["provider"]["requireSso"], true);
 }

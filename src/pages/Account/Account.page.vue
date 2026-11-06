@@ -17,6 +17,7 @@ const {
   subtitle,
   groups,
   canOpenGroups,
+  ssoOn,
   showsAgentNote,
   passwordOpen,
   email,
@@ -102,7 +103,7 @@ const {
           </dl>
         </section>
 
-        <SsoLinkCard />
+        <SsoLinkCard v-if="ssoOn" />
 
         <section
           class="flex flex-wrap items-center gap-3 rounded-card border border-line bg-panel px-5 py-4"

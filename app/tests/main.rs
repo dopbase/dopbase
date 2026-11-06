@@ -33,11 +33,39 @@ async fn test_app_with_ui(
     },
     docs_enabled,
     web_ui_enabled,
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();
   let router = server::router(state.clone());
   (directory, state, router)
+}
+
+/// A router over the same data and sessions, with `features` in place of
+/// the instance's, as after a restart with other settings.
+fn with_features(
+  state: &app::state::AppState,
+  features: app::services::features::Features,
+) -> Router {
+  let mut config = (*state.config).clone();
+  config.features = features;
+  let mut state = state.clone();
+  state.config = std::sync::Arc::new(config);
+  server::router(state)
+}
+
+/// Asserts a request was refused because `setting` is off.
+fn feature_disabled(
+  status: u16,
+  body: &Value,
+  setting: &str,
+) {
+  assert_eq!(status, 403, "{body}");
+  let message = body["error"]["FEATURE_DISABLED"].as_str();
+  assert!(
+    message.is_some_and(|message| message.contains(setting)),
+    "{body}"
+  );
 }
 
 async fn call(
@@ -1464,6 +1492,8 @@ mod tokens_personal_tokens;
 mod users_agents;
 #[path = "modules/users/lifecycle.rs"]
 mod users_lifecycle;
+#[path = "modules/users/limit.rs"]
+mod users_limit;
 
 #[tokio::test]
 async fn audit_records_store_the_client_ip_through_trusted_proxies_only() {
@@ -1479,6 +1509,7 @@ async fn audit_records_store_the_client_ip_through_trusted_proxies_only() {
       path: directory.path().join("master.key"),
     },
     trusted_proxies: vec!["10.0.0.0/8".parse().unwrap()],
+    features: app::services::features::Features::all(),
     ..ServerConfig::default()
   };
   let state = server::build_setup_state(config).await.unwrap();

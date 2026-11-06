@@ -285,7 +285,7 @@ fn a_role_can_never_hold_a_root_only_capability() {
     assert!(!access.has(capability), "{capability:?}");
   }
   assert!(access.has(Capability::UsersManage));
-  let root = Access::root();
+  let root = Access::root().restrict(&app::services::features::Features::all());
   assert!(
     Capability::ALL
       .into_iter()
@@ -328,59 +328,93 @@ async fn loads_access_from_the_built_in_roles() {
   insert_account(&db, "usr_orphan", "member", Some("rol_missing"), false).await;
   let mut conn = db.pool().acquire().await.unwrap();
 
-  let root = authx::load_access(&mut conn, "usr_root")
-    .await
-    .unwrap()
-    .unwrap();
-  assert_eq!(root, Access::root());
+  let root = authx::load_access(
+    &mut conn,
+    "usr_root",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
+  assert_eq!(
+    root,
+    Access::root().restrict(&app::services::features::Features::all())
+  );
 
-  let admin = authx::load_access(&mut conn, "usr_admin")
-    .await
-    .unwrap()
-    .unwrap();
+  let admin = authx::load_access(
+    &mut conn,
+    "usr_admin",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
   assert_eq!(admin.max_level, Level::ProjectManager);
   assert!(admin.has(Capability::UsersManage));
   assert!(admin.has(Capability::AuditRead));
   assert!(!admin.has(Capability::InstanceBackup));
   assert!(!admin.has(Capability::SsoManage));
 
-  let auditor = authx::load_access(&mut conn, "usr_auditor")
-    .await
-    .unwrap()
-    .unwrap();
+  let auditor = authx::load_access(
+    &mut conn,
+    "usr_auditor",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
   assert_eq!(auditor.max_level, Level::Metadata);
   assert!(auditor.has(Capability::AuditVerify));
   assert!(!auditor.has(Capability::UsersManage));
 
-  let agent = authx::load_access(&mut conn, "usr_agent")
-    .await
-    .unwrap()
-    .unwrap();
+  let agent = authx::load_access(
+    &mut conn,
+    "usr_agent",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
   assert_eq!(agent.sign_in, SignIn::TokenOnly);
   assert_eq!(agent.max_level, Level::Write);
 
   // An account whose role is gone authenticates but holds nothing.
-  let orphan = authx::load_access(&mut conn, "usr_orphan")
-    .await
-    .unwrap()
-    .unwrap();
-  assert_eq!(orphan, Access::none());
+  let orphan = authx::load_access(
+    &mut conn,
+    "usr_orphan",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
+  assert_eq!(
+    orphan,
+    Access::none().restrict(&app::services::features::Features::all())
+  );
 
   assert!(
-    authx::load_access(&mut conn, "usr_nobody")
-      .await
-      .unwrap()
-      .is_none()
+    authx::load_access(
+      &mut conn,
+      "usr_nobody",
+      &app::services::features::Features::all()
+    )
+    .await
+    .unwrap()
+    .is_none()
   );
   sqlx::query("UPDATE admins SET status='disabled' WHERE id='usr_admin'")
     .execute(&mut *conn)
     .await
     .unwrap();
   assert!(
-    authx::load_access(&mut conn, "usr_admin")
-      .await
-      .unwrap()
-      .is_none()
+    authx::load_access(
+      &mut conn,
+      "usr_admin",
+      &app::services::features::Features::all()
+    )
+    .await
+    .unwrap()
+    .is_none()
   );
 }
 
@@ -400,10 +434,14 @@ async fn resolves_direct_and_group_grants_on_an_environment() {
     sqlx::query(statement).execute(db.pool()).await.unwrap();
   }
   let mut conn = db.pool().acquire().await.unwrap();
-  let access = authx::load_access(&mut conn, "usr_member")
-    .await
-    .unwrap()
-    .unwrap();
+  let access = authx::load_access(
+    &mut conn,
+    "usr_member",
+    &app::services::features::Features::all(),
+  )
+  .await
+  .unwrap()
+  .unwrap();
 
   let level = |environment: &'static str| {
     let access = access.clone();
@@ -490,4 +528,54 @@ async fn rejects_grants_the_schema_does_not_allow() {
       "{statement}"
     );
   }
+}
+
+#[test]
+fn disabled_features_bind_root_and_do_not_count_between_roles() {
+  use app::services::features::Features;
+  let off = Features::default();
+  // Access that never learned the server's features fails closed.
+  assert!(!Access::root().has(Capability::SsoManage));
+  assert!(Access::root().holds(Capability::SsoManage));
+  let root = Access::root().restrict(&off);
+  assert!(!root.has(Capability::SsoManage));
+  assert!(!root.has(Capability::GroupsManage));
+  assert!(!root.has(Capability::RolesManage));
+  assert!(root.has(Capability::UsersManage));
+  assert!(root.has(Capability::InstanceBackup));
+  assert!(!root.capabilities().any(|c| c == Capability::SsoManage));
+
+  // An admin whose groups.manage is off still includes another admin who
+  // holds it on paper, so offboarding works without RBAC.
+  let admin = |id: &str| {
+    Access::role(
+      id,
+      "Admin",
+      [Capability::UsersManage, Capability::GroupsManage],
+      Level::ProjectManager,
+      SignIn::Interactive,
+    )
+  };
+  let caller = admin("a").restrict(&off);
+  assert!(!caller.has(Capability::GroupsManage));
+  assert!(caller.holds(Capability::GroupsManage));
+  assert!(caller.includes(&admin("b")));
+
+  // Roles still compare by what they hold: someone without groups.manage
+  // doesn't come to manage an admin who has it because RBAC is off.
+  let user_manager = Access::role(
+    "m",
+    "User manager",
+    [Capability::UsersManage],
+    Level::ProjectManager,
+    SignIn::Interactive,
+  )
+  .restrict(&off);
+  assert!(!user_manager.includes(&admin("b")));
+  assert!(!user_manager.includes(&admin("b").restrict(&off)));
+  assert!(
+    admin("a")
+      .restrict(&Features::all())
+      .has(Capability::GroupsManage)
+  );
 }

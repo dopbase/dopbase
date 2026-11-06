@@ -1,4 +1,5 @@
 import { computed, ref, watch, type Ref } from "vue";
+import { useAuthStore } from "~/stores/auth.store";
 import { ApiError } from "~/services/http.client";
 import { createUser, updateUser } from "~/services/users.api";
 import type { User } from "~/services/users.api";
@@ -36,6 +37,7 @@ export function useUserDialog(
   ssoEnabled: Ref<boolean>,
 ) {
   const { runWithReauth } = useReauthentication();
+  const auth = useAuthStore();
 
   const email = ref("");
   const signIn = ref<SignInChoice>("password");
@@ -45,9 +47,24 @@ export function useUserDialog(
   const formError = ref<string | null>(null);
   const errors = ref<{ email?: string; password?: string; role?: string }>({});
 
+  /**
+   * Without RBAC an admin only sets someone a new password: their email
+   * and role stay as they are.
+   */
+  const passwordOnly = computed(
+    () => editing.value !== null && !auth.hasFeature("rbac"),
+  );
+
   const roleChoices = computed<RoleChoice[]>(() =>
     roles.value
       .filter((role) => role.signIn === "interactive")
+      // With custom roles off nobody new gets one; a holder keeps theirs.
+      .filter(
+        (role) =>
+          role.builtin ||
+          auth.hasFeature("rbac.roles") ||
+          role.id === editing.value?.roleId,
+      )
       .map((role) => ({
         id: role.id,
         name: role.name,
@@ -95,9 +112,12 @@ export function useUserDialog(
     if (!trimmed) next.email = "Enter their email.";
     else if (!isValidEmail(trimmed))
       next.email = "That doesn't look like an email address.";
-    const needsPassword = !editing.value && signIn.value === "password";
+    const needsPassword =
+      passwordOnly.value || (!editing.value && signIn.value === "password");
     if (needsPassword && !password.value)
-      next.password = "Set a temporary password.";
+      next.password = passwordOnly.value
+        ? "Enter a new password."
+        : "Set a temporary password.";
     else if (password.value) {
       const problem = passwordProblem(password.value);
       if (problem) next.password = problem;
@@ -117,7 +137,9 @@ export function useUserDialog(
       await runWithReauth(async () => {
         const trimmed = email.value.trim();
         const user = editing.value;
-        if (user) {
+        if (user && passwordOnly.value) {
+          saved = await updateUser(user.id, { password: password.value });
+        } else if (user) {
           saved = await updateUser(user.id, {
             ...(trimmed !== user.email ? { email: trimmed } : {}),
             ...(roleId.value !== user.roleId ? { roleId: roleId.value } : {}),
@@ -159,6 +181,7 @@ export function useUserDialog(
 
   /** "sam@example.com reaches no project until someone gives them access." */
   const note = computed(() => {
+    if (passwordOnly.value) return "";
     if (editing.value) {
       return roleId.value !== editing.value.roleId
         ? "Changing the role signs them out everywhere and resets any access to all projects that came with the old role."
@@ -178,6 +201,7 @@ export function useUserDialog(
     roleId,
     roleChoices,
     canChooseSso,
+    passwordOnly,
     note,
     saving,
     formError,

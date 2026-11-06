@@ -17,8 +17,12 @@ import {
 import { LockIcon } from "~/assets/icons";
 import { formatLevel } from "~/utils/format";
 import { levelMeter } from "~/utils/level";
+import { useAuthStore } from "~/stores/auth.store";
 
 const controller = useGiveAccessController();
+const auth = useAuthStore();
+/** Without RBAC on the server only AI agents take new access. */
+const agentsOnly = computed(() => !auth.hasFeature("rbac"));
 const {
   kind,
   forOwnAgent,
@@ -54,7 +58,9 @@ const fromProject = computed(() => kind.value === "project");
 
 const subtitle = computed(() => {
   if (fromProject.value)
-    return `Give a person, AI agent or group access to ${parentLabel.value}.`;
+    return agentsOnly.value
+      ? `Give an AI agent access to ${parentLabel.value}.`
+      : `Give a person, AI agent or group access to ${parentLabel.value}.`;
   const who = principal.value;
   if (!who) return "";
   if (who.type === "group")
@@ -135,6 +141,7 @@ const heading = "text-[15px] font-semibold text-ink-strong";
               :model-value="chosenKey"
               :choices="principals"
               :visible="visiblePrincipals"
+              :agents-only="agentsOnly"
               @update:model-value="controller.choosePrincipal" />
             <DbAlert v-else tone="info">
               There's nobody you can list. Ask someone who can see users and
@@ -143,7 +150,14 @@ const heading = "text-[15px] font-semibold text-ink-strong";
             <p
               v-if="principals.length > 0"
               class="mt-2 text-[13px] text-ink-faint">
-              People, AI agents and groups. Root already reaches every project.
+              <template v-if="agentsOnly">
+                AI agents only. People and groups need DOPBASE_RBAC=true on the
+                server.
+              </template>
+              <template v-else>
+                People, AI agents and groups. Root already reaches every
+                project.
+              </template>
             </p>
           </section>
 

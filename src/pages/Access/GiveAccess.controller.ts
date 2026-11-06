@@ -238,7 +238,9 @@ export function useGiveAccessController() {
    * users.view, anyone's AI agent with agents.manage, and your own agents.
    */
   function grantable(user: User): boolean {
-    if (user.role !== "ai_agent") return auth.can("users.view");
+    // Without RBAC only AI agents take new access.
+    if (user.role !== "ai_agent")
+      return auth.can("users.view") && auth.hasFeature("rbac");
     return (
       auth.can("agents.manage") ||
       (auth.can("agents.view") && user.ownerId === auth.session?.adminId)
@@ -256,7 +258,7 @@ export function useGiveAccessController() {
       auth.can("users.view", "agents.view", "agents.manage")
         ? readQuery(cache, usersQuery)
         : Promise.resolve([]),
-      auth.can("users.view", "groups.manage")
+      auth.can("users.view", "groups.manage") && auth.hasFeature("rbac")
         ? readQuery(cache, groupsQuery)
         : Promise.resolve([]),
     ]);

@@ -11,6 +11,20 @@ disabling, and removing accounts needs `users.manage`, and happens in the
 Admin UI only. There is no CLI command for it. Bots and CI jobs have their own
 page, [AI agents](./ai-agents).
 
+Adding people and changing their email or role needs `DOPBASE_RBAC=true` on
+the server. Without it, the page still lists everyone, and admins can set
+someone a new password and disable, enable, or delete accounts. There's no
+**Add user**, **Edit** becomes **Set password**, and the Access and Groups tabs
+are read-only. See
+[optional features](/self-hosting/operations#optional-features).
+
+When the instance has a [user limit](/self-hosting/operations#people-limit),
+the page shows the count next to **Add user**, such as `3 of 5 active users`.
+Root, AI agents and disabled accounts don't count. Once the limit is reached,
+**Add user** and **Turn account back on** turn off and the page says so. To
+add or enable a user, disable or delete an active user, or ask your instance
+administrator to increase the limit.
+
 The table shows each person's role, their groups, how they sign in, and when
 they last signed in. Filter by email, or add a **Role** or **Status** chip to
 narrow the list to one role, or to active, disabled, or single sign-on

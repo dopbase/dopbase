@@ -8,6 +8,7 @@ use app::config::{
 use app::constants::config::{
   DATABASE_FILENAME, DEFAULT_BIND_ADDRESS, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
 };
+use app::services::features::{Feature, Features};
 
 #[test]
 fn defaults_use_the_dopbase_data_directory() {
@@ -548,6 +549,7 @@ fn generated_references_load_defaults_and_uncommented_server_examples() {
   );
   assert!(!reloaded.docs_enabled);
   assert!(reloaded.web_ui_enabled);
+  assert_eq!(reloaded.features, Features::default());
   assert_eq!(reloaded.master_key.provider, "file");
   assert_eq!(reloaded.master_key.path, data_dir.join(MASTER_KEY_FILENAME));
 }
@@ -860,4 +862,215 @@ fn trusted_proxies_read_from_file_and_environment() {
     format!("{error:#}").contains("invalid DOPBASE_TRUSTED_PROXIES"),
     "{error}"
   );
+}
+
+#[test]
+fn features_are_off_unless_the_file_or_environment_turns_them_on() {
+  assert_eq!(ServerConfig::default().features, Features::default());
+  let load = |file: Option<&str>, environment: EnvironmentOverrides| {
+    let directory = tempfile::TempDir::new().unwrap();
+    let data_dir = directory.path().join("data");
+    fs::create_dir_all(&data_dir).unwrap();
+    if let Some(contents) = file {
+      fs::write(data_dir.join(SERVER_CONFIG_FILENAME), contents).unwrap();
+    }
+    ServerConfig::load_with_environment(
+      &ServerOverrides {
+        data_dir: Some(data_dir),
+        ..Default::default()
+      },
+      environment,
+    )
+  };
+  let off = load(None, EnvironmentOverrides::default()).unwrap();
+  assert!(off.features.list().is_empty());
+
+  let file = load(
+    Some("sso = true\nrbac = true\nrbac_roles = true\n"),
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert_eq!(file.features, Features::all());
+  assert_eq!(
+    file.features.list(),
+    [Feature::Sso, Feature::Rbac, Feature::RbacRoles]
+  );
+
+  // The environment wins over the file.
+  let environment = load(
+    Some("sso = true\nrbac = true\n"),
+    EnvironmentOverrides {
+      sso: Some("false".into()),
+      rbac_roles: Some("true".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(
+    environment.features.list(),
+    [Feature::Rbac, Feature::RbacRoles]
+  );
+
+  for (name, environment) in [
+    (
+      "invalid DOPBASE_SSO",
+      EnvironmentOverrides {
+        sso: Some("yes".into()),
+        ..Default::default()
+      },
+    ),
+    (
+      "invalid DOPBASE_RBAC",
+      EnvironmentOverrides {
+        rbac: Some("1".into()),
+        ..Default::default()
+      },
+    ),
+    (
+      "invalid DOPBASE_RBAC_ROLES",
+      EnvironmentOverrides {
+        rbac_roles: Some("on".into()),
+        ..Default::default()
+      },
+    ),
+  ] {
+    assert!(format!("{:#}", load(None, environment).unwrap_err()).contains(name));
+  }
+
+  // No people limit unless one is set; 0 means no limit, like
+  // audit_retention_days.
+  assert_eq!(off.features.max_users, 0);
+  let rbac = |extra: &str| format!("rbac = true\n{extra}");
+  let file = load(
+    Some(&rbac("rbac_max_users = 5\n")),
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert_eq!(file.features.user_limit(), Some(5));
+  let lifted = load(
+    Some(&rbac("rbac_max_users = 5\n")),
+    EnvironmentOverrides {
+      rbac_max_users: Some("0".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(lifted.features.user_limit(), None);
+  let environment = load(
+    Some(&rbac("")),
+    EnvironmentOverrides {
+      rbac_max_users: Some("3".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(environment.features.user_limit(), Some(3));
+  for value in ["-1", "five", "1.5", ""] {
+    let error = load(
+      None,
+      EnvironmentOverrides {
+        rbac_max_users: Some(value.into()),
+        ..Default::default()
+      },
+    )
+    .unwrap_err();
+    assert!(
+      format!("{error:#}").contains("invalid DOPBASE_RBAC_MAX_USERS"),
+      "{value}: {error:#}"
+    );
+  }
+  assert!(
+    load(
+      Some("rbac_max_users = -1\n"),
+      EnvironmentOverrides::default()
+    )
+    .is_err()
+  );
+}
+
+#[test]
+fn a_people_limit_without_rbac_starts_with_a_warning_and_does_nothing() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(directory.path().into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides {
+      rbac_max_users: Some("5".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(config.features.user_limit(), None);
+  let warning = config.features_warning().unwrap();
+  assert!(warning.contains("DOPBASE_RBAC_MAX_USERS"), "{warning}");
+  assert!(warning.contains("DOPBASE_RBAC=true"), "{warning}");
+  assert!(!warning.contains("custom roles"), "{warning}");
+}
+
+#[test]
+fn rbac_roles_without_rbac_starts_with_a_warning_and_stays_off() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(directory.path().into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides {
+      rbac_roles: Some("true".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert!(!config.features.enabled(Feature::RbacRoles));
+  assert!(config.features.list().is_empty());
+  let warning = config.features_warning().unwrap();
+  assert!(warning.contains("DOPBASE_RBAC_ROLES"));
+  assert!(warning.contains("DOPBASE_RBAC=true"));
+
+  let both = Features {
+    rbac: true,
+    rbac_roles: true,
+    ..Features::default()
+  };
+  assert!(both.enabled(Feature::RbacRoles));
+  assert!(ServerConfig::default().features_warning().is_none());
+}
+
+#[test]
+fn disabled_features_block_their_capabilities() {
+  use app::services::authx::Capability;
+  let gated = [
+    Capability::SsoManage,
+    Capability::GroupsManage,
+    Capability::GrantsManage,
+    Capability::RolesManage,
+  ];
+  let all = Features::all();
+  assert!(!gated.iter().any(|capability| all.blocks(*capability)));
+  let off = Features::default();
+  for capability in gated {
+    assert!(off.blocks(capability), "{capability:?}");
+  }
+  // Offboarding and AI agents never depend on a feature.
+  for capability in [
+    Capability::UsersView,
+    Capability::UsersManage,
+    Capability::AgentsView,
+    Capability::AgentsManage,
+  ] {
+    assert!(!off.blocks(capability), "{capability:?}");
+  }
+  let roles_off = Features {
+    sso: true,
+    rbac: true,
+    rbac_roles: false,
+    max_users: 0,
+  };
+  let blocked: Vec<_> = gated
+    .into_iter()
+    .filter(|capability| roles_off.blocks(*capability))
+    .collect();
+  assert_eq!(blocked, [Capability::RolesManage]);
 }

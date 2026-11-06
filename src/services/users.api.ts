@@ -25,6 +25,11 @@ export interface User {
   lastSignInAt: string | null;
   /** The groups the account belongs to. */
   groups: { id: string; name: string }[];
+  /**
+   * True for the accounts the user limit counts, which are active people
+   * other than root. AI agents never count.
+   */
+  countsTowardLimit: boolean;
 }
 /** Just enough of an account to name it. */
 export type UserIdentity = Pick<User, "id" | "email">;

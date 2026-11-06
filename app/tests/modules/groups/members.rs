@@ -302,3 +302,63 @@ async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
   );
   state.db.close().await;
 }
+
+#[tokio::test]
+async fn without_rbac_groups_stay_but_nobody_changes_them() {
+  use app::services::features::Features;
+  let (_dir, state, router) = test_app().await;
+  let (root, _) = instance(&state, &router).await;
+  let member = person(&router, &root, "member@example.com", "member").await;
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/groups",
+    root.browser(),
+    Some(json!({"name":"Backend"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let group = body["data"]["group"]["id"].as_str().unwrap().to_owned();
+  let off = with_features(
+    &state,
+    Features {
+      rbac: false,
+      ..Features::all()
+    },
+  );
+  let member_path = format!("/api/v1/groups/{group}/members/{}", member.id);
+  for (method, path, body) in [
+    ("POST", "/api/v1/groups", Some(json!({"name":"Frontend"}))),
+    (
+      "PATCH",
+      &format!("/api/v1/groups/{group}"),
+      Some(json!({"name":"Core"})),
+    ),
+    ("PUT", &member_path, None),
+    ("DELETE", &format!("/api/v1/groups/{group}"), None),
+  ] {
+    let (status, response) = send(&off, method, path, root.browser(), body).await;
+    feature_disabled(status, &response, "DOPBASE_RBAC=true");
+  }
+  // The group is still there, and back on it changes again. A role that
+  // sees groups through groups.manage alone still lists them.
+  let (status, body) = send(
+    &router,
+    "POST",
+    "/api/v1/roles",
+    root.browser(),
+    Some(json!({"name":"Group keeper","capabilities":["groups.manage"],"maxLevel":"read"})),
+  )
+  .await;
+  assert_eq!(status, 201, "{body}");
+  let keeper_role = body["data"]["id"].as_str().unwrap().to_owned();
+  let keeper =
+    super::audit_scope::with_role(&router, &root, "keeper@example.com", &keeper_role).await;
+  for by in [&root, &keeper] {
+    let (status, body) = send(&off, "GET", "/api/v1/groups", by.browser(), None).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["data"][0]["name"], "Backend", "{body}");
+  }
+  let (status, body) = send(&router, "PUT", &member_path, root.browser(), None).await;
+  assert_eq!(status, 200, "{body}");
+}

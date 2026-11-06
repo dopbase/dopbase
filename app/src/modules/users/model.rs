@@ -56,6 +56,9 @@ pub struct UserResponse {
   pub last_sign_in_at: Option<String>,
   /// The groups the account belongs to, by name.
   pub groups: Vec<GroupRef>,
+  /// True for the accounts the user limit counts, which are active people
+  /// other than root. AI agents never count.
+  pub counts_toward_limit: bool,
 }
 
 /// Just enough of an account to name it.

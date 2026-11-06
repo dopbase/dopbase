@@ -16,6 +16,7 @@ use crate::{
   },
   services::{
     authx::{self, Capability, Level},
+    features::Feature,
     token,
   },
   state::AppState,
@@ -62,10 +63,12 @@ fn validate_description(value: &str) -> Result<String, HttpError> {
 }
 
 /// Seeing groups needs users.view or groups.manage, from the Admin UI.
+/// Groups stay visible while RBAC is off, so a role's groups.manage still
+/// counts here.
 fn require_view(identity: &AuthIdentity) -> Result<(), HttpError> {
   require_browser(identity)?;
   match identity {
-    AuthIdentity::Admin { access, .. } if access.has(Capability::GroupsManage) => Ok(()),
+    AuthIdentity::Admin { access, .. } if access.holds(Capability::GroupsManage) => Ok(()),
     _ => require_capability(identity, Capability::UsersView).map(|_| ()),
   }
 }
@@ -156,11 +159,13 @@ pub async fn get(
 }
 
 fn require_change(
+  state: &AppState,
   identity: &AuthIdentity,
   headers: &HeaderMap,
 ) -> Result<(String, String), HttpError> {
   require_mutation(identity, headers)?;
   require_recent_browser_auth(identity)?;
+  state.config.features.require(Feature::Rbac)?;
   let (id, email) = require_capability_browser(identity, Capability::GroupsManage)?;
   Ok((id.to_owned(), email.to_owned()))
 }
@@ -171,7 +176,7 @@ pub async fn create(
   headers: &HeaderMap,
   request: CreateGroupRequest,
 ) -> Result<GroupDetailResponse, HttpError> {
-  let (actor_id, actor_email) = require_change(identity, headers)?;
+  let (actor_id, actor_email) = require_change(state, identity, headers)?;
   let name = validate_name(&request.name)?;
   let description = validate_description(request.description.as_deref().unwrap_or(""))?;
   let id = token::public_id(GROUP_ID_PREFIX);
@@ -205,7 +210,7 @@ pub async fn update(
   id: &str,
   request: UpdateGroupRequest,
 ) -> Result<GroupDetailResponse, HttpError> {
-  let (actor_id, actor_email) = require_change(identity, headers)?;
+  let (actor_id, actor_email) = require_change(state, identity, headers)?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;
@@ -245,7 +250,7 @@ pub async fn delete(
   headers: &HeaderMap,
   id: &str,
 ) -> Result<(), HttpError> {
-  let (actor_id, actor_email) = require_change(identity, headers)?;
+  let (actor_id, actor_email) = require_change(state, identity, headers)?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;
@@ -274,7 +279,7 @@ pub async fn add_member(
   id: &str,
   user_id: &str,
 ) -> Result<GroupDetailResponse, HttpError> {
-  let (actor_id, actor_email) = require_change(identity, headers)?;
+  let (actor_id, actor_email) = require_change(state, identity, headers)?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;
@@ -317,7 +322,7 @@ pub async fn remove_member(
   id: &str,
   user_id: &str,
 ) -> Result<GroupDetailResponse, HttpError> {
-  let (actor_id, actor_email) = require_change(identity, headers)?;
+  let (actor_id, actor_email) = require_change(state, identity, headers)?;
   let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let group = repository::find(&mut tx, id).await?.ok_or_else(not_found)?;
   require_manages(identity, &mut tx, id).await?;

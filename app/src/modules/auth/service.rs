@@ -101,7 +101,7 @@ pub async fn login(
   let role = AdminRole::parse(&role_value).ok_or_else(HttpError::internal)?;
   // The password was right, so saying why it is refused leaks nothing.
   let mut conn = state.db.pool().acquire().await?;
-  let access = authx::load_access(&mut conn, &admin_id)
+  let access = authx::load_access(&mut conn, &admin_id, &state.config.features)
     .await?
     .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled."))?;
   drop(conn);
@@ -257,6 +257,8 @@ pub async fn session(
   } = identity
   {
     let mut response = session_summary(identity)?;
+    response.features = state.config.features.list();
+    response.max_users = state.config.features.user_limit();
     response.has_password = common::has_password(
       &repository::password_hash(state.db.pool(), admin_id)
         .await?
@@ -296,6 +298,8 @@ fn session_summary(identity: &AuthIdentity) -> Result<SessionResponse, HttpError
       role: *role,
       role_name: access.role_name.clone(),
       capabilities: access.capabilities().collect(),
+      features: Vec::new(),
+      max_users: None,
       max_level: access.max_level,
       token_scope: "none".into(),
       session_kind: *kind,

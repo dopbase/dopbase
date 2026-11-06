@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
+use crate::services::features::Features;
+
 /// How far into a project or environment an account may go. Each level
 /// includes every level below it.
 #[derive(
@@ -201,6 +203,10 @@ pub struct Access {
   /// The deepest level any grant can give this account.
   pub max_level: Level,
   pub sign_in: SignIn,
+  /// The features this server has on. A capability whose feature is off
+  /// counts for nobody, root included. Everything is off until `restrict`,
+  /// so access that never learned the server's settings fails closed.
+  features: Features,
 }
 
 impl Access {
@@ -212,6 +218,7 @@ impl Access {
       capabilities: Capability::ALL.into_iter().collect(),
       max_level: Level::ProjectManager,
       sign_in: SignIn::Interactive,
+      features: Features::default(),
     }
   }
 
@@ -234,6 +241,7 @@ impl Access {
         .collect(),
       max_level,
       sign_in,
+      features: Features::default(),
     }
   }
 
@@ -247,29 +255,63 @@ impl Access {
       capabilities: BTreeSet::new(),
       max_level: Level::None,
       sign_in: SignIn::Interactive,
+      features: Features::default(),
     }
   }
 
+  /// Apply the server's features: capabilities of the ones that are off
+  /// count for nothing. Until this runs, every feature counts as off.
+  pub fn restrict(
+    mut self,
+    features: &Features,
+  ) -> Self {
+    self.features = *features;
+    self
+  }
+
+  /// Whether the account may use `capability` on this server: its role
+  /// holds it and its feature is on.
   pub fn has(
+    &self,
+    capability: Capability,
+  ) -> bool {
+    !self.features.blocks(capability) && self.holds(capability)
+  }
+
+  /// Whether the role holds `capability`, whatever the server has turned
+  /// off. Use it to compare roles and to let people see what exists, never
+  /// to allow a change.
+  pub fn holds(
     &self,
     capability: Capability,
   ) -> bool {
     self.is_root || self.capabilities.contains(&capability)
   }
 
+  /// What the account may use on this server, less the capabilities of
+  /// disabled features.
   pub fn capabilities(&self) -> impl Iterator<Item = Capability> + '_ {
-    self.capabilities.iter().copied()
+    self
+      .capabilities
+      .iter()
+      .copied()
+      .filter(|capability| !self.features.blocks(*capability))
   }
 
   /// Whether this access holds every capability of `other` and a ceiling at
-  /// least as deep. Nobody but root includes root.
+  /// least as deep. Nobody but root includes root. Roles compare by what
+  /// they hold, so turning a feature off never lets someone manage an
+  /// account whose role reaches further than theirs.
   pub fn includes(
     &self,
     other: &Self,
   ) -> bool {
     self.is_root
       || (!other.is_root
-        && other.capabilities().all(|capability| self.has(capability))
+        && other
+          .capabilities
+          .iter()
+          .all(|capability| self.holds(*capability))
         && other.max_level <= self.max_level)
   }
 }
@@ -307,17 +349,24 @@ pub async fn role_access(
   )))
 }
 
-/// The access of an account by id, or `None` when it does not exist or is
+/// What an active account may do on this server, with the capabilities of
+/// disabled features taken away. `None` when it does not exist or is
 /// disabled.
 pub async fn load_access(
   conn: &mut SqliteConnection,
   admin_id: &str,
+  features: &Features,
 ) -> Result<Option<Access>, sqlx::Error> {
-  access_of(conn, admin_id, true).await
+  Ok(
+    access_of(conn, admin_id, true)
+      .await?
+      .map(|access| access.restrict(features)),
+  )
 }
 
 /// The access an account's role gives even while it is disabled, for
-/// deciding who may manage it. `None` when it does not exist.
+/// deciding who may manage it. It ignores which features are on, because
+/// roles compare by what they hold. `None` when it does not exist.
 pub async fn account_access(
   conn: &mut SqliteConnection,
   admin_id: &str,
@@ -635,7 +684,7 @@ pub async fn data_access(
       let mut reach = account_data_access(conn, admin_id, access).await?;
       if let Some(owner_id) = owner_id {
         // A missing or disabled owner leaves the agent nothing.
-        let owner = match load_access(conn, owner_id).await? {
+        let owner = match load_access(conn, owner_id, &access.features).await? {
           Some(owner) => account_data_access(conn, owner_id, &owner).await?,
           None => DataAccess::Uniform(Level::None),
         };

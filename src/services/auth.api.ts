@@ -1,5 +1,5 @@
 import { apiRequest } from "./http.client";
-import type { Capability, Level } from "./access.api";
+import type { Capability, Feature, Level } from "./access.api";
 
 /** Session kinds supported by the server. Browser UI always sends `"browser"`. */
 export type SessionKind = "browser" | "cli";
@@ -38,6 +38,13 @@ export interface SessionResponse {
   roleName?: string;
   /** What the account may do to the instance. Gate the UI on these. */
   capabilities?: Capability[];
+  /** Features the server has on. */
+  features?: Feature[];
+  /**
+   * The most active people the server allows, not counting root and AI
+   * agents. Null when there is no limit.
+   */
+  maxUsers?: number | null;
   /** The deepest level any grant can give the account. */
   maxLevel?: Level;
   /** What the role's personal tokens are for. */
