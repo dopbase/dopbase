@@ -96,13 +96,8 @@ export function useAccessPanelController() {
         return {
           grant,
           isGroup: grant.principalType === "group",
-          // Without RBAC only AI agents' access changes. An agent's name
-          // never contains an @, which a person's email always does.
-          editable:
-            canManage.value &&
-            (rbac.value ||
-              (grant.principalType === "user" &&
-                !grant.principalLabel.includes("@"))),
+          // Without RBAC only AI agents' access changes.
+          editable: canManage.value && (rbac.value || grant.principalAgent),
           where:
             grant.scopeType === "project"
               ? "Whole project"

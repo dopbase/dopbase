@@ -70,6 +70,8 @@ export interface Grant {
   principalId: string;
   /** The user's email or the group's name. */
   principalLabel: string;
+  /** True when the principal is an AI agent. */
+  principalAgent: boolean;
   scopeType: ScopeType;
   scopeId: string;
   /** `project` or `project/environment`. Empty for all projects. */

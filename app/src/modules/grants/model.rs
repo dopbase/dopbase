@@ -74,6 +74,8 @@ pub struct GrantResponse {
   pub principal_id: String,
   /// The user's email or the group's name.
   pub principal_label: String,
+  /// True when the principal is an AI agent.
+  pub principal_agent: bool,
   pub scope_type: ScopeType,
   /// Project or environment id. Empty for all projects.
   pub scope_id: String,

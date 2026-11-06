@@ -559,6 +559,7 @@ describe("useGiveAccessController from a project", () => {
           id: "grt_bot",
           principalId: "usr_bot",
           principalLabel: "review-bot",
+          principalAgent: true,
           scopeType: "environment",
           scopeId: "env_staging",
           scopeLabel: "payments/staging",

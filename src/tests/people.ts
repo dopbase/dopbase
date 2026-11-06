@@ -132,6 +132,7 @@ export function grantFixture(overrides: Partial<Grant> = {}): Grant {
     principalType: "user",
     principalId: "usr_maya",
     principalLabel: "maya@example.com",
+    principalAgent: false,
     scopeType: "project",
     scopeId: "prj_pay",
     scopeLabel: "payments",

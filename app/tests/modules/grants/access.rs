@@ -801,6 +801,30 @@ async fn without_rbac_only_ai_agents_take_new_access() {
   .await;
   assert!(status < 300, "{status} {body}");
 
+  // Project Access tells AI agents from people without guessing.
+  let (status, body) = send(
+    &off,
+    "GET",
+    "/api/v1/projects/payments/access",
+    root.browser(),
+    None,
+  )
+  .await;
+  assert_eq!(status, 200, "{body}");
+  let agent_flags: std::collections::BTreeMap<String, bool> = body["data"]["grants"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|grant| {
+      (
+        grant["principalId"].as_str().unwrap().to_owned(),
+        grant["principalAgent"].as_bool().unwrap(),
+      )
+    })
+    .collect();
+  assert_eq!(agent_flags.get(&member.id), Some(&false), "{body}");
+  assert_eq!(agent_flags.get(&agent), Some(&true), "{body}");
+
   // A grant the caller can't see stays not found, RBAC or not.
   let other = person(&router, &root, "other@example.com", "member").await;
   let (status, body) = grant(

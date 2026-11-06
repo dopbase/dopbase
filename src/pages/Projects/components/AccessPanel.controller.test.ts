@@ -25,6 +25,7 @@ const grant = (overrides: Partial<accessApi.Grant>): accessApi.Grant => ({
   principalType: "user",
   principalId: "usr_member",
   principalLabel: "member@example.com",
+  principalAgent: false,
   scopeType: "project",
   scopeId: "prj_pay",
   scopeLabel: "payments",
@@ -220,6 +221,7 @@ describe("useAccessPanelController", () => {
           id: "grt_agent",
           principalId: "usr_bot",
           principalLabel: "deploy-bot",
+          principalAgent: true,
         }),
       ],
     });
