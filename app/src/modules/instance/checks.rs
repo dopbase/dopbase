@@ -660,7 +660,7 @@ async fn user_limit(
       CheckStatus::Warn,
       "User limit exceeded",
       format!(
-        "{used} active users exceeds the configured limit of {max}. Existing users keep access. To add or enable a user, reduce the active user count below the limit or ask your instance administrator to increase it."
+        "This instance has {used} active users, above its limit of {max}. Existing users keep access. To add or enable a user, disable or delete enough active users to get below the limit, or ask your instance administrator to increase the limit."
       ),
       now,
     )

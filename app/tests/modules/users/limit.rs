@@ -173,6 +173,12 @@ async fn the_people_limit_counts_active_people_only() {
   let check = user_limit_check(&one, &root).await.unwrap();
   assert_eq!(check["status"], "warn", "{check}");
   assert_eq!(check["title"], "User limit exceeded");
+  assert!(
+    check["detail"].as_str().is_some_and(
+      |detail| detail.starts_with("This instance has 2 active users, above its limit of 1.")
+    ),
+    "{check}"
+  );
   assert_eq!(check["value"], "2 of 1");
 
   // The limit needs RBAC, like adding people does.
