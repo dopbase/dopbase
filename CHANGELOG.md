@@ -105,6 +105,9 @@ All notable changes to Dopbase are documented in this file.
   restart.
 - The sidebar's **People & access** section is now **Access**, which fits
   members who only see AI agents as well as admins.
+- Opening Single sign-on, Groups or Roles while the server has that feature
+  off says what it needs and that a server administrator can turn it on, with
+  a **docs** link instead of the setting to change.
 - The role editor uses the full page width. Each section has its
   explanation beside its fields, and a Summary before **Create role** shows how
   far the role reaches, what holders can do, their tokens, who can give it
