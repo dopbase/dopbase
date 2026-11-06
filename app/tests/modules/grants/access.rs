@@ -801,6 +801,29 @@ async fn without_rbac_only_ai_agents_take_new_access() {
   .await;
   assert!(status < 300, "{status} {body}");
 
+  // Someone who can't grant here gets the same answer for a person and an
+  // AI agent, so the refusal doesn't tell agents apart.
+  let bystander = person(&router, &root, "bystander@example.com", "member").await;
+  let mut refusals = Vec::new();
+  for id in [&bystander.id, &agent] {
+    refusals.push(
+      grant(
+        &off,
+        &member,
+        ("user", id),
+        ("project", Some("payments")),
+        "read",
+      )
+      .await,
+    );
+  }
+  assert_eq!(refusals[0], refusals[1], "{refusals:?}");
+  assert!(refusals[0].0 >= 400, "{refusals:?}");
+  assert!(
+    refusals[0].1["error"]["FEATURE_DISABLED"].is_null(),
+    "{refusals:?}"
+  );
+
   // Project Access tells AI agents from people without guessing.
   let (status, body) = send(
     &off,

@@ -251,10 +251,6 @@ pub async fn set(
   let (actor_id, actor_email) = require_browser(identity)?;
   validate_level(request.scope_type, request.level)?;
   let agent = principal_agent(state, request.principal_type, &request.principal_id).await?;
-  // Without RBAC only AI agents take new access.
-  if agent.is_none() {
-    state.config.features.require(Feature::Rbac)?;
-  }
   let own_agent = for_own_agent(identity, actor_id, agent.as_ref(), request.scope_type);
   let scope = if own_agent {
     authorize_own_agent_scope(
@@ -287,6 +283,12 @@ pub async fn set(
     own_agent,
   )
   .await?;
+  // Without RBAC only AI agents take new access. Checked once the caller
+  // may grant here and see the principal, so the answer says nothing about
+  // accounts they can't.
+  if agent.is_none() {
+    state.config.features.require(Feature::Rbac)?;
+  }
   let previous = repository::existing_level(
     &mut tx,
     request.principal_type,
