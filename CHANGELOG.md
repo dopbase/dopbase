@@ -6,6 +6,10 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `DOPBASE_SSO`, `DOPBASE_RBAC` and `DOPBASE_RBAC_ROLES` (`sso`, `rbac`,
+  `rbac_roles` in `server.toml`) turn on single sign-on, people and group
+  management, and custom roles. `GET /api/v1/auth/session` lists them in
+  `features`; a feature that's off answers `403` `FEATURE_DISABLED`.
 - AI agents have their own capabilities. `agents.view` creates agents and
   runs the ones you own, `agents.view_all` shows every agent, and
   `agents.manage` changes, deletes, or transfers anyone's. Admins get all
@@ -87,6 +91,9 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- **Breaking:** Single sign-on and people management are off by default. If
+  you use them, set `DOPBASE_SSO=true` and `DOPBASE_RBAC=true` before
+  upgrading, or accounts that only sign in with single sign-on are locked out.
 - Audit records are kept for 365 days by default, and
   `audit_retention_days = 0` keeps them forever. Leaving the setting out used
   to keep everything, so an instance whose `server.toml` has no
