@@ -45,6 +45,7 @@ const {
   isYou,
   canManage,
   rbac,
+  enableBlocked,
   subtitle,
   created,
   accessSummary,
@@ -572,15 +573,18 @@ const card = "rounded-card border border-line bg-panel p-4 sm:p-5";
               </p>
               <p class="text-sm text-ink-muted">
                 {{
-                  user.status === "disabled"
-                    ? "They can sign in again with the access they had."
-                    : "Signs them out everywhere and stops their tokens. Nothing is deleted."
+                  enableBlocked
+                    ? "This instance is at its user limit. Disable or delete an active user before turning this account back on."
+                    : user.status === "disabled"
+                      ? "They can sign in again with the access they had."
+                      : "Signs them out everywhere and stops their tokens. Nothing is deleted."
                 }}
               </p>
             </div>
             <DbButton
               v-if="user.status === 'disabled'"
               data-testid="enable-user"
+              :disabled="enableBlocked"
               @click="actions.ask('enable', user)">
               Turn back on
             </DbButton>

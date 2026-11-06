@@ -21,9 +21,9 @@ are read-only. See
 When the instance has a [user limit](/self-hosting/operations#people-limit),
 the page shows the count next to **Add user**, such as `3 of 5 active users`.
 Root, AI agents and disabled accounts don't count. Once the limit is reached,
-**Add user** turns off and the page says so. To add or enable a user, disable
-or delete an active user, or ask your instance administrator to increase the
-limit.
+**Add user** and **Turn account back on** turn off and the page says so. To
+add or enable a user, disable or delete an active user, or ask your instance
+administrator to increase the limit.
 
 The table shows each person's role, their groups, how they sign in, and when
 they last signed in. Filter by email, or add a **Role** or **Status** chip to

@@ -239,6 +239,7 @@ const signInClass: Record<SignInMethod, string> = {
                     </DbMenuItem>
                     <DbMenuItem
                       v-if="row.actions.includes('enable')"
+                      :disabled="limit?.full"
                       @select="actions.ask('enable', row.user)">
                       <template #icon><LockIcon class="h-4 w-4" /></template>
                       Turn account back on

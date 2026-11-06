@@ -9,13 +9,8 @@ import { loadFailure, shownData } from "~/queries/helpers";
 import { useInvalidate } from "~/queries/invalidate";
 import { rolesQuery, usersQuery } from "~/queries/users";
 import { formatRelativeTime } from "~/utils/format";
-import {
-  isAgent,
-  roleOf,
-  signInMethod,
-  userLimit,
-  type SignInMethod,
-} from "./people";
+import { isAgent, roleOf, signInMethod, type SignInMethod } from "./people";
+import { useUserLimit } from "./user-limit";
 import { useAccountActions, type AccountActionKind } from "./account-actions";
 
 export interface UserRow {
@@ -84,9 +79,7 @@ export function useUsersController() {
     () => canManage.value && auth.hasFeature("rbac"),
   );
   /** How full the server's people limit is, or null when there is none. */
-  const limit = computed(() =>
-    users.value ? userLimit(users.value, auth.session?.maxUsers) : null,
-  );
+  const limit = useUserLimit();
   /** Nobody new fits once the limit is full; the server refuses too. */
   const canAdd = computed(
     () => canManagePeople.value && !(limit.value?.full ?? false),
