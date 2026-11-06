@@ -204,7 +204,8 @@ pub struct Access {
   pub max_level: Level,
   pub sign_in: SignIn,
   /// The features this server has on. A capability whose feature is off
-  /// counts for nobody, root included. Everything is on until `restrict`.
+  /// counts for nobody, root included. Everything is off until `restrict`,
+  /// so access that never learned the server's settings fails closed.
   features: Features,
 }
 
@@ -217,7 +218,7 @@ impl Access {
       capabilities: Capability::ALL.into_iter().collect(),
       max_level: Level::ProjectManager,
       sign_in: SignIn::Interactive,
-      features: Features::all(),
+      features: Features::default(),
     }
   }
 
@@ -240,7 +241,7 @@ impl Access {
         .collect(),
       max_level,
       sign_in,
-      features: Features::all(),
+      features: Features::default(),
     }
   }
 
@@ -254,11 +255,12 @@ impl Access {
       capabilities: BTreeSet::new(),
       max_level: Level::None,
       sign_in: SignIn::Interactive,
-      features: Features::all(),
+      features: Features::default(),
     }
   }
 
-  /// Take away the capabilities of features this server has turned off.
+  /// Apply the server's features: capabilities of the ones that are off
+  /// count for nothing. Until this runs, every feature counts as off.
   pub fn restrict(
     mut self,
     features: &Features,

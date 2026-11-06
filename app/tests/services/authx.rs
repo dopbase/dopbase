@@ -285,7 +285,7 @@ fn a_role_can_never_hold_a_root_only_capability() {
     assert!(!access.has(capability), "{capability:?}");
   }
   assert!(access.has(Capability::UsersManage));
-  let root = Access::root();
+  let root = Access::root().restrict(&app::services::features::Features::all());
   assert!(
     Capability::ALL
       .into_iter()
@@ -336,7 +336,10 @@ async fn loads_access_from_the_built_in_roles() {
   .await
   .unwrap()
   .unwrap();
-  assert_eq!(root, Access::root());
+  assert_eq!(
+    root,
+    Access::root().restrict(&app::services::features::Features::all())
+  );
 
   let admin = authx::load_access(
     &mut conn,
@@ -384,7 +387,10 @@ async fn loads_access_from_the_built_in_roles() {
   .await
   .unwrap()
   .unwrap();
-  assert_eq!(orphan, Access::none());
+  assert_eq!(
+    orphan,
+    Access::none().restrict(&app::services::features::Features::all())
+  );
 
   assert!(
     authx::load_access(
@@ -528,6 +534,9 @@ async fn rejects_grants_the_schema_does_not_allow() {
 fn disabled_features_bind_root_and_do_not_count_between_roles() {
   use app::services::features::Features;
   let off = Features::default();
+  // Access that never learned the server's features fails closed.
+  assert!(!Access::root().has(Capability::SsoManage));
+  assert!(Access::root().holds(Capability::SsoManage));
   let root = Access::root().restrict(&off);
   assert!(!root.has(Capability::SsoManage));
   assert!(!root.has(Capability::GroupsManage));
