@@ -88,6 +88,14 @@ pub async fn run(
     audit_retention(state, now).await,
     now,
   ));
+  if let Some(max) = state.config.features.user_limit() {
+    checks.push(settle(
+      "users.limit",
+      "the people limit",
+      user_limit(pool, max, now).await,
+      now,
+    ));
+  }
   checks.push(public_url(state, now));
   checks.push(https(state, now));
   checks.extend(release.and_then(|release| version(release, now)));
@@ -632,6 +640,57 @@ async fn audit_retention(
       now,
     )
     .value(format!("{days} {}", plural(days as i64, "day", "days"))),
+  })
+}
+
+/// How full the people limit is. A full limit warns, because nobody can be
+/// added or enabled until someone leaves.
+async fn user_limit(
+  pool: &SqlitePool,
+  max: u32,
+  now: DateTime<Utc>,
+) -> Result<Check> {
+  let used = crate::modules::users::repository::active_people(pool).await?;
+  let max = i64::from(max);
+  let value = format!("{used} of {max}");
+  let result = if used > max {
+    check(
+      "users.limit",
+      CheckStatus::Warn,
+      "More people than the limit allows",
+      format!(
+        "{used} people are active but DOPBASE_RBAC_MAX_USERS is {max}. Everyone keeps access, but nobody can be added or enabled until fewer than {max} are active."
+      ),
+      now,
+    )
+  } else if used == max {
+    check(
+      "users.limit",
+      CheckStatus::Warn,
+      "The people limit is full",
+      format!(
+        "All {max} spots are taken, so nobody can be added or enabled. Disable or delete someone, or raise DOPBASE_RBAC_MAX_USERS."
+      ),
+      now,
+    )
+  } else {
+    let left = max - used;
+    check(
+      "users.limit",
+      CheckStatus::Ok,
+      "There's room for more people",
+      format!(
+        "{left} of {max} {} left. Root and AI agents don't count.",
+        plural(left, "spot", "spots")
+      ),
+      now,
+    )
+  }
+  .value(value);
+  Ok(if used >= max {
+    result.fix("/users")
+  } else {
+    result
   })
 }
 

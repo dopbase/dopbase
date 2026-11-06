@@ -3,8 +3,10 @@ use super::{
   repository::{self, Account, NewUser, UserRow},
 };
 use crate::{
+  constants::config::ENV_RBAC_MAX_USERS,
   constants::errors::AUTHORIZATION_DENIED,
   constants::errors::PASSWORD_REQUIRED,
+  constants::errors::USER_LIMIT_REACHED,
   extractors::{
     require_browser, require_capability_browser, require_mutation, require_recent_browser_auth,
   },
@@ -282,6 +284,32 @@ const ACCOUNT_VIEWERS: [Capability; 4] = [
   Capability::AgentsManage,
 ];
 
+/// Refused when the instance already holds as many active people as
+/// `DOPBASE_RBAC_MAX_USERS` allows.
+fn user_limit_reached(max: u32) -> HttpError {
+  let people = if max == 1 { "person" } else { "people" };
+  HttpError::conflict(
+    USER_LIMIT_REACHED,
+    &format!(
+      "This server allows {max} active {people}, and that's how many it has. Disable or delete someone first, or raise {ENV_RBAC_MAX_USERS}."
+    ),
+  )
+}
+
+/// Refuse early, before slower work like hashing a password, when the
+/// people limit is already reached. The write checks again.
+async fn require_room(
+  state: &AppState,
+  limit: Option<u32>,
+) -> Result<(), HttpError> {
+  if let Some(max) = limit
+    && repository::active_people(state.db.pool()).await? >= i64::from(max)
+  {
+    return Err(user_limit_reached(max));
+  }
+  Ok(())
+}
+
 fn user_not_found() -> HttpError {
   HttpError::not_found("USER_NOT_FOUND", "The user was not found.")
 }
@@ -414,6 +442,13 @@ pub async fn create(
   if !agent {
     state.config.features.require(Feature::Rbac)?;
   }
+  // Only people count toward the limit, never AI agents.
+  let limit = if agent {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
+  require_room(state, limit).await?;
   let email = if agent {
     validate_agent_name(&request.email)?
   } else {
@@ -467,17 +502,20 @@ pub async fn create(
       owner_id: agent.then_some(actor_id),
       created_by: actor_id,
       now: &now,
+      limit,
     },
   )
   .await;
-  if let Err(error) = inserted {
-    if error.to_string().contains("UNIQUE") {
+  match inserted {
+    Ok(true) => {}
+    Ok(false) => return Err(user_limit_reached(limit.unwrap_or_default())),
+    Err(error) if error.to_string().contains("UNIQUE") => {
       return Err(HttpError::conflict(
         "EMAIL_ALREADY_EXISTS",
         "An account with this email already exists.",
       ));
     }
-    return Err(error.into());
+    Err(error) => return Err(error.into()),
   }
   if let Some(level) = starting_grant(identity, &chosen.id) {
     repository::set_all_projects_grant(&mut tx, &id, Some(level), actor_id, &now).await?;
@@ -808,9 +846,26 @@ pub async fn set_status(
   } else {
     ("active", "user.enabled")
   };
+  // Enabling a person takes a spot under the people limit; AI agents and
+  // disabling never do.
+  let limit = if disable || account.agent || account.status != "disabled" {
+    None
+  } else {
+    state.config.features.user_limit()
+  };
+  require_room(state, limit).await?;
   let now = Utc::now().to_rfc3339();
   let mut tx = state.db.pool().begin().await?;
-  if repository::set_status(&mut tx, id, value, &now).await? {
+  let changed = repository::set_status(&mut tx, id, value, limit, &now).await?;
+  // Someone else may have enabled the account in the meantime; otherwise
+  // the limit stopped it.
+  if !changed
+    && let Some(max) = limit
+    && repository::status(&mut tx, id).await?.as_deref() == Some("disabled")
+  {
+    return Err(user_limit_reached(max));
+  }
+  if changed {
     if disable {
       repository::revoke_sessions(&mut tx, id, &now).await?;
       repository::cancel_device_approvals(&mut tx, id, &now).await?;

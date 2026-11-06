@@ -936,6 +936,77 @@ fn features_are_off_unless_the_file_or_environment_turns_them_on() {
   ] {
     assert!(format!("{:#}", load(None, environment).unwrap_err()).contains(name));
   }
+
+  // No people limit unless one is set; 0 means no limit, like
+  // audit_retention_days.
+  assert_eq!(off.features.max_users, 0);
+  let rbac = |extra: &str| format!("rbac = true\n{extra}");
+  let file = load(
+    Some(&rbac("rbac_max_users = 5\n")),
+    EnvironmentOverrides::default(),
+  )
+  .unwrap();
+  assert_eq!(file.features.user_limit(), Some(5));
+  let lifted = load(
+    Some(&rbac("rbac_max_users = 5\n")),
+    EnvironmentOverrides {
+      rbac_max_users: Some("0".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(lifted.features.user_limit(), None);
+  let environment = load(
+    Some(&rbac("")),
+    EnvironmentOverrides {
+      rbac_max_users: Some("3".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(environment.features.user_limit(), Some(3));
+  for value in ["-1", "five", "1.5", ""] {
+    let error = load(
+      None,
+      EnvironmentOverrides {
+        rbac_max_users: Some(value.into()),
+        ..Default::default()
+      },
+    )
+    .unwrap_err();
+    assert!(
+      format!("{error:#}").contains("invalid DOPBASE_RBAC_MAX_USERS"),
+      "{value}: {error:#}"
+    );
+  }
+  assert!(
+    load(
+      Some("rbac_max_users = -1\n"),
+      EnvironmentOverrides::default()
+    )
+    .is_err()
+  );
+}
+
+#[test]
+fn a_people_limit_without_rbac_starts_with_a_warning_and_does_nothing() {
+  let directory = tempfile::TempDir::new().unwrap();
+  let config = ServerConfig::load_with_environment(
+    &ServerOverrides {
+      data_dir: Some(directory.path().into()),
+      ..Default::default()
+    },
+    EnvironmentOverrides {
+      rbac_max_users: Some("5".into()),
+      ..Default::default()
+    },
+  )
+  .unwrap();
+  assert_eq!(config.features.user_limit(), None);
+  let warning = config.features_warning().unwrap();
+  assert!(warning.contains("DOPBASE_RBAC_MAX_USERS"), "{warning}");
+  assert!(warning.contains("DOPBASE_RBAC=true"), "{warning}");
+  assert!(!warning.contains("custom roles"), "{warning}");
 }
 
 #[test]
@@ -995,6 +1066,7 @@ fn disabled_features_block_their_capabilities() {
     sso: true,
     rbac: true,
     rbac_roles: false,
+    max_users: 0,
   };
   let blocked: Vec<_> = gated
     .into_iter()

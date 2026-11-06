@@ -36,6 +36,9 @@ pub struct SessionResponse {
   /// Features this server has on: `sso`, `rbac` and `rbac.roles`. A page
   /// for a feature that's off has nothing to show.
   pub features: Vec<crate::services::features::Feature>,
+  /// The most active people the server allows, root and AI agents not
+  /// counted. `null` when there is no limit.
+  pub max_users: Option<u32>,
   /// The deepest project and environment access any grant can give.
   pub max_level: Level,
   /// What the role's personal tokens are for: `data`, `audit`, or `none`.

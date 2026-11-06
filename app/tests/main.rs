@@ -1492,6 +1492,8 @@ mod tokens_personal_tokens;
 mod users_agents;
 #[path = "modules/users/lifecycle.rs"]
 mod users_lifecycle;
+#[path = "modules/users/limit.rs"]
+mod users_limit;
 
 #[tokio::test]
 async fn audit_records_store_the_client_ip_through_trusted_proxies_only() {
