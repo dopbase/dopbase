@@ -72,6 +72,29 @@ pub(crate) fn is_availability_error(error: &anyhow::Error) -> bool {
   error.downcast_ref::<AvailabilityError>().is_some()
 }
 
+/// Nothing accepted the connection: no server is listening at the address.
+/// Unlike a timeout or a bad response, this says nothing about what would
+/// answer there once a server starts.
+#[derive(Debug)]
+pub(crate) struct UnreachableError {
+  message: String,
+}
+
+impl fmt::Display for UnreachableError {
+  fn fmt(
+    &self,
+    formatter: &mut fmt::Formatter<'_>,
+  ) -> fmt::Result {
+    formatter.write_str(&self.message)
+  }
+}
+
+impl std::error::Error for UnreachableError {}
+
+pub(crate) fn is_unreachable_error(error: &anyhow::Error) -> bool {
+  error.downcast_ref::<UnreachableError>().is_some()
+}
+
 #[derive(Debug)]
 struct ResponseError {
   status: reqwest::StatusCode,
@@ -473,6 +496,9 @@ Check DNS, TLS, proxy, and network settings, then try again."
   };
   if classify_availability {
     return AvailabilityError::new(message).into();
+  }
+  if error.is_connect() {
+    return UnreachableError { message }.into();
   }
   anyhow::anyhow!(message)
 }
