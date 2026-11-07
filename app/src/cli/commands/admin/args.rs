@@ -2,9 +2,7 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 
-use crate::constants::limits::{
-  LAUNCH_PASSCODE_DEFAULT_SECONDS, LAUNCH_PASSCODE_MAX_SECONDS, LAUNCH_PASSCODE_MIN_SECONDS,
-};
+use crate::services::passcodes::PasscodePurpose;
 
 #[derive(Subcommand, Debug)]
 pub enum AdminCommand {
@@ -40,8 +38,8 @@ pub enum AdminCommand {
     #[arg(
       long,
       value_name = "SECONDS",
-      default_value_t = LAUNCH_PASSCODE_DEFAULT_SECONDS,
-      value_parser = clap::value_parser!(i64).range(LAUNCH_PASSCODE_MIN_SECONDS..=LAUNCH_PASSCODE_MAX_SECONDS)
+      default_value_t = PasscodePurpose::Launch.default_ttl_seconds(),
+      value_parser = clap::value_parser!(i64).range(PasscodePurpose::Launch.ttl_range_seconds())
     )]
     ttl: i64,
     /// Server config file to load (server.toml).
