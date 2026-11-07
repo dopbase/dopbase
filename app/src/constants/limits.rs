@@ -22,6 +22,13 @@ pub const SSO_FLOW_MINUTES: i64 = 10;
 pub const SSO_HANDOFF_SECONDS: i64 = 60;
 pub const MAX_PENDING_SSO_FLOWS: i64 = 1_000;
 pub const MAX_PENDING_SSO_FLOWS_PER_CLIENT: i64 = 20;
+/// Lifetime of a `dopbase admin passcode` launch passcode when `--ttl` is
+/// not given, and the range `--ttl` accepts.
+pub const LAUNCH_PASSCODE_DEFAULT_SECONDS: i64 = 60;
+pub const LAUNCH_PASSCODE_MIN_SECONDS: i64 = 15;
+pub const LAUNCH_PASSCODE_MAX_SECONDS: i64 = 600;
+/// Wrong tries that burn a launch passcode.
+pub const LAUNCH_PASSCODE_MAX_FAILURES: i64 = 5;
 
 pub const MAX_SECRETS_PER_ENVIRONMENT: usize = 1_000;
 /// How many environments one comparison reads against its base.

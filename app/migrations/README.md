@@ -73,6 +73,7 @@ The current pre-release schema is assembled in this order:
 20261026093115_audit_read_all.up.sql
 20261031120000_admin_last_sign_in.up.sql
 20261031120100_cli_device_client.up.sql
+20261107025920_passcodes.up.sql
 ```
 
 The up file applies the change. The down file removes only that version's
@@ -109,7 +110,10 @@ every audit event now that `audit.read` alone is limited to the reader's
 projects, and `tokens.personal`, so auditors can hold audit tokens.
 `admin_last_sign_in` records when each account last signed in.
 `cli_device_client` stores the client name a browser CLI login sends, such
-as `dopbase 0.2.0 on macOS`, for the approval page.
+as `dopbase 0.2.0 on macOS`, for the approval page. `passcodes` adds
+short one-time codes tied to an account and a purpose, first used by
+`dopbase admin passcode` to sign an account in from the server. Only hashes
+are stored, and an account has at most one live code per purpose.
 
 The database test suite applies all migrations, rolls back to version zero,
 and reapplies them.
