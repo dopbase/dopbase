@@ -28,48 +28,13 @@ use crate::{
   modules::common,
   services::{client_ip, token},
   state::AppState,
+  utils::passcode,
 };
 use axum::http::StatusCode;
 use chrono::{DateTime, Duration, Utc};
 
-/// Consonants only (RFC 8628 section 6.1): no vowels to spell words, and
-/// nothing that reads as another character.
-const USER_CODE_ALPHABET: &[u8] = b"BCDFGHJKLMNPQRSTVWXZ";
-const USER_CODE_LENGTH: usize = 8;
 const MAX_HOSTNAME_LENGTH: usize = 64;
 const MAX_CLIENT_LENGTH: usize = 80;
-
-fn generate_user_code() -> Result<String, HttpError> {
-  let mut code = String::with_capacity(USER_CODE_LENGTH);
-  // Rejection sampling keeps every letter equally likely: 240 is the
-  // largest multiple of the alphabet size that fits in a byte.
-  let limit = (256 / USER_CODE_ALPHABET.len() * USER_CODE_ALPHABET.len()) as u8;
-  while code.len() < USER_CODE_LENGTH {
-    let mut bytes = [0_u8; 16];
-    getrandom::fill(&mut bytes).map_err(|_| HttpError::internal())?;
-    for byte in bytes {
-      if byte < limit && code.len() < USER_CODE_LENGTH {
-        code.push(USER_CODE_ALPHABET[byte as usize % USER_CODE_ALPHABET.len()] as char);
-      }
-    }
-  }
-  Ok(code)
-}
-
-/// `WDJB-MJHT`, `wdjb mjht`, and `WDJBMJHT` are the same code.
-fn normalize_user_code(value: &str) -> Option<String> {
-  let code: String = value
-    .chars()
-    .filter(|character| !matches!(character, '-' | ' '))
-    .map(|character| character.to_ascii_uppercase())
-    .collect();
-  (code.len() == USER_CODE_LENGTH && code.bytes().all(|byte| USER_CODE_ALPHABET.contains(&byte)))
-    .then_some(code)
-}
-
-fn display_user_code(code: &str) -> String {
-  format!("{}-{}", &code[..4], &code[4..])
-}
 
 /// The hostname is shown to the approver, so keep it short and plain.
 fn sanitize_hostname(value: Option<&str>) -> Option<String> {
@@ -218,7 +183,7 @@ pub async fn start(
   // fail the login when one happens.
   let mut user_code = None;
   for _ in 0..3 {
-    let candidate = generate_user_code()?;
+    let candidate = passcode::generate().map_err(|_| HttpError::internal())?;
     let inserted = repository::insert_device_request(
       &mut tx,
       NewDeviceRequest {
@@ -243,7 +208,7 @@ pub async fn start(
   let user_code = user_code.ok_or_else(HttpError::internal)?;
   tx.commit().await?;
 
-  let user_code = display_user_code(&user_code);
+  let user_code = passcode::display(&user_code);
   let verification_uri = format!(
     "{}{CLI_APPROVE_PAGE}",
     state.config.public_url.trim_end_matches('/')
@@ -399,7 +364,7 @@ async fn user_code_hash(
   if !state.rate_limiter.check(&limit_key).await {
     return Err(rate_limited());
   }
-  match normalize_user_code(user_code) {
+  match passcode::normalize(user_code) {
     Some(code) => Ok((limit_key, token::hash(&code))),
     None => {
       state.rate_limiter.failure(&limit_key).await;
