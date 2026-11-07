@@ -192,6 +192,40 @@ pub enum SignIn {
   TokenOnly,
 }
 
+/// Why an account can't sign in to a session without single sign-on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SignInRefusal {
+  /// The account is turned off.
+  Disabled,
+  /// The account signs in with tokens only, as AI agents do.
+  TokenOnly,
+  /// Single sign-on is required and the account isn't the break-glass one.
+  SsoRequired,
+}
+
+/// The one rule for signing in without single sign-on, shared by password
+/// login, launch passcodes and `dopbase admin passcode`. `access` is `None`
+/// for a turned-off account. `require_sso` reads the instance policy and only
+/// runs when the answer depends on it.
+pub async fn sign_in_refusal<E, F>(
+  access: Option<&Access>,
+  require_sso: impl FnOnce() -> F,
+) -> Result<Option<SignInRefusal>, E>
+where
+  F: std::future::Future<Output = Result<bool, E>>,
+{
+  let Some(access) = access else {
+    return Ok(Some(SignInRefusal::Disabled));
+  };
+  if access.sign_in == SignIn::TokenOnly {
+    return Ok(Some(SignInRefusal::TokenOnly));
+  }
+  if !access.has(Capability::PasswordBreakglass) && require_sso().await? {
+    return Ok(Some(SignInRefusal::SsoRequired));
+  }
+  Ok(None)
+}
+
 /// What an account may do, resolved from its role when it authenticates.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Access {

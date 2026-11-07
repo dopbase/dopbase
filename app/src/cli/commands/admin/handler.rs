@@ -122,7 +122,7 @@ async fn mint_launch_passcode(
   ttl: i64,
 ) -> Result<IssuedPasscode> {
   use crate::services::{
-    authx::{self, Capability, SignIn},
+    authx::{self, SignInRefusal},
     passcodes::{self, PasscodePurpose},
   };
 
@@ -142,19 +142,25 @@ async fn mint_launch_passcode(
       .await?;
   let (admin_id, email) = account.context("no account exists with that email")?;
   let mut connection = db.pool().acquire().await?;
-  let access = authx::load_access(&mut connection, &admin_id, &config.features)
-    .await?
-    .with_context(|| format!("{email} is turned off, so it can't sign in"))?;
+  let access = authx::load_access(&mut connection, &admin_id, &config.features).await?;
   drop(connection);
-  if access.sign_in == SignIn::TokenOnly {
-    bail!("{email} signs in with tokens only, so it can't use a passcode");
-  }
-  if !access.has(Capability::PasswordBreakglass)
-    && crate::modules::sso::service::policy_for(db.pool(), &config.features)
-      .await?
-      .require_sso
-  {
-    bail!("single sign-on is required on this instance, so only root can sign in with a passcode");
+  let refusal = authx::sign_in_refusal(access.as_ref(), || async {
+    Ok::<_, anyhow::Error>(
+      crate::modules::sso::service::policy_for(db.pool(), &config.features)
+        .await?
+        .require_sso,
+    )
+  })
+  .await?;
+  match refusal {
+    None => {}
+    Some(SignInRefusal::Disabled) => bail!("{email} is turned off, so it can't sign in"),
+    Some(SignInRefusal::TokenOnly) => {
+      bail!("{email} signs in with tokens only, so it can't use a passcode")
+    }
+    Some(SignInRefusal::SsoRequired) => {
+      bail!("single sign-on is required on this instance, so only root can sign in with a passcode")
+    }
   }
 
   let code = crate::utils::passcode::generate()

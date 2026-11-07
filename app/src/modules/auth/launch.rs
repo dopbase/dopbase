@@ -10,7 +10,7 @@ use crate::{
   models::{AdminRole, AuthIdentity, SessionKind},
   modules::common,
   services::{
-    authx::{self, Capability, SignIn},
+    authx,
     passcodes::{self, Consumed, PasscodePurpose},
   },
   state::AppState,
@@ -77,15 +77,15 @@ pub async fn launch(
   let allowed = match (&account, consumed) {
     (Some((admin_id, ..)), Consumed::Used) => {
       let access = authx::load_access(&mut tx, admin_id, &state.config.features).await?;
-      match access {
-        Some(access) if access.sign_in != SignIn::TokenOnly => {
-          access.has(Capability::PasswordBreakglass)
-            || !crate::modules::sso::service::policy(state)
-              .await?
-              .require_sso
-        }
-        _ => false,
-      }
+      authx::sign_in_refusal(access.as_ref(), || async {
+        Ok::<_, HttpError>(
+          crate::modules::sso::service::policy(state)
+            .await?
+            .require_sso,
+        )
+      })
+      .await?
+      .is_none()
     }
     _ => false,
   };
