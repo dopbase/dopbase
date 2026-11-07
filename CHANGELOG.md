@@ -110,6 +110,8 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- Example emails in CLI help, the sign-in and setup placeholders, and the docs
+  use `dopbase.com` addresses, such as `root@dopbase.com`.
 - `dopbase client connect local` no longer needs the local server to be
   running. If nothing answers, it switches after confirmation and tells you to
   run `dopbase server start` and `dopbase login`. `local` now follows the
