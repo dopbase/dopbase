@@ -13,8 +13,11 @@ All notable changes to Dopbase are documented in this file.
   600), works once, and is deleted after five wrong tries. AI agents, turned-off
   accounts, and anyone but root while single sign-on is required are refused.
   `POST /api/v1/auth/launch` trades the passcode for a browser session, and
-  every failure answers `401` `PASSCODE_INVALID`. It refuses while the CLI is
-  connected to a different server.
+  every failure answers `401` `PASSCODE_INVALID`. Failed tries are limited per
+  email and client address, and tries while no passcode is live don't count,
+  so someone who only knows the email can't lock its owner out. If the server
+  doesn't answer, the `/launch` page offers to send the same passcode again.
+  It refuses while the CLI is connected to a different server.
 - `DOPBASE_SSO`, `DOPBASE_RBAC` and `DOPBASE_RBAC_ROLES` (`sso`, `rbac`,
   `rbac_roles` in `server.toml`) turn on single sign-on, people and group
   management, and custom roles. `GET /api/v1/auth/session` lists them in
@@ -118,7 +121,9 @@ All notable changes to Dopbase are documented in this file.
   instance's public URL from `server.toml` or `DOPBASE_PUBLIC_URL` instead of
   always meaning `http://localhost:8840`. Passing your own instance's URL works
   the same way. Something that answers but isn't Dopbase is still refused,
-  and other servers still have to be reachable. `--json` output adds
+  and other servers still have to be reachable. With nothing saved, `local`
+  stays on the default address when that already reaches this machine's
+  server, so it doesn't switch or sign you out. `--json` output adds
   `server_reachable`. See [client connect](docs/cli/client-connect.md#return-to-the-local-server).
 - **Breaking:** Single sign-on and people management are off by default. If
   you use them, set `DOPBASE_SSO=true` and `DOPBASE_RBAC=true` before
@@ -292,7 +297,8 @@ All notable changes to Dopbase are documented in this file.
   [client connect](docs/cli/client-connect.md).
 - `dopbase admin reset-password` and `dopbase admin factory-reset` refuse
   while the CLI is connected to a different server, instead of changing the
-  local instance. See [server administration](docs/cli/commands.md#server-administration).
+  local instance. That includes another server on this instance's own port,
+  such as a container published on it, while this instance is stopped. See [server administration](docs/cli/commands.md#server-administration).
 - `dopbase admin reset-password` no longer creates a data directory, database
   or master key where there is no instance, and no longer upgrades the database.
 - The sign-in artwork no longer shows up blank. Three of the five pictures
