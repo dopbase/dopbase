@@ -128,22 +128,22 @@ setup_token="$(awk '/^setup_/ { print; exit }' "${server_log}")"
 test -n "${setup_token}"
 curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/admin \
   --header 'Content-Type: application/json' \
-  --data "{\"setupToken\":\"${setup_token}\",\"email\":\"smoke@example.com\",\"password\":\"fixture-password-123\"}" \
+  --data "{\"setupToken\":\"${setup_token}\",\"email\":\"smoke@dopbase.com\",\"password\":\"fixture-password-123\"}" \
   >"${runtime_root}/claim.json"
 curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/status | grep --quiet '"state":"ready"'
 
 # A launch passcode minted on the server signs the account in exactly once.
-"${binary}" --data-dir "${data_dir}" --json admin passcode smoke@example.com >"${runtime_root}/passcode.json"
+"${binary}" --data-dir "${data_dir}" --json admin passcode smoke@dopbase.com >"${runtime_root}/passcode.json"
 passcode="$(sed -n 's/.*"passcode": "\([A-Z-]*\)".*/\1/p' "${runtime_root}/passcode.json")"
 test -n "${passcode}"
-grep --quiet "/launch#identity=smoke%40example.com&passcode=${passcode}" "${runtime_root}/passcode.json"
+grep --quiet "/launch#identity=smoke%40dopbase.com&passcode=${passcode}" "${runtime_root}/passcode.json"
 curl --fail --silent --include http://127.0.0.1:18376/api/v1/auth/launch \
   --header 'Content-Type: application/json' \
-  --data "{\"identity\":\"smoke@example.com\",\"passcode\":\"${passcode}\"}" \
+  --data "{\"identity\":\"smoke@dopbase.com\",\"passcode\":\"${passcode}\"}" \
   | grep --quiet --ignore-case '^set-cookie: dopbase_session='
 replay_status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18376/api/v1/auth/launch \
   --header 'Content-Type: application/json' \
-  --data "{\"identity\":\"smoke@example.com\",\"passcode\":\"${passcode}\"}")"
+  --data "{\"identity\":\"smoke@dopbase.com\",\"passcode\":\"${passcode}\"}")"
 test "${replay_status}" = 401
 curl --fail --silent http://127.0.0.1:18376/launch | grep --quiet '<div id="app"></div>'
 
@@ -151,7 +151,7 @@ kill -TERM "${server_pid}"
 wait "${server_pid}"
 server_pid=""
 
-DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${background_data_dir}" --json server start --background \
+DOPBASE_ROOT_EMAIL=smoke@dopbase.com "${binary}" --data-dir "${background_data_dir}" --json server start --background \
   --docs \
   --host 127.0.0.1 \
   --port 18377 \

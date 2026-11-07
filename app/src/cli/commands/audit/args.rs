@@ -107,7 +107,7 @@ const LIST_HELP: &str = "\
 Examples:
   dopbase audit list
   dopbase audit list --project storefront --environment storefront/production
-  dopbase audit list --action secret.updated --actor admin@example.com --limit 100
+  dopbase audit list --action secret.updated --actor admin@dopbase.com --limit 100
   dopbase --json audit list --cursor <CURSOR>
 
 Requires an administrator account. Events are shown newest first. When more

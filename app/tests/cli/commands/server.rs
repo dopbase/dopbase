@@ -265,7 +265,7 @@ mod background {
           "server",
           "setup",
           "--email",
-          "root@example.com",
+          "root@dopbase.com",
           "--config",
           "custom.toml",
         ])

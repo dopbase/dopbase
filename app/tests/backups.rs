@@ -84,7 +84,7 @@ async fn admin_setup() -> (TempDir, app::state::AppState, Router, String) {
     "/api/v1/bootstrap/admin",
     None,
     Some(
-      json!({"setupToken": setup, "email": "admin@example.com", "password": "correct-horse-123"}),
+      json!({"setupToken": setup, "email": "admin@dopbase.com", "password": "correct-horse-123"}),
     ),
   )
   .await;
@@ -95,7 +95,7 @@ async fn admin_setup() -> (TempDir, app::state::AppState, Router, String) {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email": "admin@example.com", "password": "correct-horse-123", "sessionKind": "cli"}),
+      json!({"email": "admin@dopbase.com", "password": "correct-horse-123", "sessionKind": "cli"}),
     ),
   )
   .await;
@@ -144,7 +144,7 @@ async fn backup_and_restore_lifecycle() {
 
   // Groups and grants are part of the snapshot.
   for statement in [
-    "INSERT INTO admins(id,email,password_hash,role,role_id,created_at,updated_at) VALUES('usr_teammate','teammate@example.com','','member','rol_member','t','t')",
+    "INSERT INTO admins(id,email,password_hash,role,role_id,created_at,updated_at) VALUES('usr_teammate','teammate@dopbase.com','','member','rol_member','t','t')",
     "INSERT INTO groups(id,name,created_at,updated_at) VALUES('grp_backend','Backend','t','t')",
     "INSERT INTO group_members(group_id,user_id,created_at) VALUES('grp_backend','usr_teammate','t')",
   ] {
@@ -562,7 +562,7 @@ async fn bootstrap_restore_lifecycle() {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email": "admin@example.com", "password": "correct-horse-123", "sessionKind": "cli"}),
+      json!({"email": "admin@dopbase.com", "password": "correct-horse-123", "sessionKind": "cli"}),
     ),
   )
   .await;
@@ -816,7 +816,7 @@ async fn bootstrap_restore_with_different_master_key() {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email": "admin@example.com", "password": "correct-horse-123", "sessionKind": "cli"}),
+      json!({"email": "admin@dopbase.com", "password": "correct-horse-123", "sessionKind": "cli"}),
     ),
   )
   .await;
@@ -860,7 +860,7 @@ async fn test_download_master_key_cookie_session_without_csrf() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email": "admin@example.com", "password": "correct-horse-123", "sessionKind": "browser"})),
+    Some(json!({"email": "admin@dopbase.com", "password": "correct-horse-123", "sessionKind": "browser"})),
   )
   .await;
   assert_eq!(status, 200);

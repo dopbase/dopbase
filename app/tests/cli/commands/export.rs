@@ -83,7 +83,7 @@ async fn run_interactive_export(
   let router = Router::new()
     .route(
       "/api/v1/auth/session",
-      get(|| async { Json(json!({"data":{"email":"fixture@example.com"}})) }),
+      get(|| async { Json(json!({"data":{"email":"fixture@dopbase.com"}})) }),
     )
     .route("/api/v1/auth/reauthenticate", post(reauthenticate))
     .route(

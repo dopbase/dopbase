@@ -60,7 +60,7 @@ async fn background_initialization_returns_credentials_only_to_the_launcher_and_
   let port = port().to_string();
   let started = success(
     command(&data)
-      .env("DOPBASE_ROOT_EMAIL", " ROOT@EXAMPLE.COM ")
+      .env("DOPBASE_ROOT_EMAIL", " ROOT@DOPBASE.COM ")
       .args([
         "--json",
         "server",
@@ -75,7 +75,7 @@ async fn background_initialization_returns_credentials_only_to_the_launcher_and_
   );
   let setup = &started["setup"];
   assert_eq!(setup["initialized"], true);
-  assert_eq!(setup["email"], "root@example.com");
+  assert_eq!(setup["email"], "root@dopbase.com");
   let password = setup["password"].as_str().unwrap();
   let storage = db(&data).await;
   let before: String = sqlx::query_scalar("SELECT password_hash FROM admins")
@@ -97,7 +97,7 @@ async fn background_initialization_returns_credentials_only_to_the_launcher_and_
   assert!(
     client
       .post(format!("{base}/api/v1/auth/login"))
-      .json(&json!({"email":"root@example.com","password":password,"sessionKind":"cli"}))
+      .json(&json!({"email":"root@dopbase.com","password":password,"sessionKind":"cli"}))
       .send()
       .await
       .unwrap()
@@ -115,7 +115,7 @@ async fn background_initialization_returns_credentials_only_to_the_launcher_and_
   assert!(
     !fs::read_to_string(data.join("dopbase.pid"))
       .unwrap()
-      .contains("root@example.com")
+      .contains("root@dopbase.com")
   );
   assert!(
     !fs::read_to_string(data.join("serve.log"))
@@ -170,7 +170,7 @@ async fn foreground_initialization_prints_password_once_and_continues_serving() 
   let port = port().to_string();
   let mut running = Running(
     command(&data)
-      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
       .args(["server", "start", "--port", &port])
       .stdout(Stdio::from(fs::File::create(&output).unwrap()))
       .stderr(Stdio::null())
@@ -189,7 +189,7 @@ async fn foreground_initialization_prints_password_once_and_continues_serving() 
   assert!(
     client
       .post(format!("{base}/api/v1/auth/login"))
-      .json(&json!({"email":"root@example.com","password":password,"sessionKind":"cli"}))
+      .json(&json!({"email":"root@dopbase.com","password":password,"sessionKind":"cli"}))
       .send()
       .await
       .unwrap()
@@ -228,7 +228,7 @@ async fn background_web_setup_relays_token_and_allows_claiming_without_restartin
   let client = reqwest::Client::new();
   let created = client
     .post(format!("{base}/api/v1/bootstrap/admin"))
-    .json(&json!({"setupToken":token,"email":"root@example.com","password":"fixture-password-123"}))
+    .json(&json!({"setupToken":token,"email":"root@dopbase.com","password":"fixture-password-123"}))
     .send()
     .await
     .unwrap();
@@ -289,7 +289,7 @@ fn automatic_start_validates_email_and_failures_before_creating_an_account() {
   let port = occupied.local_addr().unwrap().port().to_string();
   failure(
     command(directory.path())
-      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
       .args(["server", "start", "--port", &port])
       .output()
       .unwrap(),
@@ -309,7 +309,7 @@ async fn failed_automatic_credential_delivery_preserves_initialization_and_stops
     drop(reader);
     let mut cmd = command(directory.path());
     cmd
-      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
       .args(["server", "start", "--port", &port]);
     if background {
       cmd.args(["--background", "--json"]);

@@ -413,7 +413,7 @@ fn ids(page: &Value) -> Vec<String> {
 #[tokio::test(flavor = "multi_thread")]
 async fn audit_list_pages_newest_first_and_prints_the_next_page_command() {
   let fixture = Fixture::new().await;
-  seed(&fixture, "page.seeded", "pager@example.com", 5).await;
+  seed(&fixture, "page.seeded", "pager@dopbase.com", 5).await;
 
   let first = fixture
     .run(&["audit", "list", "--action", "page.seeded", "--limit", "2"])
@@ -435,7 +435,7 @@ async fn audit_list_pages_newest_first_and_prints_the_next_page_command() {
   ] {
     assert!(stdout.contains(header), "{stdout}");
   }
-  assert!(stdout.contains("pager@example.com"), "{stdout}");
+  assert!(stdout.contains("pager@dopbase.com"), "{stdout}");
   assert!(stdout.contains("2 event(s)"), "{stdout}");
   // The hint goes to standard error so the table can be piped, and it
   // repeats the filters, because a cursor only makes sense with them.
@@ -476,7 +476,7 @@ async fn audit_list_pages_newest_first_and_prints_the_next_page_command() {
   assert_eq!(seen, expected);
 
   // Filter values that need quoting survive the round trip.
-  seed(&fixture, "it's odd", "pager@example.com", 2).await;
+  seed(&fixture, "it's odd", "pager@dopbase.com", 2).await;
   let quoted = fixture
     .run(&["audit", "list", "--action", "it's odd", "--limit", "1"])
     .await;
@@ -493,7 +493,7 @@ async fn audit_list_pages_newest_first_and_prints_the_next_page_command() {
 async fn audit_list_json_returns_the_api_page_unchanged() {
   let fixture = Fixture::new().await;
   fixture.environment().await;
-  seed(&fixture, "page.seeded", "pager@example.com", 60).await;
+  seed(&fixture, "page.seeded", "pager@dopbase.com", 60).await;
 
   let api = fixture
     .request(reqwest::Method::GET, "/api/v1/audit-events", None)
@@ -656,7 +656,7 @@ async fn audit_list_shows_people_without_audit_read_only_their_own_actions() {
     .post(format!("{}/api/v1/users", fixture.url))
     .header("cookie", &cookie)
     .header("x-dopbase-csrf", &csrf)
-    .json(&json!({"email":"member@example.com","password":"correct-horse-456","role":"member"}))
+    .json(&json!({"email":"member@dopbase.com","password":"correct-horse-456","role":"member"}))
     .send()
     .await
     .unwrap()
@@ -667,7 +667,7 @@ async fn audit_list_shows_people_without_audit_read_only_their_own_actions() {
     .unwrap();
   let login: Value = api
     .post(format!("{}/api/v1/auth/login", fixture.url))
-    .json(&json!({"email":"member@example.com","password":"correct-horse-456","sessionKind":"cli"}))
+    .json(&json!({"email":"member@dopbase.com","password":"correct-horse-456","sessionKind":"cli"}))
     .send()
     .await
     .unwrap()
@@ -679,7 +679,7 @@ async fn audit_list_shows_people_without_audit_read_only_their_own_actions() {
   app::cli::session::save(
     &fixture.resolved(),
     login["data"]["token"].as_str().unwrap(),
-    Some("member@example.com"),
+    Some("member@dopbase.com"),
   )
   .unwrap();
   let events = fixture.json(&["audit", "list"]).await;

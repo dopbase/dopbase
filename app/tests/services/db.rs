@@ -145,7 +145,7 @@ async fn foreign_keys_cascade_dependent_records() {
     .unwrap();
   MIGRATOR.run(db.pool()).await.unwrap();
 
-  sqlx::query("INSERT INTO admins(id,email,password_hash,created_at,updated_at) VALUES('usr_test','admin@example.com','hash','now','now')").execute(db.pool()).await.unwrap();
+  sqlx::query("INSERT INTO admins(id,email,password_hash,created_at,updated_at) VALUES('usr_test','admin@dopbase.com','hash','now','now')").execute(db.pool()).await.unwrap();
   sqlx::query("INSERT INTO sessions(id,admin_id,kind,token_hash,created_at,last_used_at,recent_auth_at,idle_expires_at,absolute_expires_at) VALUES('ses_test','usr_test','cli',X'01','now','now','now','later','later')").execute(db.pool()).await.unwrap();
   sqlx::query(
     "INSERT INTO projects(id,name,created_at,updated_at) VALUES('prj_test','project','now','now')",

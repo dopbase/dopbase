@@ -289,7 +289,7 @@ async fn expiring_tokens_are_named_only_to_viewers_who_manage_tokens() {
   );
 
   // Auditors see the checks but not token names.
-  let auditor = with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
+  let auditor = with_role(&router, &root, "auditor@dopbase.com", "rol_auditor").await;
   let data = status(&router, &auditor).await;
   let tokens = check(&data, "tokens.expiring");
   assert!(
@@ -345,7 +345,7 @@ async fn activity_counts_reads_failed_sign_ins_refusals_and_sessions() {
       "POST",
       "/api/v1/auth/login",
       None,
-      Some(json!({"email":"admin@example.com","password":"wrong-horse-123","sessionKind":"cli"})),
+      Some(json!({"email":"admin@dopbase.com","password":"wrong-horse-123","sessionKind":"cli"})),
     )
     .await;
   }
@@ -361,7 +361,7 @@ async fn activity_counts_reads_failed_sign_ins_refusals_and_sessions() {
   assert_eq!(activity["failedSignIns"]["total"], 5);
   assert_eq!(
     activity["failedSignIns"]["accounts"],
-    json!(["admin@example.com"])
+    json!(["admin@dopbase.com"])
   );
   assert!(activity["failedSignIns"]["addresses"].is_array());
   assert_eq!(activity["rateLimited"]["total"], 1);
@@ -374,7 +374,7 @@ async fn activity_counts_reads_failed_sign_ins_refusals_and_sessions() {
   assert!(activity["activeSessions"]["cli"].as_i64().unwrap() >= 1);
 
   // Without audit.read, who failed to sign in and from where stays hidden.
-  let admin = with_role(&router, &root, "admin2@example.com", "rol_admin").await;
+  let admin = with_role(&router, &root, "admin2@dopbase.com", "rol_admin").await;
   sqlx::query(
     "DELETE FROM role_capabilities WHERE role_id = 'rol_admin' AND capability = 'audit.read'",
   )
@@ -392,7 +392,7 @@ async fn activity_counts_reads_failed_sign_ins_refusals_and_sessions() {
 async fn checks_and_activity_need_instance_view() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = with_role(&router, &root, "member@example.com", "rol_member").await;
+  let member = with_role(&router, &root, "member@dopbase.com", "rol_member").await;
   let data = status(&router, &member).await;
   assert_eq!(data["projects"], 2);
   for key in ["summary", "checks", "health", "activity"] {
@@ -414,7 +414,7 @@ async fn checks_and_activity_need_instance_view() {
 async fn only_viewers_who_get_the_checks_walk_the_audit_chain() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = with_role(&router, &root, "member@example.com", "rol_member").await;
+  let member = with_role(&router, &root, "member@dopbase.com", "rol_member").await;
   // Nothing is cached yet, so a walk here would fill the cache.
   status(&router, &member).await;
 

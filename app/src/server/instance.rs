@@ -22,7 +22,7 @@ impl fmt::Display for InitializationRequired {
         "Choose a setup method:\n",
         "  dopbase server setup\n",
         "    Guided setup in this terminal.\n\n",
-        "  dopbase server setup --email admin@example.com\n",
+        "  dopbase server setup --email admin@dopbase.com\n",
         "    Set up without prompts. A generated password will be shown once.\n\n",
         "  dopbase server setup --web\n",
         "    Set up through the web interface.\n\n",

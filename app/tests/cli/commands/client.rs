@@ -45,14 +45,14 @@ fn status_includes_cached_admin_email_and_default_environment() {
   let credential = Credential {
     token: Some("dbc_secret-token".into()),
     source: CredentialSource::EncryptedSession,
-    email: Some("admin@example.com".into()),
+    email: Some("admin@dopbase.com".into()),
   };
 
   let value = status_document(&server, &credential, true, Some("Member"));
   assert_eq!(value["authentication"], "encrypted_session");
   assert_eq!(value["identity"], "admin");
   assert_eq!(value["role"], "Member");
-  assert_eq!(value["email"], "admin@example.com");
+  assert_eq!(value["email"], "admin@dopbase.com");
   assert_eq!(value["environment"], "env_default");
   assert_eq!(value["server_status"], "connected");
   assert_eq!(value["status_source"], "live");

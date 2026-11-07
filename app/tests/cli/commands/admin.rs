@@ -693,7 +693,7 @@ mod passcode {
     let url = issued["url"].as_str().unwrap();
     assert!(
       url.ends_with(&format!(
-        "/launch#identity=admin%40example.com&passcode={passcode}"
+        "/launch#identity=admin%40dopbase.com&passcode={passcode}"
       )),
       "{url}"
     );
@@ -752,7 +752,7 @@ mod passcode {
     assert!(stdout.contains("Passcode:"), "{stdout}");
     assert!(stdout.contains("in 120 seconds"), "{stdout}");
     assert!(
-      stdout.contains("/launch#identity=admin%40example.com&passcode="),
+      stdout.contains("/launch#identity=admin%40dopbase.com&passcode="),
       "{stdout}"
     );
     assert!(stdout.contains("It works once."), "{stdout}");
@@ -762,7 +762,7 @@ mod passcode {
   async fn running_it_again_replaces_the_code_and_leaves_expired_ones_alone() {
     let fixture = Fixture::new().await;
     let _lock = running(&fixture);
-    sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_stale','stale@example.com','','member','rol_member',0,'t','t')")
+    sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_stale','stale@dopbase.com','','member','rol_member',0,'t','t')")
       .execute(fixture.state.db.pool())
       .await
       .unwrap();
@@ -809,9 +809,9 @@ mod passcode {
     let fixture = Fixture::new().await;
     let _lock = running(&fixture);
     for (id, email, role_id, status) in [
-      ("usr_agent", "agent@example.com", "rol_ai_agent", "active"),
-      ("usr_gone", "gone@example.com", "rol_member", "disabled"),
-      ("usr_member", "member@example.com", "rol_member", "active"),
+      ("usr_agent", "agent@dopbase.com", "rol_ai_agent", "active"),
+      ("usr_gone", "gone@dopbase.com", "rol_member", "disabled"),
+      ("usr_member", "member@dopbase.com", "rol_member", "active"),
     ] {
       sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,status,created_at,updated_at) VALUES(?,?,'','member',?,0,?,'t','t')")
         .bind(id)
@@ -823,15 +823,15 @@ mod passcode {
         .unwrap();
     }
     failure(
-      &run(&fixture, &["nobody@example.com"], &[]).await,
+      &run(&fixture, &["nobody@dopbase.com"], &[]).await,
       "no account exists",
     );
     failure(
-      &run(&fixture, &["agent@example.com"], &[]).await,
+      &run(&fixture, &["agent@dopbase.com"], &[]).await,
       "tokens only",
     );
     failure(
-      &run(&fixture, &["gone@example.com"], &[]).await,
+      &run(&fixture, &["gone@dopbase.com"], &[]).await,
       "turned off",
     );
 
@@ -841,7 +841,7 @@ mod passcode {
       .unwrap();
     let sso = [("DOPBASE_SSO", "true")];
     failure(
-      &run(&fixture, &["member@example.com"], &sso).await,
+      &run(&fixture, &["member@dopbase.com"], &sso).await,
       "only root can sign in with a passcode",
     );
     assert!(run(&fixture, &[EMAIL], &sso).await.status.success());

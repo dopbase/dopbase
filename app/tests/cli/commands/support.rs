@@ -18,7 +18,7 @@ use std::{
 use tempfile::TempDir;
 use tokio::io::AsyncWriteExt;
 
-pub const EMAIL: &str = "admin@example.com";
+pub const EMAIL: &str = "admin@dopbase.com";
 pub const PASSWORD: &str = "fixture-password-123";
 
 pub fn command(data: &Path) -> Command {
@@ -270,7 +270,7 @@ impl Fixture {
       .post(format!("{}/api/v1/users", self.url))
       .header("cookie", &cookie)
       .header("x-dopbase-csrf", &csrf)
-      .json(&json!({"email":"member@example.com","password":PASSWORD,"role":"member"}))
+      .json(&json!({"email":"member@dopbase.com","password":PASSWORD,"role":"member"}))
       .send()
       .await
       .unwrap()
@@ -292,7 +292,7 @@ impl Fixture {
       .unwrap();
     let login: Value = api
       .post(format!("{}/api/v1/auth/login", self.url))
-      .json(&json!({"email":"member@example.com","password":PASSWORD,"sessionKind":"cli"}))
+      .json(&json!({"email":"member@dopbase.com","password":PASSWORD,"sessionKind":"cli"}))
       .send()
       .await
       .unwrap()
@@ -304,7 +304,7 @@ impl Fixture {
     session::save(
       &self.resolved(),
       login["data"]["token"].as_str().unwrap(),
-      Some("member@example.com"),
+      Some("member@dopbase.com"),
     )
     .unwrap();
     id

@@ -2,7 +2,7 @@ use super::secrets_import::{browser_call, browser_login};
 use super::*;
 use app::services::passcodes::{self, PasscodePurpose};
 
-const ROOT: &str = "admin@example.com";
+const ROOT: &str = "admin@dopbase.com";
 
 /// Mint a launch passcode the way `dopbase admin passcode` does, straight
 /// into the database. Returns the code as the CLI prints it.
@@ -56,11 +56,11 @@ async fn passcode_rows(state: &app::state::AppState) -> i64 {
 
 /// A passcode for another account that expired and that nobody presented.
 async fn stale_passcode(state: &app::state::AppState) {
-  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_stale','stale@example.com','','member','rol_member',0,'t','t')")
+  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_stale','stale@dopbase.com','','member','rol_member',0,'t','t')")
     .execute(state.db.pool())
     .await
     .unwrap();
-  mint(state, "stale@example.com", -5).await;
+  mint(state, "stale@dopbase.com", -5).await;
 }
 
 async fn add_account(
@@ -100,7 +100,7 @@ async fn a_passcode_starts_a_browser_session_once() {
   bootstrap_admin(&state, &router).await;
   let code = mint(&state, ROOT, 60).await;
 
-  let (status, body, headers) = launch(&router, "ADMIN@example.com", &code.to_lowercase()).await;
+  let (status, body, headers) = launch(&router, "ADMIN@dopbase.com", &code.to_lowercase()).await;
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["email"], ROOT);
   assert_eq!(body["data"]["sessionKind"], "browser");
@@ -210,7 +210,7 @@ async fn every_failure_gets_the_same_reply() {
   let expired = mint(&state, ROOT, -1).await;
   let (_, expired_body, _) = launch(&router, ROOT, &expired).await;
   let (_, missing_body, _) = launch(&router, ROOT, "BBBB-BBBB").await;
-  let (_, unknown_body, _) = launch(&router, "nobody@example.com", "BBBB-BBBB").await;
+  let (_, unknown_body, _) = launch(&router, "nobody@dopbase.com", "BBBB-BBBB").await;
   let (_, malformed_body, _) = launch(&router, "not an email", "BBBB-BBBB").await;
   assert_eq!(expired_body, missing_body);
   assert_eq!(expired_body, unknown_body);
@@ -222,10 +222,10 @@ async fn every_failure_gets_the_same_reply() {
 async fn accounts_that_cannot_sign_in_are_refused_when_the_code_is_used() {
   let (_dir, state, router) = test_app().await;
   bootstrap_admin(&state, &router).await;
-  add_account(&state, "agent@example.com", "rol_ai_agent", "active").await;
-  add_account(&state, "gone@example.com", "rol_member", "disabled").await;
+  add_account(&state, "agent@dopbase.com", "rol_ai_agent", "active").await;
+  add_account(&state, "gone@dopbase.com", "rol_member", "disabled").await;
   let sessions_before = browser_sessions(&state).await;
-  for email in ["agent@example.com", "gone@example.com"] {
+  for email in ["agent@dopbase.com", "gone@dopbase.com"] {
     let code = mint(&state, email, 60).await;
     let (status, body, _) = launch(&router, email, &code).await;
     assert_invalid(status, &body);
@@ -239,13 +239,13 @@ async fn accounts_that_cannot_sign_in_are_refused_when_the_code_is_used() {
 async fn required_single_sign_on_still_lets_root_launch_but_nobody_else() {
   let (_dir, state, router) = test_app().await;
   bootstrap_admin(&state, &router).await;
-  add_account(&state, "member@example.com", "rol_member", "active").await;
+  add_account(&state, "member@dopbase.com", "rol_member", "active").await;
   sqlx::query("INSERT INTO sso_providers(id,preset,display_name,issuer,client_id,client_secret_ciphertext,client_secret_nonce,enabled,require_sso,created_at,updated_at) VALUES('sso_x','generic','Okta','https://idp.example.com','client',x'00',x'00',1,1,'t','t')")
     .execute(state.db.pool())
     .await
     .unwrap();
-  let member = mint(&state, "member@example.com", 60).await;
-  let (status, body, _) = launch(&router, "member@example.com", &member).await;
+  let member = mint(&state, "member@dopbase.com", 60).await;
+  let (status, body, _) = launch(&router, "member@dopbase.com", &member).await;
   assert_invalid(status, &body);
   let root = mint(&state, ROOT, 60).await;
   let (status, body, _) = launch(&router, ROOT, &root).await;

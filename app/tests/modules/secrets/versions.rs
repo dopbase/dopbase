@@ -117,7 +117,7 @@ async fn every_write_records_a_version_with_its_change_and_actor() {
   assert_eq!(changes, ["imported", "updated", "created"]);
   for item in page["items"].as_array().unwrap() {
     assert_eq!(item["actorType"], "root");
-    assert_eq!(item["actorLabel"], "admin@example.com");
+    assert_eq!(item["actorLabel"], "admin@dopbase.com");
     assert_eq!(item["restorable"], true);
     assert_eq!(item["current"], item["version"] == 3);
     assert!(item.get("value").is_none(), "history never returns values");

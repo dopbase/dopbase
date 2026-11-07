@@ -77,8 +77,8 @@ async fn forget_sign_in(
 async fn a_disabled_account_is_shut_out_until_it_is_enabled() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let admin = person(&router, &root, "lead@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let admin = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -99,7 +99,7 @@ async fn a_disabled_account_is_shut_out_until_it_is_enabled() {
   assert_eq!(projects(member.cli()).await.0, 401);
   assert_eq!(projects(member.browser()).await.0, 401);
   assert_eq!(projects(As::Token(&token)).await.0, 401);
-  assert_eq!(password_login(&router, "member@example.com").await, 401);
+  assert_eq!(password_login(&router, "member@dopbase.com").await, 401);
   let live: i64 =
     sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE admin_id = ? AND revoked_at IS NULL")
       .bind(&member.id)
@@ -119,7 +119,7 @@ async fn a_disabled_account_is_shut_out_until_it_is_enabled() {
   // The token works again; the ended sessions stay ended.
   assert_eq!(projects(As::Token(&token)).await.0, 200);
   assert_eq!(projects(member.cli()).await.0, 401);
-  let again = super::grants_access::sign_in(&router, "member@example.com").await;
+  let again = super::grants_access::sign_in(&router, "member@dopbase.com").await;
   assert_eq!(projects(again.cli()).await.0, 200);
   let (status, _) = set_status(&router, &admin, &member.id, "enable").await;
   assert_eq!(status, 200);
@@ -186,8 +186,8 @@ async fn live_sessions(
 async fn a_cli_login_approved_before_disabling_issues_no_session() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let admin = person(&router, &root, "lead@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let admin = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
 
   // Disabling cancels the approval before the CLI picks it up.
   let device_code = approved_cli_login(&router, &member).await;
@@ -211,7 +211,7 @@ async fn a_cli_login_approved_before_disabling_issues_no_session() {
   // way issues nothing either.
   let (status, _) = set_status(&router, &admin, &member.id, "enable").await;
   assert_eq!(status, 200);
-  let member = super::grants_access::sign_in(&router, "member@example.com").await;
+  let member = super::grants_access::sign_in(&router, "member@dopbase.com").await;
   let device_code = approved_cli_login(&router, &member).await;
   sqlx::query("UPDATE admins SET status = 'disabled' WHERE id = ?")
     .bind(&member.id)
@@ -228,9 +228,9 @@ async fn a_cli_login_approved_before_disabling_issues_no_session() {
 async fn only_someone_who_reaches_further_disables_an_account() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
-  let ops = person(&router, &root, "ops@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let ops = person(&router, &root, "ops@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
 
   for (target, code) in [
     (&root.id, "ROOT_PROTECTED"),
@@ -300,7 +300,7 @@ async fn only_someone_who_reaches_further_disables_an_account() {
 async fn interactive_sign_ins_set_the_last_sign_in_and_nothing_else_does() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (_, body) = send(
     &router,
     "GET",
@@ -313,7 +313,7 @@ async fn interactive_sign_ins_set_the_last_sign_in_and_nothing_else_does() {
   assert!(body["data"]["lastSignInAt"].is_string(), "{body}");
 
   forget_sign_in(&state, &member.id).await;
-  assert_eq!(password_login(&router, "member@example.com").await, 200);
+  assert_eq!(password_login(&router, "member@dopbase.com").await, 200);
   assert!(last_sign_in(&router, &root, &member.id).await.is_string());
 
   // Confirming a session or using a token is not signing in.
@@ -377,7 +377,7 @@ async fn interactive_sign_ins_set_the_last_sign_in_and_nothing_else_does() {
 async fn users_list_the_groups_they_belong_to() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let mut ids = Vec::new();
   for name in ["Ops", "Backend"] {
     let (status, body) = send(
@@ -427,7 +427,7 @@ async fn users_list_the_groups_they_belong_to() {
 async fn user_identities_carry_only_id_and_email() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "GET",
@@ -445,7 +445,7 @@ async fn user_identities_carry_only_id_and_email() {
     .unwrap()["email"]
     .clone();
   let mut expected = vec![
-    json!({"id":member.id,"email":"member@example.com"}),
+    json!({"id":member.id,"email":"member@dopbase.com"}),
     json!({"id":root.id,"email":root_email}),
   ];
   expected.sort_by_key(|user| user["email"].as_str().unwrap().to_owned());
@@ -470,8 +470,8 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
   use app::services::features::Features;
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let admin = person(&router, &root, "lead@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let admin = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   grant(
     &router,
     &root,
@@ -495,14 +495,14 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
       "POST",
       "/api/v1/users",
       by.browser(),
-      Some(json!({"email":"new@example.com","password":"correct-horse-123","role":"member"})),
+      Some(json!({"email":"new@dopbase.com","password":"correct-horse-123","role":"member"})),
     )
     .await;
     feature_disabled(status, &body, "DOPBASE_RBAC=true");
   }
   for change in [
     json!({"role":"admin"}),
-    json!({"email":"renamed@example.com"}),
+    json!({"email":"renamed@dopbase.com"}),
   ] {
     let (status, body) = send(
       &off,
@@ -516,7 +516,7 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
   }
 
   // Existing people keep signing in with their role and grants.
-  assert_eq!(password_login(&off, "member@example.com").await, 200);
+  assert_eq!(password_login(&off, "member@dopbase.com").await, 200);
   let runtime = format!(
     "/api/v1/environments/{}/secrets/runtime",
     env["payments/dev"]
@@ -546,7 +546,7 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"member@example.com","password":"battery-staple-456","sessionKind":"cli"})),
+    Some(json!({"email":"member@dopbase.com","password":"battery-staple-456","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 200);
@@ -557,11 +557,11 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
     "PATCH",
     &format!("/api/v1/users/{}", member.id),
     admin.browser(),
-    Some(json!({"email":"Member@Example.com","role":"member","password":"another-horse-789"})),
+    Some(json!({"email":"Member@Dopbase.com","role":"member","password":"another-horse-789"})),
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  assert_eq!(body["data"]["email"], "member@example.com", "{body}");
+  assert_eq!(body["data"]["email"], "member@dopbase.com", "{body}");
 
   // AI agents and offboarding keep working.
   let (status, body) = send(
@@ -575,7 +575,7 @@ async fn without_rbac_people_stay_as_they_are_but_can_be_offboarded() {
   assert_eq!(status, 201, "{body}");
   let (status, body) = set_status(&off, &admin, &member.id, "disable").await;
   assert_eq!(status, 200, "{body}");
-  assert_eq!(password_login(&off, "member@example.com").await, 401);
+  assert_eq!(password_login(&off, "member@dopbase.com").await, 401);
   let (status, body) = set_status(&off, &admin, &member.id, "enable").await;
   assert_eq!(status, 200, "{body}");
   let (status, body) = send(

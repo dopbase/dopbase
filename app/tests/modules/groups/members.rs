@@ -5,8 +5,8 @@ use super::*;
 async fn group_members_reach_what_the_group_is_granted() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let admin = person(&router, &root, "lead@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let admin = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
 
   let (status, body) = send(
     &router,
@@ -192,9 +192,9 @@ async fn group_members_reach_what_the_group_is_granted() {
 async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
-  let alice = person(&router, &root, "alice@example.com", "member").await;
-  let bob = person(&router, &root, "bob@example.com", "member").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let alice = person(&router, &root, "alice@dopbase.com", "member").await;
+  let bob = person(&router, &root, "bob@dopbase.com", "member").await;
   let create = |by, name: &'static str| {
     send(
       &router,
@@ -208,7 +208,7 @@ async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
   assert_eq!(status, 201, "{body}");
   assert_eq!(
     body["data"]["group"]["createdBy"],
-    json!({"id":lead.id,"email":"lead@example.com"})
+    json!({"id":lead.id,"email":"lead@dopbase.com"})
   );
   let backend = body["data"]["group"]["id"].as_str().unwrap().to_owned();
   let (status, _) = create(root.browser(), "Empty").await;
@@ -243,15 +243,15 @@ async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
   assert_eq!(
     listed["members"],
     json!([
-      {"id":alice.id,"email":"alice@example.com"},
-      {"id":bob.id,"email":"bob@example.com"},
+      {"id":alice.id,"email":"alice@dopbase.com"},
+      {"id":bob.id,"email":"bob@dopbase.com"},
     ])
   );
   assert_eq!(listed["grants"].as_array().unwrap().len(), 1);
   assert_eq!(listed["grants"][0]["principalId"], backend.as_str());
   assert_eq!(listed["grants"][0]["scopeLabel"], "payments");
   let empty = &body["data"][1];
-  assert_eq!(empty["createdBy"]["email"], "admin@example.com");
+  assert_eq!(empty["createdBy"]["email"], "admin@dopbase.com");
   assert_eq!(empty["members"], json!([]));
   assert_eq!(empty["grants"], json!([]));
 
@@ -266,11 +266,11 @@ async fn groups_show_who_made_them_who_added_each_member_and_their_grants() {
   let added_by = |index: usize| detail["data"]["members"][index]["addedBy"].clone();
   assert_eq!(
     added_by(0),
-    json!({"id":root.id,"email":"admin@example.com"})
+    json!({"id":root.id,"email":"admin@dopbase.com"})
   );
   assert_eq!(
     added_by(1),
-    json!({"id":lead.id,"email":"lead@example.com"})
+    json!({"id":lead.id,"email":"lead@dopbase.com"})
   );
 
   // Once the lead's account is gone, the group no longer names them.
@@ -308,7 +308,7 @@ async fn without_rbac_groups_stay_but_nobody_changes_them() {
   use app::services::features::Features;
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -353,7 +353,7 @@ async fn without_rbac_groups_stay_but_nobody_changes_them() {
   assert_eq!(status, 201, "{body}");
   let keeper_role = body["data"]["id"].as_str().unwrap().to_owned();
   let keeper =
-    super::audit_scope::with_role(&router, &root, "keeper@example.com", &keeper_role).await;
+    super::audit_scope::with_role(&router, &root, "keeper@dopbase.com", &keeper_role).await;
   for by in [&root, &keeper] {
     let (status, body) = send(&off, "GET", "/api/v1/groups", by.browser(), None).await;
     assert_eq!(status, 200, "{body}");

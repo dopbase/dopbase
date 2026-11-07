@@ -109,7 +109,7 @@ async fn admin_environment() -> (TempDir, app::state::AppState, Router, String, 
     "POST",
     "/api/v1/bootstrap/admin",
     None,
-    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"admin@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -118,7 +118,7 @@ async fn admin_environment() -> (TempDir, app::state::AppState, Router, String, 
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    Some(json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
   )
   .await;
   let token = login["data"]["token"].as_str().unwrap().to_owned();
@@ -154,7 +154,7 @@ async fn bootstrap_admin(
     "POST",
     "/api/v1/bootstrap/admin",
     None,
-    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"admin@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -163,7 +163,7 @@ async fn bootstrap_admin(
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    Some(json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 200);
@@ -971,7 +971,7 @@ async fn end_to_end_admin_and_runner_flow() {
     "POST",
     "/api/v1/bootstrap/admin",
     None,
-    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"admin@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -980,7 +980,7 @@ async fn end_to_end_admin_and_runner_flow() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    Some(json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 200);
@@ -1070,7 +1070,7 @@ async fn env_layout_persists_with_import_and_omits_values() {
     "POST",
     "/api/v1/bootstrap/admin",
     None,
-    Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"admin@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -1079,7 +1079,7 @@ async fn env_layout_persists_with_import_and_omits_values() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    Some(json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 200);
@@ -1273,18 +1273,18 @@ async fn wrong_logins_count_down_the_same_way_for_unknown_emails() {
     "Email or password is wrong.",
   ];
   for message in expected {
-    let (status, known) = login("admin@example.com", "wrong-password").await;
+    let (status, known) = login("admin@dopbase.com", "wrong-password").await;
     assert_eq!(status, 401);
     assert_eq!(known["error"]["AUTHENTICATION_INVALID"], message);
     // An unknown email reads the same, so replies do not reveal accounts.
-    let (status, unknown) = login("ghost@example.com", "wrong-password").await;
+    let (status, unknown) = login("ghost@dopbase.com", "wrong-password").await;
     assert_eq!(status, 401);
     assert_eq!(unknown, known);
   }
   for (email, password) in [
-    ("admin@example.com", "wrong-password"),
-    ("admin@example.com", "correct-horse-123"),
-    ("ghost@example.com", "wrong-password"),
+    ("admin@dopbase.com", "wrong-password"),
+    ("admin@dopbase.com", "correct-horse-123"),
+    ("ghost@dopbase.com", "wrong-password"),
   ] {
     let (status, body) = login(email, password).await;
     assert_eq!(status, 429, "{email}");
@@ -1427,7 +1427,7 @@ async fn disabled_web_ui_blocks_pages_and_assets_but_keeps_cli_api_and_optional_
       "POST",
       "/api/v1/bootstrap/admin",
       None,
-      Some(json!({"setupToken":setup,"email":"admin@example.com","password":"correct-horse-123"})),
+      Some(json!({"setupToken":setup,"email":"admin@dopbase.com","password":"correct-horse-123"})),
     )
     .await;
     assert_eq!(status, 201);
@@ -1436,7 +1436,7 @@ async fn disabled_web_ui_blocks_pages_and_assets_but_keeps_cli_api_and_optional_
       "POST",
       "/api/v1/auth/login",
       None,
-      Some(json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+      Some(json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
     )
     .await;
     assert_eq!(status, 200);

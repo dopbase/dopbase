@@ -182,7 +182,7 @@ async fn upgrading_to_roles_keeps_every_account_s_access() {
   ] {
     sqlx::query("INSERT INTO admins(id,email,password_hash,role,created_at,updated_at) VALUES(?,?,'',?,'t','t')")
       .bind(id)
-      .bind(format!("{id}@example.com"))
+      .bind(format!("{id}@dopbase.com"))
       .bind(role)
       .execute(db.pool())
       .await
@@ -354,7 +354,7 @@ async fn service_accounts_become_ai_agent_accounts_whose_tokens_keep_working() {
     .await
     .unwrap();
   assert_table(&db, "personal_tokens", false).await;
-  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_root','root@example.com','','root',NULL,1,'t','t')")
+  sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_root','root@dopbase.com','','root',NULL,1,'t','t')")
     .execute(db.pool())
     .await
     .unwrap();

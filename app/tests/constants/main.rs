@@ -132,8 +132,8 @@ fn query_builders_keep_the_existing_encoding() {
   );
   // Empty filter values are skipped instead of sent as blank parameters.
   assert_eq!(
-    api::audit::collection(&[("action", ""), ("actor", "admin@example.com")]),
-    "/api/v1/audit-events?actor=admin%40example.com"
+    api::audit::collection(&[("action", ""), ("actor", "admin@dopbase.com")]),
+    "/api/v1/audit-events?actor=admin%40dopbase.com"
   );
 }
 

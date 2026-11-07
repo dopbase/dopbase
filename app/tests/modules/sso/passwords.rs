@@ -99,24 +99,24 @@ async fn accounts_without_a_password_need_single_sign_on() {
     "/api/v1/users",
     &[&cookie],
     Some(&csrf),
-    Some(json!({"email":"sso-only@example.com","role":"member"})),
+    Some(json!({"email":"sso-only@dopbase.com","role":"member"})),
   )
   .await;
   assert_eq!(status, 422, "{body}");
   assert!(body["error"]["PASSWORD_REQUIRED"].is_string());
 
   let fixture = sso_fixture().await;
-  let (status, created) = create_user(&fixture, "sso-only@example.com", None).await;
+  let (status, created) = create_user(&fixture, "sso-only@dopbase.com", None).await;
   assert_eq!(status, 201, "{created}");
   assert_eq!(created["data"]["hasPassword"], false);
   assert_eq!(created["data"]["ssoLinked"], false);
 
   // No password matches the empty one.
   for guess in ["", "correct-horse-123"] {
-    let (status, _) = password_login(&fixture.router, "sso-only@example.com", guess).await;
+    let (status, _) = password_login(&fixture.router, "sso-only@dopbase.com", guess).await;
     assert!(status == 401 || status == 422, "{guess}: {status}");
   }
-  sso_session(&fixture, "c1", "sso-only-subject", "sso-only@example.com").await;
+  sso_session(&fixture, "c1", "sso-only-subject", "sso-only@dopbase.com").await;
 
   let (_, users, _) = send(
     &fixture.router,
@@ -131,7 +131,7 @@ async fn accounts_without_a_password_need_single_sign_on() {
     .as_array()
     .unwrap()
     .iter()
-    .find(|user| user["email"] == "sso-only@example.com")
+    .find(|user| user["email"] == "sso-only@dopbase.com")
     .unwrap();
   assert_eq!(row["hasPassword"], false);
   assert_eq!(row["ssoLinked"], true);
@@ -156,7 +156,7 @@ async fn accounts_without_a_password_need_single_sign_on() {
 async fn requiring_single_sign_on_keeps_root_as_the_way_back_in() {
   let fixture = sso_fixture().await;
   let (status, _) =
-    password_login(&fixture.router, "member@example.com", "correct-horse-456").await;
+    password_login(&fixture.router, "member@dopbase.com", "correct-horse-456").await;
   assert_eq!(status, 200);
 
   let (status, body) = set_required(&fixture, true).await;
@@ -167,11 +167,11 @@ async fn requiring_single_sign_on_keeps_root_as_the_way_back_in() {
 
   // A right password is refused with a reason; a wrong one stays generic.
   let (status, body) =
-    password_login(&fixture.router, "member@example.com", "correct-horse-456").await;
+    password_login(&fixture.router, "member@dopbase.com", "correct-horse-456").await;
   assert_eq!(status, 403);
   assert!(body["error"]["PASSWORD_LOGIN_DISABLED"].is_string());
   let (status, body) =
-    password_login(&fixture.router, "member@example.com", "wrong-password-1").await;
+    password_login(&fixture.router, "member@dopbase.com", "wrong-password-1").await;
   assert_eq!(status, 401);
   assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
   let (status, _, _) = call(
@@ -179,12 +179,12 @@ async fn requiring_single_sign_on_keeps_root_as_the_way_back_in() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"member@example.com","password":"correct-horse-456","sessionKind":"cli"})),
+    Some(json!({"email":"member@dopbase.com","password":"correct-horse-456","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 403);
 
-  let (status, _) = password_login(&fixture.router, "admin@example.com", "correct-horse-123").await;
+  let (status, _) = password_login(&fixture.router, "admin@dopbase.com", "correct-horse-123").await;
   assert_eq!(status, 200, "root keeps password login");
 
   // Turning single sign-on off lifts the requirement with it.
@@ -200,7 +200,7 @@ async fn requiring_single_sign_on_keeps_root_as_the_way_back_in() {
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["provider"]["requireSso"], false);
   let (status, _) =
-    password_login(&fixture.router, "member@example.com", "correct-horse-456").await;
+    password_login(&fixture.router, "member@dopbase.com", "correct-horse-456").await;
   assert_eq!(status, 200);
   let (status, body) = set_required(&fixture, true).await;
   assert_eq!(status, 409, "{body}");
@@ -209,9 +209,9 @@ async fn requiring_single_sign_on_keeps_root_as_the_way_back_in() {
 #[tokio::test]
 async fn single_sign_on_confirms_an_account_without_a_password() {
   let fixture = sso_fixture().await;
-  create_user(&fixture, "sso-only@example.com", None).await;
+  create_user(&fixture, "sso-only@dopbase.com", None).await;
   let (cookie, csrf) =
-    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@example.com").await;
+    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@dopbase.com").await;
   expire_confirmation(&fixture.state).await;
 
   let (_, session, _) = send(
@@ -265,7 +265,7 @@ async fn single_sign_on_confirms_an_account_without_a_password() {
         code,
         Grant {
           subject,
-          email: "sso-only@example.com",
+          email: "sso-only@dopbase.com",
           email_verified: Some(true),
           nonce: started.nonce.clone(),
           auth_age,
@@ -305,7 +305,7 @@ async fn single_sign_on_confirms_an_account_without_a_password() {
   .fetch_one(fixture.state.db.pool())
   .await
   .unwrap();
-  assert_eq!(mismatch, "sso-only@example.com");
+  assert_eq!(mismatch, "sso-only@dopbase.com");
 
   assert_eq!(
     reauth("fresh", "sso-only-subject", Some(0)).await,
@@ -333,9 +333,9 @@ async fn single_sign_on_confirms_an_account_without_a_password() {
 #[tokio::test]
 async fn an_account_without_a_password_can_set_one_after_confirming() {
   let fixture = sso_fixture().await;
-  create_user(&fixture, "sso-only@example.com", None).await;
+  create_user(&fixture, "sso-only@dopbase.com", None).await;
   let (cookie, csrf) =
-    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@example.com").await;
+    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@dopbase.com").await;
   let change = |cookie: String, csrf: String| {
     let router = fixture.router.clone();
     async move {
@@ -357,12 +357,12 @@ async fn an_account_without_a_password_can_set_one_after_confirming() {
   assert!(body["error"]["RECENT_AUTHENTICATION_REQUIRED"].is_string());
 
   let (cookie, csrf) =
-    sso_session(&fixture, "c2", "sso-only-subject", "sso-only@example.com").await;
+    sso_session(&fixture, "c2", "sso-only-subject", "sso-only@dopbase.com").await;
   let (status, body, _) = change(cookie, csrf).await;
   assert_eq!(status, 200, "{body}");
   let (status, _) = password_login(
     &fixture.router,
-    "sso-only@example.com",
+    "sso-only@dopbase.com",
     "brand-new-password-1",
   )
   .await;
@@ -372,15 +372,15 @@ async fn an_account_without_a_password_can_set_one_after_confirming() {
 #[tokio::test]
 async fn links_can_be_removed_without_locking_anyone_out() {
   let fixture = sso_fixture().await;
-  create_user(&fixture, "sso-only@example.com", None).await;
+  create_user(&fixture, "sso-only@dopbase.com", None).await;
   // The fixture's member has a password.
   let member_id: String =
-    sqlx::query_scalar("SELECT id FROM admins WHERE email='member@example.com'")
+    sqlx::query_scalar("SELECT id FROM admins WHERE email='member@dopbase.com'")
       .fetch_one(fixture.state.db.pool())
       .await
       .unwrap();
   let (cookie, csrf) =
-    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@example.com").await;
+    sso_session(&fixture, "c1", "sso-only-subject", "sso-only@dopbase.com").await;
 
   // Unlinking yourself needs a password to fall back on.
   let (status, body, _) = send(
@@ -395,7 +395,7 @@ async fn links_can_be_removed_without_locking_anyone_out() {
   assert_eq!(status, 409);
   assert!(body["error"]["PASSWORD_NOT_SET"].is_string());
 
-  let (cookie, csrf) = sso_session(&fixture, "c2", "member-subject", "member@example.com").await;
+  let (cookie, csrf) = sso_session(&fixture, "c2", "member-subject", "member@dopbase.com").await;
   let (status, body, _) = send(
     &fixture.router,
     "DELETE",
@@ -409,7 +409,7 @@ async fn links_can_be_removed_without_locking_anyone_out() {
 
   // An administrator removes a link, for example after the identity was
   // recreated at the provider. A verified email links it again later.
-  sso_session(&fixture, "c3", "member-subject", "member@example.com").await;
+  sso_session(&fixture, "c3", "member-subject", "member@dopbase.com").await;
   let path = format!("/api/v1/users/{member_id}/sso");
   let (status, body, _) = send(
     &fixture.router,
@@ -476,7 +476,7 @@ async fn the_password_form_can_be_hidden_without_turning_passwords_off() {
   assert_eq!(listed["password"], true, "passwords still work");
   // Only the page changes: the API still signs in with a password.
   let (status, _) =
-    password_login(&fixture.router, "member@example.com", "correct-horse-456").await;
+    password_login(&fixture.router, "member@dopbase.com", "correct-horse-456").await;
   assert_eq!(status, 200);
 
   // With single sign-on off, the form always comes back.
@@ -498,7 +498,7 @@ async fn the_password_form_can_be_hidden_without_turning_passwords_off() {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email":"member@example.com","password":"correct-horse-456","sessionKind":"browser"}),
+      json!({"email":"member@dopbase.com","password":"correct-horse-456","sessionKind":"browser"}),
     ),
   )
   .await;

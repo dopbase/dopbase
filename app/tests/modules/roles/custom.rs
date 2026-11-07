@@ -6,7 +6,7 @@ use super::*;
 async fn root_shapes_custom_roles_that_others_give_within_their_own() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
 
   // Only root creates roles, and never with root's own powers.
   let viewer = json!({"name":"Viewer","capabilities":["tokens.personal"],"maxLevel":"read"});
@@ -70,12 +70,12 @@ async fn root_shapes_custom_roles_that_others_give_within_their_own() {
     "/api/v1/users",
     lead.browser(),
     Some(
-      json!({"email":"audit@example.com","password":"correct-horse-123","roleId":"rol_auditor"}),
+      json!({"email":"audit@dopbase.com","password":"correct-horse-123","roleId":"rol_auditor"}),
     ),
   )
   .await;
   assert_eq!(status, 403, "{body}");
-  let reader = with_role(&router, &lead, "reader@example.com", &viewer_id).await;
+  let reader = with_role(&router, &lead, "reader@dopbase.com", &viewer_id).await;
   let (_, user) = send(
     &router,
     "GET",
@@ -189,7 +189,7 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
   use app::services::features::Features;
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -200,7 +200,7 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
   .await;
   assert_eq!(status, 201, "{body}");
   let viewer = body["data"]["id"].as_str().unwrap().to_owned();
-  let reader = with_role(&router, &lead, "reader@example.com", &viewer).await;
+  let reader = with_role(&router, &lead, "reader@dopbase.com", &viewer).await;
 
   let off = with_features(
     &state,
@@ -230,19 +230,19 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
     "POST",
     "/api/v1/users",
     lead.browser(),
-    Some(json!({"email":"second@example.com","password":"correct-horse-123","roleId":viewer})),
+    Some(json!({"email":"second@dopbase.com","password":"correct-horse-123","roleId":viewer})),
   )
   .await;
   feature_disabled(status, &body, "DOPBASE_RBAC_ROLES=true");
   // Someone who may not add people hears that first, not how the server is
   // set up.
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &off,
     "POST",
     "/api/v1/users",
     member.browser(),
-    Some(json!({"email":"third@example.com","password":"correct-horse-123","roleId":viewer})),
+    Some(json!({"email":"third@dopbase.com","password":"correct-horse-123","roleId":viewer})),
   )
   .await;
   assert_eq!(status, 403, "{body}");
@@ -252,7 +252,7 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
     "POST",
     "/api/v1/users",
     lead.browser(),
-    Some(json!({"email":"second@example.com","password":"correct-horse-123","role":"member"})),
+    Some(json!({"email":"second@dopbase.com","password":"correct-horse-123","role":"member"})),
   )
   .await;
   assert_eq!(status, 201, "{body}");
@@ -265,7 +265,7 @@ async fn without_custom_roles_holders_keep_theirs_but_nobody_new_gets_one() {
     "PATCH",
     &format!("/api/v1/users/{}", reader.id),
     lead.browser(),
-    Some(json!({"email":"reader2@example.com","roleId":viewer})),
+    Some(json!({"email":"reader2@dopbase.com","roleId":viewer})),
   )
   .await;
   assert_eq!(status, 200, "{body}");

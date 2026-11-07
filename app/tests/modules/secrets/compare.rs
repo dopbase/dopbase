@@ -120,7 +120,7 @@ async fn names_only_shows_which_keys_exist_without_comparing_values() {
   let (dev, prod) = (&env["payments/dev"], &env["payments/prod"]);
   put(&router, &root, prod, "API_URL", "same").await;
   put(&router, &root, dev, "API_URL", "same").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   grant(
     &router,
     &root,
@@ -306,7 +306,7 @@ async fn copy_needs_read_on_the_source_and_write_on_the_target() {
   put(&router, &root, dev, "A", "1").await;
   put(&router, &root, prod, "B", "2").await;
   put(&router, &root, search, "C", "3").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   grant(
     &router,
     &root,

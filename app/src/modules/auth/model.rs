@@ -17,7 +17,7 @@ pub struct LoginRequest {
 #[serde(rename_all = "camelCase")]
 pub struct LaunchRequest {
   /// Email of the account the passcode was issued for.
-  #[schema(example = "root@example.com")]
+  #[schema(example = "root@dopbase.com")]
   pub identity: String,
   /// The passcode. Dashes, spaces and lowercase are accepted.
   #[schema(example = "GJZG-FLMT")]

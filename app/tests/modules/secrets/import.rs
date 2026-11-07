@@ -32,7 +32,7 @@ pub(super) async fn browser_login(router: &Router) -> (String, String) {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email":"admin@example.com","password":"correct-horse-123","sessionKind":"browser"}),
+      json!({"email":"admin@dopbase.com","password":"correct-horse-123","sessionKind":"browser"}),
     ),
   )
   .await;
@@ -369,7 +369,7 @@ async fn import_checks_confirmation_before_validation_and_decryption_for_all_hum
     .unwrap();
   expire_confirmation(&state).await;
   for role in ["root", "admin", "member"] {
-    sqlx::query("UPDATE admins SET role=? WHERE email='admin@example.com'")
+    sqlx::query("UPDATE admins SET role=? WHERE email='admin@dopbase.com'")
       .bind(role)
       .execute(state.db.pool())
       .await

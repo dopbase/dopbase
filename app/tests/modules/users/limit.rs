@@ -98,16 +98,16 @@ async fn the_people_limit_counts_active_people_only() {
   // Root and AI agents never take a spot.
   let (status, body) = add(&two, &root, "deploy-bot", "ai_agent").await;
   assert_eq!(status, 201, "{body}");
-  let member = person(&two, &root, "member@example.com", "member").await;
+  let member = person(&two, &root, "member@dopbase.com", "member").await;
   let check = user_limit_check(&two, &root).await.unwrap();
   assert_eq!(check["status"], "ok", "{check}");
   assert_eq!(check["title"], "Active users within limit");
   assert_eq!(check["value"], "1 of 2");
-  let (status, body) = add(&two, &root, "auditor@example.com", "auditor").await;
+  let (status, body) = add(&two, &root, "auditor@dopbase.com", "auditor").await;
   assert_eq!(status, 201, "{body}");
 
   // Full: nobody else is added, but AI agents still are.
-  let (status, body) = add(&two, &root, "third@example.com", "admin").await;
+  let (status, body) = add(&two, &root, "third@dopbase.com", "admin").await;
   limit_reached(status, &body);
   // A request that is wrong anyway says so first.
   let (status, body) = add(&two, &root, "not-an-email", "member").await;
@@ -126,7 +126,7 @@ async fn the_people_limit_counts_active_people_only() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  assert!(!body.to_string().contains("third@example.com"), "{body}");
+  assert!(!body.to_string().contains("third@dopbase.com"), "{body}");
   let (status, body) = add(&two, &root, "backup-bot", "ai_agent").await;
   assert_eq!(status, 201, "{body}");
   let check = user_limit_check(&two, &root).await.unwrap();
@@ -138,7 +138,7 @@ async fn the_people_limit_counts_active_people_only() {
   // A disabled person frees their spot, and takes it back only if it's free.
   let (status, body) = set_status(&two, &root, &member.id, "disable").await;
   assert_eq!(status, 200, "{body}");
-  let (status, newcomer) = add(&two, &root, "newcomer@example.com", "member").await;
+  let (status, newcomer) = add(&two, &root, "newcomer@dopbase.com", "member").await;
   assert_eq!(status, 201, "{newcomer}");
   let (status, body) = set_status(&two, &root, &member.id, "enable").await;
   limit_reached(status, &body);
@@ -172,11 +172,11 @@ async fn the_people_limit_counts_active_people_only() {
   assert_eq!(
     counted,
     std::collections::BTreeMap::from([
-      ("auditor@example.com", true),
+      ("auditor@dopbase.com", true),
       ("backup-bot", false),
       ("deploy-bot", false),
-      ("member@example.com", false),
-      ("newcomer@example.com", true),
+      ("member@dopbase.com", false),
+      ("newcomer@dopbase.com", true),
       ("root", false),
     ]),
     "{body}"
@@ -201,11 +201,11 @@ async fn the_people_limit_counts_active_people_only() {
     "POST",
     "/api/v1/auth/login",
     None,
-    Some(json!({"email":"member@example.com","password":"correct-horse-123","sessionKind":"cli"})),
+    Some(json!({"email":"member@dopbase.com","password":"correct-horse-123","sessionKind":"cli"})),
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  let (status, body) = add(&one, &root, "late@example.com", "member").await;
+  let (status, body) = add(&one, &root, "late@dopbase.com", "member").await;
   limit_reached(status, &body);
   let check = user_limit_check(&one, &root).await.unwrap();
   assert_eq!(check["status"], "warn", "{check}");
@@ -243,7 +243,7 @@ async fn people_added_at_the_same_time_never_pass_the_limit() {
     let (router, root, barrier) = (one.clone(), root.clone(), barrier.clone());
     tasks.push(tokio::spawn(async move {
       barrier.wait().await;
-      add(&router, &root, &format!("p{index}@example.com"), "member").await
+      add(&router, &root, &format!("p{index}@dopbase.com"), "member").await
     }));
   }
   let mut added = 0;
@@ -269,7 +269,7 @@ async fn people_enabled_at_the_same_time_never_pass_the_limit() {
   let (root, _) = instance(&state, &router).await;
   let mut ids = Vec::new();
   for index in 0..4 {
-    let (status, body) = add(&router, &root, &format!("p{index}@example.com"), "member").await;
+    let (status, body) = add(&router, &root, &format!("p{index}@dopbase.com"), "member").await;
     assert_eq!(status, 201, "{body}");
     let id = body["data"]["id"].as_str().unwrap().to_owned();
     let (status, body) = set_status(&router, &root, &id, "disable").await;

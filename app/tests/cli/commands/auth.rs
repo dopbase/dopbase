@@ -70,7 +70,7 @@ async fn human_login_saves_credentials_only_after_success() {
     let mut command = fixture.command();
     command.arg("login");
     let mut terminal = Terminal::new(command);
-    terminal.reply("Email:", "  ADMIN@EXAMPLE.COM \r");
+    terminal.reply("Email:", "  ADMIN@DOPBASE.COM \r");
     terminal.reply("Password:", &format!("{password}\r"));
     let status = terminal.finish();
     assert!(!terminal.transcript.contains(password));
@@ -472,7 +472,7 @@ async fn logout_deletes_the_files_when_the_server_cannot_confirm() {
   };
   let cli_session = "dbc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
-  session::save(&resolved, cli_session, Some("admin@example.com")).unwrap();
+  session::save(&resolved, cli_session, Some("admin@dopbase.com")).unwrap();
   let mut cmd = command(directory.path());
   cmd.args(["--server", &url, "logout"]);
   let result = output(cmd, None).await;

@@ -33,7 +33,7 @@ fn factory_reset_parses_no_backup() {
 #[test]
 fn passcode_ttl_defaults_to_a_minute_and_stays_in_range() {
   let ttl = |arguments: &[&str]| {
-    let mut all = vec!["dopbase", "admin", "passcode", "root@example.com"];
+    let mut all = vec!["dopbase", "admin", "passcode", "root@dopbase.com"];
     all.extend_from_slice(arguments);
     Cli::try_parse_from(all).map(|cli| match cli.command {
       Command::Admin {
@@ -611,7 +611,7 @@ fn missing_subcommands_show_contextual_help() {
     (&["dopbase", "cache"], "dopbase cache clean --all --yes"),
     (
       &["dopbase", "admin"],
-      "dopbase admin reset-password admin@example.com",
+      "dopbase admin reset-password admin@dopbase.com",
     ),
   ];
 
@@ -738,7 +738,7 @@ fn audit_list_parses_filters_limit_and_cursor() {
     "--environment",
     "storefront/production",
     "--actor",
-    "admin@example.com",
+    "admin@dopbase.com",
     "--limit",
     "200",
     "--cursor",
@@ -762,7 +762,7 @@ fn audit_list_parses_filters_limit_and_cursor() {
     filters.environment.as_deref(),
     Some("storefront/production")
   );
-  assert_eq!(filters.actor.as_deref(), Some("admin@example.com"));
+  assert_eq!(filters.actor.as_deref(), Some("admin@dopbase.com"));
   assert_eq!(limit, 200);
   assert_eq!(cursor.as_deref(), Some("MjAyNi0xMC0yM3xhdWRfMQ"));
 
@@ -892,7 +892,7 @@ fn audit_export_parses_its_filters_and_output() {
     "--environment",
     "fixture/local",
     "--actor",
-    "admin@example.com",
+    "admin@dopbase.com",
     "--limit",
     "10",
   ])
@@ -919,7 +919,7 @@ fn audit_export_parses_its_filters_and_output() {
       assert_eq!(action.unwrap(), "secret.updated");
       assert_eq!(project.unwrap(), "fixture");
       assert_eq!(environment.unwrap(), "fixture/local");
-      assert_eq!(actor.unwrap(), "admin@example.com");
+      assert_eq!(actor.unwrap(), "admin@dopbase.com");
       assert_eq!(limit, Some(10));
     }
     unexpected => {
@@ -1265,8 +1265,8 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "run", "--", "true"],
     &["dopbase", "cache", "list"],
     &["dopbase", "cache", "clean"],
-    &["dopbase", "admin", "reset-password", "admin@example.com"],
-    &["dopbase", "admin", "passcode", "root@example.com"],
+    &["dopbase", "admin", "reset-password", "admin@dopbase.com"],
+    &["dopbase", "admin", "passcode", "root@dopbase.com"],
     &["dopbase", "admin", "factory-reset"],
     &["dopbase", "update"],
     &["dopbase", "backup"],

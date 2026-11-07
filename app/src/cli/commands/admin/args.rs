@@ -67,19 +67,19 @@ pub enum AdminCommand {
 
 pub(crate) const HELP: &str = "\
 Examples:
-  dopbase admin reset-password admin@example.com
-  dopbase admin passcode root@example.com
+  dopbase admin reset-password admin@dopbase.com
+  dopbase admin passcode root@dopbase.com
   dopbase admin factory-reset
 ";
 const RESET_PASSWORD_HELP: &str = "\
 Examples:
-  dopbase admin reset-password admin@example.com
+  dopbase admin reset-password admin@dopbase.com
 ";
 const PASSCODE_HELP: &str = "\
 Examples:
-  dopbase admin passcode root@example.com
-  dopbase admin passcode alice@example.com --ttl 120
-  dopbase --json admin passcode root@example.com
+  dopbase admin passcode root@dopbase.com
+  dopbase admin passcode alice@dopbase.com --ttl 120
+  dopbase --json admin passcode root@dopbase.com
 ";
 const FACTORY_RESET_HELP: &str = "\
 Examples:

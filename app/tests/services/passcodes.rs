@@ -12,7 +12,7 @@ async fn database() -> DbClient {
   for id in ["usr_root", "usr_other"] {
     sqlx::query("INSERT INTO admins(id,email,password_hash,role,is_root,created_at,updated_at) VALUES(?,?,'','admin',0,'t','t')")
       .bind(id)
-      .bind(format!("{id}@example.com"))
+      .bind(format!("{id}@dopbase.com"))
       .execute(db.pool())
       .await
       .unwrap();
@@ -231,7 +231,7 @@ async fn racing_requests_use_a_code_once() {
   let url = format!("sqlite://{}", directory.path().join("race.db").display());
   let db = DbClient::connect(&url).await.unwrap();
   MIGRATOR.run(db.pool()).await.unwrap();
-  sqlx::query("INSERT INTO admins(id,email,password_hash,role,is_root,created_at,updated_at) VALUES('usr_root','root@example.com','','admin',1,'t','t')")
+  sqlx::query("INSERT INTO admins(id,email,password_hash,role,is_root,created_at,updated_at) VALUES('usr_root','root@dopbase.com','','admin',1,'t','t')")
     .execute(db.pool())
     .await
     .unwrap();

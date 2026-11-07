@@ -183,7 +183,7 @@ async fn copy_many_needs_names_only_for_keys_and_read_for_values() {
   );
   put(&router, &root, prod, "STRIPE_KEY", "sk_live").await;
   put(&router, &root, search, "INDEX", "products").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   grant(
     &router,
     &root,

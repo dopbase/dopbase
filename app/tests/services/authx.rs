@@ -309,7 +309,7 @@ async fn insert_account(
 ) {
   sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES(?,?,'',?,?,?,'t','t')")
     .bind(id)
-    .bind(format!("{id}@example.com"))
+    .bind(format!("{id}@dopbase.com"))
     .bind(role)
     .bind(role_id)
     .bind(is_root)

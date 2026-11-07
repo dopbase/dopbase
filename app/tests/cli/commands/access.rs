@@ -13,7 +13,7 @@ async fn access_shows_an_account_its_grants_and_a_token_its_limit() {
 
   fixture.sign_in_member().await;
   let member = fixture.json(&["access"]).await;
-  assert_eq!(member["email"], "member@example.com");
+  assert_eq!(member["email"], "member@dopbase.com");
   assert_eq!(member["grants"][0]["scopeLabel"], "fixture");
   assert_eq!(member["grants"][0]["level"], "read");
   assert!(member["token"].is_null());
