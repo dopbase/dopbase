@@ -176,9 +176,12 @@ async fn five_wrong_tries_burn_the_passcode() {
     assert_invalid(status, &body);
   }
   assert_eq!(passcode_rows(&state).await, 0);
-  // The per-email limiter trips on the same try; clear it to show the code
-  // itself is gone.
-  state.rate_limiter.clear(&format!("launch:{ROOT}")).await;
+  // The limiter trips on the same try; clear it to show the code itself is
+  // gone. In-process requests carry no client address.
+  state
+    .rate_limiter
+    .clear(&format!("launch:unknown:{ROOT}"))
+    .await;
   let (status, body, _) = launch(&router, ROOT, &code).await;
   assert_invalid(status, &body);
   state.db.close().await;
@@ -188,6 +191,7 @@ async fn five_wrong_tries_burn_the_passcode() {
 async fn repeated_failures_for_one_email_are_rate_limited() {
   let (_dir, state, router) = test_app().await;
   bootstrap_admin(&state, &router).await;
+  mint(&state, ROOT, 60).await;
   for _ in 0..5 {
     let (status, body, _) = launch(&router, ROOT, "BBBB-BBBB").await;
     assert_invalid(status, &body);
@@ -199,6 +203,76 @@ async fn repeated_failures_for_one_email_are_rate_limited() {
     passcode_rows(&state).await,
     1,
     "a refused try never reaches the code"
+  );
+  state.db.close().await;
+}
+
+#[tokio::test]
+async fn tries_without_a_live_passcode_cost_nothing() {
+  let (_dir, state, router) = test_app().await;
+  bootstrap_admin(&state, &router).await;
+  // Someone who only knows the email can't use up the owner's tries.
+  for _ in 0..10 {
+    let (status, body, _) = launch(&router, ROOT, "BBBB-BBBB").await;
+    assert_invalid(status, &body);
+  }
+  let code = mint(&state, ROOT, 60).await;
+  let (status, body, _) = launch(&router, ROOT, &code).await;
+  assert_eq!(status, 200, "{body}");
+  state.db.close().await;
+}
+
+/// A launch request from `address`, the way a real connection arrives.
+async fn launch_from(
+  router: &Router,
+  address: &str,
+  identity: &str,
+  passcode: &str,
+) -> u16 {
+  let mut request = Request::builder()
+    .method("POST")
+    .uri("/api/v1/auth/launch")
+    .header(header::CONTENT_TYPE, "application/json")
+    .body(Body::from(
+      json!({"identity":identity,"passcode":passcode}).to_string(),
+    ))
+    .unwrap();
+  request.extensions_mut().insert(axum::extract::ConnectInfo(
+    address.parse::<std::net::SocketAddr>().unwrap(),
+  ));
+  router
+    .clone()
+    .oneshot(request)
+    .await
+    .unwrap()
+    .status()
+    .as_u16()
+}
+
+#[tokio::test]
+async fn failures_from_one_address_do_not_lock_out_another() {
+  let (_dir, state, router) = test_app().await;
+  bootstrap_admin(&state, &router).await;
+  mint(&state, ROOT, 60).await;
+  for _ in 0..4 {
+    assert_eq!(
+      launch_from(&router, "198.51.100.7:4000", ROOT, "BBBB-BBBB").await,
+      401
+    );
+  }
+  // The fifth wrong try burns the code and fills that address's bucket.
+  assert_eq!(
+    launch_from(&router, "198.51.100.7:4000", ROOT, "BBBB-BBBB").await,
+    401
+  );
+  let code = mint(&state, ROOT, 60).await;
+  assert_eq!(
+    launch_from(&router, "198.51.100.7:4000", ROOT, &code).await,
+    429
+  );
+  assert_eq!(
+    launch_from(&router, "203.0.113.9:4000", ROOT, &code).await,
+    200
   );
   state.db.close().await;
 }

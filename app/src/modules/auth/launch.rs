@@ -10,7 +10,7 @@ use crate::{
   models::{AdminRole, AuthIdentity, SessionKind},
   modules::common,
   services::{
-    authx,
+    authx, client_ip,
     passcodes::{self, Consumed, PasscodePurpose},
   },
   state::AppState,
@@ -52,7 +52,12 @@ pub async fn launch(
 ) -> Result<LaunchResult, HttpError> {
   // A malformed email can't match an account, so it fails like any other.
   let email = common::validate_email(&request.identity).map_err(|_| invalid())?;
-  let limit_key = format!("launch:{email}");
+  // Keyed on the address too, so someone elsewhere who knows the email
+  // can't lock its owner out of the one way in that needs no password.
+  let limit_key = format!(
+    "launch:{}:{email}",
+    client_ip::current().map_or_else(|| "unknown".to_owned(), |ip| ip.to_string())
+  );
   if !state.rate_limiter.check(&limit_key).await {
     return Err(HttpError::new(
       StatusCode::TOO_MANY_REQUESTS,
@@ -64,7 +69,9 @@ pub async fn launch(
   let now = Utc::now();
 
   let account = repository::admin_by_email(state.db.pool(), &email).await?;
-  let mut tx = state.db.pool().begin().await?;
+  // Take the write lock now: the steps below read before they write, and a
+  // deferred transaction can't always upgrade under a concurrent writer.
+  let mut tx = state.db.pool().begin_with("BEGIN IMMEDIATE").await?;
   let consumed = match &account {
     Some((admin_id, ..)) => {
       passcodes::consume(&mut tx, PURPOSE, admin_id, code.as_deref(), now).await?
@@ -109,7 +116,10 @@ pub async fn launch(
     )
     .await?;
     tx.commit().await?;
-    state.rate_limiter.failure(&limit_key).await;
+    // With no live code there is nothing to guess, so the try costs nothing.
+    if consumed != Consumed::Missing {
+      state.rate_limiter.failure(&limit_key).await;
+    }
     return Err(invalid());
   }
 

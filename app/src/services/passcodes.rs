@@ -121,9 +121,10 @@ pub async fn issue(
 
 /// Check a presented code and use it up when it matches. `code` is the
 /// canonical form, or `None` when what was typed cannot be a code, which
-/// still counts as a wrong try. Run it inside the caller's transaction:
-/// the first statement takes the write lock, so two requests presenting the
-/// same code cannot both see [`Consumed::Used`].
+/// still counts as a wrong try. Run it inside a transaction that already
+/// holds the write lock (`BEGIN IMMEDIATE`): the steps read before they
+/// write, and two requests presenting the same code must not both see
+/// [`Consumed::Used`].
 pub async fn consume(
   connection: &mut SqliteConnection,
   purpose: PasscodePurpose,
