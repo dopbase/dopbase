@@ -85,7 +85,9 @@ dopbase login
 data directory, at its public URL. That is `http://localhost:8840` unless
 `server.toml` or `DOPBASE_PUBLIC_URL` sets another one. On the default URL,
 Dopbase removes the configured server override and returns to the implicit
-local default. Any other public URL is saved as the active server.
+local default. Any other public URL is saved as the active server. When no
+server is saved and the default URL already reaches this instance, `local`
+leaves things as they are and keeps your CLI session.
 
 The local server doesn't have to be running. If nothing answers at its URL,
 Dopbase still switches after confirmation and tells you to start it:

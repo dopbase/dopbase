@@ -965,8 +965,11 @@ Each command prints the data directory it uses. All three refuse when this CLI
 is connected to a different server, through `dopbase client connect` or
 `DOPBASE_URL`, and ask you to connect to the local instance. A connection
 counts as this instance when it is the instance's public URL, or `localhost`,
-`127.0.0.1`, or `::1` on the port the server listens on. With no saved
-connection, as in a fresh container, the commands run. To fix a refusal,
+`127.0.0.1`, or `::1` on the port the server listens on. If this instance is
+stopped and a Dopbase server still answers at that address, it's another
+server on the same port, such as a container published on it, and the
+commands refuse too. With no saved connection, as in a fresh container, the
+commands run. To fix a refusal,
 connect to the local instance first, or set `DOPBASE_URL` to it for one run:
 
 ```bash
