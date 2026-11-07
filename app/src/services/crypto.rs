@@ -89,6 +89,33 @@ impl CryptoService {
     Ok(service)
   }
 
+  /// Load the key file at `path` and check it against an instance that
+  /// already has one. Unlike `initialize`, this never creates a key file
+  /// and never writes to the database.
+  pub async fn open_existing(
+    pool: &SqlitePool,
+    path: &Path,
+  ) -> Result<Self> {
+    let record: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
+      "SELECT verification_ciphertext, verification_nonce FROM instance_metadata WHERE id = 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    let (ciphertext, nonce) = record.context(
+      "this instance has never been started, so it has no master key yet. Start the server once first",
+    )?;
+    let service = Self {
+      master_key: Arc::new(RwLock::new(Zeroizing::new(read_key_file(path)?))),
+    };
+    let clear = service
+      .decrypt_master(&ciphertext, &nonce, b"instance-verification")
+      .context("configured master key does not match this database")?;
+    if clear != VERIFICATION_TEXT {
+      bail!("configured master key does not match this database");
+    }
+    Ok(service)
+  }
+
   /// How the key file at `path` compares with the key in use. Both copies
   /// stay in zeroized buffers and are compared in constant time.
   pub fn key_file_state(

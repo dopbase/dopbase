@@ -197,6 +197,14 @@ async fn offline_password_reset_updates_the_account_and_revokes_sessions() {
   terminal.reply("Confirm new password:", &format!("{password}\r"));
   assert!(terminal.finish().success());
   assert!(!terminal.transcript.contains(password));
+  assert!(
+    terminal
+      .transcript
+      .contains(&format!("Instance: {}", fixture.data_dir.display())),
+    "{}",
+    terminal.transcript
+  );
+  assert!(!terminal.transcript.contains("pause"), "server was stopped");
   let db = app::services::db::DbClient::connect(&app::config::sqlite_url(
     &fixture.data_dir.join("dopbase.db"),
   ))
@@ -220,13 +228,348 @@ async fn offline_password_reset_updates_the_account_and_revokes_sessions() {
     .await
     .unwrap();
   assert_eq!(active, 0);
-  let audits: i64 =
-    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='admin.password_reset'")
+  let audits: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM audit_events WHERE action='admin.password_reset' AND json_extract(metadata,'$.serverRunning')=0",
+  )
+  .fetch_one(db.pool())
+  .await
+  .unwrap();
+  assert_eq!(audits, 1);
+  assert!(
+    app::services::audit_chain::verify(db.pool())
+      .await
+      .unwrap()
+      .ok
+  );
+  db.close().await;
+}
+
+#[cfg(unix)]
+mod reset_password {
+  use super::super::support::{EMAIL, Fixture, PASSWORD, command, terminal::Terminal};
+  use serde_json::json;
+
+  const NEW_PASSWORD: &str = "replacement-password-123";
+
+  fn reset(data_dir: &std::path::Path) -> Terminal {
+    let mut cmd = command(data_dir);
+    cmd.args(["admin", "reset-password", EMAIL]);
+    Terminal::new(cmd)
+  }
+
+  async fn login(
+    fixture: &Fixture,
+    password: &str,
+  ) -> u16 {
+    reqwest::Client::new()
+      .post(format!("{}/api/v1/auth/login", fixture.url))
+      .json(&json!({"email":EMAIL,"password":password,"sessionKind":"cli"}))
+      .send()
+      .await
+      .unwrap()
+      .status()
+      .as_u16()
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn it_works_while_the_server_is_running() {
+    let fixture = Fixture::new().await;
+    // The fixture serves in-process without the instance lock, so take it
+    // here to look like a running server.
+    let _lock = app::server::InstanceLock::acquire(&app::config::sqlite_url(
+      &fixture.data_dir.join("dopbase.db"),
+    ))
+    .unwrap();
+    let mut terminal = reset(&fixture.data_dir);
+    terminal.reply("New password:", &format!("{NEW_PASSWORD}\r"));
+    terminal.reply("Confirm new password:", &format!("{NEW_PASSWORD}\r"));
+    assert!(terminal.finish().success(), "{}", terminal.transcript);
+    assert!(terminal.transcript.contains("pause still runs out"));
+
+    assert_eq!(login(&fixture, PASSWORD).await, 401);
+    assert_eq!(login(&fixture, NEW_PASSWORD).await, 200);
+    let revoked = reqwest::Client::new()
+      .get(format!("{}/api/v1/projects", fixture.url))
+      .bearer_auth(&fixture.token)
+      .send()
+      .await
+      .unwrap()
+      .status();
+    assert_eq!(revoked, 401, "the old session stopped working");
+
+    let pool = fixture.state.db.pool();
+    let running: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM audit_events WHERE action='admin.password_reset' AND json_extract(metadata,'$.serverRunning')=1",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(running, 1);
+    assert!(app::services::audit_chain::verify(pool).await.unwrap().ok);
+  }
+
+  #[tokio::test]
+  async fn it_creates_nothing_where_there_is_no_instance() {
+    let directory = tempfile::TempDir::new().unwrap();
+    let missing = directory.path().join("missing");
+    let empty = directory.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+    for data_dir in [&missing, &empty] {
+      let mut terminal = reset(data_dir);
+      assert_eq!(terminal.finish().code(), Some(1));
+      assert!(
+        terminal.transcript.contains("there's no Dopbase instance"),
+        "{}",
+        terminal.transcript
+      );
+    }
+    assert!(!missing.exists());
+    assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn it_refuses_a_database_a_newer_version_upgraded() {
+    let fixture = Fixture::new().await;
+    let pool = fixture.state.db.pool();
+    sqlx::query("INSERT INTO _sqlx_migrations(version,description,installed_on,success,checksum,execution_time) VALUES(99991231000000,'from the future',CURRENT_TIMESTAMP,1,x'00',0)")
+      .execute(pool)
+      .await
+      .unwrap();
+    let before: String = sqlx::query_scalar("SELECT password_hash FROM admins WHERE email=?")
+      .bind(EMAIL)
+      .fetch_one(pool)
+      .await
+      .unwrap();
+    fixture.stop().await;
+
+    let mut terminal = reset(&fixture.data_dir);
+    assert_eq!(terminal.finish().code(), Some(1));
+    assert!(
+      terminal.transcript.contains("a newer version of Dopbase"),
+      "{}",
+      terminal.transcript
+    );
+    let db = app::services::db::DbClient::connect(&app::config::sqlite_url(
+      &fixture.data_dir.join("dopbase.db"),
+    ))
+    .await
+    .unwrap();
+    let after: String = sqlx::query_scalar("SELECT password_hash FROM admins WHERE email=?")
+      .bind(EMAIL)
       .fetch_one(db.pool())
       .await
       .unwrap();
-  assert_eq!(audits, 1);
-  db.close().await;
+    db.close().await;
+    assert_eq!(before, after);
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn it_never_writes_a_new_master_key() {
+    let fixture = Fixture::new().await;
+    fixture.stop().await;
+    let key = fixture.data_dir.join("master.key");
+    std::fs::remove_file(&key).unwrap();
+    let mut terminal = reset(&fixture.data_dir);
+    assert_eq!(terminal.finish().code(), Some(1));
+    assert!(!key.exists(), "{}", terminal.transcript);
+  }
+}
+
+/// `passcode`, `reset-password` and `factory-reset` only change the local
+/// instance, so they refuse when the CLI is connected somewhere else.
+#[cfg(unix)]
+mod connected_server {
+  use super::super::support::{EMAIL, Fixture, command, output, terminal::Terminal};
+
+  const ELSEWHERE: &str = "http://localhost:8841";
+  const PASSCODE_REFUSED: &str = "please connect to local instance to perform passcode action";
+
+  fn connect(
+    fixture: &Fixture,
+    url: &str,
+  ) {
+    std::fs::write(
+      fixture.data_dir.join("config.toml"),
+      format!("version = 1\nserver_url = \"{url}\"\n"),
+    )
+    .unwrap();
+  }
+
+  async fn passcode(
+    fixture: &Fixture,
+    env: &[(&str, &str)],
+  ) -> std::process::Output {
+    let mut cmd = command(&fixture.data_dir);
+    cmd.args(["admin", "passcode", EMAIL]);
+    for (name, value) in env {
+      cmd.env(name, value);
+    }
+    output(cmd, None).await
+  }
+
+  fn interactive(
+    fixture: &Fixture,
+    arguments: &[&str],
+  ) -> Terminal {
+    let mut cmd = command(&fixture.data_dir);
+    cmd.arg("admin").args(arguments);
+    let mut terminal = Terminal::new(cmd);
+    assert_eq!(terminal.finish().code(), Some(1));
+    terminal
+  }
+
+  async fn audit_rows(fixture: &Fixture) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_events")
+      .fetch_one(fixture.state.db.pool())
+      .await
+      .unwrap()
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn all_three_refuse_before_touching_anything() {
+    let fixture = Fixture::new().await;
+    let _lock = app::server::InstanceLock::acquire(&app::config::sqlite_url(
+      &fixture.data_dir.join("dopbase.db"),
+    ))
+    .unwrap();
+    connect(&fixture, ELSEWHERE);
+    let before = audit_rows(&fixture).await;
+
+    let refused = passcode(&fixture, &[]).await;
+    assert!(!refused.status.success());
+    let message = String::from_utf8_lossy(&refused.stderr);
+    assert!(message.contains(PASSCODE_REFUSED), "{message}");
+
+    for (arguments, refused) in [
+      (
+        &["reset-password", EMAIL][..],
+        "please connect to local instance to perform reset-password action",
+      ),
+      (
+        &["factory-reset"][..],
+        "please connect to local instance to perform factory-reset action",
+      ),
+    ] {
+      let terminal = interactive(&fixture, arguments);
+      assert!(
+        terminal.transcript.contains(refused),
+        "{}",
+        terminal.transcript
+      );
+      assert!(!terminal.transcript.contains("New password"));
+      assert!(!terminal.transcript.contains("Type please-wipe-out-system"));
+    }
+    assert!(fixture.data_dir.join("dopbase.db").is_file());
+    assert_eq!(audit_rows(&fixture).await, before);
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn dopbase_url_counts_as_a_connection_too() {
+    let fixture = Fixture::new().await;
+    let refused = passcode(&fixture, &[("DOPBASE_URL", "https://dopbase.example.com")]).await;
+    assert!(!refused.status.success());
+    let message = String::from_utf8_lossy(&refused.stderr);
+    assert!(message.contains(PASSCODE_REFUSED), "{message}");
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn a_connection_to_this_instance_or_none_at_all_is_allowed() {
+    let fixture = Fixture::new().await;
+    let _lock = app::server::InstanceLock::acquire(&app::config::sqlite_url(
+      &fixture.data_dir.join("dopbase.db"),
+    ))
+    .unwrap();
+    // No config.toml: nothing is saved, as inside a fresh container.
+    assert!(passcode(&fixture, &[]).await.status.success());
+    for url in ["http://localhost:8840", "http://127.0.0.1:8840"] {
+      connect(&fixture, url);
+      let issued = passcode(&fixture, &[]).await;
+      assert!(
+        issued.status.success(),
+        "{url}: {}",
+        String::from_utf8_lossy(&issued.stderr)
+      );
+    }
+  }
+}
+
+mod connection_is_local {
+  use app::cli::commands::connection_is_local;
+
+  #[test]
+  fn the_public_url_matches() {
+    let public = "https://dopbase.example.com";
+    assert!(connection_is_local(public, public, "0.0.0.0:8840"));
+    assert!(connection_is_local(
+      "https://dopbase.example.com/",
+      public,
+      "0.0.0.0:8840"
+    ));
+    assert!(!connection_is_local(
+      "http://dopbase.example.com",
+      public,
+      "0.0.0.0:8840"
+    ));
+    assert!(!connection_is_local(
+      "https://other.example.com",
+      public,
+      "0.0.0.0:8840"
+    ));
+    assert!(!connection_is_local(
+      "https://dopbase.example.com/other",
+      "https://dopbase.example.com/dopbase",
+      "0.0.0.0:8840"
+    ));
+  }
+
+  #[test]
+  fn any_loopback_name_reaches_a_loopback_public_url() {
+    for connected in [
+      "http://localhost:8840",
+      "http://127.0.0.1:8840",
+      "http://[::1]:8840",
+    ] {
+      assert!(
+        connection_is_local(connected, "http://localhost:8840", "127.0.0.1:8840"),
+        "{connected}"
+      );
+    }
+  }
+
+  #[test]
+  fn loopback_on_the_bind_port_matches_whatever_the_public_url() {
+    assert!(connection_is_local(
+      "http://localhost:8841",
+      "https://dopbase.example.com",
+      "0.0.0.0:8841"
+    ));
+    assert!(connection_is_local(
+      "http://127.0.0.1:8841",
+      "http://SERVER_HOST:8841",
+      "0.0.0.0:8841"
+    ));
+  }
+
+  #[test]
+  fn another_port_or_host_does_not_match() {
+    // The case that started this: connected to a container on 8841 while
+    // the local instance is on 8840.
+    assert!(!connection_is_local(
+      "http://localhost:8841",
+      "http://localhost:8840",
+      "127.0.0.1:8840"
+    ));
+    assert!(!connection_is_local(
+      "http://192.168.1.20:8840",
+      "http://localhost:8840",
+      "0.0.0.0:8840"
+    ));
+    assert!(!connection_is_local(
+      "https://localhost:8840",
+      "http://localhost:8840",
+      "127.0.0.1:8840"
+    ));
+  }
 }
 
 #[cfg(unix)]

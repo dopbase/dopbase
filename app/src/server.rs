@@ -555,6 +555,22 @@ impl InstanceLock {
     Ok(Some(Self { file }))
   }
 
+  /// Take the lock if no server holds it. `None` means a server is running
+  /// for this database (or the database is in memory).
+  pub fn acquire_if_free(database_url: &str) -> Result<Option<Self>> {
+    if database_url.contains(":memory:") {
+      return Ok(None);
+    }
+    let file = Self::open(database_url)?;
+    match file.try_lock() {
+      Ok(()) => Ok(Some(Self { file })),
+      Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+      Err(std::fs::TryLockError::Error(error)) => {
+        Err(error).context("failed to take the Dopbase database lock")
+      }
+    }
+  }
+
   pub fn is_held(database_url: &str) -> Result<bool> {
     if database_url.contains(":memory:") {
       return Ok(false);

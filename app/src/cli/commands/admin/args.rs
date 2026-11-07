@@ -8,11 +8,12 @@ use crate::constants::limits::{
 
 #[derive(Subcommand, Debug)]
 pub enum AdminCommand {
-  /// Reset a user's password (offline recovery on the server machine).
+  /// Reset a user's password on the instance hosted on this machine.
   ///
-  /// Loads the local server configuration and database directly, so it must
-  /// be run on the machine hosting the server and requires an interactive
-  /// terminal.
+  /// Writes to the instance's database directly, with the server running or
+  /// stopped, and needs an interactive terminal. Run it on the machine or
+  /// inside the container that hosts the server. It refuses when this CLI is
+  /// connected to a different server.
   #[command(after_help = RESET_PASSWORD_HELP)]
   ResetPassword {
     /// Email of the account to reset.
@@ -29,7 +30,8 @@ pub enum AdminCommand {
   /// Run it on the machine hosting the running server, as a user who can
   /// write the server's data directory. Open the printed link to sign in
   /// without a password. The passcode works once and expires after --ttl
-  /// seconds; running the command again replaces it.
+  /// seconds; running the command again replaces it. It refuses when this
+  /// CLI is connected to a different server.
   #[command(after_help = PASSCODE_HELP)]
   Passcode {
     /// Email of the account to sign in.
@@ -50,7 +52,8 @@ pub enum AdminCommand {
   ///
   /// Removes the entire Dopbase data directory from its active location. A ZIP
   /// backup is created first unless --no-backup is passed. The server must be
-  /// stopped and an interactive root password confirmation is required.
+  /// stopped and an interactive root password confirmation is required. It
+  /// refuses when this CLI is connected to a different server.
   #[command(after_help = FACTORY_RESET_HELP)]
   FactoryReset {
     /// Server config file to load (server.toml).
