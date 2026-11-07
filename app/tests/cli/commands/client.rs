@@ -383,3 +383,36 @@ async fn client_connect_refuses_to_leave_the_local_foreground_server() {
   );
   assert_eq!(std::fs::read(&config_path).unwrap(), before);
 }
+
+/// With nothing saved the CLI already talks to this machine's server at the
+/// default URL. `local` then means "stay here", even when the public URL is
+/// a different address for the same server.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn client_connect_local_stays_put_when_the_default_already_reaches_it() {
+  use super::support::{Fixture, command, output};
+  let fixture = Fixture::new().await;
+  let config_path = fixture.client_dir.join("config.toml");
+  let _ = std::fs::remove_file(&config_path);
+  let session = fixture.client_dir.join("session");
+  assert!(session.exists());
+
+  let mut connect = command(&fixture.client_dir);
+  connect
+    .env("DOPBASE_PUBLIC_URL", "https://dopbase.internal")
+    .args(["client", "connect", "local"]);
+  let result = output(connect, None).await;
+  let stdout = String::from_utf8_lossy(&result.stdout);
+  assert!(
+    result.status.success(),
+    "{stdout}{}",
+    String::from_utf8_lossy(&result.stderr)
+  );
+  assert!(
+    stdout.contains("Already connected to http://localhost:8840"),
+    "{stdout}"
+  );
+  assert!(session.exists(), "the CLI session was kept");
+  let config = app::cli::local_config::read(&config_path).unwrap();
+  assert_eq!(config.server_url, None);
+}

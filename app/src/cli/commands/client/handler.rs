@@ -39,7 +39,20 @@ pub(crate) async fn connect(
   })?;
   let default_url = local_config::normalize(DEFAULT_PUBLIC_URL)?;
   let target = if value == "local" {
-    local_config::normalize(&server_config.public_url).unwrap_or_else(|_| default_url.clone())
+    // With nothing saved the CLI already uses the default URL. When that
+    // reaches this instance, `local` is where the CLI already is, even if
+    // the public URL is spelled differently, so keep it instead of switching.
+    if matches!(current.source, local_config::ServerSource::Default)
+      && crate::cli::commands::connection_is_local(
+        &current.url,
+        &server_config.public_url,
+        &server_config.bind_address,
+      )
+    {
+      current.url.clone()
+    } else {
+      local_config::normalize(&server_config.public_url).unwrap_or_else(|_| default_url.clone())
+    }
   } else {
     local_config::normalize_connect_target(value)?
   };
