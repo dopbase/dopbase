@@ -33,7 +33,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase status`                       | Alias for `dopbase client status`   |
 | `dopbase access`                       | Show what you or a token can reach  |
 | `dopbase update`                       | Check GitHub for a newer release    |
-| `dopbase admin reset-password <email>` | Reset a user password offline       |
+| `dopbase admin reset-password <email>` | Reset a user password on the server |
 | `dopbase admin passcode <email>`       | Sign an account in without password |
 | `dopbase admin factory-reset`          | Reset the local instance offline    |
 
@@ -942,7 +942,8 @@ dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
 
 ## Server administration
 
-Maintenance commands operate directly on the server database:
+Maintenance commands open the server's database directly. They never talk to
+a server over the network:
 
 ```bash
 dopbase admin reset-password admin@example.com
@@ -951,14 +952,40 @@ dopbase admin factory-reset
 dopbase admin factory-reset --no-backup
 ```
 
-`admin reset-password` performs offline recovery on the host machine. Because it accesses SQLite files directly, the background or foreground server process must be stopped first to avoid database locks.
+They act on the instance in the local data directory (`--data-dir`,
+`DOPBASE_DATA_DIR`, or `~/.dopbase`), so run them on the machine that hosts
+the server. For a server in a container, run them inside it:
+
+```bash
+docker exec -it dopbase dopbase admin reset-password admin@example.com
+```
+
+Each command prints the data directory it uses. All three refuse when this CLI
+is connected to a different server, through `dopbase client connect` or
+`DOPBASE_URL`, and ask you to connect to the local instance. A connection
+counts as this instance when it is the instance's public URL, or `localhost`,
+`127.0.0.1`, or `::1` on the port the server listens on. With no saved
+connection, as in a fresh container, the commands run. To fix a refusal,
+connect to the local instance first, or set `DOPBASE_URL` to it for one run:
+
+```bash
+dopbase client connect http://localhost:8840
+DOPBASE_URL=http://localhost:8840 dopbase admin reset-password admin@example.com
+```
+
+`admin reset-password` sets a new password in the instance's database. It
+works with the server running or stopped. When the server is stopped, it holds
+the instance lock while it writes, so a server can't start halfway through.
+It never creates a data directory, database, or master key and never upgrades
+the database. It refuses a directory with no instance, a master key that
+doesn't match, and a database a newer Dopbase version has upgraded.
 
 | Option                     | Description                                       |
 | -------------------------- | ------------------------------------------------- |
 | `--config <FILE>`          | Server configuration file to load (`server.toml`) |
 | `--master-key-file <FILE>` | Path to the server master key file                |
 
-The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
+The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and revokes every active session on the instance. If the server is running and too many wrong passwords paused sign-in for the account, that pause still runs out on its own.
 
 `admin passcode` prints a one-time passcode and a link that signs an account
 in to the Admin UI without a password. Run it on the server machine while the
@@ -973,6 +1000,7 @@ dopbase --json admin passcode root@example.com
 ```text
 Launch passcode for root@example.com
 
+Instance:  /srv/dopbase
 Passcode:  GJZG-FLMT
 Expires:   in 60 seconds (14:03:27 UTC)
 Open:      https://dopbase.example.com/launch#identity=root%40example.com&passcode=GJZG-FLMT
@@ -996,7 +1024,7 @@ It works for any person's account. It refuses AI agents, which sign in with
 tokens only, and turned-off accounts. While single sign-on is required, only
 root can use it. It also refuses when the server isn't running or the Admin UI
 is off (`web_ui = false`). With `--json` it prints `email`, `passcode`,
-`expiresAt`, `ttlSeconds`, and `url`.
+`expiresAt`, `ttlSeconds`, `url`, and `dataDir`.
 
 A passcode works once, and five wrong tries delete it. Each passcode issued,
 and each sign-in attempt with one, is recorded in the audit log.
