@@ -112,6 +112,30 @@ you are signing in to, and its footer shows the Dopbase version.
   emails.
 - If you followed a link to a specific page, signing in returns you there.
 
+## Signing in from the server
+
+Someone with access to the server machine can sign any person in without a
+password. On the server, run:
+
+```bash
+dopbase admin passcode root@example.com
+```
+
+It prints a passcode such as `GJZG-FLMT` and a link to `/launch`. Open the
+link in a browser and Dopbase signs that account in and opens **Projects**.
+The passcode works once and expires after 60 seconds unless you pass
+`--ttl`. The page removes it from the address bar as soon as it loads.
+
+- A used, expired, or mistyped passcode shows **This launch link didn't
+  work**. Run the command again for a new one.
+- Opening a link while signed in as someone else signs that browser in as the
+  new account and ends the old session.
+- Opening `/launch` without a passcode goes to **Projects** when you are signed
+  in, and to the sign-in page when you are not.
+
+See [`dopbase admin passcode`](../cli/commands.md#server-administration) for
+which accounts it accepts.
+
 ## Approving a CLI sign-in
 
 `dopbase login --browser` opens a page that shows the code from the terminal,

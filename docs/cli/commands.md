@@ -34,6 +34,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase access`                       | Show what you or a token can reach  |
 | `dopbase update`                       | Check GitHub for a newer release    |
 | `dopbase admin reset-password <email>` | Reset a user password offline       |
+| `dopbase admin passcode <email>`       | Sign an account in without password |
 | `dopbase admin factory-reset`          | Reset the local instance offline    |
 
 When no server is configured, client commands use `http://localhost:8840`.
@@ -941,10 +942,11 @@ dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
 
 ## Server administration
 
-Offline maintenance commands operate directly on the server database:
+Maintenance commands operate directly on the server database:
 
 ```bash
 dopbase admin reset-password admin@example.com
+dopbase admin passcode root@example.com
 dopbase admin factory-reset
 dopbase admin factory-reset --no-backup
 ```
@@ -957,6 +959,47 @@ dopbase admin factory-reset --no-backup
 | `--master-key-file <FILE>` | Path to the server master key file                |
 
 The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
+
+`admin passcode` prints a one-time passcode and a link that signs an account
+in to the Admin UI without a password. Run it on the server machine while the
+server is running, as a user who can write the server's data directory:
+
+```bash
+dopbase admin passcode root@example.com
+dopbase admin passcode alice@example.com --ttl 120
+dopbase --json admin passcode root@example.com
+```
+
+```text
+Launch passcode for root@example.com
+
+Passcode:  GJZG-FLMT
+Expires:   in 60 seconds (14:03:27 UTC)
+Open:      https://dopbase.example.com/launch#identity=root%40example.com&passcode=GJZG-FLMT
+
+It works once. Running this command again replaces it.
+```
+
+| Option            | Description                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| `--ttl <SECONDS>` | How long the passcode stays valid, from 15 to 600. Default 60 |
+| `--config <FILE>` | Server configuration file to load (`server.toml`)             |
+
+The command writes a hash of the passcode into the server database, so it
+never talks to the server and needs no sign-in. Being able to write the data
+directory is what lets you use it. Each account has one passcode at a time,
+and running the command again replaces it. The passcode sits in the link's
+fragment (after `#`), which browsers never send to the server, so it stays
+out of proxy and access logs.
+
+It works for any person's account. It refuses AI agents, which sign in with
+tokens only, and turned-off accounts. While single sign-on is required, only
+root can use it. It also refuses when the server isn't running or the Admin UI
+is off (`web_ui = false`). With `--json` it prints `email`, `passcode`,
+`expiresAt`, `ttlSeconds`, and `url`.
+
+A passcode works once, and five wrong tries delete it. Each passcode issued,
+and each sign-in attempt with one, is recorded in the audit log.
 
 `admin factory-reset` also requires the server to be stopped. It displays the
 exact data directory, then requires `please-wipe-out-system` and the Dopbase
