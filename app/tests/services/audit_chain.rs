@@ -53,7 +53,7 @@ async fn record_at(
     &mut transaction,
     &AuditEntry {
       actor_id: Some("adm_1"),
-      actor_label: Some("admin@example.com"),
+      actor_label: Some("admin@dopbase.com"),
       action,
       project_id: Some("prj_1"),
       environment_id: Some("env_1"),

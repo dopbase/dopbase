@@ -6,6 +6,18 @@ All notable changes to Dopbase are documented in this file.
 
 ### Added
 
+- `dopbase admin passcode <email>` signs an account in to the Admin UI
+  without a password. Run it on the server machine while the server runs; it
+  prints a one-time passcode and a `/launch#identity=…&passcode=…` link that
+  opens Projects as that account. The passcode lasts 60 seconds (`--ttl`, 15 to
+  600), works once, and is deleted after five wrong tries. AI agents, turned-off
+  accounts, and anyone but root while single sign-on is required are refused.
+  `POST /api/v1/auth/launch` trades the passcode for a browser session, and
+  every failure answers `401` `PASSCODE_INVALID`. Failed tries are limited per
+  email and client address, and tries while no passcode is live don't count,
+  so someone who only knows the email can't lock its owner out. If the server
+  doesn't answer, the `/launch` page offers to send the same passcode again.
+  It refuses while the CLI is connected to a different server.
 - `DOPBASE_SSO`, `DOPBASE_RBAC` and `DOPBASE_RBAC_ROLES` (`sso`, `rbac`,
   `rbac_roles` in `server.toml`) turn on single sign-on, people and group
   management, and custom roles. `GET /api/v1/auth/session` lists them in
@@ -101,6 +113,18 @@ All notable changes to Dopbase are documented in this file.
 
 ### Changed
 
+- Example emails in CLI help, the sign-in and setup placeholders, and the docs
+  use `dopbase.com` addresses, such as `root@dopbase.com`.
+- `dopbase client connect local` no longer needs the local server to be
+  running. If nothing answers, it switches after confirmation and tells you to
+  run `dopbase server start` and `dopbase login`. `local` now follows the
+  instance's public URL from `server.toml` or `DOPBASE_PUBLIC_URL` instead of
+  always meaning `http://localhost:8840`. Passing your own instance's URL works
+  the same way. Something that answers but isn't Dopbase is still refused,
+  and other servers still have to be reachable. With nothing saved, `local`
+  stays on the default address when that already reaches this machine's
+  server, so it doesn't switch or sign you out. `--json` output adds
+  `server_reachable`. See [client connect](docs/cli/client-connect.md#return-to-the-local-server).
 - **Breaking:** Single sign-on and people management are off by default. If
   you use them, set `DOPBASE_SSO=true` and `DOPBASE_RBAC=true` before
   upgrading, or accounts that only sign in with single sign-on are locked out.
@@ -249,6 +273,8 @@ All notable changes to Dopbase are documented in this file.
   command touches the saved login in that case. A CI job that runs
   `dopbase logout` as cleanup with the token set now fails: drop that step, or
   run `env -u DOPBASE_TOKEN dopbase logout` if the job also saved a login.
+- `dopbase admin reset-password` works with the server running or stopped,
+  and prints the data directory it changed.
 
 ### Removed
 
@@ -264,6 +290,20 @@ All notable changes to Dopbase are documented in this file.
 
 ### Fixed
 
+- `dopbase client connect local` works again while `dopbase server start`
+  runs in the foreground. Any foreground server used to block every switch,
+  including a switch to that server. Now Ctrl+C is only needed when you leave
+  the local foreground server for another one. See
+  [client connect](docs/cli/client-connect.md).
+- `dopbase admin reset-password` and `dopbase admin factory-reset` refuse
+  while the CLI is connected to a different server, instead of changing the
+  local instance. That includes another server on this instance's own port,
+  such as a container published on it, while this instance is stopped. See [server administration](docs/cli/commands.md#server-administration).
+- `dopbase admin reset-password` no longer creates a data directory, database
+  or master key where there is no instance, and no longer upgrades the database.
+- The sign-in artwork no longer shows up blank. Three of the five pictures
+  were inlined as `data:` images, which the Content Security Policy blocks;
+  the UI build now ships every asset as a file.
 - Release builds on macOS 27 no longer fail with `mis-aligned LINKEDIT string pool`
   while loading `sqlx-macros`.
 - Right after first-run setup, root's role name and session details now show

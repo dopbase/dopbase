@@ -15,7 +15,7 @@ use tempfile::TempDir;
 fn generated(data: &Path) -> Value {
   success(
     command(data)
-      .args(["--json", "server", "setup", "--email", "ROOT@EXAMPLE.COM"])
+      .args(["--json", "server", "setup", "--email", "ROOT@DOPBASE.COM"])
       .stdin(Stdio::null())
       .output()
       .unwrap(),
@@ -57,7 +57,7 @@ fn disabled_web_ui_start_shows_setup_guidance_without_provisioning() {
     assert!(info.starts_with("Info:"), "{info}");
     assert!(info.contains("dopbase server setup\n"), "{info}");
     assert!(
-      info.contains("dopbase server setup --email admin@example.com"),
+      info.contains("dopbase server setup --email admin@dopbase.com"),
       "{info}"
     );
     assert!(info.contains("dopbase server setup --web"), "{info}");
@@ -121,7 +121,7 @@ fn setup_rejects_invalid_modes_before_creating_state() {
         "server",
         "setup",
         "--email",
-        "root@example.com",
+        "root@dopbase.com",
       ],
       "--server cannot be used",
     ),
@@ -135,7 +135,7 @@ fn setup_rejects_invalid_modes_before_creating_state() {
         "server",
         "setup",
         "--email",
-        "root@example.com",
+        "root@dopbase.com",
         "--port",
         "9000",
       ],
@@ -163,7 +163,7 @@ fn setup_rejects_invalid_modes_before_creating_state() {
 
 #[tokio::test]
 async fn generated_setup_creates_one_root_and_audit_without_sessions_or_login() {
-  for environment in [None, Some("  ROOT@EXAMPLE.COM  ")] {
+  for environment in [None, Some("  ROOT@DOPBASE.COM  ")] {
     let directory = TempDir::new().unwrap();
     let data = directory.path().join("instance");
     let result = match environment {
@@ -178,7 +178,7 @@ async fn generated_setup_creates_one_root_and_audit_without_sessions_or_login() 
       ),
     };
     assert_eq!(result["initialized"], true);
-    assert_eq!(result["email"], "root@example.com");
+    assert_eq!(result["email"], "root@dopbase.com");
     assert_eq!(result["data_dir"], data.to_str().unwrap());
     let password = result["password"].as_str().unwrap();
     assert_eq!(password.len(), 43);
@@ -191,7 +191,7 @@ async fn generated_setup_creates_one_root_and_audit_without_sessions_or_login() 
         .await
         .unwrap();
     assert_eq!(result["admin_id"], id);
-    assert_eq!(email, "root@example.com");
+    assert_eq!(email, "root@dopbase.com");
     assert_eq!(role, "root");
     assert!(
       argon2::PasswordVerifier::verify_password(
@@ -218,7 +218,7 @@ async fn generated_setup_creates_one_root_and_audit_without_sessions_or_login() 
     for name in ["server.toml", "config.toml"] {
       let contents = fs::read_to_string(data.join(name)).unwrap();
       assert!(!contents.contains(password));
-      assert!(!contents.contains("root@example.com"));
+      assert!(!contents.contains("root@dopbase.com"));
     }
   }
 }
@@ -230,9 +230,9 @@ fn human_generated_output_displays_password_once() {
     let mut cmd = command(directory.path());
     cmd.args(["server", "setup"]);
     if environment {
-      cmd.env("DOPBASE_ROOT_EMAIL", "root@example.com");
+      cmd.env("DOPBASE_ROOT_EMAIL", "root@dopbase.com");
     } else {
-      cmd.args(["--email", "root@example.com"]);
+      cmd.args(["--email", "root@dopbase.com"]);
     }
     let output = cmd
       .stdin(Stdio::null())
@@ -257,7 +257,7 @@ fn human_generated_output_displays_password_once() {
 fn environment_email_validation_and_blank_fallback_create_no_files() {
   let directory = TempDir::new().unwrap();
   let data = directory.path().join("missing");
-  for email in ["", "  ", "invalid", "a@", "a@b@example.com"] {
+  for email in ["", "  ", "invalid", "a@", "a@b@dopbase.com"] {
     for web in [false, true] {
       if web && email.trim().is_empty() {
         continue;
@@ -309,31 +309,31 @@ fn non_unicode_environment_email_is_rejected_unless_explicitly_overridden() {
         "DOPBASE_ROOT_EMAIL",
         std::ffi::OsString::from_vec(vec![0xff]),
       )
-      .args(["--json", "server", "setup", "--email", "root@example.com"])
+      .args(["--json", "server", "setup", "--email", "root@dopbase.com"])
       .stdin(Stdio::null())
       .output()
       .unwrap(),
   );
-  assert_eq!(result["email"], "root@example.com");
+  assert_eq!(result["email"], "root@dopbase.com");
 }
 
 #[test]
 fn explicit_email_overrides_environment_without_fallback() {
   let directory = TempDir::new().unwrap();
-  for environment in ["other@example.com", "invalid"] {
+  for environment in ["other@dopbase.com", "invalid"] {
     let instance = TempDir::new_in(directory.path()).unwrap();
     let result = success(
       command(instance.path())
         .env("DOPBASE_ROOT_EMAIL", environment)
-        .args(["--json", "server", "setup", "--email", " ROOT@EXAMPLE.COM "])
+        .args(["--json", "server", "setup", "--email", " ROOT@DOPBASE.COM "])
         .stdin(Stdio::null())
         .output()
         .unwrap(),
     );
-    assert_eq!(result["email"], "root@example.com");
+    assert_eq!(result["email"], "root@dopbase.com");
     failure(
       command(instance.path())
-        .env("DOPBASE_ROOT_EMAIL", "other@example.com")
+        .env("DOPBASE_ROOT_EMAIL", "other@dopbase.com")
         .args(["server", "setup"])
         .output()
         .unwrap(),
@@ -343,7 +343,7 @@ fn explicit_email_overrides_environment_without_fallback() {
   let missing = directory.path().join("missing");
   failure(
     command(&missing)
-      .env("DOPBASE_ROOT_EMAIL", "valid@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "valid@dopbase.com")
       .args(["server", "setup", "--email", "invalid"])
       .output()
       .unwrap(),
@@ -360,7 +360,7 @@ async fn repeated_and_competing_setup_preserve_the_first_account() {
   for _ in 0..2 {
     children.push(
       command(&data)
-        .args(["--json", "server", "setup", "--email", "root@example.com"])
+        .args(["--json", "server", "setup", "--email", "root@dopbase.com"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -382,7 +382,7 @@ async fn repeated_and_competing_setup_preserve_the_first_account() {
   let key = fs::read(data.join("master.key")).unwrap();
   failure(
     command(&data)
-      .args(["server", "setup", "--email", "other@example.com"])
+      .args(["server", "setup", "--email", "other@dopbase.com"])
       .output()
       .unwrap(),
     "already been initialized",
@@ -413,7 +413,7 @@ async fn reference_write_failure_is_retryable_without_rotating_the_key() {
   let cfg = blocked.join("server.toml");
   failure(
     command(&data)
-      .args(["server", "setup", "--email", "root@example.com", "--config"])
+      .args(["server", "setup", "--email", "root@dopbase.com", "--config"])
       .arg(&cfg)
       .output()
       .unwrap(),
@@ -428,7 +428,7 @@ async fn reference_write_failure_is_retryable_without_rotating_the_key() {
   fs::remove_file(&blocked).unwrap();
   assert!(
     command(&data)
-      .args(["server", "setup", "--email", "root@example.com", "--config"])
+      .args(["server", "setup", "--email", "root@dopbase.com", "--config"])
       .arg(&cfg)
       .output()
       .unwrap()
@@ -446,7 +446,7 @@ fn setup_respects_the_existing_instance_lock() {
   let _lock = app::server::InstanceLock::acquire(&url).unwrap();
   failure(
     command(directory.path())
-      .args(["server", "setup", "--email", "root@example.com"])
+      .args(["server", "setup", "--email", "root@dopbase.com"])
       .output()
       .unwrap(),
     "instance is in use",
@@ -454,7 +454,7 @@ fn setup_respects_the_existing_instance_lock() {
   for background in [false, true] {
     let mut cmd = command(directory.path());
     cmd
-      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
       .args(["server", "start"]);
     if background {
       cmd.arg("--background");
@@ -473,11 +473,11 @@ fn corrupt_storage_is_not_treated_as_a_fresh_instance() {
   for args in [
     vec!["server", "start"],
     vec!["server", "start", "--background"],
-    vec!["server", "setup", "--email", "root@example.com"],
+    vec!["server", "setup", "--email", "root@dopbase.com"],
   ] {
     failure(
       command(directory.path())
-        .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+        .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
         .args(args)
         .output()
         .unwrap(),
@@ -507,7 +507,7 @@ async fn incorrect_key_during_setup_preserves_uninitialized_storage() {
         "server",
         "setup",
         "--email",
-        "root@example.com",
+        "root@dopbase.com",
         "--master-key-file",
       ])
       .arg(&wrong_key)
@@ -518,7 +518,7 @@ async fn incorrect_key_during_setup_preserves_uninitialized_storage() {
   for background in [false, true] {
     let mut cmd = command(directory.path());
     cmd
-      .env("DOPBASE_ROOT_EMAIL", "root@example.com")
+      .env("DOPBASE_ROOT_EMAIL", "root@dopbase.com")
       .args(["server", "start", "--port", "0", "--master-key-file"])
       .arg(&wrong_key);
     if background {
@@ -549,7 +549,7 @@ async fn only_explicit_setup_resumes_pending_factory_reset() {
   let backup = directory.path().join("backups/fixture.dop");
   fs::write(&backup, "old backup fixture").unwrap();
   for background in [false, true] {
-    for email in ["", "replacement@example.com"] {
+    for email in ["", "replacement@dopbase.com"] {
       let mut cmd = command(directory.path());
       cmd
         .env("DOPBASE_ROOT_EMAIL", email)
@@ -565,7 +565,7 @@ async fn only_explicit_setup_resumes_pending_factory_reset() {
   assert!(marker.exists());
   assert!(backup.exists());
   let output = command(directory.path())
-    .args(["server", "setup", "--email", "replacement@example.com"])
+    .args(["server", "setup", "--email", "replacement@dopbase.com"])
     .output()
     .unwrap();
   assert!(output.status.success());
@@ -579,7 +579,7 @@ async fn only_explicit_setup_resumes_pending_factory_reset() {
     .fetch_one(db.pool())
     .await
     .unwrap();
-  assert_eq!(email, "replacement@example.com");
+  assert_eq!(email, "replacement@dopbase.com");
   assert_eq!(count(&db, "admins").await, 1);
   db.close().await;
 }
@@ -591,7 +591,7 @@ async fn credential_output_failure_reports_committed_initialization() {
   let (read, write) = nix::unistd::pipe().unwrap();
   drop(read);
   let output = command(directory.path())
-    .args(["--json", "server", "setup", "--email", "root@example.com"])
+    .args(["--json", "server", "setup", "--email", "root@dopbase.com"])
     .stdout(Stdio::from(write))
     .stderr(Stdio::piped())
     .spawn()
@@ -614,7 +614,7 @@ async fn credential_output_failure_reports_committed_initialization() {
   db.close().await;
   failure(
     command(directory.path())
-      .args(["server", "setup", "--email", "root@example.com"])
+      .args(["server", "setup", "--email", "root@dopbase.com"])
       .output()
       .unwrap(),
     "already been initialized",
@@ -637,15 +637,15 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     (true, Some("  "), None, None),
     (
       false,
-      Some(" ROOT+SETUP@EXAMPLE.COM "),
+      Some(" ROOT+SETUP@DOPBASE.COM "),
       None,
-      Some("root+setup@example.com"),
+      Some("root+setup@dopbase.com"),
     ),
     (
       false,
       Some("invalid"),
-      Some("CLI+SETUP@EXAMPLE.COM"),
-      Some("cli+setup@example.com"),
+      Some("CLI+SETUP@DOPBASE.COM"),
+      Some("cli+setup@dopbase.com"),
     ),
   ] {
     let directory = TempDir::new().unwrap();
@@ -736,7 +736,7 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     let invalid = client
       .post(format!("{base}/api/v1/bootstrap/admin"))
       .json(
-        &json!({"setupToken":"wrong", "email":"root@example.com", "password":"fixture-password-123"}),
+        &json!({"setupToken":"wrong", "email":"root@dopbase.com", "password":"fixture-password-123"}),
       )
       .send()
       .await
@@ -745,7 +745,7 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     let created = client
       .post(format!("{base}/api/v1/bootstrap/admin"))
       .json(
-        &json!({"setupToken":token, "email":"root@example.com", "password":"fixture-password-123"}),
+        &json!({"setupToken":token, "email":"root@dopbase.com", "password":"fixture-password-123"}),
       )
       .send()
       .await
@@ -758,7 +758,7 @@ async fn web_setup_keeps_its_token_session_redirect_contract_and_continues_servi
     let login = client
       .post(format!("{base}/api/v1/auth/login"))
       .json(
-        &json!({"email":"root@example.com","password":"fixture-password-123","sessionKind":"cli"}),
+        &json!({"email":"root@dopbase.com","password":"fixture-password-123","sessionKind":"cli"}),
       )
       .send()
       .await
@@ -965,7 +965,7 @@ mod guided {
     terminal.wait_for("Root email:", 0);
     let from = terminal.send("invalid\r");
     terminal.wait_for("valid email", from);
-    let from = terminal.send(&format!("{}ROOT@EXAMPLE.COM\r", "\x7f".repeat(7)));
+    let from = terminal.send(&format!("{}ROOT@DOPBASE.COM\r", "\x7f".repeat(7)));
     terminal.wait_for("Root password:", from);
     let from = terminal.send("short\r");
     terminal.wait_for("at least 12", from);
@@ -989,7 +989,7 @@ mod guided {
       .fetch_one(db.pool())
       .await
       .unwrap();
-    assert_eq!(email, "root@example.com");
+    assert_eq!(email, "root@dopbase.com");
     assert!(
       argon2::PasswordVerifier::verify_password(
         &argon2::Argon2::default(),
@@ -1008,7 +1008,7 @@ mod guided {
     let data = directory.path().join("missing");
     let mut terminal = Terminal::with_email(&data, Some("  "));
     terminal.wait_for("Root email:", 0);
-    let from = terminal.send("root@example.com\r");
+    let from = terminal.send("root@dopbase.com\r");
     terminal.wait_for("Root password:", from);
     terminal.send("\x03");
     assert_eq!(terminal.finish().code(), Some(130));

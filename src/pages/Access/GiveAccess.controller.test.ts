@@ -131,7 +131,7 @@ describe("useGiveAccessController", () => {
     expect(page.principal.value).toEqual({
       type: "user",
       id: "usr_maya",
-      label: "maya@example.com",
+      label: "maya@dopbase.com",
       maxLevel: "project_manager",
     });
     expect(
@@ -175,7 +175,7 @@ describe("useGiveAccessController", () => {
       },
     ]);
     expect(page.summary.value).toBe(
-      "maya@example.com will be able to read and change secrets in all of data.",
+      "maya@dopbase.com will be able to read and change secrets in all of data.",
     );
     expect(await page.submit()).toBe(true);
     expect(accessApi.setGrant).toHaveBeenCalledWith({
@@ -205,7 +205,7 @@ describe("useGiveAccessController", () => {
       ["payments / staging", null],
     ]);
     expect(page.summary.value).toBe(
-      "maya@example.com will be able to read secrets in payments / prod and staging.",
+      "maya@dopbase.com will be able to read secrets in payments / prod and staging.",
     );
     expect(await page.submit()).toBe(true);
     expect(
@@ -477,7 +477,7 @@ describe("useGiveAccessController", () => {
       { userId: "usr_maya" },
       ["Users", { name: "users" }],
       [
-        "maya@example.com",
+        "maya@dopbase.com",
         { name: "user-access", params: { userId: "usr_maya" } },
       ],
     ],
@@ -485,7 +485,7 @@ describe("useGiveAccessController", () => {
       "agent-access-give",
       { agentId: "usr_maya" },
       ["AI agents", { name: "agents" }],
-      ["maya@example.com", { name: "agent", params: { agentId: "usr_maya" } }],
+      ["maya@dopbase.com", { name: "agent", params: { agentId: "usr_maya" } }],
     ],
     [
       "group-access-give",
@@ -584,8 +584,8 @@ describe("useGiveAccessController from a project", () => {
     let page = await open();
     expect(page.principals.value.map((choice) => choice.label)).toEqual([
       "Backend",
-      "maya@example.com",
-      "reader@example.com",
+      "maya@dopbase.com",
+      "reader@dopbase.com",
     ]);
 
     signInAs(["agents.view_all", "agents.manage"]);
@@ -607,8 +607,8 @@ describe("useGiveAccessController from a project", () => {
       ]),
     ).toEqual([
       ["Backend", "groups", "1 member"],
-      ["maya@example.com", "people", "Member · has Write now"],
-      ["reader@example.com", "people", "Viewer"],
+      ["maya@dopbase.com", "people", "Member · has Write now"],
+      ["reader@dopbase.com", "people", "Viewer"],
       ["review-bot", "agents", "AI agent · has 1 environment"],
     ]);
     page.principalFilter.value = "REV";

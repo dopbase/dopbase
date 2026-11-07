@@ -19,7 +19,7 @@ struct CapturedRequests {
 }
 
 async fn session_handler() -> Json<Value> {
-  Json(json!({"data":{"email":"admin@example.com"}}))
+  Json(json!({"data":{"email":"admin@dopbase.com"}}))
 }
 
 async fn resolve_handler() -> Json<Value> {
@@ -71,7 +71,7 @@ fn save_session(
     config_path: directory.path().join("config.toml"),
     config: ClientConfig::default(),
   };
-  session::save(&server, TOKEN, Some("admin@example.com")).unwrap();
+  session::save(&server, TOKEN, Some("admin@dopbase.com")).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

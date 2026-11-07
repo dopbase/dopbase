@@ -9,7 +9,7 @@ async fn initialize(config: &app::config::ServerConfig) {
     &state,
     app::modules::bootstrap::model::BootstrapAdminRequest {
       setup_token,
-      email: "root@example.com".into(),
+      email: "root@dopbase.com".into(),
       password: "fixture-password-123".into(),
     },
   )
@@ -146,7 +146,7 @@ fn foreground_and_background_start_create_references_in_the_selected_locations()
     };
     assert!(
       command(&data_dir)
-        .args(["server", "setup", "--email", "root@example.com", "--config"])
+        .args(["server", "setup", "--email", "root@dopbase.com", "--config"])
         .arg(&config_path)
         .status()
         .unwrap()

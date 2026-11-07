@@ -95,7 +95,7 @@ describe("useGroupController", () => {
       ]),
     ).toEqual([
       [
-        "maya@example.com",
+        "maya@dopbase.com",
         "Member",
         { name: "user", params: { userId: "usr_maya" } },
       ],
@@ -246,7 +246,7 @@ describe("useGroupController", () => {
     await settle();
     await controller.removeMember(detail.members[0]!);
     expect(controller.membersError.value).toBe(
-      "Could not take maya@example.com out of the group.",
+      "Could not take maya@dopbase.com out of the group.",
     );
     expect(controller.memberRows.value).toHaveLength(2);
   });

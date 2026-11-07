@@ -24,7 +24,7 @@ vi.mock("~/services/users.api");
 
 const departed = userFixture({
   id: "usr_gone",
-  email: "gone@example.com",
+  email: "gone@dopbase.com",
   status: "disabled",
 });
 const otherBot = userFixture({
@@ -59,8 +59,8 @@ describe("useTransferOwnerDialog", () => {
     const { dialog } = await openDialog();
 
     expect(dialog.options.value).toEqual([
-      { value: "usr_lead", label: "lead@example.com" },
-      { value: "usr_root", label: "root@example.com" },
+      { value: "usr_lead", label: "lead@dopbase.com" },
+      { value: "usr_root", label: "root@dopbase.com" },
     ]);
   });
 

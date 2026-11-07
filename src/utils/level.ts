@@ -56,7 +56,7 @@ export const LEVEL_VERBS: Record<Level, string> = {
 };
 
 /**
- * One sentence on what a grant will allow: "maya@example.com will be able
+ * One sentence on what a grant will allow: "maya@dopbase.com will be able
  * to read secrets in payments / staging." `who` is a person's or agent's
  * name, or a group's, with `isGroup` set.
  */

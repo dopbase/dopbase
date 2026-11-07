@@ -48,7 +48,7 @@ const { controller } = await vi.hoisted(async () => {
       openProjectAccess: vi.fn(),
       canCreateProjects: ref(true),
       showSetupChecklist: ref(false),
-      accountEmail: ref("root@example.com"),
+      accountEmail: ref("root@dopbase.com"),
       signInMethods: ref<unknown>(null),
       nameDialog: ref<unknown>(null),
       nameDialogCopy: ref({
@@ -226,7 +226,7 @@ describe("Projects page", () => {
 
     const checklist = host.querySelector('[data-testid="setup-checklist"]');
     expect(checklist?.textContent).toContain("3 of 4 done");
-    expect(checklist?.textContent).toContain("root@example.com");
+    expect(checklist?.textContent).toContain("root@dopbase.com");
     expect(checklist?.textContent).toContain("Add single sign-on");
     expect(
       checklist?.querySelector('[aria-current="step"]')?.textContent,

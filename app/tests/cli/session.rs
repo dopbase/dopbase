@@ -6,7 +6,7 @@ use std::fs;
 use tempfile::TempDir;
 
 const TOKEN: &str = "dbs_test_marker_that_must_stay_encrypted";
-const EMAIL: &str = "admin@example.com";
+const EMAIL: &str = "admin@dopbase.com";
 
 fn server(
   directory: &TempDir,

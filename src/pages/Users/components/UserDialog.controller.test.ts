@@ -72,7 +72,7 @@ describe("useUserDialog", () => {
 
     it("fills in the account being edited", async () => {
       const { dialog } = await openDialog({ editing: maya });
-      expect(dialog.email.value).toBe("maya@example.com");
+      expect(dialog.email.value).toBe("maya@dopbase.com");
       expect(dialog.roleId.value).toBe("rol_member");
     });
 
@@ -191,7 +191,7 @@ describe("useUserDialog", () => {
 
     it("needs a temporary password for someone signing in with one", async () => {
       const { dialog } = await openDialog();
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       await dialog.submit();
       expect(dialog.errors.value).toEqual({
         password: "Set a temporary password.",
@@ -200,7 +200,7 @@ describe("useUserDialog", () => {
 
     it("holds passwords to the length limits", async () => {
       const { dialog } = await openDialog();
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
 
       dialog.password.value = "short";
       await dialog.submit();
@@ -214,7 +214,7 @@ describe("useUserDialog", () => {
 
     it("needs no password for someone who signs in with single sign-on", async () => {
       const { dialog } = await openDialog({ sso: true });
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       dialog.signIn.value = "sso";
       await dialog.submit();
       expect(dialog.errors.value).toEqual({});
@@ -222,7 +222,7 @@ describe("useUserDialog", () => {
 
     it("asks for a role when there's none to pick", async () => {
       const { dialog } = await openDialog({ roles: [agentRole] });
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       dialog.password.value = PASSWORD;
       await dialog.submit();
       expect(dialog.errors.value).toEqual({ role: "Pick a role." });
@@ -241,9 +241,9 @@ describe("useUserDialog", () => {
   describe("notes", () => {
     it("tells you a new account reaches nothing until it gets access", async () => {
       const { dialog } = await openDialog();
-      dialog.email.value = "  sam@example.com ";
+      dialog.email.value = "  sam@dopbase.com ";
       expect(dialog.note.value).toBe(
-        "sam@example.com reaches no project until someone gives them access. You can do that from their page right after this.",
+        "sam@dopbase.com reaches no project until someone gives them access. You can do that from their page right after this.",
       );
     });
 
@@ -265,14 +265,14 @@ describe("useUserDialog", () => {
   describe("saving", () => {
     it("creates an account with a temporary password and the chosen role", async () => {
       const { dialog } = await openDialog();
-      dialog.email.value = " sam@example.com ";
+      dialog.email.value = " sam@dopbase.com ";
       dialog.password.value = PASSWORD;
       dialog.roleId.value = "rol_viewer";
 
       const saved = await dialog.submit();
 
       expect(usersApi.createUser).toHaveBeenCalledWith(
-        "sam@example.com",
+        "sam@dopbase.com",
         PASSWORD,
         { roleId: "rol_viewer" },
       );
@@ -282,12 +282,12 @@ describe("useUserDialog", () => {
 
     it("creates a single sign-on account without a password", async () => {
       const { dialog } = await openDialog({ sso: true });
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       dialog.signIn.value = "sso";
 
       await dialog.submit();
 
-      expect(usersApi.createUser).toHaveBeenCalledWith("sam@example.com", "", {
+      expect(usersApi.createUser).toHaveBeenCalledWith("sam@dopbase.com", "", {
         roleId: "rol_member",
       });
     });
@@ -301,11 +301,11 @@ describe("useUserDialog", () => {
       });
 
       dialog.roleId.value = "rol_member";
-      dialog.email.value = "maya@corp.example";
+      dialog.email.value = "maya@corp.dopbase.com";
       dialog.password.value = PASSWORD;
       await dialog.submit();
       expect(usersApi.updateUser).toHaveBeenLastCalledWith("usr_maya", {
-        email: "maya@corp.example",
+        email: "maya@corp.dopbase.com",
         password: PASSWORD,
       });
       expect(usersApi.createUser).not.toHaveBeenCalled();
@@ -316,7 +316,7 @@ describe("useUserDialog", () => {
         new ApiError(409, { EMAIL_TAKEN: "Someone already uses that email." }),
       );
       const { dialog } = await openDialog();
-      dialog.email.value = "maya@example.com";
+      dialog.email.value = "maya@dopbase.com";
       dialog.password.value = PASSWORD;
 
       expect(await dialog.submit()).toBeNull();
@@ -342,7 +342,7 @@ describe("useUserDialog", () => {
         new ApiError(403, { ROLE_NOT_ASSIGNABLE: "You can't give that role." }),
       );
       const { dialog } = await openDialog();
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       dialog.password.value = PASSWORD;
 
       await dialog.submit();
@@ -352,7 +352,7 @@ describe("useUserDialog", () => {
     it("says the account wasn't saved when the failure isn't from the server", async () => {
       vi.mocked(usersApi.createUser).mockRejectedValue(new TypeError("fetch"));
       const { dialog } = await openDialog();
-      dialog.email.value = "sam@example.com";
+      dialog.email.value = "sam@dopbase.com";
       dialog.password.value = PASSWORD;
 
       expect(await dialog.submit()).toBeNull();
@@ -365,7 +365,7 @@ describe("useUserDialog", () => {
     it("only sets a new password, leaving email and role alone", async () => {
       useAuthStore().session = {
         adminId: "usr_lead",
-        email: "lead@example.com",
+        email: "lead@dopbase.com",
         sessionKind: "browser",
         recentAuthentication: true,
         role: "admin",
@@ -375,7 +375,7 @@ describe("useUserDialog", () => {
       const { dialog } = await openDialog({ editing: maya });
       expect(dialog.passwordOnly.value).toBe(true);
       expect(dialog.note.value).toBe("");
-      dialog.email.value = "renamed@example.com";
+      dialog.email.value = "renamed@dopbase.com";
       dialog.roleId.value = "rol_admin";
       expect(await dialog.submit()).toBeNull();
       expect(dialog.errors.value.password).toBe("Enter a new password.");
@@ -391,7 +391,7 @@ describe("useUserDialog", () => {
     it("offers only built-in roles, and keeps the custom one a person holds", async () => {
       useAuthStore().session = {
         adminId: "usr_lead",
-        email: "lead@example.com",
+        email: "lead@dopbase.com",
         sessionKind: "browser",
         recentAuthentication: true,
         role: "admin",

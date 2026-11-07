@@ -13,4 +13,3 @@ target/
 .vscode/
 .playwright-mcp
 backlog/archive
-app/docs

@@ -29,7 +29,7 @@ struct CapturedRequest {
 }
 
 async fn session_handler() -> Json<Value> {
-  Json(json!({"data":{"email":"admin@example.com"}}))
+  Json(json!({"data":{"email":"admin@dopbase.com"}}))
 }
 
 async fn create_handler(
@@ -75,7 +75,7 @@ fn save_session(
     config_path: directory.path().join("config.toml"),
     config: ClientConfig::default(),
   };
-  session::save(&server, TOKEN, Some("admin@example.com")).unwrap();
+  session::save(&server, TOKEN, Some("admin@dopbase.com")).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -190,7 +190,7 @@ async fn clone_session(State(state): State<CloneState>) -> Response {
       "This operation requires a human project account.",
     ),
     _ => clone_ok(json!({
-      "email":"admin@example.com",
+      "email":"admin@dopbase.com",
       "recentAuthentication": state.scenario != CloneScenario::StaleSession
     })),
   }

@@ -263,7 +263,7 @@ async fn only_runner_tokens_reach_the_runtime_gate() {
   assert_eq!(status, 403);
   assert!(body["error"]["RUNNER_TOKEN_REQUIRED"].is_string(), "{body}");
 
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "POST",

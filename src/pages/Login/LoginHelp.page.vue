@@ -25,7 +25,7 @@ const { host, ssoName } = useLoginHelpController();
         Root, on the server, with Dopbase stopped
       </p>
       <DbCode class="mt-2"
-        >dopbase admin reset-password root@example.com</DbCode
+        >dopbase admin reset-password root@dopbase.com</DbCode
       >
       <p class="mt-2 text-[13px] text-ink-muted">
         It checks the master key on the server. The key never goes through the

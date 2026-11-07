@@ -23,7 +23,7 @@ function event(overrides: Partial<AuditEvent>): AuditEvent {
     id: "aud_1",
     actorType: "admin",
     actorId: "usr_1",
-    actorLabel: "maya@example.com",
+    actorLabel: "maya@dopbase.com",
     action: "secret.revealed",
     projectId: "prj_pay",
     environmentId: "env_prod",
@@ -67,7 +67,7 @@ describe("useActivityPanelController", () => {
     );
     expect(c.rows.value[0]).toMatchObject({
       time: "just now",
-      actor: "maya@example.com",
+      actor: "maya@dopbase.com",
       where: "prod",
       whereProtected: true,
       details: "STRIPE_WEBHOOK_SECRET",
@@ -80,7 +80,7 @@ describe("useActivityPanelController", () => {
 
     c.wholeProject.value = true;
     c.action.value = "secret.updated";
-    c.actor.value = " lead@example.com ";
+    c.actor.value = " lead@dopbase.com ";
     await nextTick();
 
     await vi.waitFor(() =>
@@ -90,7 +90,7 @@ describe("useActivityPanelController", () => {
           projectId: "prj_pay",
           environmentId: undefined,
           action: "secret.updated",
-          actor: "lead@example.com",
+          actor: "lead@dopbase.com",
         },
         expect.any(AbortSignal),
       ),
@@ -100,7 +100,7 @@ describe("useActivityPanelController", () => {
       query: {
         projectId: "prj_pay",
         action: "secret.updated",
-        actor: "lead@example.com",
+        actor: "lead@dopbase.com",
       },
     });
   });

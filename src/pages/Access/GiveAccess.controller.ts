@@ -617,7 +617,7 @@ export function useGiveAccessController() {
   );
 
   /**
-   * "Users / maya@example.com", then the page's own title. The name is left
+   * "Users / maya@dopbase.com", then the page's own title. The name is left
    * out until it loads, so the breadcrumb never shows an empty link.
    */
   const breadcrumbs = computed<Breadcrumb[]>(() => {

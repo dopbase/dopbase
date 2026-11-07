@@ -182,7 +182,7 @@ async fn secret_history_pages_versions_without_values() {
     rows[1].starts_with("v2") && rows[1].contains("available"),
     "{stdout}"
   );
-  assert!(rows[1].contains("updated") && rows[1].contains("admin@example.com"));
+  assert!(rows[1].contains("updated") && rows[1].contains("admin@dopbase.com"));
   assert!(!stdout.contains("marker-"), "{stdout}");
   assert!(
     stderr.contains("Next page: dopbase secret history fixture/local API_KEY --limit 2 --before 2"),
@@ -360,7 +360,7 @@ async fn reveal_asks_for_browser_confirmation_when_the_account_has_no_password()
     .post(format!("{}/api/v1/users", fixture.url))
     .header("cookie", &root_cookie)
     .header("x-dopbase-csrf", &root_csrf)
-    .json(&json!({"email":"member@example.com","password":"correct-horse-456","role":"member"}))
+    .json(&json!({"email":"member@dopbase.com","password":"correct-horse-456","role":"member"}))
     .send()
     .await
     .unwrap()
@@ -386,7 +386,7 @@ async fn reveal_asks_for_browser_confirmation_when_the_account_has_no_password()
       api
         .post(format!("{url}/api/v1/auth/login"))
         .json(
-          &json!({"email":"member@example.com","password":"correct-horse-456","sessionKind":kind}),
+          &json!({"email":"member@dopbase.com","password":"correct-horse-456","sessionKind":kind}),
         )
         .send()
         .await
@@ -414,14 +414,14 @@ async fn reveal_asks_for_browser_confirmation_when_the_account_has_no_password()
   session::save(
     &fixture.resolved(),
     cli["data"]["token"].as_str().unwrap(),
-    Some("member@example.com"),
+    Some("member@dopbase.com"),
   )
   .unwrap();
 
   // Make the member an SSO-only account: no password, one linked identity.
   let pool = fixture.state.db.pool();
   let now = chrono::Utc::now().to_rfc3339();
-  sqlx::query("UPDATE admins SET password_hash='' WHERE email='member@example.com'")
+  sqlx::query("UPDATE admins SET password_hash='' WHERE email='member@dopbase.com'")
     .execute(pool)
     .await
     .unwrap();
@@ -432,7 +432,7 @@ async fn reveal_asks_for_browser_confirmation_when_the_account_has_no_password()
     .execute(pool)
     .await
     .unwrap();
-  sqlx::query("INSERT INTO admin_identities(id,admin_id,provider_id,issuer,subject,linked_via,created_at) SELECT 'idn_t',id,'sso_t','https://idp.example.com','member-subject','manual',? FROM admins WHERE email='member@example.com'")
+  sqlx::query("INSERT INTO admin_identities(id,admin_id,provider_id,issuer,subject,linked_via,created_at) SELECT 'idn_t',id,'sso_t','https://idp.example.com','member-subject','manual',? FROM admins WHERE email='member@dopbase.com'")
     .bind(&now)
     .execute(pool)
     .await

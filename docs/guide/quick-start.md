@@ -62,7 +62,7 @@ the server continues serving. Existing instances skip setup and show Sign in.
 For startup without browser setup:
 
 ```bash
-DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase server start
 ```
 
 This creates root on fresh storage and displays a generated password once. Save

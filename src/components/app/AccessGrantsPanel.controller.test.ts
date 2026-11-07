@@ -15,7 +15,7 @@ vi.mock("~/services/access.api", async (original) => ({
 const maya: GrantPrincipal = {
   type: "user",
   id: "usr_maya",
-  label: "maya@example.com",
+  label: "maya@dopbase.com",
   maxLevel: "project_manager",
 };
 
@@ -278,7 +278,7 @@ describe("useAccessGrantsPanel", () => {
     p.askRemoveSelected();
     expect(p.removeTitle.value).toBe("Remove 2 grants?");
     expect(p.removeDescription.value).toBe(
-      "maya@example.com loses access to payments and payments/prod on their next request. Other grants they hold stay.",
+      "maya@dopbase.com loses access to payments and payments/prod on their next request. Other grants they hold stay.",
     );
     await p.confirmRemove();
     expect(vi.mocked(accessApi.removeGrant).mock.calls).toEqual([

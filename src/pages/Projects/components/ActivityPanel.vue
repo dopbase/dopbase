@@ -96,7 +96,7 @@ const addChip = `${chip} cursor-pointer border-line text-ink-muted transition-co
           v-model="draft"
           class="h-[30px] w-48 rounded-control border border-accent/60 bg-panel px-2.5 font-mono text-sm text-ink-strong outline-none"
           :placeholder="
-            field === 'action' ? 'secret.revealed' : 'maya@example.com'
+            field === 'action' ? 'secret.revealed' : 'maya@dopbase.com'
           "
           :aria-label="field === 'action' ? 'Action' : 'Actor'"
           @keydown.enter.prevent="commit"

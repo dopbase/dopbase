@@ -104,7 +104,7 @@ async fn approved_browser_login_issues_one_cli_session() {
   assert_eq!(status, 200, "{body}");
   assert_eq!(body["data"]["status"], "approved");
   let session = &body["data"]["session"];
-  assert_eq!(session["email"], "admin@example.com");
+  assert_eq!(session["email"], "admin@dopbase.com");
   assert_eq!(session["sessionKind"], "cli");
   assert!(session["csrfToken"].is_null());
   let token = session["token"].as_str().unwrap();
@@ -380,7 +380,7 @@ async fn a_confirmation_refreshes_the_cli_session_that_asked_for_it() {
     "/api/v1/users",
     &cookie,
     Some(&csrf),
-    json!({"email":"other@example.com","password":"correct-horse-456","role":"member"}),
+    json!({"email":"other@dopbase.com","password":"correct-horse-456","role":"member"}),
   )
   .await;
   assert_eq!(status, 201, "{created}");
@@ -390,7 +390,7 @@ async fn a_confirmation_refreshes_the_cli_session_that_asked_for_it() {
     "/api/v1/auth/login",
     None,
     Some(
-      json!({"email":"other@example.com","password":"correct-horse-456","sessionKind":"browser"}),
+      json!({"email":"other@dopbase.com","password":"correct-horse-456","sessionKind":"browser"}),
     ),
   )
   .await;

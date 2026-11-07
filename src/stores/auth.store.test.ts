@@ -219,7 +219,7 @@ describe("auth store features", () => {
     const store = useAuthStore();
     store.session = {
       adminId: "usr_root",
-      email: "root@example.com",
+      email: "root@dopbase.com",
       sessionKind: "browser",
       recentAuthentication: true,
       role: "root",

@@ -76,7 +76,7 @@ beforeEach(() => {
   route.name = "user";
   route.params = { userId: "usr_maya" };
   vi.mocked(usersApi.fetchUser).mockImplementation(async (id) =>
-    id === "usr_maya" ? maya : userFixture({ id, email: `${id}@example.com` }),
+    id === "usr_maya" ? maya : userFixture({ id, email: `${id}@dopbase.com` }),
   );
   vi.mocked(accessApi.fetchUserAccess).mockResolvedValue(accessFixture());
   vi.mocked(accessApi.fetchGroups).mockResolvedValue([backend, frontend]);
@@ -187,7 +187,7 @@ describe("useUserController", () => {
       vi.mocked(usersApi.fetchUser).mockImplementation((id) =>
         id === "usr_maya"
           ? new Promise((resolve) => (answerMaya = resolve))
-          : Promise.resolve(userFixture({ id, email: "sam@example.com" })),
+          : Promise.resolve(userFixture({ id, email: "sam@dopbase.com" })),
       );
       const c = await open();
 
@@ -210,7 +210,7 @@ describe("useUserController", () => {
         reviewBot,
         person,
         ...Array.from({ length: active }, (_, index) =>
-          userFixture({ id: `usr_p${index}`, email: `p${index}@example.com` }),
+          userFixture({ id: `usr_p${index}`, email: `p${index}@dopbase.com` }),
         ),
       ]);
       signInAs(MANAGER, { adminId: "usr_lead" });
@@ -364,7 +364,7 @@ describe("useUserController", () => {
       expect(c.principal.value).toEqual({
         type: "user",
         id: "usr_maya",
-        label: "maya@example.com",
+        label: "maya@dopbase.com",
         maxLevel: "project_manager",
       });
     });
@@ -478,7 +478,7 @@ describe("useUserController", () => {
       id: "evt_1",
       actorType: "root",
       actorId: "usr_root",
-      actorLabel: "root@example.com",
+      actorLabel: "root@dopbase.com",
       action: "login.succeeded",
       projectId: null,
       environmentId: null,
@@ -557,7 +557,7 @@ describe("useUserController", () => {
             action: "grant.set",
             projectId: "prj_pay",
             environmentId: "env_prod",
-            metadata: { principal: "maya@example.com", level: "read" },
+            metadata: { principal: "maya@dopbase.com", level: "read" },
           },
           {
             ...signedIn,
@@ -586,7 +586,7 @@ describe("useUserController", () => {
       ).toEqual([
         {
           tone: "accent",
-          detail: "maya@example.com · Read",
+          detail: "maya@dopbase.com · Read",
           origin: "127.0.0.1",
         },
         {

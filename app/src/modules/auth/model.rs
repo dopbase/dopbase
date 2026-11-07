@@ -11,6 +11,18 @@ pub struct LoginRequest {
   pub password: String,
   pub session_kind: SessionKind,
 }
+/// A launch passcode from `dopbase admin passcode`, as the `/launch` page
+/// read it from its link.
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchRequest {
+  /// Email of the account the passcode was issued for.
+  #[schema(example = "root@dopbase.com")]
+  pub identity: String,
+  /// The passcode. Dashes, spaces and lowercase are accepted.
+  #[schema(example = "GJZG-FLMT")]
+  pub passcode: String,
+}
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponse {

@@ -9,6 +9,7 @@ pub const DEVICE_REQUEST_ID_PREFIX: &str = "dvr_";
 pub const ENVIRONMENT_ID_PREFIX: &str = "env_";
 pub const GRANT_ID_PREFIX: &str = "grt_";
 pub const GROUP_ID_PREFIX: &str = "grp_";
+pub const PASSCODE_ID_PREFIX: &str = "psc_";
 pub const PERSONAL_TOKEN_ID_PREFIX: &str = "ptk_";
 /// Personal tokens of people and AI agent accounts.
 pub const PERSONAL_TOKEN_PREFIX: &str = "dpp_";

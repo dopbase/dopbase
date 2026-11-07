@@ -30,11 +30,33 @@ pub(crate) async fn connect(
     );
   }
   let current = local_config::resolve(None, data_dir)?;
+  // The instance this machine runs from the same data directory. Its URL is
+  // known without asking the network, so connecting to it does not need it
+  // to be up.
+  let server_config = ServerConfig::load(&ServerOverrides {
+    data_dir: data_dir.map(Path::to_path_buf),
+    ..ServerOverrides::default()
+  })?;
+  let default_url = local_config::normalize(DEFAULT_PUBLIC_URL)?;
   let target = if value == "local" {
-    DEFAULT_PUBLIC_URL.to_owned()
+    // With nothing saved the CLI already uses the default URL. When that
+    // reaches this instance, `local` is where the CLI already is, even if
+    // the public URL is spelled differently, so keep it instead of switching.
+    if matches!(current.source, local_config::ServerSource::Default)
+      && crate::cli::commands::connection_is_local(
+        &current.url,
+        &server_config.public_url,
+        &server_config.bind_address,
+      )
+    {
+      current.url.clone()
+    } else {
+      local_config::normalize(&server_config.public_url).unwrap_or_else(|_| default_url.clone())
+    }
   } else {
     local_config::normalize_connect_target(value)?
   };
+  let own_instance = value == "local" || is_own_instance(&target, &server_config);
   if target.starts_with("http://") {
     output::print_warning(&insecure_transport_warning(&target));
   }
@@ -44,36 +66,45 @@ pub(crate) async fn connect(
     config_path: current.config_path.clone(),
     config: current.config.clone(),
   };
-  let health = ApiClient::new(&prospective, None)?.health().await?;
-  if health.get("product").and_then(Value::as_str) != Some("dopbase")
-    || health.get("apiVersion").and_then(Value::as_str) != Some("v1")
-  {
-    bail!("the endpoint is not a compatible Dopbase v1 server");
-  }
+  // Nothing listening at our own instance just means it is not started yet.
+  // Anything that does answer must still be a compatible Dopbase server.
+  let reachable = match ApiClient::new(&prospective, None)?.health().await {
+    Ok(health) => {
+      if health.get("product").and_then(Value::as_str) != Some("dopbase")
+        || health.get("apiVersion").and_then(Value::as_str) != Some("v1")
+      {
+        bail!("the endpoint is not a compatible Dopbase v1 server");
+      }
+      true
+    }
+    Err(error) if own_instance && client::is_unreachable_error(&error) => false,
+    Err(error) => return Err(error),
+  };
+  // `local` on the default URL keeps the implicit default instead of saving it.
+  let saved_url = (value != "local" || target != default_url).then(|| target.clone());
 
   if current.url == target {
     let config = ClientConfig {
       version: 1,
-      server_url: (value != "local").then_some(target.clone()),
+      server_url: saved_url,
       default_environment: current.config.default_environment.clone(),
     };
     local_config::write(&current.config_path, &config)?;
     print_connection_result(
       json_output,
-      &current.url,
-      &target,
-      false,
-      false,
-      false,
-      false,
+      &ConnectionResult {
+        previous_server_url: &current.url,
+        server_url: &target,
+        reachable,
+        changed: false,
+        background_server_stopped: false,
+        session_removed: false,
+        default_environment_cleared: false,
+      },
     );
     return Ok(());
   }
 
-  let server_config = ServerConfig::load(&ServerOverrides {
-    data_dir: data_dir.map(Path::to_path_buf),
-    ..ServerOverrides::default()
-  })?;
   let daemon_state = crate::daemon::inspect(&server_config.data_dir)?;
   let switching_away_from_background_server = match &daemon_state {
     ManagedDaemonState::Running(pid_file) => pid_file
@@ -82,15 +113,24 @@ pub(crate) async fn connect(
       .is_some_and(|url| url == current.url),
     ManagedDaemonState::Absent | ManagedDaemonState::Stale => false,
   };
+  // Only a foreground server we are leaving blocks the switch. Connecting to
+  // it, or moving between two other servers, is fine.
+  let switching_away_from_local_server = crate::cli::commands::connection_is_local(
+    &current.url,
+    &server_config.public_url,
+    &server_config.bind_address,
+  );
   let foreground_running = match &daemon_state {
     ManagedDaemonState::Running(_) => false,
     ManagedDaemonState::Absent | ManagedDaemonState::Stale => {
-      crate::server::InstanceLock::is_held(&server_config.database_url)?
+      switching_away_from_local_server
+        && crate::server::InstanceLock::is_held(&server_config.database_url)?
     }
   };
   if foreground_running {
     bail!(
-      "A foreground Dopbase server is running for {}. Stop it with Ctrl+C, then run `dopbase client connect` again",
+      "{} is a foreground Dopbase server running from {}. Stop it with Ctrl+C before you switch away from it, then run `dopbase client connect` again",
+      current.url,
       server_config.data_dir.display()
     );
   }
@@ -111,20 +151,40 @@ pub(crate) async fn connect(
   let default_environment_cleared = current.config.default_environment.is_some();
   let config = ClientConfig {
     version: 1,
-    server_url: (value != "local").then_some(target.clone()),
+    server_url: saved_url,
     default_environment: None,
   };
   local_config::write(&current.config_path, &config)?;
   print_connection_result(
     json_output,
-    &current.url,
-    &target,
-    true,
-    background_server_stopped,
-    session_removed,
-    default_environment_cleared,
+    &ConnectionResult {
+      previous_server_url: &current.url,
+      server_url: &target,
+      reachable,
+      changed: true,
+      background_server_stopped,
+      session_removed,
+      default_environment_cleared,
+    },
   );
   Ok(())
+}
+
+/// Whether `target` is this machine's own instance: the data directory holds
+/// a database, and the URL is its public URL or a loopback address on its
+/// port.
+fn is_own_instance(
+  target: &str,
+  server_config: &ServerConfig,
+) -> bool {
+  let has_database =
+    crate::config::database_path(&server_config.database_url).is_ok_and(|path| path.is_file());
+  has_database
+    && crate::cli::commands::connection_is_local(
+      target,
+      &server_config.public_url,
+      &server_config.bind_address,
+    )
 }
 
 pub fn insecure_transport_warning(server_url: &str) -> String {
@@ -151,43 +211,63 @@ pub fn server_switch_confirmed(answer: &str) -> bool {
   matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-fn print_connection_result(
-  json_output: bool,
-  previous_server_url: &str,
-  server_url: &str,
+struct ConnectionResult<'a> {
+  previous_server_url: &'a str,
+  server_url: &'a str,
+  /// False when nothing answered at our own instance, which was accepted
+  /// because it simply has not been started.
+  reachable: bool,
   changed: bool,
   background_server_stopped: bool,
   session_removed: bool,
   default_environment_cleared: bool,
+}
+
+fn print_connection_result(
+  json_output: bool,
+  result: &ConnectionResult<'_>,
 ) {
+  let server_url = result.server_url;
   let value = json!({
     "server_url": server_url,
-    "previous_server_url": previous_server_url,
+    "previous_server_url": result.previous_server_url,
     "connected": true,
-    "changed": changed,
-    "background_server_stopped": background_server_stopped,
-    "session_removed": session_removed,
-    "default_environment_cleared": default_environment_cleared,
+    "server_reachable": result.reachable,
+    "changed": result.changed,
+    "background_server_stopped": result.background_server_stopped,
+    "session_removed": result.session_removed,
+    "default_environment_cleared": result.default_environment_cleared,
   });
   if json_output {
     output::print_json(&value).expect("serializing a JSON value cannot fail");
-  } else if changed {
+    return;
+  }
+  if result.changed {
     output::print_success(&format!("Connected to {server_url}."));
     output::print_fields(&[
-      ("Previous server:", previous_server_url.to_owned()),
+      ("Previous server:", result.previous_server_url.to_owned()),
       (
         "Background server stopped:",
-        yes_no(background_server_stopped).into(),
+        yes_no(result.background_server_stopped).into(),
       ),
-      ("CLI session removed:", yes_no(session_removed).into()),
+      (
+        "CLI session removed:",
+        yes_no(result.session_removed).into(),
+      ),
       (
         "Default environment cleared:",
-        yes_no(default_environment_cleared).into(),
+        yes_no(result.default_environment_cleared).into(),
       ),
     ]);
-    output::print_text("Run `dopbase login` to authenticate with the new server.");
   } else {
     output::print_text(&format!("Already connected to {server_url}."));
+  }
+  if !result.reachable {
+    output::print_text(&format!(
+      "No server is running at {server_url} yet. Start it with `dopbase server start`, then run `dopbase login`."
+    ));
+  } else if result.changed {
+    output::print_text("Run `dopbase login` to authenticate with the new server.");
   }
 }
 

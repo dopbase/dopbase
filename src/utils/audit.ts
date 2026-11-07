@@ -22,7 +22,7 @@ const count = (value: unknown): number | null =>
 
 /**
  * What an event touched, in a few words, from its metadata:
- * `maya@example.com · Write`, `staging → qa`, `DATABASE_URL v3`. Empty when
+ * `maya@dopbase.com · Write`, `staging → qa`, `DATABASE_URL v3`. Empty when
  * the record holds nothing worth naming.
  */
 export function eventDetail(event: AuditEvent): string {

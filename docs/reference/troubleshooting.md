@@ -18,8 +18,8 @@ Run `dopbase server setup` with the same instance options to finish it. A damage
 database or mismatched master key is an error, not a reason to initialize again.
 
 If setup says the instance is already initialized, do not reset it to recover a
-password. Stop its server and use `dopbase admin reset-password EMAIL` with the
-matching master key. This also recovers credentials lost after initialization
+password. Use `dopbase admin reset-password EMAIL` on the server with the
+matching master key. The server can keep running. This also recovers credentials lost after initialization
 committed. Subsequent startup never generates a replacement password. See
 [server setup](/cli/setup).
 

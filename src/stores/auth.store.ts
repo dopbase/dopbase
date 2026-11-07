@@ -195,6 +195,19 @@ export const useAuthStore = defineStore("auth", () => {
     return response.redirectTo;
   }
 
+  /**
+   * Signs in with a launch passcode from `dopbase admin passcode`. Any
+   * account this browser was signed in as is replaced.
+   */
+  async function completeLaunch(
+    identity: string,
+    passcode: string,
+  ): Promise<void> {
+    adopt(await authApi.launch(identity, passcode));
+    // The launch response has no capabilities; the session endpoint does.
+    await fetchSession().catch(() => undefined);
+  }
+
   function adopt(response: authApi.LoginResponse): void {
     startSession({
       adminId: response.adminId,
@@ -303,6 +316,7 @@ export const useAuthStore = defineStore("auth", () => {
     setCsrf,
     loadBootstrapStatus,
     completeSso,
+    completeLaunch,
     bootstrap,
     login,
     fetchSession,

@@ -17,8 +17,8 @@ use tokio::{
 #[test]
 fn login_email_is_trimmed_lowercased_and_validated() {
   assert_eq!(
-    normalize_login_email("  Admin@Example.COM  ").unwrap(),
-    "admin@example.com"
+    normalize_login_email("  Admin@Dopbase.COM  ").unwrap(),
+    "admin@dopbase.com"
   );
   assert_eq!(
     normalize_login_email("not-an-email")

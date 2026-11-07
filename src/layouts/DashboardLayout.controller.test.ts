@@ -50,7 +50,7 @@ describe("useDashboardLayoutController", () => {
   it("shows a member only the sections their capabilities open", () => {
     useAuthStore().session = {
       adminId: "usr_2",
-      email: "maya@example.com",
+      email: "maya@dopbase.com",
       sessionKind: "browser",
       recentAuthentication: false,
       role: "member",
@@ -70,7 +70,7 @@ describe("useDashboardLayoutController", () => {
   it("names the built-in role when the session has no role name", () => {
     useAuthStore().session = {
       adminId: "usr_1",
-      email: "root@example.com",
+      email: "root@dopbase.com",
       sessionKind: "browser",
       recentAuthentication: false,
       role: "root",

@@ -25,7 +25,7 @@ fn plaintext(body: &Value) -> String {
 async fn a_personal_token_reaches_its_account_s_live_access_within_its_scope() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let dev = &env["payments/dev"];
   let prod = &env["payments/prod"];
   grant(
@@ -99,7 +99,7 @@ async fn a_personal_token_reaches_its_account_s_live_access_within_its_scope() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  assert_eq!(body["data"]["email"], "member@example.com");
+  assert_eq!(body["data"]["email"], "member@dopbase.com");
   assert_eq!(body["data"]["token"]["name"], "ci");
   assert_eq!(body["data"]["token"]["level"], "write");
 
@@ -179,7 +179,7 @@ async fn a_personal_token_reaches_its_account_s_live_access_within_its_scope() {
 async fn an_ai_agent_never_reaches_more_than_its_owner() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let owner = person(&router, &root, "lead@example.com", "admin").await;
+  let owner = person(&router, &root, "lead@dopbase.com", "admin").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -282,7 +282,7 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   // An auditor can't create agents, so it can't own one; another admin
   // can take it.
   let auditor =
-    super::audit_scope::with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
+    super::audit_scope::with_role(&router, &root, "auditor@dopbase.com", "rol_auditor").await;
   let (status, body) = send(
     &router,
     "PATCH",
@@ -293,7 +293,7 @@ async fn an_ai_agent_never_reaches_more_than_its_owner() {
   .await;
   assert_eq!(status, 400, "{body}");
   assert!(body["error"]["OWNER_INVALID"].is_string());
-  let deputy = person(&router, &root, "deputy@example.com", "admin").await;
+  let deputy = person(&router, &root, "deputy@dopbase.com", "admin").await;
   let (status, body) = send(
     &router,
     "PATCH",
@@ -433,7 +433,7 @@ async fn a_root_owned_ai_agent_writes_where_it_is_granted_write() {
 async fn replacing_an_agent_s_token_revokes_its_other_live_tokens_in_one_step() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let owner = person(&router, &root, "lead@example.com", "admin").await;
+  let owner = person(&router, &root, "lead@dopbase.com", "admin").await;
   let (_, body) = send(
     &router,
     "POST",
@@ -498,7 +498,7 @@ async fn replacing_an_agent_s_token_revokes_its_other_live_tokens_in_one_step() 
   assert!(stale.is_none());
 
   // A person's tokens are theirs to revoke one by one.
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (_, body) = token(
     &router,
     &member,
@@ -524,8 +524,8 @@ async fn replacing_an_agent_s_token_revokes_its_other_live_tokens_in_one_step() 
 async fn someone_who_cannot_manage_people_learns_nothing_about_other_accounts() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
-  let other = person(&router, &root, "other@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
+  let other = person(&router, &root, "other@dopbase.com", "member").await;
 
   // A missing id, root and another person all get the role refusal.
   for user in ["usr_missing", root.id.as_str(), other.id.as_str()] {
@@ -573,7 +573,7 @@ async fn someone_who_cannot_manage_people_learns_nothing_about_other_accounts() 
 async fn managing_without_seeing_people_treats_a_missing_account_like_one_out_of_reach() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -588,7 +588,7 @@ async fn managing_without_seeing_people_treats_a_missing_account_like_one_out_of
   .await;
   assert_eq!(status, 201, "{body}");
   let role_id = body["data"]["id"].as_str().unwrap();
-  let desk = super::audit_scope::with_role(&router, &root, "desk@example.com", role_id).await;
+  let desk = super::audit_scope::with_role(&router, &root, "desk@dopbase.com", role_id).await;
 
   // Root and an admin reach further than the desk; a missing id must look
   // the same as they do.

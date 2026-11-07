@@ -15,7 +15,7 @@ vi.mock("~/services/access.api", async (original) => ({
 const maya: GrantPrincipal = {
   type: "user",
   id: "usr_maya",
-  label: "maya@example.com",
+  label: "maya@dopbase.com",
   maxLevel: "project_manager",
 };
 const bot: GrantPrincipal = {
@@ -47,7 +47,7 @@ describe("useChangeAccessDialog", () => {
     );
     dialog.level.value = "metadata";
     expect(dialog.summary.value).toBe(
-      "maya@example.com will be able to see the secret names in payments/prod.",
+      "maya@dopbase.com will be able to see the secret names in payments/prod.",
     );
     expect(await dialog.submit()).toBe(true);
     expect(accessApi.setGrant).toHaveBeenCalledWith({

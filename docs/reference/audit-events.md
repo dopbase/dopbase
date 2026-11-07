@@ -224,7 +224,7 @@ It must never contain the plaintext secret value, a usable authentication token,
 
 ```text
 2026-08-27 14:23
-actor: alice@example.com
+actor: alice@dopbase.com
 action: secret.updated
 project: payment-service
 environment: production

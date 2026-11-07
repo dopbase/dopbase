@@ -16,7 +16,7 @@ use crate::{
   http::HttpError,
   models::{AdminRole, AuthIdentity, SessionKind},
   services::{
-    authx::{self, Capability, SignIn},
+    authx::{self, Capability, SignInRefusal},
     token,
   },
   state::AppState,
@@ -101,41 +101,56 @@ pub async fn login(
   let role = AdminRole::parse(&role_value).ok_or_else(HttpError::internal)?;
   // The password was right, so saying why it is refused leaks nothing.
   let mut conn = state.db.pool().acquire().await?;
-  let access = authx::load_access(&mut conn, &admin_id, &state.config.features)
-    .await?
-    .ok_or_else(|| HttpError::unauthorized(AUTHENTICATION_INVALID, "The account is disabled."))?;
+  let access = authx::load_access(&mut conn, &admin_id, &state.config.features).await?;
   drop(conn);
-  if access.sign_in == SignIn::TokenOnly {
-    return Err(HttpError::unauthorized(
-      AUTHENTICATION_INVALID,
-      "This account signs in with tokens only.",
-    ));
-  }
-  let actor_type = if access.is_root { "root" } else { "admin" };
+  let actor_type = if access.as_ref().is_some_and(|access| access.is_root) {
+    "root"
+  } else {
+    "admin"
+  };
   // Only a break-glass account, root, keeps password sign-in while single
   // sign-on is required, so there is always a way back in.
-  if !access.has(Capability::PasswordBreakglass)
-    && crate::modules::sso::service::policy(state)
-      .await?
-      .require_sso
-  {
-    let _ = common::audit_standalone(
-      state.db.pool(),
-      actor_type,
-      Some(&admin_id),
-      Some(&email),
-      "login.failed",
-      None,
-      None,
-      None,
-      None,
-      serde_json::json!({"reason":"password_login_disabled"}),
+  let refusal = authx::sign_in_refusal(access.as_ref(), || async {
+    Ok::<_, HttpError>(
+      crate::modules::sso::service::policy(state)
+        .await?
+        .require_sso,
     )
-    .await;
-    return Err(HttpError::forbidden(
-      PASSWORD_LOGIN_DISABLED,
-      "Password sign-in is turned off for this account. Use single sign-on.",
-    ));
+  })
+  .await?;
+  match refusal {
+    None => {}
+    Some(SignInRefusal::Disabled) => {
+      return Err(HttpError::unauthorized(
+        AUTHENTICATION_INVALID,
+        "The account is disabled.",
+      ));
+    }
+    Some(SignInRefusal::TokenOnly) => {
+      return Err(HttpError::unauthorized(
+        AUTHENTICATION_INVALID,
+        "This account signs in with tokens only.",
+      ));
+    }
+    Some(SignInRefusal::SsoRequired) => {
+      let _ = common::audit_standalone(
+        state.db.pool(),
+        actor_type,
+        Some(&admin_id),
+        Some(&email),
+        "login.failed",
+        None,
+        None,
+        None,
+        None,
+        serde_json::json!({"reason":"password_login_disabled"}),
+      )
+      .await;
+      return Err(HttpError::forbidden(
+        PASSWORD_LOGIN_DISABLED,
+        "Password sign-in is turned off for this account. Use single sign-on.",
+      ));
+    }
   }
   let mut tx = state.db.pool().begin().await?;
   let session = issue_session(&mut tx, &admin_id, request.session_kind).await?;

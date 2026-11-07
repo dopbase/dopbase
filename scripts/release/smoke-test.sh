@@ -33,7 +33,7 @@ fi
 grep --quiet 'dopbase server setup' "${runtime_root}/fresh-start.out"
 test ! -e "${data_dir}"
 
-DOPBASE_ROOT_EMAIL=smoke@example.com "${binary}" --data-dir "${data_dir}" server start \
+DOPBASE_ROOT_EMAIL=smoke@dopbase.com "${binary}" --data-dir "${data_dir}" server start \
   --docs \
   --host 127.0.0.1 \
   --port "${SMOKE_PORT}" \

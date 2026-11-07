@@ -99,7 +99,7 @@ pub(super) async fn instance(
   router: &Router,
 ) -> (Person, std::collections::HashMap<String, String>) {
   bootstrap_admin(state, router).await;
-  let root = sign_in(router, "admin@example.com").await;
+  let root = sign_in(router, "admin@dopbase.com").await;
   let mut environments = std::collections::HashMap::new();
   for (project, names) in [
     ("payments", ["dev", "prod"].as_slice()),
@@ -201,7 +201,7 @@ pub(super) async fn names(
 async fn grants_decide_what_a_member_reaches() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let dev = &env["payments/dev"];
   let prod = &env["payments/prod"];
   let secrets = |id: &str| format!("/api/v1/environments/{id}/secrets");
@@ -383,7 +383,7 @@ async fn grants_decide_what_a_member_reaches() {
 async fn an_environment_created_protected_is_never_open_to_project_grants() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, _) = grant(
     &router,
     &root,
@@ -454,7 +454,7 @@ async fn an_environment_created_protected_is_never_open_to_project_grants() {
 async fn grant_requests_are_checked_before_they_change_anything() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let dev = env["payments/dev"].clone();
 
   for (scope, level, code) in [
@@ -534,9 +534,9 @@ async fn a_scoped_admin_cannot_reach_past_its_own_access() {
   let (_dir, state, router) = test_app().await;
   let (root, env) = instance(&state, &router).await;
   // Root's admins start with every project; this one is cut to payments.
-  let admin = person(&router, &root, "scoped@example.com", "admin").await;
-  let peer = person(&router, &root, "peer@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let admin = person(&router, &root, "scoped@dopbase.com", "admin").await;
+  let peer = person(&router, &root, "peer@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (_, access) = send(
     &router,
     "GET",
@@ -650,13 +650,13 @@ async fn a_scoped_admin_cannot_reach_past_its_own_access() {
     "PATCH",
     &format!("/api/v1/users/{}", member.id),
     admin.browser(),
-    Some(json!({"email":"renamed@example.com"})),
+    Some(json!({"email":"renamed@dopbase.com"})),
   )
   .await;
   assert_eq!(status, 200, "{body}");
 
   // Admins an admin creates start with no data access.
-  let made = person(&router, &admin, "made@example.com", "admin").await;
+  let made = person(&router, &admin, "made@dopbase.com", "admin").await;
   assert!(names(&router, &made, "/api/v1/projects").await.is_empty());
 
   // A project the admin creates is theirs to manage.
@@ -681,7 +681,7 @@ async fn a_scoped_admin_cannot_reach_past_its_own_access() {
 async fn a_project_manager_grants_only_to_people_and_groups_they_can_list() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "POST",
@@ -692,7 +692,7 @@ async fn a_project_manager_grants_only_to_people_and_groups_they_can_list() {
   .await;
   assert_eq!(status, 201, "{body}");
   let role_id = body["data"]["id"].as_str().unwrap();
-  let lead = super::audit_scope::with_role(&router, &root, "lead@example.com", role_id).await;
+  let lead = super::audit_scope::with_role(&router, &root, "lead@dopbase.com", role_id).await;
   let (status, body) = grant(
     &router,
     &root,
@@ -744,7 +744,7 @@ async fn without_rbac_only_ai_agents_take_new_access() {
   use app::services::features::Features;
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   let (status, body) = grant(
     &router,
     &root,
@@ -803,7 +803,7 @@ async fn without_rbac_only_ai_agents_take_new_access() {
 
   // Someone who can't grant here gets the same answer for a person and an
   // AI agent, so the refusal doesn't tell agents apart.
-  let bystander = person(&router, &root, "bystander@example.com", "member").await;
+  let bystander = person(&router, &root, "bystander@dopbase.com", "member").await;
   let mut refusals = Vec::new();
   for id in [&bystander.id, &agent] {
     refusals.push(
@@ -849,7 +849,7 @@ async fn without_rbac_only_ai_agents_take_new_access() {
   assert_eq!(agent_flags.get(&agent), Some(&true), "{body}");
 
   // A grant the caller can't see stays not found, RBAC or not.
-  let other = person(&router, &root, "other@example.com", "member").await;
+  let other = person(&router, &root, "other@dopbase.com", "member").await;
   let (status, body) = grant(
     &router,
     &root,

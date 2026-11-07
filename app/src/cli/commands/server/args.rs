@@ -168,12 +168,12 @@ impl ServerLaunchArgs {
 const SETUP_HELP: &str = "\
 Examples:
   dopbase server setup
-  dopbase server setup --email admin@example.com
-  dopbase --data-dir /srv/dopbase --json server setup --email admin@example.com
+  dopbase server setup --email admin@dopbase.com
+  dopbase --data-dir /srv/dopbase --json server setup --email admin@dopbase.com
   dopbase server setup --web
   dopbase server setup --web --port 9000
-  dopbase server setup --web --email admin@example.com
-  DOPBASE_ROOT_EMAIL=admin@example.com dopbase server setup
+  dopbase server setup --web --email admin@dopbase.com
+  DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase server setup
 
 CLI setup creates the root account and exits without starting a server.
 --email or DOPBASE_ROOT_EMAIL generates a password and prints it once in CLI mode.

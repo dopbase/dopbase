@@ -24,7 +24,7 @@ const grant = (overrides: Partial<accessApi.Grant>): accessApi.Grant => ({
   id: "grt_1",
   principalType: "user",
   principalId: "usr_member",
-  principalLabel: "member@example.com",
+  principalLabel: "member@dopbase.com",
   principalAgent: false,
   scopeType: "project",
   scopeId: "prj_pay",
@@ -133,7 +133,7 @@ describe("useAccessPanelController", () => {
     expect(controller.changePrincipal.value).toEqual({
       type: "user",
       id: "usr_member",
-      label: "member@example.com",
+      label: "member@dopbase.com",
       maxLevel: "write",
     });
     expect(controller.changing.value).toBe(projectGrant);
@@ -201,7 +201,7 @@ describe("useAccessPanelController", () => {
   it("without RBAC lets you change only AI agents' access", async () => {
     useAuthStore().session = {
       adminId: "usr_lead",
-      email: "lead@example.com",
+      email: "lead@dopbase.com",
       sessionKind: "browser",
       recentAuthentication: true,
       role: "admin",

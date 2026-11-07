@@ -33,7 +33,8 @@ dopbase client connect 192.168.1.20:8840
 
 The command normalizes the URL and verifies that it is a compatible Dopbase
 server before changing machine-global state. If validation fails, the previous
-server and credential remain active.
+server and credential remain active. The one exception is this machine's own
+instance, covered under [Return to the local server](#return-to-the-local-server).
 
 Domain names must include `http://` or `https://`. A bare domain such as
 `dopbase.example.com` is rejected with an example of the required format.
@@ -57,11 +58,13 @@ current managed background server when present, delete the encrypted local CLI
 session, and clear the saved default environment. There is no non-interactive
 bypass.
 
-If a foreground `dopbase server start` process is using the same data directory, stop
-it with Ctrl+C before switching. A `dopbase server start --background` process representing
-the current endpoint is stopped automatically after confirmation. Remote
-servers, unrelated local servers, and browser sessions are never stopped or
-revoked.
+If the current endpoint is a foreground `dopbase server start` process using
+the same data directory, stop it with Ctrl+C before switching away from it.
+Connecting to that foreground server, for example with `client connect local`
+after using a remote server, works while it runs. A
+`dopbase server start --background` process representing the current endpoint
+is stopped automatically after confirmation. Remote servers, unrelated local
+servers, and browser sessions are never stopped or revoked.
 
 Connecting does not authenticate. Sign in separately after switching:
 
@@ -78,8 +81,27 @@ dopbase client connect local
 dopbase login
 ```
 
-After validating `http://localhost:8840`, Dopbase removes the configured server
-override and returns to the implicit local default.
+`local` means this machine's own instance: the server configured in the same
+data directory, at its public URL. That is `http://localhost:8840` unless
+`server.toml` or `DOPBASE_PUBLIC_URL` sets another one. On the default URL,
+Dopbase removes the configured server override and returns to the implicit
+local default. Any other public URL is saved as the active server. When no
+server is saved and the default URL already reaches this instance, `local`
+leaves things as they are and keeps your CLI session.
+
+The local server doesn't have to be running. If nothing answers at its URL,
+Dopbase still switches after confirmation and tells you to start it:
+
+```bash
+dopbase client connect local
+dopbase server start
+dopbase login
+```
+
+The same applies when you pass your own instance's URL instead of `local`,
+as long as the data directory holds its database. If something else answers
+at that URL and it isn't a compatible Dopbase server, the switch is refused.
+Every other server must be reachable before Dopbase saves it.
 
 `DOPBASE_URL` must be unset before changing the saved endpoint. Otherwise, its
 environment override would remain active instead of the newly selected server.

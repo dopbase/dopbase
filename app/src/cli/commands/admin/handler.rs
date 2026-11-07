@@ -1,6 +1,6 @@
-use super::AdminCommand;
+use super::{AdminCommand, target};
 use crate::cli::{output, prompt};
-use crate::config::{ServerConfig, ServerOverrides, database_path, ensure_data_dir};
+use crate::config::{ServerConfig, ServerOverrides, database_path};
 use anyhow::{Context, Result, bail};
 use serde_json::json;
 use std::{
@@ -21,11 +21,181 @@ pub(crate) async fn execute(
       config,
       master_key_file,
     } => reset_password(email, data_dir, config, master_key_file).await?,
+    AdminCommand::Passcode { email, ttl, config } => {
+      issue_passcode(email, ttl, data_dir, config, json_output).await?
+    }
     AdminCommand::FactoryReset { config, no_backup } => {
       factory_reset_offline(data_dir, config, no_backup, json_output).await?
     }
   }
   Ok(0)
+}
+
+struct IssuedPasscode {
+  email: String,
+  passcode: String,
+  expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Mint a launch passcode for a running server. The CLI never talks to the
+/// server: it writes the hashed passcode into the server's database, so only
+/// someone who can write the data directory can sign anyone in this way.
+async fn issue_passcode(
+  email: String,
+  ttl: i64,
+  data_dir: Option<PathBuf>,
+  config: Option<PathBuf>,
+  json_output: bool,
+) -> Result<()> {
+  let config = ServerConfig::load(&ServerOverrides {
+    data_dir,
+    config_path: config,
+    ..Default::default()
+  })?;
+  target::ensure_connected_here("passcode", &config).await?;
+  if !config.web_ui_enabled {
+    bail!(
+      "the Admin UI is turned off on this server (web_ui = false), so there is nothing to sign in to"
+    );
+  }
+  database_path(&config.database_url)?;
+  // The server holds the instance lock while it runs. A passcode only
+  // lives for seconds, so minting one while nothing can read it is
+  // pointless. This command never takes the lock itself.
+  if !crate::server::InstanceLock::is_held(&config.database_url)? {
+    bail!(
+      "the Dopbase server isn't running for the instance in {}. Start it, then run this command again",
+      config.data_dir.display()
+    );
+  }
+  let db = crate::services::db::DbClient::connect(&config.database_url).await?;
+  let issued = mint_launch_passcode(&db, &config, email.trim(), ttl).await;
+  db.close().await;
+  let issued = issued?;
+
+  let url = format!(
+    "{}{}#identity={}&passcode={}",
+    config.public_url.trim_end_matches('/'),
+    crate::constants::api::auth::LAUNCH_PAGE,
+    url::form_urlencoded::byte_serialize(issued.email.as_bytes()).collect::<String>(),
+    issued.passcode,
+  );
+  if json_output {
+    output::print_value(
+      true,
+      &json!({
+        "email": issued.email,
+        "passcode": issued.passcode,
+        "expiresAt": issued.expires_at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "ttlSeconds": ttl,
+        "url": url,
+        "dataDir": config.data_dir,
+      }),
+    );
+    return Ok(());
+  }
+  output::print_success(&format!("Launch passcode for {}", issued.email));
+  output::print_text("");
+  output::print_fields(&[
+    ("Instance:", config.data_dir.display().to_string()),
+    ("Passcode:", issued.passcode),
+    (
+      "Expires:",
+      format!(
+        "in {ttl} seconds ({} UTC)",
+        issued.expires_at.format("%H:%M:%S")
+      ),
+    ),
+    ("Open:", url),
+  ]);
+  output::print_text("");
+  output::print_text("It works once. Running this command again replaces it.");
+  Ok(())
+}
+
+async fn mint_launch_passcode(
+  db: &crate::services::db::DbClient,
+  config: &ServerConfig,
+  email: &str,
+  ttl: i64,
+) -> Result<IssuedPasscode> {
+  use crate::services::{
+    authx::{self, SignInRefusal},
+    passcodes::{self, PasscodePurpose},
+  };
+
+  check_schema(db).await?;
+  let has_table: Option<i64> =
+    sqlx::query_scalar("SELECT 1 FROM sqlite_master WHERE type='table' AND name='passcodes'")
+      .fetch_optional(db.pool())
+      .await?;
+  if has_table.is_none() {
+    bail!(
+      "the running server is older than this command. Restart the server on this version first"
+    );
+  }
+  let account: Option<(String, String)> =
+    sqlx::query_as("SELECT id,email FROM admins WHERE email=? COLLATE NOCASE")
+      .bind(email)
+      .fetch_optional(db.pool())
+      .await?;
+  let (admin_id, email) = account.context("no account exists with that email")?;
+  let mut connection = db.pool().acquire().await?;
+  let access = authx::load_access(&mut connection, &admin_id, &config.features).await?;
+  drop(connection);
+  let refusal = authx::sign_in_refusal(access.as_ref(), || async {
+    Ok::<_, anyhow::Error>(
+      crate::modules::sso::service::policy_for(db.pool(), &config.features)
+        .await?
+        .require_sso,
+    )
+  })
+  .await?;
+  match refusal {
+    None => {}
+    Some(SignInRefusal::Disabled) => bail!("{email} is turned off, so it can't sign in"),
+    Some(SignInRefusal::TokenOnly) => {
+      bail!("{email} signs in with tokens only, so it can't use a passcode")
+    }
+    Some(SignInRefusal::SsoRequired) => {
+      bail!("single sign-on is required on this instance, so only root can sign in with a passcode")
+    }
+  }
+
+  let code = crate::utils::passcode::generate()
+    .map_err(|_| anyhow::anyhow!("could not generate a passcode"))?;
+  let hostname = crate::cli::client::local_hostname();
+  let now = chrono::Utc::now();
+  let mut tx = db.pool().begin().await?;
+  let expires_at = passcodes::issue(
+    &mut tx,
+    PasscodePurpose::Launch,
+    &admin_id,
+    &code,
+    chrono::Duration::seconds(ttl),
+    hostname.as_deref(),
+    now,
+  )
+  .await?;
+  crate::modules::common::audit(
+    &mut tx,
+    "system",
+    None,
+    Some("server-cli"),
+    "passcode.issued",
+    None,
+    None,
+    Some("admin"),
+    Some(&admin_id),
+    json!({"purpose":PasscodePurpose::Launch.as_str(),"email":email,"ttlSeconds":ttl,"host":hostname}),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(IssuedPasscode {
+    email,
+    passcode: crate::utils::passcode::display(&code),
+    expires_at,
+  })
 }
 
 const FACTORY_RESET_CONFIRMATION: &str = "please-wipe-out-system";
@@ -52,6 +222,7 @@ async fn factory_reset_offline(
     config_path: config,
     ..Default::default()
   })?;
+  target::ensure_connected_here("factory-reset", &config).await?;
   let database = database_path(&config.database_url)?;
   let reset_target = validate_factory_reset_target(&config.data_dir, &database)?;
   let _lock = crate::server::InstanceLock::acquire(&config.database_url)
@@ -323,6 +494,10 @@ pub fn factory_reset_quarantine_path(data_dir: &Path) -> Result<PathBuf> {
   Ok(path)
 }
 
+/// Set a new password straight in the instance's database. It works with
+/// the server running or stopped. It never creates an instance, a master
+/// key or runs migrations, so pointing it at the wrong directory changes
+/// nothing.
 async fn reset_password(
   email: String,
   data_dir: Option<PathBuf>,
@@ -338,16 +513,45 @@ async fn reset_password(
     master_key_path: master_key_file,
     ..Default::default()
   })?;
-  ensure_data_dir(&config.data_dir)?;
-  let _lock = crate::server::InstanceLock::acquire(&config.database_url)?
-    .context("offline recovery requires a file-backed SQLite database")?;
+  target::ensure_connected_here("reset-password", &config).await?;
+  let database = database_path(&config.database_url)?;
+  if !database.is_file() {
+    bail!(
+      "there's no Dopbase instance in {}. Pass --data-dir for the right one, or run this command on the machine or inside the container that hosts the server",
+      config.data_dir.display()
+    );
+  }
+  eprintln!("Instance: {}", config.data_dir.display());
+
   let db = crate::services::db::DbClient::connect(&config.database_url).await?;
-  db.migrate().await?;
-  let _crypto =
-    crate::services::crypto::CryptoService::initialize(db.pool(), &config.master_key.path).await?;
+  let reset = reset_password_in(&db, &config, email.trim()).await;
+  db.close().await;
+  let running = reset?;
+
+  output::print_success(&format!(
+    "Password reset on the instance in {}.",
+    config.data_dir.display()
+  ));
+  output::print_text("All sessions on this instance were revoked.");
+  if running {
+    output::print_text(
+      "If too many wrong passwords paused sign-in for this account, that pause still runs out on its own.",
+    );
+  }
+  Ok(())
+}
+
+/// Returns whether the server was running when the password was written.
+async fn reset_password_in(
+  db: &crate::services::db::DbClient,
+  config: &ServerConfig,
+  email: &str,
+) -> Result<bool> {
+  check_schema(db).await?;
+  crate::services::crypto::CryptoService::open_existing(db.pool(), &config.master_key.path).await?;
   let admin: Option<(String, String)> =
     sqlx::query_as("SELECT id,email FROM admins WHERE email=? COLLATE NOCASE")
-      .bind(email.trim())
+      .bind(email)
       .fetch_optional(db.pool())
       .await?;
   let (admin_id, normalized) = admin.context("no administrator exists with that email")?;
@@ -358,14 +562,25 @@ async fn reset_password(
   )?;
   let hash = crate::modules::common::hash_password(&password)
     .map_err(|_| anyhow::anyhow!("password hashing failed"))?;
+
+  // A stopped server could start while this writes and run its migrations
+  // underneath it, so hold the lock for the write. A running server has
+  // already migrated, so write alongside it. Check the schema again in
+  // case a newer server started while the prompt was open.
+  let lock = crate::server::InstanceLock::acquire_if_free(&config.database_url)?;
+  let running = lock.is_none();
+  check_schema(db).await?;
   let now = chrono::Utc::now().to_rfc3339();
   let mut tx = db.pool().begin().await?;
-  sqlx::query("UPDATE admins SET password_hash=?,updated_at=? WHERE id=?")
+  let updated = sqlx::query("UPDATE admins SET password_hash=?,updated_at=? WHERE id=?")
     .bind(hash)
     .bind(&now)
     .bind(&admin_id)
     .execute(&mut *tx)
     .await?;
+  if updated.rows_affected() != 1 {
+    bail!("{normalized} was removed while the password was being typed");
+  }
   sqlx::query("UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL")
     .bind(&now)
     .execute(&mut *tx)
@@ -380,13 +595,49 @@ async fn reset_password(
     None,
     Some("admin"),
     Some(&admin_id),
-    json!({"email":normalized}),
+    json!({"email":normalized,"serverRunning":running}),
   )
   .await?;
   tx.commit().await?;
-  db.checkpoint().await?;
-  db.close().await;
-  output::print_success("Password reset complete.");
-  output::print_text("All human sessions were revoked.");
+  if !running {
+    // Nothing else has the database open, so fold the WAL back in now.
+    db.checkpoint().await?;
+  }
+  drop(lock);
+  Ok(running)
+}
+
+/// Refuse a database this binary cannot safely write: one that isn't a
+/// Dopbase database, one a newer version upgraded, or one too old to have
+/// the hash-chained audit log the reset writes to.
+async fn check_schema(db: &crate::services::db::DbClient) -> Result<()> {
+  let applied: Vec<(i64, bool)> =
+    match sqlx::query_as("SELECT version,success FROM _sqlx_migrations")
+      .fetch_all(db.pool())
+      .await
+    {
+      Ok(applied) => applied,
+      Err(_) => bail!("this database was never set up by Dopbase"),
+    };
+  if applied.iter().any(|(_, success)| !success) {
+    bail!("a database upgrade failed on this instance. Start the server to see the error");
+  }
+  let newest = crate::services::db::MIGRATOR
+    .iter()
+    .map(|migration| migration.version)
+    .max()
+    .unwrap_or_default();
+  if applied.iter().any(|(version, _)| *version > newest) {
+    bail!("a newer version of Dopbase upgraded this database. Run this command with that version");
+  }
+  let chained: Option<i64> =
+    sqlx::query_scalar("SELECT 1 FROM pragma_table_info('audit_events') WHERE name='record_hash'")
+      .fetch_optional(db.pool())
+      .await?;
+  if chained.is_none() {
+    bail!(
+      "this database is older than this command. Start the server on this version once, then run it again"
+    );
+  }
   Ok(())
 }

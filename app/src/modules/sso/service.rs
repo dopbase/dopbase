@@ -76,12 +76,21 @@ pub struct SsoPolicy {
 }
 
 pub async fn policy(state: &AppState) -> Result<SsoPolicy, sqlx::Error> {
+  policy_for(state.db.pool(), &state.config.features).await
+}
+
+/// [`policy`] without a running server, for commands that open the
+/// database directly.
+pub async fn policy_for(
+  pool: &sqlx::SqlitePool,
+  features: &crate::services::features::Features,
+) -> Result<SsoPolicy, sqlx::Error> {
   // With the feature off a stored provider changes nothing: no button, and
   // "required" no longer blocks password sign-in.
-  if !state.config.features.enabled(Feature::Sso) {
+  if !features.enabled(Feature::Sso) {
     return Ok(SsoPolicy::default());
   }
-  Ok(match repository::enabled_policy(state.db.pool()).await? {
+  Ok(match repository::enabled_policy(pool).await? {
     Some((name, require_sso, hide_password_form)) => SsoPolicy {
       enabled_name: Some(name),
       require_sso,

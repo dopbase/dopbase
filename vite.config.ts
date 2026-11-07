@@ -33,6 +33,9 @@ export default defineConfig({
     },
   },
   build: {
+    // The server's CSP allows images and fonts from 'self' only, so Vite must
+    // not inline small assets as data: URIs; the browser would block them.
+    assetsInlineLimit: 0,
     rolldownOptions: {
       checks: {
         pluginTimings: false, // turn off the PLUGIN_TIMINGS message

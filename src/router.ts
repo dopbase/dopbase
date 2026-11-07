@@ -47,6 +47,14 @@ export const router = createRouter({
       meta: { public: true },
     },
     {
+      // `dopbase admin passcode` links here with the passcode in the
+      // fragment. Signed-in browsers may use it too, to switch accounts.
+      path: "/launch",
+      name: "launch",
+      component: () => import("~/pages/Launch/Launch.page.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/setup",
       name: "setup",
       component: () => import("~/pages/Setup/Setup.page.vue"),

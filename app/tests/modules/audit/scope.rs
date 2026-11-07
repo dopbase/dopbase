@@ -50,9 +50,9 @@ async fn each_reader_sees_the_audit_events_their_role_and_grants_allow() {
   let payments = payments["data"]["id"].as_str().unwrap().to_owned();
   let search = search["data"]["id"].as_str().unwrap().to_owned();
 
-  let auditor = with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
-  let lead = person(&router, &root, "lead@example.com", "admin").await;
-  let member = person(&router, &root, "member@example.com", "member").await;
+  let auditor = with_role(&router, &root, "auditor@dopbase.com", "rol_auditor").await;
+  let lead = person(&router, &root, "lead@dopbase.com", "admin").await;
+  let member = person(&router, &root, "member@dopbase.com", "member").await;
   // The lead manages payments only.
   let (_, access) = send(
     &router,

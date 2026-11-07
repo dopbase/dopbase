@@ -66,7 +66,7 @@ export interface ActivityRow {
   when: string;
   at: string;
   tone: "crit" | "accent";
-  /** What it touched, from its metadata, such as `maya@example.com · Write`. */
+  /** What it touched, from its metadata, such as `maya@dopbase.com · Write`. */
   detail: string;
   /** Address and client, when the record has them. */
   origin: string;

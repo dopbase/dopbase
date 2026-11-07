@@ -26,23 +26,25 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase server status`                | Check the local server process      |
 | `dopbase server logs`                  | Read background server logs         |
 | `dopbase client connect <server-url>`  | Validate and save another server    |
-| `dopbase client connect local`         | Return to the implicit local server |
+| `dopbase client connect local`         | Return to this machine's server     |
 | `dopbase login`                        | Sign in or save a runner token      |
 | `dopbase logout`                       | End and remove the saved login      |
 | `dopbase client status`                | Show safe effective client settings |
 | `dopbase status`                       | Alias for `dopbase client status`   |
 | `dopbase access`                       | Show what you or a token can reach  |
 | `dopbase update`                       | Check GitHub for a newer release    |
-| `dopbase admin reset-password <email>` | Reset a user password offline       |
+| `dopbase admin reset-password <email>` | Reset a user password on the server |
+| `dopbase admin passcode <email>`       | Sign an account in without password |
 | `dopbase admin factory-reset`          | Reset the local instance offline    |
 
 When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint, asks for interactive confirmation,
 stops the current managed background server when present, deletes the previous
 encrypted CLI session, clears the saved default environment, and then saves the
-new endpoint. A foreground server must first be stopped with Ctrl+C. It does
-not select a project or environment, stop remote or unrelated local servers,
-or revoke browser sessions.
+new endpoint. To switch away from a local foreground server, stop it with
+Ctrl+C first; connecting to one while it runs works. It does not select a
+project or environment, stop remote or unrelated local servers, or revoke
+browser sessions.
 
 ## Server setup
 
@@ -399,10 +401,10 @@ them newest first with the change, who made it, when, and a status:
 ```text
 $ dopbase secret history payment-service/production DATABASE_URL
 VERSION   CHANGE                BY                SAVED                  STATUS
-v4        rolled back from v2   ana@example.com   2026-10-23 10:02 UTC   current
-v3        updated               bob@example.com   2026-10-22 18:40 UTC   available
-v2        imported              bob@example.com   2026-10-21 09:15 UTC   available
-v1        created               ana@example.com   2026-09-01 08:00 UTC   available
+v4        rolled back from v2   ana@dopbase.com   2026-10-23 10:02 UTC   current
+v3        updated               bob@dopbase.com   2026-10-22 18:40 UTC   available
+v2        imported              bob@dopbase.com   2026-10-21 09:15 UTC   available
+v1        created               ana@dopbase.com   2026-09-01 08:00 UTC   available
 
 4 version(s)
 ```
@@ -671,7 +673,7 @@ request. `--limit` sets the page size from 1 to 200 (default 50):
 ```bash
 dopbase audit list
 dopbase audit list --project storefront --environment storefront/production
-dopbase audit list --action secret.updated --actor admin@example.com --limit 100
+dopbase audit list --action secret.updated --actor admin@dopbase.com --limit 100
 dopbase --json audit list --cursor <CURSOR>
 ```
 
@@ -941,22 +943,95 @@ dopbase restore ./pre-upgrade.dop --setup-token setup_... --yes
 
 ## Server administration
 
-Offline maintenance commands operate directly on the server database:
+Maintenance commands open the server's database directly. They never talk to
+a server over the network:
 
 ```bash
-dopbase admin reset-password admin@example.com
+dopbase admin reset-password admin@dopbase.com
+dopbase admin passcode root@dopbase.com
 dopbase admin factory-reset
 dopbase admin factory-reset --no-backup
 ```
 
-`admin reset-password` performs offline recovery on the host machine. Because it accesses SQLite files directly, the background or foreground server process must be stopped first to avoid database locks.
+They act on the instance in the local data directory (`--data-dir`,
+`DOPBASE_DATA_DIR`, or `~/.dopbase`), so run them on the machine that hosts
+the server. For a server in a container, run them inside it:
+
+```bash
+docker exec -it dopbase dopbase admin reset-password admin@dopbase.com
+```
+
+Each command prints the data directory it uses. All three refuse when this CLI
+is connected to a different server, through `dopbase client connect` or
+`DOPBASE_URL`, and ask you to connect to the local instance. A connection
+counts as this instance when it is the instance's public URL, or `localhost`,
+`127.0.0.1`, or `::1` on the port the server listens on. If this instance is
+stopped and a Dopbase server still answers at that address, it's another
+server on the same port, such as a container published on it, and the
+commands refuse too. With no saved connection, as in a fresh container, the
+commands run. To fix a refusal,
+connect to the local instance first, or set `DOPBASE_URL` to it for one run:
+
+```bash
+dopbase client connect http://localhost:8840
+DOPBASE_URL=http://localhost:8840 dopbase admin reset-password admin@dopbase.com
+```
+
+`admin reset-password` sets a new password in the instance's database. It
+works with the server running or stopped. When the server is stopped, it holds
+the instance lock while it writes, so a server can't start halfway through.
+It never creates a data directory, database, or master key and never upgrades
+the database. It refuses a directory with no instance, a master key that
+doesn't match, and a database a newer Dopbase version has upgraded.
 
 | Option                     | Description                                       |
 | -------------------------- | ------------------------------------------------- |
 | `--config <FILE>`          | Server configuration file to load (`server.toml`) |
 | `--master-key-file <FILE>` | Path to the server master key file                |
 
-The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and immediately revokes all active sessions for that account.
+The command requires an interactive terminal, prompts for a new password (12 to 128 characters), updates the stored Argon2id hash, and revokes every active session on the instance. If the server is running and too many wrong passwords paused sign-in for the account, that pause still runs out on its own.
+
+`admin passcode` prints a one-time passcode and a link that signs an account
+in to the Admin UI without a password. Run it on the server machine while the
+server is running, as a user who can write the server's data directory:
+
+```bash
+dopbase admin passcode root@dopbase.com
+dopbase admin passcode alice@dopbase.com --ttl 120
+dopbase --json admin passcode root@dopbase.com
+```
+
+```text
+Launch passcode for root@dopbase.com
+
+Instance:  /srv/dopbase
+Passcode:  GJZG-FLMT
+Expires:   in 60 seconds (14:03:27 UTC)
+Open:      https://dopbase.example.com/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT
+
+It works once. Running this command again replaces it.
+```
+
+| Option            | Description                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| `--ttl <SECONDS>` | How long the passcode stays valid, from 15 to 600. Default 60 |
+| `--config <FILE>` | Server configuration file to load (`server.toml`)             |
+
+The command writes a hash of the passcode into the server database, so it
+never talks to the server and needs no sign-in. Being able to write the data
+directory is what lets you use it. Each account has one passcode at a time,
+and running the command again replaces it. The passcode sits in the link's
+fragment (after `#`), which browsers never send to the server, so it stays
+out of proxy and access logs.
+
+It works for any person's account. It refuses AI agents, which sign in with
+tokens only, and turned-off accounts. While single sign-on is required, only
+root can use it. It also refuses when the server isn't running or the Admin UI
+is off (`web_ui = false`). With `--json` it prints `email`, `passcode`,
+`expiresAt`, `ttlSeconds`, `url`, and `dataDir`.
+
+A passcode works once, and five wrong tries delete it. Each passcode issued,
+and each sign-in attempt with one, is recorded in the audit log.
 
 `admin factory-reset` also requires the server to be stopped. It displays the
 exact data directory, then requires `please-wipe-out-system` and the Dopbase

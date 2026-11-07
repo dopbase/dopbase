@@ -5,4 +5,5 @@ mod client_ip;
 mod crypto;
 mod db;
 mod migrations;
+mod passcodes;
 mod token;

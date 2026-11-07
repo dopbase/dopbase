@@ -116,7 +116,7 @@ async fn a_provider_whose_preset_was_removed_still_signs_in() {
     "member-code",
     Grant {
       subject: "member-subject",
-      email: "member@example.com",
+      email: "member@dopbase.com",
       email_verified: Some(true),
       nonce: started.nonce.clone(),
       auth_age: None,

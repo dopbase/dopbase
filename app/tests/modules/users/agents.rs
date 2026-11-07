@@ -78,7 +78,7 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
   )
   .await;
   assert_eq!(status, 201, "{body}");
-  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
   grant(
     &router,
     &root,
@@ -99,7 +99,7 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
     None,
   )
   .await;
-  assert_eq!(user["data"]["ownerEmail"], "maya@example.com");
+  assert_eq!(user["data"]["ownerEmail"], "maya@dopbase.com");
 
   // On payments she gives it Names only, Read or Write, never more than
   // her own Write.
@@ -185,7 +185,7 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
   assert_eq!(status, 200, "{access}");
   assert_eq!(access["data"]["grants"].as_array().unwrap().len(), 2);
   // Maya backs both grants in full, so neither carries an owner level.
-  assert_eq!(access["data"]["ownerEmail"], "maya@example.com");
+  assert_eq!(access["data"]["ownerEmail"], "maya@dopbase.com");
   for grant in access["data"]["grants"].as_array().unwrap() {
     assert!(grant.get("ownerLevel").is_none(), "{grant}");
   }
@@ -285,7 +285,7 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  let other = person(&router, &root, "other@example.com", "member").await;
+  let other = person(&router, &root, "other@dopbase.com", "member").await;
   let (status, body) = send(
     &router,
     "PATCH",
@@ -325,7 +325,7 @@ async fn a_member_gives_their_own_agent_no_more_than_they_reach() {
 async fn an_owner_reaches_only_their_own_agents_and_never_people() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
   grant(
     &router,
     &root,
@@ -334,7 +334,7 @@ async fn an_owner_reaches_only_their_own_agents_and_never_people() {
     "write",
   )
   .await;
-  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  let sam = person(&router, &root, "sam@dopbase.com", "admin").await;
   let theirs = agent(&router, &sam, "sam-bot").await;
   let item = format!("/api/v1/users/{theirs}");
 
@@ -383,7 +383,7 @@ async fn an_owner_reaches_only_their_own_agents_and_never_people() {
     "POST",
     "/api/v1/users",
     maya.browser(),
-    Some(json!({"email":"new@example.com","password":"correct-horse-123","role":"member"})),
+    Some(json!({"email":"new@dopbase.com","password":"correct-horse-123","role":"member"})),
   )
   .await;
   assert_eq!(status, 403, "{body}");
@@ -404,7 +404,7 @@ async fn an_owner_reaches_only_their_own_agents_and_never_people() {
 async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
   let bot = agent(&router, &maya, "maya-bot").await;
   let item = format!("/api/v1/users/{bot}");
 
@@ -417,10 +417,10 @@ async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
     &["tokens.personal", "agents.view", "agents.view_all"],
   )
   .await;
-  let lead = with_role(&router, &root, "lead@example.com", &lead_role).await;
+  let lead = with_role(&router, &root, "lead@dopbase.com", &lead_role).await;
   assert_eq!(listed(&router, &lead).await, ["maya-bot"]);
   let (_, user) = send(&router, "GET", &item, lead.browser(), None).await;
-  assert_eq!(user["data"]["ownerEmail"], "maya@example.com");
+  assert_eq!(user["data"]["ownerEmail"], "maya@dopbase.com");
   for path in [format!("{item}/access"), format!("{item}/tokens")] {
     let (status, body) = send(&router, "GET", &path, lead.browser(), None).await;
     assert_eq!(status, 200, "{path}: {body}");
@@ -449,7 +449,7 @@ async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
   .await;
   // The upgrade gives custom roles agent capabilities; a role made now
   // has only what it is given.
-  let people = with_role(&router, &root, "people@example.com", &people_role).await;
+  let people = with_role(&router, &root, "people@dopbase.com", &people_role).await;
   assert!(
     !listed(&router, &people)
       .await
@@ -478,7 +478,7 @@ async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
 
   // agents.manage changes and transfers anyone's agent. The new owner must
   // hold agents.view: the lead does, an auditor doesn't.
-  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  let sam = person(&router, &root, "sam@dopbase.com", "admin").await;
   let (status, body) = send(
     &router,
     "PATCH",
@@ -488,7 +488,7 @@ async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  let auditor = with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
+  let auditor = with_role(&router, &root, "auditor@dopbase.com", "rol_auditor").await;
   let (status, body) = send(
     &router,
     "PATCH",
@@ -508,7 +508,7 @@ async fn seeing_every_agent_and_managing_them_are_separate_capabilities() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  assert_eq!(body["data"]["ownerEmail"], "lead@example.com");
+  assert_eq!(body["data"]["ownerEmail"], "lead@dopbase.com");
   // It is the lead's now, so Maya no longer sees it.
   assert!(listed(&router, &maya).await.is_empty());
   let (status, body) = send(
@@ -535,7 +535,7 @@ async fn built_in_roles_hold_the_agent_capabilities_they_should() {
     ("rol_member", &["agents.view"]),
     ("rol_auditor", &["agents.view_all"]),
   ] {
-    let who = with_role(&router, &root, &format!("{role}@example.com"), role).await;
+    let who = with_role(&router, &root, &format!("{role}@dopbase.com"), role).await;
     let (status, session) = send(&router, "GET", "/api/v1/auth/session", who.browser(), None).await;
     assert_eq!(status, 200, "{session}");
     let mut held: Vec<String> = session["data"]["capabilities"]
@@ -556,7 +556,7 @@ async fn built_in_roles_hold_the_agent_capabilities_they_should() {
 async fn only_agents_manage_gives_someone_elses_agent_access() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
   let bot = agent(&router, &maya, "maya-bot").await;
 
   // Both manage payments; one holds users.*, the other agents.manage.
@@ -576,8 +576,8 @@ async fn only_agents_manage_gives_someone_elses_agent_access() {
     "project_manager",
   )
   .await;
-  let people = with_role(&router, &root, "people@example.com", &people_role).await;
-  let lead = with_role(&router, &root, "lead@example.com", &lead_role).await;
+  let people = with_role(&router, &root, "people@dopbase.com", &people_role).await;
+  let lead = with_role(&router, &root, "lead@dopbase.com", &lead_role).await;
   for who in [&people, &lead] {
     let (status, body) = grant(
       &router,
@@ -643,9 +643,9 @@ async fn only_agents_manage_gives_someone_elses_agent_access() {
 async fn agents_manage_hands_agents_over_but_creates_none() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
-  let other = person(&router, &root, "other@example.com", "member").await;
-  with_role(&router, &root, "auditor@example.com", "rol_auditor").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
+  let other = person(&router, &root, "other@dopbase.com", "member").await;
+  with_role(&router, &root, "auditor@dopbase.com", "rol_auditor").await;
   let bot = agent(&router, &maya, "maya-bot").await;
   let lead_role = custom_role(
     &router,
@@ -654,7 +654,7 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
     &["tokens.personal", "agents.view_all", "agents.manage"],
   )
   .await;
-  let lead = with_role(&router, &root, "lead@example.com", &lead_role).await;
+  let lead = with_role(&router, &root, "lead@dopbase.com", &lead_role).await;
 
   // Whoever creates an agent owns it, and owning one takes agents.view.
   let (status, body) = send(
@@ -670,11 +670,11 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
   // The lead sees the people who could own an agent, so the console can
   // offer them, but not the ones who couldn't.
   let seen = listed(&router, &lead).await;
-  for email in ["maya@example.com", "other@example.com", "maya-bot"] {
+  for email in ["maya@dopbase.com", "other@dopbase.com", "maya-bot"] {
     assert!(seen.contains(&email.to_owned()), "{email}: {seen:?}");
   }
   assert!(
-    !seen.contains(&"auditor@example.com".to_owned()),
+    !seen.contains(&"auditor@dopbase.com".to_owned()),
     "{seen:?}"
   );
   // Maya gave her agent a token before it changes hands.
@@ -711,7 +711,7 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
   )
   .await;
   assert_eq!(status, 200, "{body}");
-  assert_eq!(body["data"]["ownerEmail"], "other@example.com");
+  assert_eq!(body["data"]["ownerEmail"], "other@dopbase.com");
   // A new owner starts with no tokens, so Maya's copy stops working.
   let (status, _) = send(&router, "GET", me, As::Token(&token), None).await;
   assert_eq!(status, 401);
@@ -740,8 +740,8 @@ async fn agents_manage_hands_agents_over_but_creates_none() {
 async fn an_owner_doesnt_undo_a_disable_by_agents_manage() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
-  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
+  let sam = person(&router, &root, "sam@dopbase.com", "admin").await;
   let bot = agent(&router, &maya, "maya-bot").await;
   let item = format!("/api/v1/users/{bot}");
   // Sam turns it off, and it stays off until agents.manage turns it on.
@@ -770,8 +770,8 @@ async fn an_owner_doesnt_undo_a_disable_by_agents_manage() {
 async fn an_agent_owner_cant_probe_other_accounts() {
   let (_dir, state, router) = test_app().await;
   let (root, _) = instance(&state, &router).await;
-  let maya = person(&router, &root, "maya@example.com", "member").await;
-  let sam = person(&router, &root, "sam@example.com", "admin").await;
+  let maya = person(&router, &root, "maya@dopbase.com", "member").await;
+  let sam = person(&router, &root, "sam@dopbase.com", "admin").await;
   agent(&router, &maya, "maya-bot").await;
 
   // Root, a person and a missing id answer alike, whatever she asks.
@@ -781,7 +781,7 @@ async fn an_agent_owner_cant_probe_other_accounts() {
       (
         "PATCH",
         item.clone(),
-        Some(json!({"email":"x@example.com"})),
+        Some(json!({"email":"x@dopbase.com"})),
       ),
       ("POST", format!("{item}/disable"), None),
       ("POST", format!("{item}/enable"), None),

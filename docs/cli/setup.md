@@ -25,7 +25,7 @@ instance starts normally without changing its accounts or credentials.
 To create root without opening a browser, supply an email:
 
 ```bash
-DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase server start
 ```
 
 Dopbase generates a password, displays it once, and continues serving. Save the
@@ -62,13 +62,13 @@ Once the server is running, sign in with `dopbase login` or open the Admin UI.
 Provide an email to generate a password:
 
 ```bash
-dopbase server setup --email admin@example.com
+dopbase server setup --email admin@dopbase.com
 ```
 
 You can also supply the email through the environment:
 
 ```bash
-export DOPBASE_ROOT_EMAIL=admin@example.com
+export DOPBASE_ROOT_EMAIL=admin@dopbase.com
 dopbase server setup
 ```
 
@@ -92,7 +92,7 @@ output, and CI logs can still retain the printed value.
 For automation, request JSON and send stdout to a protected destination:
 
 ```bash
-dopbase --data-dir /srv/dopbase --json server setup --email admin@example.com
+dopbase --data-dir /srv/dopbase --json server setup --email admin@dopbase.com
 ```
 
 Successful JSON output contains these fields. The values below are placeholders:
@@ -101,7 +101,7 @@ Successful JSON output contains these fields. The values below are placeholders:
 {
   "initialized": true,
   "admin_id": "<root-account-id>",
-  "email": "admin@example.com",
+  "email": "admin@dopbase.com",
   "data_dir": "/srv/dopbase",
   "password": "<generated-password>"
 }
@@ -128,11 +128,11 @@ session and opens Projects. Restoring a backup opens Sign in.
 To prefill the root email, set `DOPBASE_ROOT_EMAIL` or pass `--email`:
 
 ```bash
-dopbase server setup --web --email ops+cloud@example.com
+dopbase server setup --web --email ops+cloud@dopbase.com
 ```
 
 The printed link includes an encoded email, for example
-`/setup?token=<SETUP_TOKEN>&email=ops%2Bcloud%40example.com`. Opening it fills the
+`/setup?token=<SETUP_TOKEN>&email=ops%2Bcloud%40dopbase.com`. Opening it fills the
 token and email fields, then removes those parameters from the address bar.
 The email remains editable. You still choose and confirm a password before
 submitting the form. With no email supplied, the existing token-only link is

@@ -76,7 +76,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     "/api/v1/bootstrap/admin",
     None,
     None,
-    Some(json!({"setupToken": setup, "email":"root@example.com", "password":"correct-horse-123"})),
+    Some(json!({"setupToken": setup, "email":"root@dopbase.com", "password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -120,7 +120,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     "/api/v1/users",
     Some(&cookie),
     Some(&csrf),
-    Some(json!({"email":"admin@example.com","password":"correct-horse-456"})),
+    Some(json!({"email":"admin@dopbase.com","password":"correct-horse-456"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -132,7 +132,7 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
     None,
     None,
     Some(
-      json!({"email":"admin@example.com","password":"correct-horse-456","sessionKind":"browser"}),
+      json!({"email":"admin@dopbase.com","password":"correct-horse-456","sessionKind":"browser"}),
     ),
   )
   .await;
@@ -163,9 +163,9 @@ async fn root_can_manage_admins_but_cannot_delete_root_and_can_reset() {
   // The root user's actions are recorded as `root`; other administrators
   // stay `admin`.
   for (action, actor_label, expected) in [
-    ("admin.bootstrapped", "root@example.com", "root"),
-    ("admin.created", "root@example.com", "root"),
-    ("login.succeeded", "admin@example.com", "admin"),
+    ("admin.bootstrapped", "root@dopbase.com", "root"),
+    ("admin.created", "root@dopbase.com", "root"),
+    ("login.succeeded", "admin@dopbase.com", "admin"),
   ] {
     let actor_type: String = sqlx::query_scalar(
       "SELECT actor_type FROM audit_events WHERE action=? AND actor_label=? ORDER BY seq DESC LIMIT 1",
@@ -210,7 +210,7 @@ async fn accounts_keep_their_role_row_and_starting_grant_in_step() {
     "/api/v1/bootstrap/admin",
     None,
     None,
-    Some(json!({"setupToken": setup, "email":"root@example.com", "password":"correct-horse-123"})),
+    Some(json!({"setupToken": setup, "email":"root@dopbase.com", "password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -230,7 +230,7 @@ async fn accounts_keep_their_role_row_and_starting_grant_in_step() {
     "/api/v1/users",
     Some(&cookie),
     Some(&csrf),
-    Some(json!({"email":"teammate@example.com","password":"correct-horse-456","role":"member"})),
+    Some(json!({"email":"teammate@dopbase.com","password":"correct-horse-456","role":"member"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -349,7 +349,7 @@ async fn members_and_agents_cannot_create_projects() {
     "/api/v1/bootstrap/admin",
     None,
     None,
-    Some(json!({"setupToken":setup,"email":"root@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"root@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -369,7 +369,7 @@ async fn members_and_agents_cannot_create_projects() {
     "/api/v1/users",
     Some(&root_cookie),
     Some(&root_csrf),
-    Some(json!({"email":"member@example.com","password":"correct-horse-456","role":"member"})),
+    Some(json!({"email":"member@dopbase.com","password":"correct-horse-456","role":"member"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -381,7 +381,7 @@ async fn members_and_agents_cannot_create_projects() {
     None,
     None,
     Some(
-      json!({"email":"member@example.com","password":"correct-horse-456","sessionKind":"browser"}),
+      json!({"email":"member@dopbase.com","password":"correct-horse-456","sessionKind":"browser"}),
     ),
   )
   .await;
@@ -473,7 +473,7 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
     "/api/v1/bootstrap/admin",
     None,
     None,
-    Some(json!({"setupToken":setup,"email":"root@example.com","password":"correct-horse-123"})),
+    Some(json!({"setupToken":setup,"email":"root@dopbase.com","password":"correct-horse-123"})),
   )
   .await;
   assert_eq!(status, 201);
@@ -502,7 +502,7 @@ async fn ai_agent_accounts_hold_expiring_tokens_within_their_role() {
   let (status, _, _) =
     create(json!({"email":"build-agent","role":"ai_agent","password":"correct-horse-123"})).await;
   assert_eq!(status, 400);
-  let (status, _, _) = create(json!({"email":"agent@example.com","role":"ai_agent"})).await;
+  let (status, _, _) = create(json!({"email":"agent@dopbase.com","role":"ai_agent"})).await;
   assert_eq!(status, 422);
   let (status, account, _) = create(json!({"email":"build-agent","role":"ai_agent"})).await;
   assert_eq!(status, 201);
