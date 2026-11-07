@@ -126,6 +126,7 @@ async fn mint_launch_passcode(
     passcodes::{self, PasscodePurpose},
   };
 
+  check_schema(db).await?;
   let has_table: Option<i64> =
     sqlx::query_scalar("SELECT 1 FROM sqlite_master WHERE type='table' AND name='passcodes'")
       .fetch_optional(db.pool())
