@@ -30,10 +30,10 @@ Migration tools are planned for a later release. They will need to preserve reso
 
 You can select a self-hosted endpoint again with `dopbase client connect`. The client should make the active endpoint visible so users can verify the destination before importing, exporting, or updating secrets.
 
-Use `dopbase client connect local` to return to the implicit
-`http://localhost:8840` default. Connecting validates the destination and clears
-the credential from the previous active server. Run `dopbase login` against the
-new destination.
+Use `dopbase client connect local` to return to this machine's own instance,
+`http://localhost:8840` by default. The local server doesn't need to be running
+yet. Connecting clears the credential from the previous active server. Run
+`dopbase login` against the new destination.
 
 The selected Cloud URL is stored in the user's machine-global config. The login
 token is stored in the encrypted extensionless `session` file, not in the TOML

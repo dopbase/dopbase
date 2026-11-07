@@ -78,9 +78,11 @@ credential unchanged.
 
 After validation, Dopbase asks for confirmation. A successful switch stops the
 current managed background server when present, removes the previous encrypted
-CLI session and key, and clears the previous default environment. A foreground
-server must be stopped with Ctrl+C first. Remote and unrelated local servers
-are not stopped. Authenticate separately against the new endpoint:
+CLI session and key, and clears the previous default environment. When the
+current endpoint is a local foreground server, stop it with Ctrl+C first;
+connecting to a running foreground server needs no such step. Remote and
+unrelated local servers are not stopped. Authenticate separately against the
+new endpoint:
 
 ```bash
 dopbase login
@@ -93,9 +95,13 @@ dopbase client connect local
 dopbase login
 ```
 
-The `local` alias resolves to `http://localhost:8840`. Dopbase validates the
-local server, removes the `server_url` override, and removes the previous
-server's credential.
+The `local` alias resolves to the public URL of the instance in the same data
+directory, which is `http://localhost:8840` by default. On that default URL
+Dopbase removes the `server_url` override; any other public URL is saved. The
+previous server's credential is removed either way. The local server can be
+stopped when you switch: if nothing answers at its URL, Dopbase switches
+anyway and asks you to start it. Something that answers but isn't a
+compatible Dopbase server is still refused.
 
 Persistent switching is rejected while `DOPBASE_URL` is set because that
 environment variable would override the newly saved endpoint.

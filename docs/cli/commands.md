@@ -26,7 +26,7 @@ the [CLI cheat sheet](./cheat-sheet).
 | `dopbase server status`                | Check the local server process      |
 | `dopbase server logs`                  | Read background server logs         |
 | `dopbase client connect <server-url>`  | Validate and save another server    |
-| `dopbase client connect local`         | Return to the implicit local server |
+| `dopbase client connect local`         | Return to this machine's server     |
 | `dopbase login`                        | Sign in or save a runner token      |
 | `dopbase logout`                       | End and remove the saved login      |
 | `dopbase client status`                | Show safe effective client settings |
@@ -41,9 +41,10 @@ When no server is configured, client commands use `http://localhost:8840`.
 `client connect` validates a new endpoint, asks for interactive confirmation,
 stops the current managed background server when present, deletes the previous
 encrypted CLI session, clears the saved default environment, and then saves the
-new endpoint. A foreground server must first be stopped with Ctrl+C. It does
-not select a project or environment, stop remote or unrelated local servers,
-or revoke browser sessions.
+new endpoint. To switch away from a local foreground server, stop it with
+Ctrl+C first; connecting to one while it runs works. It does not select a
+project or environment, stop remote or unrelated local servers, or revoke
+browser sessions.
 
 ## Server setup
 
