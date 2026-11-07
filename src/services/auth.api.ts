@@ -205,6 +205,22 @@ export async function exchangeSso(code: string): Promise<SsoExchangeResponse> {
   return data;
 }
 
+/**
+ * Trades a launch passcode from `dopbase admin passcode` for a browser
+ * session. Answers like `login`.
+ */
+export async function launch(
+  identity: string,
+  passcode: string,
+): Promise<LoginResponse> {
+  const { data } = await apiRequest<LoginResponse>(`${BASE}/launch`, {
+    method: "POST",
+    body: { identity, passcode },
+    anonymous: true,
+  });
+  return data;
+}
+
 /** Returns the provider URL to open for linking the current account. */
 export async function startSsoLink(): Promise<string> {
   const { data } = await apiRequest<{ authorizeUrl: string }>(

@@ -20,6 +20,7 @@ describe("project routes", () => {
     ["/projects/p/billing/e/env_1", "legacy-environment"],
     ["/projects/p/billing/e/env_1/tokens", "legacy-environment"],
     ["/projects/p/billing/e/env_1/import", "legacy-environment"],
+    ["/launch", "launch"],
     ["/status", "status"],
     ["/users/usr_1", "user"],
     ["/users/usr_1/access", "user-access"],
