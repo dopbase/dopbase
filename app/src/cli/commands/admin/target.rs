@@ -7,20 +7,69 @@
 
 use crate::cli::local_config::{self, ServerSource};
 use crate::config::ServerConfig;
-use anyhow::Result;
-use std::net::SocketAddr;
+use crate::server::InstanceLock;
+use anyhow::{Result, bail};
+use serde_json::Value;
+use std::{net::SocketAddr, time::Duration};
 use url::{Host, Url};
 
-/// Whether the CLI's saved connection (client config or `DOPBASE_URL`)
-/// points at the instance in `config`. With no saved connection there is
-/// nothing to contradict, so this is true. Each command refuses with its own
-/// message when this is false.
-pub(super) fn connected_here(config: &ServerConfig) -> Result<bool> {
+/// How long to wait for a server at the connected address to answer.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Refuse `dopbase admin <command>` unless the CLI's saved connection
+/// (client config or `DOPBASE_URL`) points at the instance in `config`.
+/// With no saved connection there is nothing to contradict, so it passes.
+///
+/// An address can look like this instance and still be another one: a
+/// container published on this instance's port answers on the same
+/// loopback address. So when this instance is stopped and a Dopbase server
+/// answers at the connected address anyway, that server is someone else.
+pub(super) async fn ensure_connected_here(
+  command: &str,
+  config: &ServerConfig,
+) -> Result<()> {
   let connection = local_config::resolve(None, Some(&config.data_dir))?;
-  Ok(
-    matches!(connection.source, ServerSource::Default)
-      || connection_is_local(&connection.url, &config.public_url, &config.bind_address),
-  )
+  if matches!(connection.source, ServerSource::Default) {
+    return Ok(());
+  }
+  let url = &connection.url;
+  if !connection_is_local(url, &config.public_url, &config.bind_address) {
+    bail!("please connect to local instance to perform {command} action");
+  }
+  if !InstanceLock::is_held(&config.database_url)? && answers_as_dopbase(url).await {
+    bail!(
+      "another Dopbase server is answering at {url}, please run {command} action on that server"
+    );
+  }
+  Ok(())
+}
+
+/// Whether a Dopbase server answers its health check at `url`.
+async fn answers_as_dopbase(url: &str) -> bool {
+  let Ok(client) = reqwest::Client::builder()
+    .timeout(PROBE_TIMEOUT)
+    .redirect(reqwest::redirect::Policy::none())
+    .build()
+  else {
+    return false;
+  };
+  let health = format!(
+    "{}{}",
+    url.trim_end_matches('/'),
+    crate::constants::api::health::ROOT
+  );
+  let Ok(response) = client.get(health).send().await else {
+    return false;
+  };
+  let Ok(body) = response.json::<Value>().await else {
+    return false;
+  };
+  body
+    .get("data")
+    .unwrap_or(&body)
+    .get("product")
+    .and_then(Value::as_str)
+    == Some("dopbase")
 }
 
 /// Whether `connected` reaches the instance with this public URL and bind

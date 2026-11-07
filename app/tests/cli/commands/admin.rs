@@ -491,6 +491,74 @@ mod connected_server {
       );
     }
   }
+
+  /// This instance's own config says `port`, so loopback on that port looks
+  /// like this instance.
+  fn listen_on(
+    fixture: &Fixture,
+    port: u16,
+  ) {
+    std::fs::write(
+      fixture.data_dir.join("server.toml"),
+      format!("port = {port}\n"),
+    )
+    .unwrap();
+  }
+
+  fn free_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+      .unwrap()
+      .local_addr()
+      .unwrap()
+      .port()
+  }
+
+  /// A container published on this instance's port answers at the same
+  /// loopback address. With this instance stopped, that server can't be it.
+  #[tokio::test(flavor = "multi_thread")]
+  async fn another_server_on_this_instances_port_is_refused() {
+    let container = Fixture::new().await;
+    let port = url::Url::parse(&container.url).unwrap().port().unwrap();
+    let local = Fixture::new().await;
+    local.stop().await;
+    listen_on(&local, port);
+    connect(&local, &container.url);
+
+    for (arguments, command) in [
+      (&["reset-password", EMAIL][..], "reset-password"),
+      (&["factory-reset"][..], "factory-reset"),
+    ] {
+      let terminal = interactive(&local, arguments);
+      let transcript = terminal.transcript.replace(['\r', '\n'], "");
+      assert!(
+        transcript.contains(&format!(
+          "another Dopbase server is answering at {}, please run {command} action on that server",
+          container.url
+        )),
+        "{transcript}"
+      );
+      assert!(!transcript.contains("New password"));
+      assert!(!transcript.contains("Type please-wipe-out-system"));
+    }
+  }
+
+  /// Stopped, with nothing listening on its port: the saved connection is
+  /// just this instance waiting to be started.
+  #[tokio::test(flavor = "multi_thread")]
+  async fn a_stopped_instance_with_nothing_on_its_port_is_allowed() {
+    let local = Fixture::new().await;
+    local.stop().await;
+    let port = free_port();
+    listen_on(&local, port);
+    connect(&local, &format!("http://127.0.0.1:{port}"));
+
+    let mut cmd = command(&local.data_dir);
+    cmd.args(["admin", "reset-password", EMAIL]);
+    let mut terminal = Terminal::new(cmd);
+    terminal.reply("New password:", "replacement-password-123\r");
+    terminal.reply("Confirm new password:", "replacement-password-123\r");
+    assert!(terminal.finish().success(), "{}", terminal.transcript);
+  }
 }
 
 mod connection_is_local {

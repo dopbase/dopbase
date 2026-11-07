@@ -52,9 +52,7 @@ async fn issue_passcode(
     config_path: config,
     ..Default::default()
   })?;
-  if !target::connected_here(&config)? {
-    bail!("please connect to local instance to perform passcode action");
-  }
+  target::ensure_connected_here("passcode", &config).await?;
   if !config.web_ui_enabled {
     bail!(
       "the Admin UI is turned off on this server (web_ui = false), so there is nothing to sign in to"
@@ -224,9 +222,7 @@ async fn factory_reset_offline(
     config_path: config,
     ..Default::default()
   })?;
-  if !target::connected_here(&config)? {
-    bail!("please connect to local instance to perform factory-reset action");
-  }
+  target::ensure_connected_here("factory-reset", &config).await?;
   let database = database_path(&config.database_url)?;
   let reset_target = validate_factory_reset_target(&config.data_dir, &database)?;
   let _lock = crate::server::InstanceLock::acquire(&config.database_url)
@@ -517,9 +513,7 @@ async fn reset_password(
     master_key_path: master_key_file,
     ..Default::default()
   })?;
-  if !target::connected_here(&config)? {
-    bail!("please connect to local instance to perform reset-password action");
-  }
+  target::ensure_connected_here("reset-password", &config).await?;
   let database = database_path(&config.database_url)?;
   if !database.is_file() {
     bail!(
