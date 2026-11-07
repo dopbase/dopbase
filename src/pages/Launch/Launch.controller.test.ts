@@ -126,8 +126,40 @@ describe("useLaunchController", () => {
     const { controller } = mountController(useLaunchController);
     await settle();
     expect(controller.error.value).toContain("expired or was already used");
+    expect(controller.canRetry.value).toBe(false);
     expect(routerReplace).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["the network fails", new ApiError(0, { NETWORK_ERROR: "down" })],
+    ["the server errors", new ApiError(500, { INTERNAL_ERROR: "boom" })],
+  ])(
+    "offers to send the same passcode again when %s",
+    async (_case, failure) => {
+      window.history.replaceState(
+        null,
+        "",
+        "/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT",
+      );
+      vi.mocked(authApi.launch).mockRejectedValueOnce(failure);
+      const { controller } = mountController(useLaunchController);
+      await settle();
+      expect(controller.error.value).toContain("wasn't checked");
+      expect(controller.error.value).not.toContain("expired or was");
+      expect(controller.canRetry.value).toBe(true);
+      expect(window.location.hash).toBe("");
+
+      vi.mocked(authApi.launch).mockResolvedValueOnce(browserSession());
+      vi.mocked(authApi.fetchSession).mockResolvedValue(browserSessionInfo());
+      await controller.retry();
+      expect(authApi.launch).toHaveBeenLastCalledWith(
+        "root@dopbase.com",
+        "GJZG-FLMT",
+      );
+      expect(controller.error.value).toBeNull();
+      expect(routerReplace).toHaveBeenCalledWith({ name: "projects" });
+    },
+  );
 
   it("tries again when a new link is pasted into the same tab", async () => {
     window.history.replaceState(
@@ -171,5 +203,6 @@ describe("useLaunchController", () => {
     const { controller } = mountController(useLaunchController);
     await settle();
     expect(controller.error.value).toContain("Wait a few minutes");
+    expect(controller.canRetry.value).toBe(false);
   });
 });

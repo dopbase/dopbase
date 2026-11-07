@@ -4,7 +4,7 @@ import { FocusLayout } from "~/layouts";
 import { DbAlert, DbButton, DbSpinner } from "~/components/ui";
 
 /** Launch — signs in with a passcode from `dopbase admin passcode`. */
-const { error } = useLaunchController();
+const { error, canRetry, retry } = useLaunchController();
 </script>
 
 <template>
@@ -14,8 +14,20 @@ const { error } = useLaunchController();
         This launch link didn't work
       </h1>
       <DbAlert>{{ error }}</DbAlert>
+      <DbButton
+        v-if="canRetry"
+        variant="primary"
+        size="lg"
+        class="w-full"
+        data-testid="launch-retry"
+        @click="retry">
+        Try again
+      </DbButton>
       <RouterLink :to="{ name: 'login' }" class="w-full">
-        <DbButton variant="primary" size="lg" class="w-full">
+        <DbButton
+          :variant="canRetry ? 'secondary' : 'primary'"
+          size="lg"
+          class="w-full">
           Go to sign in
         </DbButton>
       </RouterLink>
