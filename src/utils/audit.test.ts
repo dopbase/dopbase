@@ -10,7 +10,7 @@ function event(
     id: "evt_1",
     actorType: "root",
     actorId: "usr_root",
-    actorLabel: "root@example.com",
+    actorLabel: "root@dopbase.com",
     action: "login.succeeded",
     projectId: null,
     environmentId: null,
@@ -45,18 +45,18 @@ describe("eventOrigin", () => {
 describe("eventDetail", () => {
   it.each([
     [
-      { principal: "maya@example.com", level: "write" },
-      "maya@example.com · Write",
+      { principal: "maya@dopbase.com", level: "write" },
+      "maya@dopbase.com · Write",
     ],
     [{ principal: "backend", level: "bogus" }, "backend"],
     [{ oldName: "staging", newName: "qa" }, "staging → qa"],
     [{ oldName: "Backend", name: "Platform" }, "Backend → Platform"],
     [
-      { group: "Backend", email: "sam@example.com" },
-      "sam@example.com in Backend",
+      { group: "Backend", email: "sam@dopbase.com" },
+      "sam@dopbase.com in Backend",
     ],
     [{ group: "Backend", userId: "usr_sam" }, "Backend"],
-    [{ email: "maya@example.com", role: "rol_member" }, "maya@example.com"],
+    [{ email: "maya@dopbase.com", role: "rol_member" }, "maya@dopbase.com"],
     [{ key: "DATABASE_URL", version: 3 }, "DATABASE_URL v3"],
     [
       { key: "dopbase-2026-11-01.tar.gz", size: 12 },

@@ -65,17 +65,17 @@ describe("useSetupController", () => {
   });
   it("prefills email and token, removing both in one replacement", () => {
     routeQuery.token = "setup_first-run-token";
-    routeQuery.email = "  ops+cloud@example.com  ";
+    routeQuery.email = "  ops+cloud@dopbase.com  ";
     routeQuery.other = "kept";
     const c = useSetupController();
     expect(c.setupToken.value).toBe("setup_first-run-token");
-    expect(c.email.value).toBe("ops+cloud@example.com");
+    expect(c.email.value).toBe("ops+cloud@dopbase.com");
     expect(routerReplace).toHaveBeenCalledTimes(1);
     expect(routerReplace).toHaveBeenCalledWith({ query: { other: "kept" } });
     expect(bootstrapApi.bootstrapAdmin).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, null, "", "  ", ["one@example.com", "two@example.com"]])(
+  it.each([undefined, null, "", "  ", ["one@dopbase.com", "two@dopbase.com"]])(
     "ignores an absent, blank or repeated email: %s",
     (value) => {
       routeQuery.email = value;
@@ -96,14 +96,14 @@ describe("useSetupController", () => {
     expect(bootstrapApi.bootstrapAdmin).not.toHaveBeenCalled();
     vi.mocked(bootstrapApi.bootstrapAdmin).mockResolvedValueOnce({
       adminId: "usr_1",
-      email: "edited@example.com",
+      email: "edited@dopbase.com",
       csrfToken: "csrf_1",
     });
-    c.email.value = "edited@example.com";
+    c.email.value = "edited@dopbase.com";
     await c.submit();
     expect(bootstrapApi.bootstrapAdmin).toHaveBeenCalledWith({
       setupToken: VALID.setupToken,
-      email: "edited@example.com",
+      email: "edited@dopbase.com",
       password: VALID.password,
     });
   });

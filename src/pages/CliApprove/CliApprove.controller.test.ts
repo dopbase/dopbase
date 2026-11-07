@@ -53,7 +53,7 @@ beforeEach(() => {
   // Signed in already, in another tab, before the CLI asked.
   vi.mocked(authApi.fetchSession).mockResolvedValue({
     ...browserSessionInfo(),
-    email: "dev@example.com",
+    email: "dev@dopbase.com",
     role: "admin",
     csrfToken: "csrf_tab",
   });
@@ -103,7 +103,7 @@ describe("useCliApproveController", () => {
     expect(c.request.value).toEqual(pending);
     expect(c.isConfirmation.value).toBe(false);
     expect(c.account.value).toEqual({
-      email: "dev@example.com",
+      email: "dev@dopbase.com",
       role: "Administrator",
       initial: "D",
     });

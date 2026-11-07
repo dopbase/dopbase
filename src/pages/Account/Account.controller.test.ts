@@ -99,13 +99,13 @@ describe("useAccountController", () => {
     vi.mocked(authApi.login).mockResolvedValueOnce(
       browserSession({
         adminId: "usr_root",
-        email: "root@example.com",
+        email: "root@dopbase.com",
         csrfToken: "csrf_root",
         role: "root",
         lastLoginAt: new Date(Date.now() - 60000).toISOString(),
       }),
     );
-    await useAuthStore().login("root@example.com", "oldpassword1");
+    await useAuthStore().login("root@dopbase.com", "oldpassword1");
 
     const root = useAccountController();
     expect(root.role.value).toBe("root");

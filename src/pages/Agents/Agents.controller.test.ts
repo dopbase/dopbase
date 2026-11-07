@@ -185,7 +185,7 @@ describe("useAgentsController", () => {
     ]);
     const controller = await mountAgents();
 
-    expect(rowOf(controller, "usr_bot").owner).toBe("maya@example.com");
+    expect(rowOf(controller, "usr_bot").owner).toBe("maya@dopbase.com");
     expect(rowOf(controller, "usr_orphan").owner).toBe("No owner");
     expect(rowOf(controller, "usr_stray").owner).toBe("Unknown");
   });
@@ -195,7 +195,7 @@ describe("useAgentsController", () => {
     const controller = await mountAgents();
 
     expect(controller.loadError.value).toBeNull();
-    expect(rowOf(controller, "usr_bot").owner).toBe("maya@example.com");
+    expect(rowOf(controller, "usr_bot").owner).toBe("maya@dopbase.com");
     expect(controller.agentRole.value).toBeNull();
   });
 
@@ -314,11 +314,11 @@ describe("useAgentsController", () => {
   it("names the owner from the agent, without listing people", async () => {
     signInAs(["agents.view_all"], { adminId: "usr_reader", role: "member" });
     vi.mocked(usersApi.fetchUsers).mockResolvedValue([
-      { ...deployBot, ownerEmail: "lead@example.com" },
+      { ...deployBot, ownerEmail: "lead@dopbase.com" },
     ]);
     const controller = await mountAgents();
 
-    expect(rowOf(controller, "usr_deploy").owner).toBe("lead@example.com");
+    expect(rowOf(controller, "usr_deploy").owner).toBe("lead@dopbase.com");
   });
 
   it("links each row to the agent's audit activity", async () => {
@@ -346,8 +346,8 @@ describe("useAgentsController", () => {
     const controller = await mountAgents();
 
     expect(controller.ownerFilters.value).toEqual([
-      { value: "lead@example.com", label: "lead@example.com" },
-      { value: "maya@example.com", label: "maya@example.com" },
+      { value: "lead@dopbase.com", label: "lead@dopbase.com" },
+      { value: "maya@dopbase.com", label: "maya@dopbase.com" },
     ]);
   });
 
@@ -356,14 +356,14 @@ describe("useAgentsController", () => {
     const visible = () =>
       controller.visibleRows.value.map((row) => row.agent.id);
 
-    controller.ownerFilter.value = "lead@example.com";
+    controller.ownerFilter.value = "lead@dopbase.com";
     expect(visible()).toEqual(["usr_deploy"]);
 
     controller.ownerFilter.value = null;
     controller.filter.value = "  REVIEW ";
     expect(visible()).toEqual(["usr_bot"]);
 
-    controller.ownerFilter.value = "lead@example.com";
+    controller.ownerFilter.value = "lead@dopbase.com";
     expect(visible()).toEqual([]);
   });
 

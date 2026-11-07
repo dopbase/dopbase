@@ -30,17 +30,17 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com&passcode=GJZG-FLMT",
+      "/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.launch).mockResolvedValueOnce(
-      browserSession({ email: "root@example.com" }),
+      browserSession({ email: "root@dopbase.com" }),
     );
     vi.mocked(authApi.fetchSession).mockResolvedValue(browserSessionInfo());
     const { controller } = mountController(useLaunchController);
     await settle();
     expect(window.location.hash).toBe("");
     expect(authApi.launch).toHaveBeenCalledWith(
-      "root@example.com",
+      "root@dopbase.com",
       "GJZG-FLMT",
     );
     expect(useAuthStore().isAuthenticated).toBe(true);
@@ -52,14 +52,14 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=ops%2Broot%40example.com&passcode=GJZG-FLMT",
+      "/launch#identity=ops%2Broot%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.launch).mockResolvedValueOnce(browserSession());
     vi.mocked(authApi.fetchSession).mockResolvedValue(browserSessionInfo());
     mountController(useLaunchController);
     await settle();
     expect(authApi.launch).toHaveBeenCalledWith(
-      "ops+root@example.com",
+      "ops+root@dopbase.com",
       "GJZG-FLMT",
     );
   });
@@ -86,7 +86,7 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com",
+      "/launch#identity=root%40dopbase.com",
     );
     vi.mocked(authApi.fetchSession).mockRejectedValueOnce(
       new ApiError(401, { AUTHENTICATION_REQUIRED: "no" }),
@@ -102,7 +102,7 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch?identity=root%40example.com&passcode=GJZG-FLMT",
+      "/launch?identity=root%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.fetchSession).mockRejectedValueOnce(
       new ApiError(401, { AUTHENTICATION_REQUIRED: "no" }),
@@ -118,7 +118,7 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com&passcode=GJZG-FLMT",
+      "/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.launch).mockRejectedValueOnce(
       new ApiError(401, { PASSCODE_INVALID: "expired" }),
@@ -133,7 +133,7 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com&passcode=GJZG-FLMT",
+      "/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.launch).mockRejectedValueOnce(
       new ApiError(401, { PASSCODE_INVALID: "expired" }),
@@ -147,12 +147,12 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com&passcode=KTVB-RMQD",
+      "/launch#identity=root%40dopbase.com&passcode=KTVB-RMQD",
     );
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     await settle();
     expect(authApi.launch).toHaveBeenLastCalledWith(
-      "root@example.com",
+      "root@dopbase.com",
       "KTVB-RMQD",
     );
     expect(controller.error.value).toBeNull();
@@ -163,7 +163,7 @@ describe("useLaunchController", () => {
     window.history.replaceState(
       null,
       "",
-      "/launch#identity=root%40example.com&passcode=GJZG-FLMT",
+      "/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT",
     );
     vi.mocked(authApi.launch).mockRejectedValueOnce(
       new ApiError(429, { RATE_LIMITED: "slow down" }),

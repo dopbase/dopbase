@@ -107,7 +107,7 @@ const mockStatus: instanceApi.StatusResponse = {
     failedSignIns: {
       total: 3,
       hourly: [],
-      accounts: ["root@example.com"],
+      accounts: ["root@dopbase.com"],
       addresses: ["203.0.113.7"],
     },
     rateLimited: { total: 0, hourly: [] },
@@ -389,7 +389,7 @@ describe("useInstanceController", () => {
       {
         label: "Failed sign-ins",
         value: "3",
-        detail: "All for root@example.com, from 203.0.113.7",
+        detail: "All for root@dopbase.com, from 203.0.113.7",
       },
       {
         label: "Rate limited",

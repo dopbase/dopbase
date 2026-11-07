@@ -119,7 +119,7 @@ const ssoOnly = computed(
           name="email"
           type="email"
           autocomplete="email"
-          placeholder="you@example.com"
+          placeholder="you@dopbase.com"
           :error="fieldErrors.email" />
 
         <div class="flex flex-col gap-1">

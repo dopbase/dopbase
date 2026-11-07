@@ -37,7 +37,7 @@ export interface MemberRow {
   to: RouteLocationRaw;
 }
 
-/** "lead" for lead@example.com: the Added column stays short. */
+/** "lead" for lead@dopbase.com: the Added column stays short. */
 function shortName(email: string): string {
   return email.split("@")[0] || email;
 }

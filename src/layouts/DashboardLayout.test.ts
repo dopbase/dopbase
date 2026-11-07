@@ -7,7 +7,7 @@ const { controller } = await vi.hoisted(async () => {
   const { ref } = await import("vue");
   return {
     controller: {
-      email: ref("admin@example.com"),
+      email: ref("admin@dopbase.com"),
       roleName: ref("Admin"),
       sections: ref([
         {
@@ -108,7 +108,7 @@ describe("DashboardLayout", () => {
     const sheet = document.body.querySelector<HTMLElement>(sheetSelector);
     expect(sheet?.textContent).toContain("Projects");
     expect(sheet?.textContent).toContain("Admin");
-    expect(sheet?.textContent).toContain("admin@example.com");
+    expect(sheet?.textContent).toContain("admin@dopbase.com");
 
     sheet
       ?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
@@ -141,7 +141,7 @@ describe("DashboardLayout", () => {
     const button = aside?.querySelector<HTMLButtonElement>(
       '[data-testid="account-menu-button"]',
     );
-    expect(button?.textContent).toContain("admin@example.com");
+    expect(button?.textContent).toContain("admin@dopbase.com");
     expect(aside?.querySelector('[data-testid="account-menu"]')).toBeNull();
 
     button?.click();

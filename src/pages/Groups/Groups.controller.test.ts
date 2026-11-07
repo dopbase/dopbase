@@ -33,10 +33,10 @@ vi.mock("~/services/users.api");
 
 const backend = groupSummaryFixture({
   members: [
-    { id: "usr_maya", email: "maya@example.com" },
-    { id: "usr_reader", email: "reader@example.com" },
-    { id: "usr_sam", email: "sam@example.com" },
-    { id: "usr_kai", email: "kai@example.com" },
+    { id: "usr_maya", email: "maya@dopbase.com" },
+    { id: "usr_reader", email: "reader@dopbase.com" },
+    { id: "usr_sam", email: "sam@dopbase.com" },
+    { id: "usr_kai", email: "kai@dopbase.com" },
   ],
   memberCount: 4,
   grants: [
@@ -61,14 +61,14 @@ describe("group rows", () => {
   it("stacks three avatars and counts the rest", () => {
     const row = toGroupRow(backend);
     expect(row.preview.map((member) => member.email)).toEqual([
-      "maya@example.com",
-      "reader@example.com",
-      "sam@example.com",
+      "maya@dopbase.com",
+      "reader@dopbase.com",
+      "sam@dopbase.com",
     ]);
     expect(row.more).toBe(1);
     expect(row.memberLabel).toBe("4 members");
     expect(row.reach).toEqual(["payments"]);
-    expect(row.createdBy).toBe("lead@example.com");
+    expect(row.createdBy).toBe("lead@dopbase.com");
   });
 
   it("shows an empty group with no access and a deleted creator", () => {

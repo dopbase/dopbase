@@ -102,7 +102,7 @@ describe("useAgentController", () => {
     expect(controller.agent.value).toEqual(reviewBot);
     expect(controller.access.value).toEqual(botAccess);
     expect(controller.role.value?.id).toBe("rol_ai_agent");
-    expect(controller.ownerEmail.value).toBe("maya@example.com");
+    expect(controller.ownerEmail.value).toBe("maya@dopbase.com");
     expect(controller.people.value.map((person) => person.id)).toEqual([
       "usr_maya",
       "usr_lead",
@@ -253,10 +253,10 @@ describe("useAgentController", () => {
     const controller = await mountAgent();
 
     expect(controller.subtitle.value).toBe(
-      "Owned by maya@example.com · reaches at most Read",
+      "Owned by maya@dopbase.com · reaches at most Read",
     );
     expect(controller.accessSummary.value).toBe(
-      "review-bot reaches at most Read, and never more than maya@example.com does.",
+      "review-bot reaches at most Read, and never more than maya@dopbase.com does.",
     );
   });
 
@@ -449,7 +449,7 @@ describe("useAgentController", () => {
     await controller.transferred();
 
     expect(controller.transferOpen.value).toBe(false);
-    expect(controller.ownerEmail.value).toBe("lead@example.com");
+    expect(controller.ownerEmail.value).toBe("lead@dopbase.com");
   });
 
   it("goes back to the agents list after deleting the agent", async () => {

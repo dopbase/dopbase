@@ -22,7 +22,7 @@ describe("shared validation", () => {
   });
 
   it("accepts bounded email addresses and trims input", () => {
-    expect(isValidEmail(" admin@example.com ")).toBe(true);
+    expect(isValidEmail(" admin@dopbase.com ")).toBe(true);
     expect(isValidEmail("admin@example")).toBe(false);
   });
 

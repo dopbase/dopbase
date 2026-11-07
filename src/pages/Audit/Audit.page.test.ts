@@ -8,7 +8,7 @@ const { controller } = await vi.hoisted(async () => {
     id: "aud_1",
     actorType: "personal_token",
     actorId: "usr_maya",
-    actorLabel: "maya@example.com",
+    actorLabel: "maya@dopbase.com",
     action: "secret.revealed",
     projectId: "prj_1",
     environmentId: "env_1",
@@ -37,7 +37,7 @@ const { controller } = await vi.hoisted(async () => {
         actor: "usr_maya",
       }),
       actionOptions: ref([]),
-      actorOptions: ref([{ value: "usr_maya", label: "maya@example.com" }]),
+      actorOptions: ref([{ value: "usr_maya", label: "maya@dopbase.com" }]),
       whereOptions: ref([]),
       whereValue: ref(null),
       where: () => "payments/prod",
@@ -109,7 +109,7 @@ describe("AuditPage", () => {
 
     expect(row?.textContent).toContain("2m ago");
     expect(row?.textContent).toContain("secret.revealed");
-    expect(row?.textContent).toContain("maya@example.com");
+    expect(row?.textContent).toContain("maya@dopbase.com");
     expect(row?.textContent).toContain("via personal token");
     expect(row?.textContent).toContain("payments/prod");
   });
@@ -119,7 +119,7 @@ describe("AuditPage", () => {
     const chip = host.querySelector("[data-testid='filter-chip']");
 
     expect(chip?.textContent).toContain("Actor:");
-    expect(chip?.textContent).toContain("maya@example.com");
+    expect(chip?.textContent).toContain("maya@dopbase.com");
   });
 
   it("opens the event in a drawer with its details and the chain line", async () => {

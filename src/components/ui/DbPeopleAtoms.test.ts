@@ -43,7 +43,7 @@ afterEach(() => {
 
 describe("DbAvatar", () => {
   it("shows the first letter of an email in capitals", async () => {
-    const host = await mount(() => h(DbAvatar, { name: "maya@example.com" }));
+    const host = await mount(() => h(DbAvatar, { name: "maya@dopbase.com" }));
     expect(host.textContent?.trim()).toBe("M");
     expect(host.firstElementChild?.getAttribute("aria-hidden")).toBe("true");
   });
@@ -55,7 +55,7 @@ describe("DbAvatar", () => {
 
   it("dims a disabled account", async () => {
     const host = await mount(() =>
-      h(DbAvatar, { name: "sam@example.com", muted: true, size: "sm" }),
+      h(DbAvatar, { name: "sam@dopbase.com", muted: true, size: "sm" }),
     );
     expect(host.firstElementChild?.className).toContain("opacity-50");
     expect(host.firstElementChild?.className).toContain("h-6");

@@ -179,7 +179,7 @@ export function useUserDialog(
     }
   }
 
-  /** "sam@example.com reaches no project until someone gives them access." */
+  /** "sam@dopbase.com reaches no project until someone gives them access." */
   const note = computed(() => {
     if (passwordOnly.value) return "";
     if (editing.value) {

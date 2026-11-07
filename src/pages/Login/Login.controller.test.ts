@@ -248,7 +248,7 @@ describe("useLoginController", () => {
     });
     const c = login();
     await settle();
-    c.email.value = "dev@example.com";
+    c.email.value = "dev@dopbase.com";
     c.password.value = "correct-horse-789";
     await c.submit();
     expect(c.formError.value).toContain("Sign in with Keycloak");

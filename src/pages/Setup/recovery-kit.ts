@@ -21,9 +21,9 @@ export function maskKey(hex: string): string {
 }
 
 export interface RecoveryKitDetails {
-  /** `secrets.acme.dev` */
+  /** `secrets.dopbase.com` */
   host: string;
-  /** `https://secrets.acme.dev` */
+  /** `https://secrets.dopbase.com` */
   origin: string;
   /** Root's email. */
   email: string;
@@ -57,7 +57,7 @@ export function recoveryKitText(kit: RecoveryKitDetails): string {
   ].join("\n");
 }
 
-/** File name for the kit: `dopbase-recovery-kit-secrets.acme.dev.txt`. */
+/** File name for the kit: `dopbase-recovery-kit-secrets.dopbase.com.txt`. */
 export function recoveryKitFileName(host: string): string {
   const safe = host.replace(/[^a-z0-9.-]/gi, "-") || "server";
   return `dopbase-recovery-kit-${safe}.txt`;

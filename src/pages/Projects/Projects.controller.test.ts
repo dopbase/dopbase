@@ -29,7 +29,7 @@ vi.mock("~/stores/auth.store", () => ({
     get isRoot() {
       return viewer.isRoot;
     },
-    session: { email: "root@example.com" },
+    session: { email: "root@dopbase.com" },
   }),
 }));
 
@@ -229,7 +229,7 @@ describe("useProjectsController", () => {
     const c = await loaded();
 
     expect(c.showSetupChecklist.value).toBe(true);
-    expect(c.accountEmail.value).toBe("root@example.com");
+    expect(c.accountEmail.value).toBe("root@dopbase.com");
     await vi.waitFor(() => expect(c.signInMethods.value).toEqual(methods));
   });
 

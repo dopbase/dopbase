@@ -26,7 +26,7 @@ function version(
     changeType: "updated",
     sourceVersion: null,
     actorType: "admin",
-    actorLabel: "admin@example.com",
+    actorLabel: "admin@dopbase.com",
     createdAt: "2026-10-20T00:00:00Z",
     current: false,
     restorable: true,

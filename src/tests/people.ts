@@ -22,7 +22,7 @@ const AT = "2026-10-01T00:00:00Z";
 export function userFixture(overrides: Partial<User> = {}): User {
   const user: Omit<User, "countsTowardLimit"> & Partial<User> = {
     id: "usr_maya",
-    email: "maya@example.com",
+    email: "maya@dopbase.com",
     role: "member",
     roleId: "rol_member",
     roleName: "Member",
@@ -48,14 +48,14 @@ export function userFixture(overrides: Partial<User> = {}): User {
 
 export const root = userFixture({
   id: "usr_root",
-  email: "root@example.com",
+  email: "root@dopbase.com",
   role: "root",
   roleId: null,
   roleName: "Root",
 });
 export const lead = userFixture({
   id: "usr_lead",
-  email: "lead@example.com",
+  email: "lead@dopbase.com",
   role: "admin",
   roleId: "rol_admin",
   roleName: "Admin",
@@ -63,7 +63,7 @@ export const lead = userFixture({
 export const maya = userFixture();
 export const reader = userFixture({
   id: "usr_reader",
-  email: "reader@example.com",
+  email: "reader@dopbase.com",
   roleId: "rol_viewer",
   roleName: "Viewer",
 });
@@ -139,7 +139,7 @@ export function grantFixture(overrides: Partial<Grant> = {}): Grant {
     id: "grt_pay",
     principalType: "user",
     principalId: "usr_maya",
-    principalLabel: "maya@example.com",
+    principalLabel: "maya@dopbase.com",
     principalAgent: false,
     scopeType: "project",
     scopeId: "prj_pay",
@@ -155,7 +155,7 @@ export function grantFixture(overrides: Partial<Grant> = {}): Grant {
 export function accessFixture(overrides: Partial<UserAccess> = {}): UserAccess {
   return {
     userId: "usr_maya",
-    email: "maya@example.com",
+    email: "maya@dopbase.com",
     roleName: "Member",
     maxLevel: "project_manager",
     groups: [],
@@ -172,7 +172,7 @@ export function groupSummaryFixture(
     name: "Backend",
     description: "Payments service team",
     memberCount: 0,
-    createdBy: { id: "usr_lead", email: "lead@example.com" },
+    createdBy: { id: "usr_lead", email: "lead@dopbase.com" },
     createdAt: AT,
     updatedAt: AT,
     members: [],
@@ -186,9 +186,9 @@ export function memberFixture(
 ): GroupMember {
   return {
     id: "usr_maya",
-    email: "maya@example.com",
+    email: "maya@dopbase.com",
     addedAt: "2026-10-20T09:00:00Z",
-    addedBy: { id: "usr_lead", email: "lead@example.com" },
+    addedBy: { id: "usr_lead", email: "lead@dopbase.com" },
     ...overrides,
   };
 }
@@ -240,7 +240,7 @@ export function signInAs(
 ): void {
   useAuthStore().session = {
     adminId,
-    email: `${adminId}@example.com`,
+    email: `${adminId}@dopbase.com`,
     sessionKind: "browser",
     recentAuthentication: true,
     role,

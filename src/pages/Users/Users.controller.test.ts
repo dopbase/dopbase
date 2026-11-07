@@ -32,13 +32,13 @@ vi.mock("~/services/auth.api");
 
 const ssoUser = userFixture({
   id: "usr_sso",
-  email: "Sam@Example.com",
+  email: "Sam@Dopbase.com",
   hasPassword: false,
   ssoLinked: true,
 });
 const disabled = userFixture({
   id: "usr_gone",
-  email: "gone@example.com",
+  email: "gone@dopbase.com",
   status: "disabled",
 });
 
@@ -322,7 +322,7 @@ describe("useUsersController", () => {
 
     it("combines search, role and status", async () => {
       const c = await mountAs();
-      c.filter.value = "example.com";
+      c.filter.value = "dopbase.com";
       c.roleFilter.value = "Member";
       c.statusFilter.value = "active";
       expect(ids(c.visibleRows.value)).toEqual(["usr_maya", "usr_sso"]);
@@ -343,7 +343,7 @@ describe("useUsersController", () => {
 
     it("sends a new account straight to its Access tab", async () => {
       const c = await mountAs();
-      const sam = userFixture({ id: "usr_sam", email: "sam@example.com" });
+      const sam = userFixture({ id: "usr_sam", email: "sam@dopbase.com" });
 
       c.openAdd();
       await c.saved(sam);

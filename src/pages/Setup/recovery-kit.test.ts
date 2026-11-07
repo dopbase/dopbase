@@ -26,22 +26,22 @@ describe("recovery kit", () => {
 
   it("puts the key, the server and the restore steps in the kit", () => {
     const text = recoveryKitText({
-      host: "secrets.acme.dev",
-      origin: "https://secrets.acme.dev",
-      email: "root@acme.dev",
+      host: "secrets.dopbase.com",
+      origin: "https://secrets.dopbase.com",
+      email: "root@dopbase.com",
       key: "ab".repeat(32),
       createdAt: new Date("2026-10-31T09:00:00Z"),
     });
-    expect(text).toContain("Server: https://secrets.acme.dev");
-    expect(text).toContain("Root account: root@acme.dev");
+    expect(text).toContain("Server: https://secrets.dopbase.com");
+    expect(text).toContain("Root account: root@dopbase.com");
     expect(text).toContain("ab".repeat(32));
     expect(text).toContain("Choose Restore a backup");
     expect(text).toContain("2026-10-31T09:00:00.000Z");
   });
 
   it("names the file after the server, without path characters", () => {
-    expect(recoveryKitFileName("secrets.acme.dev:8443")).toBe(
-      "dopbase-recovery-kit-secrets.acme.dev-8443.txt",
+    expect(recoveryKitFileName("secrets.dopbase.com:8443")).toBe(
+      "dopbase-recovery-kit-secrets.dopbase.com-8443.txt",
     );
     expect(recoveryKitFileName("")).toBe("dopbase-recovery-kit-server.txt");
   });

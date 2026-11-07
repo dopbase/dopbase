@@ -33,7 +33,7 @@ describe("useAccountActions", () => {
 
     expect(actions.pending.value).toEqual({ kind: "disable", user: maya });
     expect(actions.copy.value).toMatchObject({
-      title: "Disable maya@example.com?",
+      title: "Disable maya@dopbase.com?",
       confirmLabel: "Disable account",
       tone: "danger",
       confirmWord: undefined,
@@ -66,7 +66,7 @@ describe("useAccountActions", () => {
 
     actions.ask("enable", disabled);
     expect(actions.copy.value).toMatchObject({
-      title: "Turn maya@example.com back on?",
+      title: "Turn maya@dopbase.com back on?",
       confirmLabel: "Turn back on",
       tone: "primary",
     });
@@ -82,7 +82,7 @@ describe("useAccountActions", () => {
 
     actions.ask("unlink", userFixture({ ssoLinked: true, hasPassword: false }));
     expect(actions.copy.value?.title).toBe(
-      "Unlink single sign-on for maya@example.com?",
+      "Unlink single sign-on for maya@dopbase.com?",
     );
     expect(actions.copy.value?.description).toContain("can't sign in");
 
@@ -105,10 +105,10 @@ describe("useAccountActions", () => {
 
     actions.ask("delete", maya);
     expect(actions.copy.value).toMatchObject({
-      title: "Delete maya@example.com?",
+      title: "Delete maya@dopbase.com?",
       confirmLabel: "Delete account",
       tone: "danger",
-      confirmWord: "maya@example.com",
+      confirmWord: "maya@dopbase.com",
     });
     expect(actions.copy.value?.description).toContain("can't be undone");
 
