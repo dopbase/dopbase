@@ -84,8 +84,12 @@ pub mod auth {
   pub const SSO_LINK: &str = api_path!("/auth/sso/link");
   pub const SSO_IDENTITY: &str = api_path!("/auth/sso/identity");
   pub const SSO_REAUTH: &str = api_path!("/auth/sso/reauth");
+  pub const LAUNCH: &str = api_path!("/auth/launch");
   /// Admin UI page where a user approves a browser CLI login.
   pub const CLI_APPROVE_PAGE: &str = "/cli/approve";
+  /// Admin UI page that trades a `dopbase admin passcode` passcode for a
+  /// browser session.
+  pub const LAUNCH_PAGE: &str = "/launch";
 }
 
 pub mod projects {

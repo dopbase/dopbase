@@ -1,4 +1,4 @@
-use super::{device, error::AuthError, model::*, service};
+use super::{device, error::AuthError, launch as launch_service, model::*, service};
 use crate::{
   extractors::{OptionalIdentity, require_mutation},
   http::{HttpResponse, HttpResponseFormat},
@@ -40,6 +40,39 @@ pub async fn login(
     );
   }
   Ok(response)
+}
+
+/// Sign in with a launch passcode
+///
+/// Trade a passcode from `dopbase admin passcode` for a browser session.
+/// The response matches password login: a session cookie and a CSRF token.
+/// A passcode works once. Wrong, expired, used, and unknown passcodes all get
+/// the same reply, and each failure removes expired passcodes. A browser
+/// session the request already carries is ended. No authentication required;
+/// the passcode is the proof.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::auth::LAUNCH,
+  tag = "authentication",
+  request_body = LaunchRequest,
+  responses(
+    (status = 200, description = "Session started", body = inline(HttpResponseFormat<LoginResponse>)),
+    (status = 401, description = "The passcode is wrong, expired, used, or unknown", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many tries for this email", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn launch(
+  State(state): State<AppState>,
+  OptionalIdentity(identity): OptionalIdentity,
+  axum::Json(request): axum::Json<LaunchRequest>,
+) -> Result<HttpResponse<LoginResponse>, AuthError> {
+  let result = launch_service::launch(&state, identity.as_ref(), request).await?;
+  Ok(
+    HttpResponse::ok(result.response, "LOGIN_SUCCEEDED").with_header(
+      HeaderName::from_static("set-cookie"),
+      session_cookie(&state, &result.cookie_token)?,
+    ),
+  )
 }
 
 /// The browser session cookie. Every way of signing in to the Admin UI

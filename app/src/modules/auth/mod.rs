@@ -7,12 +7,17 @@ pub mod controller;
 mod device;
 pub mod doc;
 pub mod error;
+mod launch;
 pub mod model;
 mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
   Router::new()
     .route(crate::constants::api::auth::LOGIN, post(controller::login))
+    .route(
+      crate::constants::api::auth::LAUNCH,
+      post(controller::launch),
+    )
     .route(
       crate::constants::api::auth::LOGOUT,
       post(controller::logout),

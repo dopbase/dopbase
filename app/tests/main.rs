@@ -1458,6 +1458,8 @@ async fn disabled_web_ui_blocks_pages_and_assets_but_keeps_cli_api_and_optional_
 mod audit_scope;
 #[path = "modules/auth/cli_device.rs"]
 mod auth_cli_device;
+#[path = "modules/auth/launch.rs"]
+mod auth_launch;
 #[path = "modules/grants/access.rs"]
 mod grants_access;
 #[path = "modules/groups/members.rs"]
