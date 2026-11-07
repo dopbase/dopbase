@@ -21,11 +21,170 @@ pub(crate) async fn execute(
       config,
       master_key_file,
     } => reset_password(email, data_dir, config, master_key_file).await?,
+    AdminCommand::Passcode { email, ttl, config } => {
+      issue_passcode(email, ttl, data_dir, config, json_output).await?
+    }
     AdminCommand::FactoryReset { config, no_backup } => {
       factory_reset_offline(data_dir, config, no_backup, json_output).await?
     }
   }
   Ok(0)
+}
+
+struct IssuedPasscode {
+  email: String,
+  passcode: String,
+  expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Mint a launch passcode for a running server. The CLI never talks to the
+/// server: it writes the hashed passcode into the server's database, so only
+/// someone who can write the data directory can sign anyone in this way.
+async fn issue_passcode(
+  email: String,
+  ttl: i64,
+  data_dir: Option<PathBuf>,
+  config: Option<PathBuf>,
+  json_output: bool,
+) -> Result<()> {
+  let config = ServerConfig::load(&ServerOverrides {
+    data_dir,
+    config_path: config,
+    ..Default::default()
+  })?;
+  if !config.web_ui_enabled {
+    bail!(
+      "the Admin UI is turned off on this server (web_ui = false), so there is nothing to sign in to"
+    );
+  }
+  database_path(&config.database_url)?;
+  // The server holds the instance lock while it runs. A passcode only
+  // lives for seconds, so minting one while nothing can read it is
+  // pointless. This command never takes the lock itself.
+  if !crate::server::InstanceLock::is_held(&config.database_url)? {
+    bail!(
+      "the Dopbase server isn't running for this instance. Start it, then run this command again"
+    );
+  }
+  let db = crate::services::db::DbClient::connect(&config.database_url).await?;
+  let issued = mint_launch_passcode(&db, &config, email.trim(), ttl).await;
+  db.close().await;
+  let issued = issued?;
+
+  let url = format!(
+    "{}{}#identity={}&passcode={}",
+    config.public_url.trim_end_matches('/'),
+    crate::constants::api::auth::LAUNCH_PAGE,
+    url::form_urlencoded::byte_serialize(issued.email.as_bytes()).collect::<String>(),
+    issued.passcode,
+  );
+  if json_output {
+    output::print_value(
+      true,
+      &json!({
+        "email": issued.email,
+        "passcode": issued.passcode,
+        "expiresAt": issued.expires_at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "ttlSeconds": ttl,
+        "url": url,
+      }),
+    );
+    return Ok(());
+  }
+  output::print_success(&format!("Launch passcode for {}", issued.email));
+  output::print_text("");
+  output::print_fields(&[
+    ("Passcode:", issued.passcode),
+    (
+      "Expires:",
+      format!(
+        "in {ttl} seconds ({} UTC)",
+        issued.expires_at.format("%H:%M:%S")
+      ),
+    ),
+    ("Open:", url),
+  ]);
+  output::print_text("");
+  output::print_text("It works once. Running this command again replaces it.");
+  Ok(())
+}
+
+async fn mint_launch_passcode(
+  db: &crate::services::db::DbClient,
+  config: &ServerConfig,
+  email: &str,
+  ttl: i64,
+) -> Result<IssuedPasscode> {
+  use crate::services::{
+    authx::{self, Capability, SignIn},
+    passcodes::{self, PasscodePurpose},
+  };
+
+  let has_table: Option<i64> =
+    sqlx::query_scalar("SELECT 1 FROM sqlite_master WHERE type='table' AND name='passcodes'")
+      .fetch_optional(db.pool())
+      .await?;
+  if has_table.is_none() {
+    bail!(
+      "the running server is older than this command. Restart the server on this version first"
+    );
+  }
+  let account: Option<(String, String)> =
+    sqlx::query_as("SELECT id,email FROM admins WHERE email=? COLLATE NOCASE")
+      .bind(email)
+      .fetch_optional(db.pool())
+      .await?;
+  let (admin_id, email) = account.context("no account exists with that email")?;
+  let mut connection = db.pool().acquire().await?;
+  let access = authx::load_access(&mut connection, &admin_id, &config.features)
+    .await?
+    .with_context(|| format!("{email} is turned off, so it can't sign in"))?;
+  drop(connection);
+  if access.sign_in == SignIn::TokenOnly {
+    bail!("{email} signs in with tokens only, so it can't use a passcode");
+  }
+  if !access.has(Capability::PasswordBreakglass)
+    && crate::modules::sso::service::policy_for(db.pool(), &config.features)
+      .await?
+      .require_sso
+  {
+    bail!("single sign-on is required on this instance, so only root can sign in with a passcode");
+  }
+
+  let code = crate::utils::passcode::generate()
+    .map_err(|_| anyhow::anyhow!("could not generate a passcode"))?;
+  let hostname = crate::cli::client::local_hostname();
+  let now = chrono::Utc::now();
+  let mut tx = db.pool().begin().await?;
+  let expires_at = passcodes::issue(
+    &mut tx,
+    PasscodePurpose::Launch,
+    &admin_id,
+    &code,
+    chrono::Duration::seconds(ttl),
+    hostname.as_deref(),
+    now,
+  )
+  .await?;
+  crate::modules::common::audit(
+    &mut tx,
+    "system",
+    None,
+    Some("server-cli"),
+    "passcode.issued",
+    None,
+    None,
+    Some("admin"),
+    Some(&admin_id),
+    json!({"purpose":PasscodePurpose::Launch.as_str(),"email":email,"ttlSeconds":ttl,"host":hostname}),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(IssuedPasscode {
+    email,
+    passcode: crate::utils::passcode::display(&code),
+    expires_at,
+  })
 }
 
 const FACTORY_RESET_CONFIRMATION: &str = "please-wipe-out-system";

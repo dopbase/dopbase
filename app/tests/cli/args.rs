@@ -31,6 +31,26 @@ fn factory_reset_parses_no_backup() {
 }
 
 #[test]
+fn passcode_ttl_defaults_to_a_minute_and_stays_in_range() {
+  let ttl = |arguments: &[&str]| {
+    let mut all = vec!["dopbase", "admin", "passcode", "root@example.com"];
+    all.extend_from_slice(arguments);
+    Cli::try_parse_from(all).map(|cli| match cli.command {
+      Command::Admin {
+        command: AdminCommand::Passcode { ttl, .. },
+      } => ttl,
+      other => panic!("expected passcode command, got {other:?}"),
+    })
+  };
+  assert_eq!(ttl(&[]).unwrap(), 60);
+  assert_eq!(ttl(&["--ttl", "15"]).unwrap(), 15);
+  assert_eq!(ttl(&["--ttl", "600"]).unwrap(), 600);
+  for refused in ["14", "601", "0", "-5", "soon"] {
+    assert!(ttl(&["--ttl", refused]).is_err(), "{refused}");
+  }
+}
+
+#[test]
 fn run_rejects_token_flags_before_the_child_separator() {
   for flag in ["-t", "--token"] {
     assert!(
@@ -1061,6 +1081,7 @@ fn other_incomplete_commands_show_full_help() {
     &["dopbase", "run"],
     &["dopbase", "run", "--"],
     &["dopbase", "admin", "reset-password"],
+    &["dopbase", "admin", "passcode"],
     &["dopbase", "restore"],
   ];
 
@@ -1245,6 +1266,7 @@ fn parses_each_public_command_and_detects_missing_cases() {
     &["dopbase", "cache", "list"],
     &["dopbase", "cache", "clean"],
     &["dopbase", "admin", "reset-password", "admin@example.com"],
+    &["dopbase", "admin", "passcode", "root@example.com"],
     &["dopbase", "admin", "factory-reset"],
     &["dopbase", "update"],
     &["dopbase", "backup"],

@@ -132,6 +132,21 @@ curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/admin \
   >"${runtime_root}/claim.json"
 curl --fail --silent http://127.0.0.1:18376/api/v1/bootstrap/status | grep --quiet '"state":"ready"'
 
+# A launch passcode minted on the server signs the account in exactly once.
+"${binary}" --data-dir "${data_dir}" --json admin passcode smoke@example.com >"${runtime_root}/passcode.json"
+passcode="$(sed -n 's/.*"passcode": "\([A-Z-]*\)".*/\1/p' "${runtime_root}/passcode.json")"
+test -n "${passcode}"
+grep --quiet "/launch#identity=smoke%40example.com&passcode=${passcode}" "${runtime_root}/passcode.json"
+curl --fail --silent --include http://127.0.0.1:18376/api/v1/auth/launch \
+  --header 'Content-Type: application/json' \
+  --data "{\"identity\":\"smoke@example.com\",\"passcode\":\"${passcode}\"}" \
+  | grep --quiet --ignore-case '^set-cookie: dopbase_session='
+replay_status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18376/api/v1/auth/launch \
+  --header 'Content-Type: application/json' \
+  --data "{\"identity\":\"smoke@example.com\",\"passcode\":\"${passcode}\"}")"
+test "${replay_status}" = 401
+curl --fail --silent http://127.0.0.1:18376/launch | grep --quiet '<div id="app"></div>'
+
 kill -TERM "${server_pid}"
 wait "${server_pid}"
 server_pid=""

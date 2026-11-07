@@ -285,3 +285,244 @@ async fn factory_reset_command_requires_a_stopped_instance_and_root_confirmation
     }
   }
 }
+
+#[cfg(unix)]
+mod passcode {
+  use super::super::support::{EMAIL, Fixture, command, failure, output, success};
+  use serde_json::{Value, json};
+
+  /// Runs `dopbase admin passcode` against the fixture's data directory,
+  /// the way an operator on the server machine would.
+  async fn run(
+    fixture: &Fixture,
+    arguments: &[&str],
+    env: &[(&str, &str)],
+  ) -> std::process::Output {
+    let mut cmd = command(&fixture.data_dir);
+    cmd.args(["admin", "passcode"]).args(arguments);
+    for (name, value) in env {
+      cmd.env(name, value);
+    }
+    output(cmd, None).await
+  }
+
+  /// The fixture serves in-process and does not take the instance lock, so
+  /// take it here to look like a running server.
+  fn running(fixture: &Fixture) -> Option<app::server::InstanceLock> {
+    app::server::InstanceLock::acquire(&app::config::sqlite_url(
+      &fixture.data_dir.join("dopbase.db"),
+    ))
+    .unwrap()
+  }
+
+  async fn launch(
+    fixture: &Fixture,
+    identity: &str,
+    passcode: &str,
+  ) -> reqwest::Response {
+    reqwest::Client::new()
+      .post(format!("{}/api/v1/auth/launch", fixture.url))
+      .json(&json!({"identity":identity,"passcode":passcode}))
+      .send()
+      .await
+      .unwrap()
+  }
+
+  async fn rows(fixture: &Fixture) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM passcodes")
+      .fetch_one(fixture.state.db.pool())
+      .await
+      .unwrap()
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn a_printed_passcode_signs_the_account_in_once() {
+    let fixture = Fixture::new().await;
+    let _lock = running(&fixture);
+    let issued: Value = run_json(&fixture, &[EMAIL.to_uppercase().as_str()]).await;
+    assert_eq!(issued["email"], EMAIL);
+    assert_eq!(issued["ttlSeconds"], 60);
+    let passcode = issued["passcode"].as_str().unwrap();
+    assert!(
+      app::utils::passcode::normalize(passcode).is_some() && passcode.as_bytes()[4] == b'-',
+      "{passcode}"
+    );
+    let url = issued["url"].as_str().unwrap();
+    assert!(
+      url.ends_with(&format!(
+        "/launch#identity=admin%40example.com&passcode={passcode}"
+      )),
+      "{url}"
+    );
+    let expires_at = chrono::DateTime::parse_from_rfc3339(issued["expiresAt"].as_str().unwrap())
+      .unwrap()
+      .with_timezone(&chrono::Utc);
+    let left = (expires_at - chrono::Utc::now()).num_seconds();
+    assert!((50..=60).contains(&left), "{left}");
+
+    let response = launch(&fixture, EMAIL, passcode).await;
+    assert_eq!(response.status(), 200);
+    assert!(
+      response
+        .headers()
+        .get("set-cookie")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with("dopbase_session=")
+    );
+    assert_eq!(launch(&fixture, EMAIL, passcode).await.status(), 401);
+
+    let issued_events: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM audit_events WHERE action='passcode.issued' AND actor_label='server-cli'",
+    )
+    .fetch_one(fixture.state.db.pool())
+    .await
+    .unwrap();
+    assert_eq!(issued_events, 1);
+    let report = app::services::audit_chain::verify(fixture.state.db.pool())
+      .await
+      .unwrap();
+    assert!(report.ok, "chain broke: {:?}", report.broken);
+  }
+
+  async fn run_json(
+    fixture: &Fixture,
+    arguments: &[&str],
+  ) -> Value {
+    let mut cmd = command(&fixture.data_dir);
+    cmd.args(["--json", "admin", "passcode"]).args(arguments);
+    success(&output(cmd, None).await)
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn human_output_shows_the_code_expiry_and_link() {
+    let fixture = Fixture::new().await;
+    let _lock = running(&fixture);
+    let result = run(&fixture, &[EMAIL, "--ttl", "120"], &[]).await;
+    assert!(result.status.success(), "{result:?}");
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(
+      stdout.contains(&format!("Launch passcode for {EMAIL}")),
+      "{stdout}"
+    );
+    assert!(stdout.contains("Passcode:"), "{stdout}");
+    assert!(stdout.contains("in 120 seconds"), "{stdout}");
+    assert!(
+      stdout.contains("/launch#identity=admin%40example.com&passcode="),
+      "{stdout}"
+    );
+    assert!(stdout.contains("It works once."), "{stdout}");
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn running_it_again_replaces_the_code_and_leaves_expired_ones_alone() {
+    let fixture = Fixture::new().await;
+    let _lock = running(&fixture);
+    sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,created_at,updated_at) VALUES('usr_stale','stale@example.com','','member','rol_member',0,'t','t')")
+      .execute(fixture.state.db.pool())
+      .await
+      .unwrap();
+    sqlx::query("INSERT INTO passcodes(id,purpose,admin_id,code_hash,created_at,expires_at) VALUES('psc_stale','launch','usr_stale',x'00','2020-01-01T00:00:00+00:00','2020-01-01T00:01:00+00:00')")
+      .execute(fixture.state.db.pool())
+      .await
+      .unwrap();
+    let first = run_json(&fixture, &[EMAIL]).await;
+    let second = run_json(&fixture, &[EMAIL]).await;
+    assert_ne!(first["passcode"], second["passcode"]);
+    assert_eq!(
+      rows(&fixture).await,
+      2,
+      "one live code plus the untouched stale one"
+    );
+    assert_eq!(
+      launch(&fixture, EMAIL, first["passcode"].as_str().unwrap())
+        .await
+        .status(),
+      401
+    );
+    assert_eq!(
+      launch(&fixture, EMAIL, second["passcode"].as_str().unwrap())
+        .await
+        .status(),
+      200
+    );
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn it_needs_a_running_server_with_the_admin_ui() {
+    let fixture = Fixture::new().await;
+    failure(&run(&fixture, &[EMAIL], &[]).await, "isn't running");
+    let _lock = running(&fixture);
+    failure(
+      &run(&fixture, &[EMAIL], &[("DOPBASE_WEB_UI", "false")]).await,
+      "web_ui = false",
+    );
+    assert_eq!(rows(&fixture).await, 0);
+  }
+
+  #[tokio::test(flavor = "multi_thread")]
+  async fn it_refuses_accounts_that_cannot_sign_in() {
+    let fixture = Fixture::new().await;
+    let _lock = running(&fixture);
+    for (id, email, role_id, status) in [
+      ("usr_agent", "agent@example.com", "rol_ai_agent", "active"),
+      ("usr_gone", "gone@example.com", "rol_member", "disabled"),
+      ("usr_member", "member@example.com", "rol_member", "active"),
+    ] {
+      sqlx::query("INSERT INTO admins(id,email,password_hash,role,role_id,is_root,status,created_at,updated_at) VALUES(?,?,'','member',?,0,?,'t','t')")
+        .bind(id)
+        .bind(email)
+        .bind(role_id)
+        .bind(status)
+        .execute(fixture.state.db.pool())
+        .await
+        .unwrap();
+    }
+    failure(
+      &run(&fixture, &["nobody@example.com"], &[]).await,
+      "no account exists",
+    );
+    failure(
+      &run(&fixture, &["agent@example.com"], &[]).await,
+      "tokens only",
+    );
+    failure(
+      &run(&fixture, &["gone@example.com"], &[]).await,
+      "turned off",
+    );
+
+    sqlx::query("INSERT INTO sso_providers(id,preset,display_name,issuer,client_id,client_secret_ciphertext,client_secret_nonce,enabled,require_sso,created_at,updated_at) VALUES('sso_x','generic','Okta','https://idp.example.com','client',x'00',x'00',1,1,'t','t')")
+      .execute(fixture.state.db.pool())
+      .await
+      .unwrap();
+    let sso = [("DOPBASE_SSO", "true")];
+    failure(
+      &run(&fixture, &["member@example.com"], &sso).await,
+      "only root can sign in with a passcode",
+    );
+    assert!(run(&fixture, &[EMAIL], &sso).await.status.success());
+    assert_eq!(rows(&fixture).await, 1, "only root got a code");
+  }
+
+  #[tokio::test]
+  async fn it_only_runs_on_the_server_machine() {
+    use clap::Parser;
+    let remote = app::cli::args::Cli::try_parse_from([
+      "dopbase",
+      "--server",
+      "https://dopbase.example.com",
+      "admin",
+      "passcode",
+      EMAIL,
+    ])
+    .unwrap();
+    assert_eq!(
+      app::cli::commands::execute(remote)
+        .await
+        .unwrap_err()
+        .to_string(),
+      "--server cannot be used with local `dopbase admin` commands"
+    );
+  }
+}

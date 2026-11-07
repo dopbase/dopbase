@@ -804,7 +804,7 @@ fn client_name() -> String {
   format!("dopbase {} on {os}", env!("CARGO_PKG_VERSION"))
 }
 
-fn local_hostname() -> Option<String> {
+pub(crate) fn local_hostname() -> Option<String> {
   #[cfg(unix)]
   {
     nix::unistd::gethostname()
