@@ -22,7 +22,7 @@ instance starts normally without changing its accounts or credentials.
 To create root without opening a browser, supply an email:
 
 ```bash
-DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start
+DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase server start
 ```
 
 Dopbase generates a password, displays it once, and continues serving. Save the
@@ -43,7 +43,7 @@ provisioning, or the web flow with an email prefilled.
 For background startup with a root email:
 
 ```bash
-DOPBASE_ROOT_EMAIL=admin@example.com dopbase --json server start --background
+DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase --json server start --background
 ```
 
 The launching command returns the password once. JSON keeps the normal startup
@@ -54,7 +54,7 @@ fields and adds `setup` only when this start created root:
   "setup": {
     "initialized": true,
     "admin_id": "<root-account-id>",
-    "email": "admin@example.com",
+    "email": "admin@dopbase.com",
     "data_dir": "/srv/dopbase",
     "password": "<generated-password>"
   }

@@ -54,7 +54,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
-Email:           tutorial@example.com
+Email:           tutorial@dopbase.com
 Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```
 
@@ -81,7 +81,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
-Email:           tutorial@example.com
+Email:           tutorial@dopbase.com
 Environment:     env_856343 (default)
 ```
 
@@ -160,7 +160,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
-Email:           tutorial@example.com
+Email:           tutorial@dopbase.com
 Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```
 
@@ -191,7 +191,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
-Email:           tutorial@example.com
+Email:           tutorial@dopbase.com
 Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```
 
@@ -279,7 +279,7 @@ Captured interaction, with redraws removed:
 Dopbase login
 Server: http://localhost:19000
 
-? Email: tutorial@example.com
+? Email: tutorial@dopbase.com
 ? Password: ********
 Logged in to http://localhost:19000.
 ```
@@ -295,7 +295,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  encrypted_session
 Identity:        admin
-Email:           tutorial@example.com
+Email:           tutorial@dopbase.com
 Environment:     none (set with `dopbase env default <ENVIRONMENT_REF>`)
 ```
 

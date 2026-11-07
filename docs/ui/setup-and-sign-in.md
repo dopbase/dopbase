@@ -118,7 +118,7 @@ Someone with access to the server machine can sign any person in without a
 password. On the server, run:
 
 ```bash
-dopbase admin passcode root@example.com
+dopbase admin passcode root@dopbase.com
 ```
 
 It prints a passcode such as `GJZG-FLMT` and a link to `/launch`. Open the

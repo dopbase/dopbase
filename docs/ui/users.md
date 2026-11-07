@@ -98,7 +98,7 @@ explains why grants, groups and tokens don't apply, with a link to
 
 If you can read the whole audit log, **Recent activity** lists root's five
 latest events: when, the action, what it touched (such as
-`maya@example.com · Read`), and the address it came from.
+`maya@dopbase.com · Read`), and the address it came from.
 **See all in Audit log** opens the log filtered to root. A link to one of
 root's old tabs opens this page.
 

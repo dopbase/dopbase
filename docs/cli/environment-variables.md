@@ -14,7 +14,7 @@ precedence over values in `server.toml`.
 | `DOPBASE_TOKEN`                   | `dbs_xxxxxxxxxxxxxxxxx`       | Supplies a client credential before the encrypted credential saved by `dopbase login`. Runner tokens support `run` and scoped exports; personal tokens act for their account within their own scope and level.                   |
 | `DOPBASE_URL`                     | `https://dopbase.example.com` | Selects the server for client commands when the global `--server` option is not set.                                                                                                                                             |
 | `DOPBASE_ENV`                     | `payment-service/production`  | Selects the environment for `dopbase run` when no positional environment is given. An immutable ID such as `env_482731` also works.                                                                                              |
-| `DOPBASE_ROOT_EMAIL`              | `ops@example.com`             | Bootstrap root email for fresh `server start` or CLI setup; generates a password once. Initialized startup ignores it. Explicit `setup --email` overrides it; `setup --web` only prefills the form.                              |
+| `DOPBASE_ROOT_EMAIL`              | `ops@dopbase.com`             | Bootstrap root email for fresh `server start` or CLI setup; generates a password once. Initialized startup ignores it. Explicit `setup --email` overrides it; `setup --web` only prefills the form.                              |
 | `DOPBASE_DATA_DIR`                | `/srv/dopbase`                | Changes the directory used for server data and local CLI configuration. The default is `~/.dopbase`.                                                                                                                             |
 | `DOPBASE_HOST`                    | `0.0.0.0`                     | Sets the network interface used by `dopbase server start`, `dopbase server start --background`, and `dopbase server setup --web`. The default is `127.0.0.1`.                                                                    |
 | `DOPBASE_PORT`                    | `9000`                        | Sets the server port. The default is `8840`.                                                                                                                                                                                     |
@@ -47,7 +47,7 @@ dopbase run -- ./payment-service
 Start a self-hosted server with environment-based configuration:
 
 ```bash
-export DOPBASE_ROOT_EMAIL=ops@example.com
+export DOPBASE_ROOT_EMAIL=ops@dopbase.com
 export DOPBASE_DATA_DIR=/srv/dopbase
 export DOPBASE_HOST=0.0.0.0
 export DOPBASE_PORT=9000

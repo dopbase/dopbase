@@ -401,10 +401,10 @@ them newest first with the change, who made it, when, and a status:
 ```text
 $ dopbase secret history payment-service/production DATABASE_URL
 VERSION   CHANGE                BY                SAVED                  STATUS
-v4        rolled back from v2   ana@example.com   2026-10-23 10:02 UTC   current
-v3        updated               bob@example.com   2026-10-22 18:40 UTC   available
-v2        imported              bob@example.com   2026-10-21 09:15 UTC   available
-v1        created               ana@example.com   2026-09-01 08:00 UTC   available
+v4        rolled back from v2   ana@dopbase.com   2026-10-23 10:02 UTC   current
+v3        updated               bob@dopbase.com   2026-10-22 18:40 UTC   available
+v2        imported              bob@dopbase.com   2026-10-21 09:15 UTC   available
+v1        created               ana@dopbase.com   2026-09-01 08:00 UTC   available
 
 4 version(s)
 ```
@@ -673,7 +673,7 @@ request. `--limit` sets the page size from 1 to 200 (default 50):
 ```bash
 dopbase audit list
 dopbase audit list --project storefront --environment storefront/production
-dopbase audit list --action secret.updated --actor admin@example.com --limit 100
+dopbase audit list --action secret.updated --actor admin@dopbase.com --limit 100
 dopbase --json audit list --cursor <CURSOR>
 ```
 
@@ -947,8 +947,8 @@ Maintenance commands open the server's database directly. They never talk to
 a server over the network:
 
 ```bash
-dopbase admin reset-password admin@example.com
-dopbase admin passcode root@example.com
+dopbase admin reset-password admin@dopbase.com
+dopbase admin passcode root@dopbase.com
 dopbase admin factory-reset
 dopbase admin factory-reset --no-backup
 ```
@@ -958,7 +958,7 @@ They act on the instance in the local data directory (`--data-dir`,
 the server. For a server in a container, run them inside it:
 
 ```bash
-docker exec -it dopbase dopbase admin reset-password admin@example.com
+docker exec -it dopbase dopbase admin reset-password admin@dopbase.com
 ```
 
 Each command prints the data directory it uses. All three refuse when this CLI
@@ -971,7 +971,7 @@ connect to the local instance first, or set `DOPBASE_URL` to it for one run:
 
 ```bash
 dopbase client connect http://localhost:8840
-DOPBASE_URL=http://localhost:8840 dopbase admin reset-password admin@example.com
+DOPBASE_URL=http://localhost:8840 dopbase admin reset-password admin@dopbase.com
 ```
 
 `admin reset-password` sets a new password in the instance's database. It
@@ -993,18 +993,18 @@ in to the Admin UI without a password. Run it on the server machine while the
 server is running, as a user who can write the server's data directory:
 
 ```bash
-dopbase admin passcode root@example.com
-dopbase admin passcode alice@example.com --ttl 120
-dopbase --json admin passcode root@example.com
+dopbase admin passcode root@dopbase.com
+dopbase admin passcode alice@dopbase.com --ttl 120
+dopbase --json admin passcode root@dopbase.com
 ```
 
 ```text
-Launch passcode for root@example.com
+Launch passcode for root@dopbase.com
 
 Instance:  /srv/dopbase
 Passcode:  GJZG-FLMT
 Expires:   in 60 seconds (14:03:27 UTC)
-Open:      https://dopbase.example.com/launch#identity=root%40example.com&passcode=GJZG-FLMT
+Open:      https://dopbase.example.com/launch#identity=root%40dopbase.com&passcode=GJZG-FLMT
 
 It works once. Running this command again replaces it.
 ```

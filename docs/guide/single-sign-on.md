@@ -125,8 +125,8 @@ The Users page decides who can sign in. Dopbase has no sign-up page and sends
 no invitations. An administrator adds each person by email, and only those
 emails get through. Signing in at the provider never creates an account, so
 Dopbase has no setting to limit sign-in by email domain: the list of accounts
-is already narrower than any domain rule. A personal address such as
-`someone@gmail.com` works too, as long as an administrator added it.
+is already narrower than any domain rule. An address outside your company's
+domain also works, as long as an administrator added it.
 
 The provider still decides who can reach the Dopbase sign-in at all. To turn
 away everyone outside your organization before they get to Dopbase, set it up

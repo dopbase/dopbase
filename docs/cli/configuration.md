@@ -181,7 +181,7 @@ Server status:   connected (live)
 Server source:   config
 Authentication:  dopbase login (saved session)
 Role:            Member
-Email:           alex@example.com
+Email:           alex@dopbase.com
 Environment:     env_482731 (default)
 ```
 

@@ -79,7 +79,7 @@ Start a separate Dopbase instance for the trial, so it doesn't touch a real
 one:
 
 ```bash
-DOPBASE_ROOT_EMAIL=root@example.com dopbase server start \
+DOPBASE_ROOT_EMAIL=root@dopbase.com dopbase server start \
   --data-dir ./dopbase-sso-demo \
   --port 7480 \
   --public-url http://localhost:7480
@@ -109,7 +109,7 @@ selected for the rest of the Keycloak steps.
 
 ## 4. Copy the redirect URI from Dopbase
 
-In another tab, open `http://localhost:7480` and sign in as `root@example.com`
+In another tab, open `http://localhost:7480` and sign in as `root@dopbase.com`
 with the password from step 2. Open **Single sign-on** and copy the redirect
 URI under **1. Register Dopbase with your provider**.
 

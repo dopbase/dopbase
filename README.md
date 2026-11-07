@@ -60,7 +60,7 @@ to create root or restore a backup. The server continues running after setup.
 An initialized instance starts normally.
 
 To create root without browser setup, run
-`DOPBASE_ROOT_EMAIL=admin@example.com dopbase server start`. Save the generated
+`DOPBASE_ROOT_EMAIL=admin@dopbase.com dopbase server start`. Save the generated
 password shown once, then sign in. Later starts ignore this bootstrap input and
 preserve credentials. Background startup returns credentials to the launching
 command; Docker or redirected foreground output can retain them in logs.
